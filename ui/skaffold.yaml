@@ -1,0 +1,21 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: driftmower-ui
+
+deploy:
+  kubectl: {}
+  kubeContext: ee-lte-1.codemowers.io
+
+build:
+  artifacts:
+    - image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
+      docker:
+        dockerfile: Dockerfile
+
+manifests:
+  rawYaml:
+    - k8s/deployment.yaml
+    - k8s/service.yaml
+    - k8s/ingress.yaml
+    - k8s/certificate.yaml

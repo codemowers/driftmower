@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driftmower-ui
+  namespace: driftmowers
+spec:
+  selector:
+    matchLabels:
+      app: driftmower-ui
+  template:
+    metadata:
+      labels:
+        app: driftmower-ui
+    spec:
+      imagePullSecrets:
+        - name: rasmus-gitea-registry-secret
+      containers:
+        - name: app
+          image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
+          ports:
+            - containerPort: 80
