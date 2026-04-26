@@ -1,0 +1,32 @@
+const AVG_UPGRADE_TIME = 1
+
+function debtTone(hours: number): string {
+  if (hours < 10)  return "text-status-ok-label"
+  if (hours < 50)  return "text-status-patch-label"
+  if (hours < 100) return "text-status-minor-label"
+  return "text-status-major-label"
+}
+
+type Props = {
+  outdatedWorkloadCount: number
+}
+
+export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) {
+  const hours = outdatedWorkloadCount * AVG_UPGRADE_TIME
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-6">
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Technical Debt Estimate
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
+        </p>
+      </div>
+      <p className={`text-4xl font-semibold tabular-nums ${debtTone(hours)}`}>
+        ~{hours}h
+      </p>
+    </div>
+  )
+}
