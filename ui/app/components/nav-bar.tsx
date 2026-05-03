@@ -41,7 +41,7 @@ function isNavActive(pathname: string, href: string): boolean {
 
 export default function NavBar() {
     const [isExpanded, setIsExpanded] = useState(true)
-    const { isConnected, clusterName } = useClusterState();
+    const { isConnected, clusterName, reportId } = useClusterState();
     const pathname = usePathname()
 
     useEffect(() => {
@@ -100,9 +100,10 @@ export default function NavBar() {
                             const Icon = item.icon
                             const active = isNavActive(pathname, item.href)
 
+                            const href = reportId ? `${item.href}?report=${reportId}` : item.href
                             const link = (
                                 <Link
-                                    href={item.href}
+                                    href={href}
                                     title={isExpanded ? item.name : undefined}
                                     aria-label={item.name}
                                     aria-current={active ? "page" : undefined}

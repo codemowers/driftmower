@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-
-type Issue = { image: string; type: string; message: string }
+import type { Issue } from "@/lib/cluster/reports"
 
 const TYPE_STYLE: Record<string, { bg: string; text: string }> = {
   scraper_failed:  { bg: "bg-status-major-bg", text: "text-status-major-label" },

@@ -10,6 +10,7 @@ import ScraperIssues from "./components/scraper-issues";
 import PageHeader from "../components/page-header";
 import { cn } from "@/lib/utils";
 import { Boxes, ShipWheel } from "lucide-react";
+import type { ImageUsage } from "@/lib/cluster/reports";
 
 function rottennessValueTone(score: number): StatValueTone {
   if (score < 0.15) return "ok"
@@ -27,48 +28,57 @@ const valueToneText: Record<StatValueTone, string> = {
   muted: "text-muted-foreground",
 }
 
+function groupByWorkload(usages: ImageUsage[]): Map<string, ImageUsage[]> {
+  return usages.reduce((map, u) => {
+    if (!u.workloadRootInfo) return map
+    const { kind, name, namespace } = u.workloadRootInfo
+    const key = `${kind}/${namespace}/${name}`
+    const group = map.get(key) ?? []
+    group.push(u)
+    map.set(key, group)
+    return map
+  }, new Map<string, ImageUsage[]>())
+}
+
+const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 2, patch_behind: 1 }
+
 export default function ExecutiveSummaryPage() {
-  const { data } = useClusterState();
+  const { data, reportId } = useClusterState();
   const rottennessScore = data?.rotenness.normalizedScore ?? -1;
   const rottennessTone = rottennessValueTone(rottennessScore)
 
-  const topmostOwnerCount = data ? Object.keys(data.report.workloadGroupMap).length : 0
-  const helmReleaseCount = data
-    ? Object.keys(data.report.releaseGroupMap).filter(k => k.startsWith("helm/")).length
-    : 0
-
   const usages = data?.report.imageUsages ?? []
+
+  const workloadMap = groupByWorkload(usages)
+  const topmostOwnerCount = workloadMap.size
+  const helmReleaseCount = new Set(
+    usages.flatMap(u => u.releaseInfo?.managementKind === "helm" ? [u.releaseInfo.groupKey] : [])
+  ).size
+
   const okCount    = usages.filter(u => u.versionStatus.statusType === "up_to_date").length
   const patchCount = usages.filter(u => u.versionStatus.statusType === "patch_behind").length
   const minorCount = usages.filter(u => u.versionStatus.statusType === "minor_behind").length
   const majorCount = usages.filter(u => u.versionStatus.statusType === "major_behind").length
 
-  const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 2, patch_behind: 1 }
-
-  const topOutdatedWorkloads: OutdatedWorkloadEntry[] = data
-    ? Object.entries(data.rotenness.workloadScores)
-        .filter(([, score]) => score.normalizedScore > 0)
-        .map(([key, score]) => {
-          const workloadUsages = data.report.workloadGroupMap[key] ?? []
-          const status = worstStatus(workloadUsages)
-          const worstUsage = workloadUsages.find(u => u.versionStatus.statusType === status)
-          return {
-            key,
-            kind:        score.workloadRootInfo.kind,
-            name:        score.workloadRootInfo.name,
-            namespace:   score.workloadRootInfo.namespace,
-            currentTag:  worstUsage?.actualTag ?? "—",
-            latestTag:   worstUsage?.versionStatus.latestTag ?? null,
-            statusType:  status,
-            score:       score.normalizedScore,
-          }
-        })
-        .sort((a, b) =>
-          (DRIFT_SEVERITY[b.statusType] ?? 0) - (DRIFT_SEVERITY[a.statusType] ?? 0)
-          || b.score - a.score
-        )
-        .slice(0, 5)
-    : []
+  const topOutdatedWorkloads: OutdatedWorkloadEntry[] = Array.from(workloadMap.entries())
+    .map(([key, workloadUsages]) => {
+      const status = worstStatus(workloadUsages)
+      const worstUsage = workloadUsages.find(u => u.versionStatus.statusType === status)
+      const { kind, name, namespace } = workloadUsages[0].workloadRootInfo!
+      return {
+        key,
+        kind,
+        name,
+        namespace,
+        currentTag: worstUsage?.versionStatus.deployedTag ?? "—",
+        latestTag: worstUsage?.versionStatus.latestTag ?? null,
+        statusType: status,
+        score: DRIFT_SEVERITY[status] ?? 0,
+      }
+    })
+    .filter(e => (DRIFT_SEVERITY[e.statusType] ?? 0) > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -111,7 +121,7 @@ export default function ExecutiveSummaryPage() {
         {/* Section links */}
         <div className="flex w-full flex-wrap gap-5">
           <SectionLinkCard
-            href="/topmost-owners"
+            href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
             title="Topmost Owners"
             count={topmostOwnerCount}
             countEntity="owners"
@@ -119,7 +129,7 @@ export default function ExecutiveSummaryPage() {
             icon={Boxes}
           />
           <SectionLinkCard
-            href="/helm-releases"
+            href={reportId ? `/helm-releases?report=${reportId}` : "/helm-releases"}
             title="Helm Releases"
             count={helmReleaseCount}
             countEntity="releases"
