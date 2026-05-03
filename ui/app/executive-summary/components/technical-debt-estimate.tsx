@@ -20,7 +20,7 @@ export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) 
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Technical Debt Estimate
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-gray-400">
           {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
         </p>
       </div>

@@ -2,24 +2,32 @@ import { RefreshCw } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { refreshState } from "@/lib/cluster/refresh-state"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export default function Refreshbutton() {
-  const { lastRefreshed } = useClusterState()
+  const { lastRefreshed, isFetchingReport } = useClusterState()
 
   return (
-    <div className="flex items-center gap-4">
-      <span className="text-sm text-gray-400">
-        {`Updated ${
-          lastRefreshed != null
-            ? lastRefreshed.toLocaleTimeString(undefined, {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false,
-              })
-            : "—"
-        }`}
-      </span>
+    <div className="flex items-start gap-3">
+      <div className="flex flex-col items-end">
+        <span className="text-sm text-gray-400">
+          {`Updated ${
+            lastRefreshed != null
+              ? lastRefreshed.toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                })
+              : "—"
+          }`}
+        </span>
+        {lastRefreshed != null && (
+          <span className="text-xs text-gray-300">
+            {lastRefreshed.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+          </span>
+        )}
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -28,7 +36,7 @@ export default function Refreshbutton() {
         aria-label="Refresh"
         onClick={() => refreshState()}
       >
-        <RefreshCw className="size-4" aria-hidden />
+        <RefreshCw className={cn("size-4", isFetchingReport && "animate-spin")} aria-hidden />
       </Button>
     </div>
   )

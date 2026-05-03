@@ -14,7 +14,10 @@ export default function PageHeader({ title, subtitle }: Props) {
         <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
       </div>
-      <Refreshbutton />
+      <div className="p-1">
+        <Refreshbutton />
+      </div>
+
     </header>
   )
 }
