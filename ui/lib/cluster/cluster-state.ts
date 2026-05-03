@@ -1,10 +1,13 @@
 import { create } from "zustand"
-import type { AnalyzeClusterProgress, ClusterData } from "./refresh-state"
+import type { AnalyzeClusterProgress } from "./refresh-state"
+import type { Report } from "./reports"
 
 export type ClusterState = {
   clusterName: string | null
-  data: ClusterData | null
+  data: Report | null
+  reportId: string | null
   isLoading: boolean
+  isFetchingReport: boolean
   isConnected: boolean
   error: string | null
   lastRefreshed: Date | null
@@ -15,7 +18,9 @@ export type ClusterState = {
 export const useClusterState = create<ClusterState>(() => ({
   clusterName: null,
   data: null,
+  reportId: null,
   isLoading: false,
+  isFetchingReport: false,
   isConnected: false,
   error: null,
   lastRefreshed: null,

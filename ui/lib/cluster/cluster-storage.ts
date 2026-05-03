@@ -1,11 +1,11 @@
-import type { ClusterData } from "./refresh-state"
+import type { Report } from "./reports"
 import { useClusterState } from "./cluster-state"
 
 const STORAGE_KEY = "cluster-snapshot"
 const STALE_THRESHOLD_MS = 60 * 60 * 1000
 
 type ClusterSnapshot = {
-  data: ClusterData
+  data: Report
   lastRefreshed: string
   clusterName: string | null
 }

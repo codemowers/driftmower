@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import NavBar from "./components/nav-bar";
 import RefreshingOverlay from "./components/refreshing-overlay";
@@ -38,7 +39,7 @@ export default function RootLayout({
       </head>
 
       <body className="flex h-screen min-h-0 flex-col overflow-hidden">
-        <ClusterInit />
+        <Suspense><ClusterInit /></Suspense>
         <RefreshingOverlay />
 
         <TooltipProvider>
