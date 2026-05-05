@@ -20,7 +20,9 @@ const SEVERITY_ORDER: Record<StatusType, number> = {
 
 export default function HelmReleaseDetailPage() {
   const { uid } = useParams<{ uid: string }>()
-  const { data, reportId } = useClusterState()
+  const data = useClusterState(s => s.data)
+  const reportId = useClusterState(s => s.reportId)
+  const explorerResources = useClusterState(s => s.explorerResources)
 
   const score = data
     ? Object.values(data.rotenness.releaseScores).find(s => s.releaseInfo.uid === uid)
@@ -64,7 +66,7 @@ export default function HelmReleaseDetailPage() {
             
             <ChartCard releaseInfo={score.releaseInfo} />
 
-            <ReleaseTabs usages={usages} issues={data!.issues} />
+            <ReleaseTabs usages={usages} issues={data!.issues} explorerResources={explorerResources} releaseInfo={score.releaseInfo} />
           </>
         ) : (
           <p className="text-sm text-muted-foreground">Release not found</p>

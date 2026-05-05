@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import type { ImageUsage, Issue } from "@/lib/cluster/reports"
+import type { ImageUsage, Issue, ReleaseInfo } from "@/lib/cluster/reports"
+import type { ExplorerResource } from "@/lib/cluster/cluster-state"
 import ContainersTab from "./containers-tab"
+import ResourcesTab from "./resources-tab"
 
 const TABS = ["Containers", "Resources", "Values", "Manifest"] as const
 type Tab = typeof TABS[number]
@@ -11,9 +13,11 @@ type Tab = typeof TABS[number]
 type Props = {
   usages: ImageUsage[]
   issues: Issue[]
+  explorerResources: ExplorerResource[] | null
+  releaseInfo: ReleaseInfo
 }
 
-export default function ReleaseTabs({ usages, issues }: Props) {
+export default function ReleaseTabs({ usages, issues, explorerResources, releaseInfo }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -40,7 +44,7 @@ export default function ReleaseTabs({ usages, issues }: Props) {
         <ContainersTab usages={usages} issues={issues} />
       )}
       {active === "Resources" && (
-        <p className="text-sm text-muted-foreground">Resources coming soon</p>
+        <ResourcesTab usages={usages} explorerResources={explorerResources} releaseInfo={releaseInfo} />
       )}
       {active === "Values" && (
         <p className="text-sm text-muted-foreground">Values not available coming soon</p>

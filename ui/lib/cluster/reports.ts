@@ -34,6 +34,8 @@ export type WorkloadScore = {
     kind: string
     name: string
     namespace: string
+    uid: string
+    groupKey: string
   }
 }
 
@@ -61,6 +63,8 @@ export type ImageUsage = {
     kind: string
     name: string
     namespace: string
+    uid: string
+    groupKey: string
   } | null
   releaseInfo: ReleaseInfo | null
 }
