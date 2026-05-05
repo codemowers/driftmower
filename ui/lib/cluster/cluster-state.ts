@@ -2,6 +2,22 @@ import { create } from "zustand"
 import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
 
+export type ExplorerResource = {
+  type: string
+  uid: string
+  kind: string
+  apiGroup: string
+  name: string
+  namespace: string
+  labels?: Record<string, string>
+  ownerUID?: string
+  managerUID?: string
+  ips?: string[]
+  nodeName?: string
+  phase?: string
+  images?: { name: string; normalized: string; digest: string }[]
+}
+
 export type ClusterState = {
   clusterName: string | null
   data: Report | null
@@ -13,6 +29,7 @@ export type ClusterState = {
   lastRefreshed: Date | null
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
+  explorerResources: ExplorerResource[] | null
 }
 
 export const useClusterState = create<ClusterState>(() => ({
@@ -26,4 +43,5 @@ export const useClusterState = create<ClusterState>(() => ({
   lastRefreshed: null,
   socketProgress: null,
   containerCount: null,
+  explorerResources: null,
 }))
