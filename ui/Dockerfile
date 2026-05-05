@@ -6,9 +6,16 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine-slim
+FROM node:22-slim
 
-COPY --from=builder /app/out /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+ENV NODE_ENV=production
+ENV PORT=80
+ENV HOSTNAME=::
 
 EXPOSE 80
+CMD ["node", "server.js"]
