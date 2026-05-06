@@ -96,11 +96,11 @@ export default function ContainersTab({ usages, issues }: Props) {
                       <span className="font-mono text-sm text-foreground">{vs.latestTag ?? "—"}</span>
                       <div>
                         {statusStyle ? (
-                          <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", statusStyle.bg, statusStyle.text)}>
+                          <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", statusStyle.bg, statusStyle.text)}>
                             {statusStyle.label}
                           </span>
                         ) : (
-                          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                          <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-muted-foreground">
                             No data
                           </span>
                         )}

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ArrowLeft, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Refreshbutton from "@/app/components/refresh-button"
+import Refreshbutton from "@/app/components/core/refresh-button"
 import CopyButton from "@/app/components/copy-button"
 import { cn } from "@/lib/utils"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"

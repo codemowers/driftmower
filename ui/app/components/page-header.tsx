@@ -1,6 +1,6 @@
 "use client"
 
-import Refreshbutton from "./refresh-button"
+import Refreshbutton from "./core/refresh-button"
 
 type Props = {
   title: string

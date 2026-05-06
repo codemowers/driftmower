@@ -71,8 +71,8 @@ function ReleaseItem({ entry, reportId }: { entry: ReleaseEntry; reportId: strin
 
       {/* Contents */}
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm text-foreground tabular-nums">{totalContainers} containers</span>
-        <span className="text-xs text-muted-foreground tabular-nums">{totalWorkloadCount} workloads</span>
+        <span className="text-sm text-foreground tabular-nums">{totalContainers} {totalContainers === 1 ? "container" : "containers"}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{totalWorkloadCount} {totalWorkloadCount === 1 ? "workload" : "workloads"}</span>
       </div>
 
       {/* Stale repos */}

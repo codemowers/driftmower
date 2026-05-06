@@ -44,7 +44,7 @@ const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 
 
 export default function ExecutiveSummaryPage() {
   const { data, reportId } = useClusterState();
-  const rottennessScore = data?.rotenness.normalizedScore ?? -1;
+  const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = rottennessValueTone(rottennessScore)
 
   const usages = data?.report.imageUsages ?? []

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import NavBar from "./components/nav-bar";
-import RefreshingOverlay from "./components/refreshing-overlay";
+import NavBar from "./components/core/nav-bar";
+import RefreshingOverlay from "./components/core/refreshing-overlay";
 import ClusterInit from "./components/cluster-init";
 import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected";
 import { TooltipProvider } from "@/components/ui/tooltip";
