@@ -10,6 +10,8 @@ deploy:
 build:
   artifacts:
     - image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
+      platforms:
+        - linux/amd64
       docker:
         dockerfile: Dockerfile
 

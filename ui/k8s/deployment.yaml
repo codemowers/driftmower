@@ -12,6 +12,8 @@ spec:
       labels:
         app: driftmower-ui
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       imagePullSecrets:
         - name: rasmus-gitea-registry-secret
       containers:
