@@ -50,6 +50,8 @@ export type ImageUsage = {
     repository: string
     tag: string
     digest: string
+    repositoryUrl?: string
+    tagUrl?: string
   }
   versionStatus: {
     statusType: StatusType
