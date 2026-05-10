@@ -83,12 +83,12 @@ export default function DescendantsTab({ explorerResources, workloadUid }: Props
             <div
               key={r.uid}
               className={cn(
-                "flex items-center gap-3 px-4 py-2",
+                "flex items-center gap-3 px-4 py-3",
                 idx > 0 && "border-t border-gray-100"
               )}
             >
               {prefix && (
-                <span className="whitespace-pre text-muted-foreground/70">{prefix}</span>
+                <span className="whitespace-pre text-gray-400">{prefix}</span>
               )}
 
               {r.kind === "Pod" && (
