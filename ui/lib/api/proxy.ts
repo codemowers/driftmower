@@ -45,7 +45,7 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
 }
 
 export function backendUrl(): string {
-  return process.env.BACKEND_URL ?? "http://driftmower-be.driftmowers"
+  return process.env.BACKEND_URL ?? "http://driftmower-be.driftmowers:3030"
 }
 
 export function explorerUrl(): string {

@@ -26,7 +26,7 @@ spec:
             # Defaults assume backend and explorer live in the `driftmowers` namespace
             # of the same cluster. Override if your setup differs.
             - name: BACKEND_URL
-              value: "http://driftmower-be.driftmowers"
+              value: "http://driftmower-be.driftmowers:3030"
             - name: EXPLORER_URL
               value: "http://driftmower-explorer.driftmowers"
             # Public ingress URL for the backend, used by the browser for socket.io.
