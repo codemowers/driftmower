@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -10,6 +11,7 @@ import WorkloadFilters from "./workload-filters"
 
 export type WorkloadEntry = {
   groupKey: string
+  uid: string
   kind: string
   name: string
   namespace: string
@@ -37,15 +39,20 @@ function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
 const GRID = "grid-cols-[95px_3fr_2fr_1fr_0.9fr_1fr]"
 
 function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: string | null }) {
-  const { kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
+  const router = useRouter()
+  const { uid, kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
 
   const managerHref = manager.kind === "helm"
     ? (reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
     : null
 
+  const href = reportId
+    ? `/topmost-owners/${uid}?report=${reportId}`
+    : `/topmost-owners/${uid}`
+
   return (
-    <div className={cn("grid items-center gap-4 pl-6 pr-4 py-4", GRID)}>
+    <Link href={href} className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}>
       {/* Kind */}
       <div className="self-start text-right">
         <span className="rounded-md bg-brand-bg px-2.5 py-1 text-xs font-semibold text-brand-label">
@@ -70,10 +77,16 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
       {/* Manager */}
       <div className="min-w-0">
         {managerHref ? (
-          <Link href={managerHref} className="group inline-flex items-center gap-1.5 max-w-full text-sm text-foreground hover:text-brand-text hover:underline">
+          <span
+            role="link"
+            tabIndex={0}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(managerHref) }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); router.push(managerHref) } }}
+            className="group inline-flex items-center gap-1.5 max-w-full text-sm text-foreground hover:text-brand-text hover:underline cursor-pointer"
+          >
             <span className="font-mono truncate">{manager.kind === "helm" ? manager.name : ""}</span>
             <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
-          </Link>
+          </span>
         ) : (
           <span className="font-mono text-sm text-muted-foreground">Standalone</span>
         )}
@@ -103,7 +116,7 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
           </span>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 

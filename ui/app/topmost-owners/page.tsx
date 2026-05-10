@@ -16,7 +16,6 @@ const SEVERITY_ORDER: Record<StatusType, number> = {
   no_version:   -1,
 }
 
-// Sort order for display: Major → Minor → Patch → OK → No data
 const DISPLAY_ORDER: Record<StatusType, number> = {
   major_behind: 0,
   minor_behind: 1,
@@ -32,7 +31,6 @@ const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_beh
 export default function TopmostOwnersPage() {
   const data = useClusterState(s => s.data)
 
-  // Map groupKey → canonical release UID (from releaseScores)
   const releaseUidByGroupKey = new Map<string, string>()
   if (data) {
     for (const score of Object.values(data.rotenness.releaseScores)) {
@@ -47,6 +45,9 @@ export default function TopmostOwnersPage() {
           const parts = key.split("/")
           if (parts.length < 3) return null
           const [kind, namespace, name] = parts
+
+          const uid = usages[0]?.workloadRootInfo?.uid
+          if (!uid) return null
 
           const ri = usages[0]?.releaseInfo
           const releaseUid = ri ? releaseUidByGroupKey.get(ri.groupKey) : undefined
@@ -77,6 +78,7 @@ export default function TopmostOwnersPage() {
 
           return {
             groupKey: key,
+            uid,
             kind,
             name,
             namespace,
