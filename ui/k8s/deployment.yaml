@@ -18,7 +18,7 @@ spec:
         - name: rasmus-gitea-registry-secret
       containers:
         - name: app
-          image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
+          image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0
           ports:
             - containerPort: 80
           env:
