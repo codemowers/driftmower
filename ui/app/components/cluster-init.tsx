@@ -7,6 +7,8 @@ import { fetchLatestReport, fetchReport } from "@/lib/cluster/reports"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { EXPLORER_RESOURCES_URL } from "@/lib/cluster/constants"
 
+const LIVE_DATA_FETCH_INTERVAL = 30000;
+
 export default function ClusterInit() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -22,13 +24,33 @@ export default function ClusterInit() {
       } else {
         await fetchLatestReport()
       }
-      fetch(EXPLORER_RESOURCES_URL)
-        .then(r => r.json())
-        .then(data => useClusterState.setState({ explorerResources: data }))
-        .catch(() => {})
     }
     void init()
   }, [reportParam])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function liveDataFetching() {
+      while (!cancelled) {
+        try {
+          await checkConnection()
+        } catch {}
+
+        try {
+          const res = await fetch(EXPLORER_RESOURCES_URL)
+          const data = await res.json()
+          if (cancelled) return
+          useClusterState.setState({ explorerResources: data })
+        } catch {}
+
+        await new Promise(r => setTimeout(r, LIVE_DATA_FETCH_INTERVAL))
+      }
+    }
+
+    void liveDataFetching()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!reportId) return
