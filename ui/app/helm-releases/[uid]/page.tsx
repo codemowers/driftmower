@@ -63,7 +63,7 @@ export default function HelmReleaseDetailPage() {
               namespace={score.releaseInfo.namespace}
               worstStatus={worstStatus}
             />
-            
+
             <ChartCard releaseInfo={score.releaseInfo} />
 
             <ReleaseTabs usages={usages} issues={data!.issues} explorerResources={explorerResources} releaseInfo={score.releaseInfo} />

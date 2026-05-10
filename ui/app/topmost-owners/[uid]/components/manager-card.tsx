@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Layers, ExternalLink } from "lucide-react"
+import { ShipWheel, ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 
@@ -24,7 +24,7 @@ export default function ManagerCard({ releaseInfo, releaseUid, reportId }: Props
       </p>
       <div className="flex items-center gap-5 rounded-xl border border-gray-200 bg-white px-5 py-5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
-          <Layers className="size-6" strokeWidth={2} />
+          <ShipWheel className="size-6" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

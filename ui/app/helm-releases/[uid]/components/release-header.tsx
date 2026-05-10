@@ -1,8 +1,7 @@
-import Link from "next/link"
-import { ArrowLeft, AlertTriangle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { AlertTriangle, ShipWheel } from "lucide-react"
 import Refreshbutton from "@/app/components/core/refresh-button"
 import CopyButton from "@/app/components/copy-button"
+import Breadcrumbs from "@/app/components/breadcrumbs"
 import { cn } from "@/lib/utils"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"
 
@@ -39,46 +38,52 @@ export default function ReleaseHeader({
 
   return (
     <header className="flex items-start justify-between gap-8">
-      <div className="flex flex-col gap-2">
-        <Button
-          asChild
-          variant="outline"
-          size="icon"
-          className="border-gray-200 bg-white hover:bg-gray-50"
-          aria-label="Back to Helm Releases"
-        >
-          <Link href={backHref}>
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
+      <div className="flex flex-col gap-3">
+        <Breadcrumbs
+          items={[
+            { label: "Helm Releases", href: backHref },
+            { label: releaseInfo.name },
+          ]}
+        />
 
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-            {releaseInfo.name}
-          </h1>
-          <CopyButton value={releaseInfo.name} />
-          <span className="rounded-md bg-brand-bg px-2 py-0.5 text-xs font-semibold text-brand-label">
-            {releaseInfo.managementKind}
-          </span>
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums",
-              scoreStyle ? [scoreStyle.bg, scoreStyle.text] : "bg-gray-100 text-muted-foreground"
-            )}
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-brand-icon"
+            aria-label="Helm release"
           >
-            {worstStatus === "no_data" || worstStatus === "no_version" ? "—" : normalizedScore.toFixed(2)}
-          </span>
-          {issueCount > 0 && (
-            <span className="flex items-center gap-1 rounded-md bg-status-minor-bg px-1.5 py-0.5 text-status-minor-label">
-              <AlertTriangle className="size-3" />
-              <span className="text-xs font-medium tabular-nums">{issueCount}</span>
-            </span>
-          )}
-        </div>
+            <ShipWheel className="size-6" />
+          </div>
 
-        <p className="text-sm text-muted-foreground">
-          {releaseInfo.namespace} · {containers} · {workloads}
-        </p>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
+                {releaseInfo.name}
+              </h1>
+              <CopyButton value={releaseInfo.name} />
+              <span className="rounded-md bg-brand-bg px-2 py-0.5 text-xs font-semibold text-brand-label">
+                {releaseInfo.managementKind}
+              </span>
+              <span
+                className={cn(
+                  "rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums",
+                  scoreStyle ? [scoreStyle.bg, scoreStyle.text] : "bg-gray-100 text-muted-foreground"
+                )}
+              >
+                {worstStatus === "no_data" || worstStatus === "no_version" ? "—" : normalizedScore.toFixed(2)}
+              </span>
+              {issueCount > 0 && (
+                <span className="flex items-center gap-1 rounded-md bg-status-minor-bg px-1.5 py-0.5 text-status-minor-label">
+                  <AlertTriangle className="size-3" />
+                  <span className="text-xs font-medium tabular-nums">{issueCount}</span>
+                </span>
+              )}
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              {releaseInfo.namespace} · {containers} · {workloads}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="p-1">
