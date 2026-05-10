@@ -21,3 +21,15 @@ spec:
           image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
           ports:
             - containerPort: 80
+          env:
+            # In-cluster service URLs used by Next.js server-side proxy routes.
+            # Defaults assume backend and explorer live in the `driftmowers` namespace
+            # of the same cluster. Override if your setup differs.
+            - name: BACKEND_URL
+              value: "http://driftmower-be.driftmowers"
+            - name: EXPLORER_URL
+              value: "http://driftmower-explorer.driftmowers"
+            # Public ingress URL for the backend, used by the browser for socket.io.
+            # Must be set per-cluster — the browser cannot resolve in-cluster DNS.
+            - name: BACKEND_PUBLIC_URL
+              value: "https://driftmower-be.ee-lte-1.codemowers.io"

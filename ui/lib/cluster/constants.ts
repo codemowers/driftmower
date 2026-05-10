@@ -1,7 +1,5 @@
-export const BACKEND_URL = "https://driftmower-be.ee-lte-1.codemowers.io"
-export const ANALYZE_CLUSTER_URL = `${BACKEND_URL}/analyze-cluster`
-export const KUBERNETES_CONTEXTS_URL = `${BACKEND_URL}/kubernetes-contexts`
-export const REPORTS_URL = `${BACKEND_URL}/reports`
-
-export const EXPLORER_URL = "https://driftmower-explorer.ee-lte-1.codemowers.io"
-export const EXPLORER_RESOURCES_URL = `${EXPLORER_URL}/api/resources`
+export const ANALYZE_CLUSTER_URL = "/api/analyze-cluster"
+export const KUBERNETES_CONTEXTS_URL = "/api/kubernetes-contexts"
+export const REPORTS_URL = "/api/reports"
+export const EXPLORER_RESOURCES_URL = "/api/explorer-resources"
+export const CONFIG_URL = "/api/config"

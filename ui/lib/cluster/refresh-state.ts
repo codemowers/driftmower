@@ -1,6 +1,6 @@
-import { io } from "socket.io-client"
+import { io, type Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
-import { BACKEND_URL, ANALYZE_CLUSTER_URL } from "./constants"
+import { ANALYZE_CLUSTER_URL, CONFIG_URL } from "./constants"
 import { fetchLatestReport } from "./reports"
 
 export type { ImageUsage } from "./reports"
@@ -13,6 +13,20 @@ export type AnalyzeClusterProgress = {
   image?: string
 }
 
+let cachedBackendPublicUrl: string | null = null
+
+async function getBackendPublicUrl(): Promise<string> {
+  if (cachedBackendPublicUrl !== null) return cachedBackendPublicUrl
+  const res = await fetch(CONFIG_URL, { cache: "no-store" })
+  if (!res.ok) throw new Error(`Failed to fetch runtime config: ${res.status}`)
+  const { backendPublicUrl } = (await res.json()) as { backendPublicUrl: string }
+  if (!backendPublicUrl) {
+    throw new Error("BACKEND_PUBLIC_URL is not configured on the server")
+  }
+  cachedBackendPublicUrl = backendPublicUrl
+  return backendPublicUrl
+}
+
 export async function refreshState(): Promise<void> {
   useClusterState.setState({
     isLoading: true,
@@ -21,18 +35,20 @@ export async function refreshState(): Promise<void> {
     containerCount: null,
   })
 
-  const socket = io(BACKEND_URL, { transports: ["websocket"] })
-  socket.on("analyze-cluster progress", (data: unknown) => {
-    const progress =
-      data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
-    const update: Partial<ClusterState> = { socketProgress: progress }
-    if (typeof progress?.containerCount === "number") {
-      update.containerCount = progress.containerCount
-    }
-    useClusterState.setState(update)
-  })
-
+  let socket: Socket | null = null
   try {
+    const backendPublicUrl = await getBackendPublicUrl()
+    socket = io(backendPublicUrl, { transports: ["websocket"] })
+    socket.on("analyze-cluster progress", (data: unknown) => {
+      const progress =
+        data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
+      const update: Partial<ClusterState> = { socketProgress: progress }
+      if (typeof progress?.containerCount === "number") {
+        update.containerCount = progress.containerCount
+      }
+      useClusterState.setState(update)
+    })
+
     const res = await fetch(ANALYZE_CLUSTER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,7 +57,7 @@ export async function refreshState(): Promise<void> {
     if (!res.ok) throw new Error(`Failed to fetch cluster data: ${res.status}`)
     useClusterState.setState({ socketProgress: null })
     await fetchLatestReport()
-    useClusterState.setState({ isLoading: false });
+    useClusterState.setState({ isLoading: false })
   } catch (e) {
     useClusterState.setState({
       error: String(e),
@@ -50,6 +66,6 @@ export async function refreshState(): Promise<void> {
       containerCount: null,
     })
   } finally {
-    socket.disconnect()
+    socket?.disconnect()
   }
 }
