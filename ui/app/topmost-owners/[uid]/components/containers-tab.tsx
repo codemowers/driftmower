@@ -1,6 +1,26 @@
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { relativeTimeFromNow } from "@/lib/format-time"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
+
+function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="font-mono text-sm text-foreground">{tag ?? "—"}</span>
+      {builtAt && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <time dateTime={builtAt} className="font-mono text-xs text-muted-foreground">
+              {relativeTimeFromNow(builtAt)}
+            </time>
+          </TooltipTrigger>
+          <TooltipContent>{builtAt}</TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  )
+}
 
 type Props = {
   usages: ImageUsage[]
@@ -63,8 +83,8 @@ export default function ContainersTab({ usages, issues }: Props) {
                 <span className="truncate font-mono text-xs text-muted-foreground">
                   {u.imageInfo.registry}/{u.imageInfo.repository}
                 </span>
-                <span className="font-mono text-sm text-foreground">{vs.deployedTag ?? "—"}</span>
-                <span className="font-mono text-sm text-foreground">{vs.latestTag ?? "—"}</span>
+                <TagCell tag={vs.deployedTag} builtAt={vs.deployedBuiltAt} />
+                <TagCell tag={vs.latestTag}   builtAt={vs.latestBuiltAt} />
                 <div>
                   {statusStyle ? (
                     <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", statusStyle.bg, statusStyle.text)}>
