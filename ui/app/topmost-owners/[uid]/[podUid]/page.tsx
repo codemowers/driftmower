@@ -118,7 +118,13 @@ export default function PodDetailPage() {
           normalizedScore={normalizedScore}
         />
 
-        <NetworkCard scopeLabel="1 pod" cta="Per-pod view coming soon" />
+        <NetworkCard
+          scopeLabel={containerLabel}
+          href={reportId
+            ? `/topmost-owners/${workloadUid}/${podUid}/network-topology?report=${reportId}`
+            : `/topmost-owners/${workloadUid}/${podUid}/network-topology`
+          }
+        />
 
         <IssuesCard issues={podIssues} />
 

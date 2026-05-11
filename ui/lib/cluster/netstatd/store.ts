@@ -141,6 +141,7 @@ export type AggregateBucket = {
   count: number
   firstSeen: number
   lastSeen: number
+  localIPs: Set<string>
 }
 
 export type NetstatdStatus = "idle" | "connecting" | "open" | "closed" | "error"
@@ -296,10 +297,13 @@ function splitAggKey(key: string): [string, string, string, string] {
   ]
 }
 
-function incrementAggregate(state: NetstatdState, key: string, now: number): void {
+function incrementAggregate(state: NetstatdState, key: string, now: number, localIP: string): void {
   const existing = state.aggregates.get(key)
   if (existing) {
-    state.aggregates.set(key, { ...existing, count: existing.count + 1, lastSeen: now })
+    const localIPs = existing.localIPs.has(localIP) || !localIP
+      ? existing.localIPs
+      : new Set(existing.localIPs).add(localIP)
+    state.aggregates.set(key, { ...existing, count: existing.count + 1, lastSeen: now, localIPs })
     return
   }
   const parsed = parseAggKey(key)
@@ -313,6 +317,7 @@ function incrementAggregate(state: NetstatdState, key: string, now: number): voi
     count: 1,
     firstSeen: now,
     lastSeen: now,
+    localIPs: localIP ? new Set([localIP]) : new Set(),
   })
 }
 
@@ -338,14 +343,19 @@ function syncAggregateForConnection(
   if (newKey === prevKey) {
     if (newKey) {
       const existing = state.aggregates.get(newKey)
-      if (existing) state.aggregates.set(newKey, { ...existing, lastSeen: now })
+      if (existing) {
+        const localIPs = !conn.localIP || existing.localIPs.has(conn.localIP)
+          ? existing.localIPs
+          : new Set(existing.localIPs).add(conn.localIP)
+        state.aggregates.set(newKey, { ...existing, lastSeen: now, localIPs })
+      }
     }
     return { ...conn, aggKey: newKey ?? undefined }
   }
 
   if (prevKey) decrementAggregate(state, prevKey)
   if (newKey) {
-    incrementAggregate(state, newKey, now)
+    incrementAggregate(state, newKey, now, conn.localIP)
     state.cookieToAgg.set(cookieKey, newKey)
   } else if (prevKey) {
     state.cookieToAgg.delete(cookieKey)

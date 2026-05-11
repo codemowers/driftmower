@@ -21,6 +21,7 @@ export function aggregate(
   aggregates: Map<string, AggregateBucket>,
   resources: ExplorerResource[] | null,
   hosts: Map<string, HostInfo>,
+  localIPFilter?: Set<string>,
 ): Aggregated {
   const inClusterOut: AggRow[] = []
   const unknownOut: AggRow[] = []
@@ -46,6 +47,8 @@ export function aggregate(
   )
 
   for (const bucket of aggregates.values()) {
+    if (localIPFilter && !intersects(bucket.localIPs, localIPFilter)) continue
+
     const row: AggRow = {
       key: bucket.key,
       label: bucket.peerIP,
@@ -143,6 +146,12 @@ function labelForPeer(
   const pod = podByIP.get(ip)
   if (pod) return labelForOwner(pod, ownerByUid)
   return ip || "?"
+}
+
+function intersects(a: Set<string>, b: Set<string>): boolean {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a]
+  for (const v of small) if (large.has(v)) return true
+  return false
 }
 
 function labelForOwner(pod: ExplorerResource, ownerByUid: Map<string, ExplorerResource>): string {
