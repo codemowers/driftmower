@@ -66,22 +66,9 @@ export default function ContainersTab({ usages, issues }: Props) {
                 <span className="truncate font-mono text-sm font-medium text-foreground">
                   {u.containerName}
                 </span>
-                {/* TODO: link to /image-tags/<digest> once the OCI Image Tag page exists */}
-                {u.imageInfo.repositoryUrl ? (
-                  <a
-                    href={u.imageInfo.repositoryUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate font-mono text-xs text-brand-label hover:underline"
-                    title={repoLabel}
-                  >
-                    {repoLabel}
-                  </a>
-                ) : (
-                  <span className="truncate font-mono text-xs text-muted-foreground" title={repoLabel}>
-                    {repoLabel}
-                  </span>
-                )}
+                <span className="truncate font-mono text-xs text-muted-foreground" title={repoLabel}>
+                  {repoLabel}
+                </span>
                 <TagCell tag={vs.deployedTag} builtAt={vs.deployedBuiltAt} />
                 <TagCell tag={vs.latestTag}   builtAt={vs.latestBuiltAt} />
                 <div>
