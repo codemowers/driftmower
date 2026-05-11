@@ -1,10 +1,10 @@
 {
-  "id": "4f567809-7878-448c-84b9-57b24387e845",
+  "id": "dde506fb-c96f-4f2f-9d69-3f23fbd533a2",
   "sourceType": "cluster",
   "clusterContext": "in-cluster",
-  "createdAt": "2026-05-10 12:06:39",
-  "reportHash": "1de88b5b0222ced95737d8c08453e5a48bd1ab1d2f1dae33ae71f5ac56380f9c",
-  "previousReportId": "afdd39ca-d0db-44c5-8cef-7fb4bbc1e84a",
+  "createdAt": "2026-05-11 17:05:34",
+  "reportHash": "2c6cff64a9744cc96ec926b61ddeec6e1ad68022f7b21d1c1e3ec6576bd418ee",
+  "previousReportId": "3972b35f-22df-41c1-856e-9e754ebdd89b",
   "report": {
     "imageUsages": [
       {
@@ -1089,7 +1089,9 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "1.29.1",
-          "deployedTag": "1.29.0"
+          "deployedTag": "1.29.0",
+          "deployedBuiltAt": "2026-04-01T10:39:10Z",
+          "latestBuiltAt": "2026-05-08T14:37:53Z"
         }
       },
       {
@@ -1384,29 +1386,26 @@
       {
         "context": "in-cluster",
         "namespace": "driftmowers",
-        "podName": "driftmower-be-7885f5cb84-n2wqd",
-        "uid": "b51f68aa-134e-4c3c-94da-7aff12e7c09c",
+        "podName": "driftmower-be-74958c4b7f-pl9dg",
+        "uid": "8efbdc75-8ce6-454a-8481-1e7788f0d9df",
         "containerName": "driftmower-be",
-        "image": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-        "imageId": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+        "image": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+        "imageId": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
         "controllerKind": "ReplicaSet",
-        "controllerName": "driftmower-be-7885f5cb84",
+        "controllerName": "driftmower-be-74958c4b7f",
         "hasImagePullSecrets": true,
         "imageInfo": {
           "registry": "docker.io",
           "repository": "codemowers/driftmower-be",
-          "tag": "v0.4.0",
-          "digest": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+          "tag": "0.5.0",
+          "digest": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
           "repositoryUrl": "https://hub.docker.com/r/codemowers/driftmower-be",
-          "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=v0.4.0"
+          "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=0.5.0"
         },
-        "originalImage": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-        "actualTag": "latest",
-        "allActualTags": [
-          "latest",
-          "v0.4.0"
-        ],
-        "tagStatus": "match",
+        "originalImage": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+        "actualTag": "0.5.0",
+        "allActualTags": [],
+        "tagStatus": "digest_verification_failed",
         "digestSemver": null,
         "workloadRootInfo": {
           "kind": "Deployment",
@@ -1417,8 +1416,12 @@
         },
         "releaseInfo": null,
         "versionStatus": {
-          "statusType": "no_data",
-          "deployedTag": "v0.4.0"
+          "statusType": "ahead",
+          "majorDifference": 0,
+          "minorDifference": 0,
+          "patchDifference": 0,
+          "latestTag": "v0.4.0",
+          "deployedTag": "0.5.0"
         }
       },
       {
@@ -1459,22 +1462,22 @@
       {
         "context": "in-cluster",
         "namespace": "driftmowers",
-        "podName": "driftmower-ui-7659b94976-z9xtw",
-        "uid": "760b04d5-194e-4332-99da-9c86348e355d",
+        "podName": "driftmower-ui-659fb8dc84-8rt8g",
+        "uid": "9c82fe1e-9131-4d00-979f-0a0428a65740",
         "containerName": "app",
-        "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-        "imageId": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
+        "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+        "imageId": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
         "controllerKind": "ReplicaSet",
-        "controllerName": "driftmower-ui-7659b94976",
+        "controllerName": "driftmower-ui-659fb8dc84",
         "hasImagePullSecrets": true,
         "imageInfo": {
           "registry": "zot.ee-lte-1.codemowers.io",
           "repository": "ua69abad191/driftmower-ui",
-          "tag": "b2f66a1-dirty",
-          "digest": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4"
+          "tag": "0.1.0",
+          "digest": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b"
         },
-        "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-        "actualTag": "b2f66a1-dirty",
+        "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+        "actualTag": "0.1.0",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -1487,8 +1490,8 @@
         },
         "releaseInfo": null,
         "versionStatus": {
-          "statusType": "no_version",
-          "deployedTag": "b2f66a1-dirty"
+          "statusType": "no_data",
+          "deployedTag": "0.1.0"
         }
       },
       {
@@ -3419,7 +3422,8 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "1.14.3",
-          "deployedTag": "1.14.2"
+          "deployedTag": "1.14.2",
+          "deployedBuiltAt": "2026-03-06T06:35:26Z"
         }
       },
       {
@@ -4834,76 +4838,6 @@
       {
         "context": "in-cluster",
         "namespace": "kube-system",
-        "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-        "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-        "containerName": "driftmower-be",
-        "image": "mirror.gcr.io/aquasec/trivy:0.69.3",
-        "imageId": null,
-        "controllerKind": "Job",
-        "controllerName": "scan-vulnerabilityreport-56c86496c7",
-        "hasImagePullSecrets": false,
-        "imageInfo": {
-          "registry": "mirror.gcr.io",
-          "repository": "aquasec/trivy",
-          "tag": "0.69.3",
-          "digest": null
-        },
-        "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3",
-        "actualTag": "0.69.3",
-        "allActualTags": [],
-        "tagStatus": "no_digest",
-        "digestSemver": null,
-        "workloadRootInfo": {
-          "kind": "Job",
-          "name": "scan-vulnerabilityreport-56c86496c7",
-          "namespace": "kube-system",
-          "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-          "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-        },
-        "releaseInfo": null,
-        "versionStatus": {
-          "statusType": "no_data",
-          "deployedTag": "0.69.3"
-        }
-      },
-      {
-        "context": "in-cluster",
-        "namespace": "kube-system",
-        "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-        "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-        "containerName": "a2a3d46b-6003-4f15-9f9f-9626bc961eb0",
-        "image": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-        "imageId": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-        "controllerKind": "Job",
-        "controllerName": "scan-vulnerabilityreport-56c86496c7",
-        "hasImagePullSecrets": false,
-        "imageInfo": {
-          "registry": "mirror.gcr.io",
-          "repository": "aquasec/trivy",
-          "tag": "0.69.3",
-          "digest": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
-        },
-        "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-        "actualTag": "0.69.3",
-        "allActualTags": [],
-        "tagStatus": "digest_verification_failed",
-        "digestSemver": null,
-        "workloadRootInfo": {
-          "kind": "Job",
-          "name": "scan-vulnerabilityreport-56c86496c7",
-          "namespace": "kube-system",
-          "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-          "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-        },
-        "releaseInfo": null,
-        "versionStatus": {
-          "statusType": "no_data",
-          "deployedTag": "0.69.3"
-        }
-      },
-      {
-        "context": "in-cluster",
-        "namespace": "kube-system",
         "podName": "trivy-operator-5f6879ccc-jcp9g",
         "uid": "6c06a63a-ae8a-40ef-b637-478899a2bb4e",
         "containerName": "trivy-operator",
@@ -5002,7 +4936,7 @@
         "context": "in-cluster",
         "namespace": "kube-system",
         "podName": "zot-0",
-        "uid": "869548ee-ff35-4335-b427-95db395ba57f",
+        "uid": "8579dbd7-786e-41a4-869f-f29130b099a2",
         "containerName": "zot",
         "image": "ghcr.io/project-zot/zot:v2.1.15@sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
         "imageId": "sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
@@ -5046,7 +4980,9 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "v2.1.16",
-          "deployedTag": "v2.1.15"
+          "deployedTag": "v2.1.15",
+          "deployedBuiltAt": "2026-03-08T22:36:42Z",
+          "latestBuiltAt": "2026-04-19T06:31:16Z"
         }
       },
       {
@@ -5455,29 +5391,31 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "2.5.2",
-          "deployedTag": "2.5.1"
+          "deployedTag": "2.5.1",
+          "deployedBuiltAt": "2025-12-11T00:43:47Z",
+          "latestBuiltAt": "2026-04-23T11:01:57Z"
         }
       },
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-2b9bg",
-        "uid": "b976b163-788e-4346-bd31-7643141369ec",
+        "podName": "llama-6cjhb",
+        "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
         "containerName": "llama",
-        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
         "controllerKind": "DaemonSet",
         "controllerName": "llama",
         "hasImagePullSecrets": false,
         "imageInfo": {
           "registry": "ghcr.io",
           "repository": "ggml-org/llama.cpp",
-          "tag": "server-vulkan-b7993",
-          "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "tag": "server-vulkan-b9102",
+          "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
         },
-        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "actualTag": "server-vulkan-b7993",
+        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "actualTag": "server-vulkan-b9102",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -5491,14 +5429,14 @@
         "releaseInfo": null,
         "versionStatus": {
           "statusType": "no_version",
-          "deployedTag": "server-vulkan-b7993"
+          "deployedTag": "server-vulkan-b9102"
         }
       },
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-2b9bg",
-        "uid": "b976b163-788e-4346-bd31-7643141369ec",
+        "podName": "llama-6cjhb",
+        "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
         "containerName": "model-downloader",
         "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
         "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -5540,23 +5478,23 @@
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-2n58j",
-        "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+        "podName": "llama-6hxkl",
+        "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
         "containerName": "llama",
-        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
         "controllerKind": "DaemonSet",
         "controllerName": "llama",
         "hasImagePullSecrets": false,
         "imageInfo": {
           "registry": "ghcr.io",
           "repository": "ggml-org/llama.cpp",
-          "tag": "server-vulkan-b7993",
-          "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "tag": "server-vulkan-b9102",
+          "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
         },
-        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "actualTag": "server-vulkan-b7993",
+        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "actualTag": "server-vulkan-b9102",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -5570,14 +5508,14 @@
         "releaseInfo": null,
         "versionStatus": {
           "statusType": "no_version",
-          "deployedTag": "server-vulkan-b7993"
+          "deployedTag": "server-vulkan-b9102"
         }
       },
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-2n58j",
-        "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+        "podName": "llama-6hxkl",
+        "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
         "containerName": "model-downloader",
         "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
         "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -5619,23 +5557,23 @@
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-h29gf",
-        "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+        "podName": "llama-7fwzp",
+        "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
         "containerName": "llama",
-        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
         "controllerKind": "DaemonSet",
         "controllerName": "llama",
         "hasImagePullSecrets": false,
         "imageInfo": {
           "registry": "ghcr.io",
           "repository": "ggml-org/llama.cpp",
-          "tag": "server-vulkan-b7993",
-          "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "tag": "server-vulkan-b9102",
+          "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
         },
-        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "actualTag": "server-vulkan-b7993",
+        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "actualTag": "server-vulkan-b9102",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -5649,14 +5587,14 @@
         "releaseInfo": null,
         "versionStatus": {
           "statusType": "no_version",
-          "deployedTag": "server-vulkan-b7993"
+          "deployedTag": "server-vulkan-b9102"
         }
       },
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-h29gf",
-        "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+        "podName": "llama-7fwzp",
+        "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
         "containerName": "model-downloader",
         "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
         "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -5698,23 +5636,23 @@
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-rc27h",
-        "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+        "podName": "llama-jgdlh",
+        "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
         "containerName": "llama",
-        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+        "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
         "controllerKind": "DaemonSet",
         "controllerName": "llama",
         "hasImagePullSecrets": false,
         "imageInfo": {
           "registry": "ghcr.io",
           "repository": "ggml-org/llama.cpp",
-          "tag": "server-vulkan-b7993",
-          "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "tag": "server-vulkan-b9102",
+          "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
         },
-        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-        "actualTag": "server-vulkan-b7993",
+        "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+        "actualTag": "server-vulkan-b9102",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -5728,14 +5666,14 @@
         "releaseInfo": null,
         "versionStatus": {
           "statusType": "no_version",
-          "deployedTag": "server-vulkan-b7993"
+          "deployedTag": "server-vulkan-b9102"
         }
       },
       {
         "context": "in-cluster",
         "namespace": "llm",
-        "podName": "llama-rc27h",
-        "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+        "podName": "llama-jgdlh",
+        "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
         "containerName": "model-downloader",
         "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
         "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -5778,22 +5716,22 @@
         "context": "in-cluster",
         "namespace": "llm",
         "podName": "webui-0",
-        "uid": "8d06ace5-e9ab-4a2a-94cc-946140a16e2b",
+        "uid": "7307a985-3158-4d6e-93e1-baf9447f1b51",
         "containerName": "webui",
-        "image": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-        "imageId": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+        "image": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+        "imageId": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
         "controllerKind": "StatefulSet",
         "controllerName": "webui",
         "hasImagePullSecrets": false,
         "imageInfo": {
           "registry": "ghcr.io",
           "repository": "open-webui/open-webui",
-          "tag": "v0.7.2",
-          "digest": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+          "tag": "v0.9.5",
+          "digest": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
           "repositoryUrl": "https://ghcr.io/open-webui/open-webui"
         },
-        "originalImage": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-        "actualTag": "v0.7.2",
+        "originalImage": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+        "actualTag": "v0.9.5",
         "allActualTags": [],
         "tagStatus": "digest_verification_failed",
         "digestSemver": null,
@@ -5811,7 +5749,7 @@
           "minorDifference": 0,
           "patchDifference": 0,
           "latestTag": "v0.4.1",
-          "deployedTag": "v0.7.2"
+          "deployedTag": "v0.9.5"
         }
       },
       {
@@ -6882,7 +6820,8 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "3.7.1",
-          "deployedTag": "3.6.7"
+          "deployedTag": "3.6.7",
+          "deployedBuiltAt": "2026-02-23T09:25:06Z"
         }
       },
       {
@@ -6934,7 +6873,9 @@
           "minorDifference": 2,
           "patchDifference": 0,
           "latestTag": "2.7.1",
-          "deployedTag": "2.5.0"
+          "deployedTag": "2.5.0",
+          "deployedBuiltAt": "2026-01-21T08:21:46Z",
+          "latestBuiltAt": "2026-04-27T07:40:33Z"
         }
       },
       {
@@ -8462,7 +8403,9 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "1.19.1",
-          "deployedTag": "1.19.0"
+          "deployedTag": "1.19.0",
+          "deployedBuiltAt": "2026-03-11T17:10:20Z",
+          "latestBuiltAt": "2026-04-16T09:35:45Z"
         }
       },
       {
@@ -8504,7 +8447,9 @@
           "minorDifference": 0,
           "patchDifference": 1,
           "latestTag": "2.20.1",
-          "deployedTag": "2.20.0"
+          "deployedTag": "2.20.0",
+          "deployedBuiltAt": "2026-03-25T15:20:45Z",
+          "latestBuiltAt": "2026-04-16T09:31:59Z"
         }
       },
       {
@@ -8634,7 +8579,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8685,7 +8632,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8736,7 +8685,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8787,7 +8738,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8838,7 +8791,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8889,7 +8844,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8940,7 +8897,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -8991,7 +8950,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9042,7 +9003,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9093,7 +9056,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9144,7 +9109,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9195,7 +9162,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9246,7 +9215,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9297,7 +9268,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9348,7 +9321,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9399,7 +9374,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9450,7 +9427,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9501,7 +9480,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9552,7 +9533,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -9603,7 +9586,9 @@
           "minorDifference": 1,
           "patchDifference": 0,
           "latestTag": "0.41.0",
-          "deployedTag": "0.40.2"
+          "deployedTag": "0.40.2",
+          "deployedBuiltAt": "2026-04-01T09:10:36Z",
+          "latestBuiltAt": "2026-05-01T08:14:12Z"
         }
       },
       {
@@ -12916,7 +12901,7 @@
             "context": "in-cluster",
             "namespace": "kube-system",
             "podName": "zot-0",
-            "uid": "869548ee-ff35-4335-b427-95db395ba57f",
+            "uid": "8579dbd7-786e-41a4-869f-f29130b099a2",
             "containerName": "zot",
             "image": "ghcr.io/project-zot/zot:v2.1.15@sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
             "imageId": "sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
@@ -13092,22 +13077,22 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-2b9bg",
-            "uid": "b976b163-788e-4346-bd31-7643141369ec",
+            "podName": "llama-6cjhb",
+            "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
             "containerName": "llama",
-            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "controllerKind": "DaemonSet",
             "controllerName": "llama",
             "hasImagePullSecrets": false,
             "imageInfo": {
               "registry": "ghcr.io",
               "repository": "ggml-org/llama.cpp",
-              "tag": "server-vulkan-b7993",
-              "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe"
+              "tag": "server-vulkan-b9102",
+              "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c"
             },
-            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "actualTag": "server-vulkan-b7993",
+            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "actualTag": "server-vulkan-b9102",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -13123,22 +13108,22 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-2n58j",
-            "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+            "podName": "llama-6hxkl",
+            "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
             "containerName": "llama",
-            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "controllerKind": "DaemonSet",
             "controllerName": "llama",
             "hasImagePullSecrets": false,
             "imageInfo": {
               "registry": "ghcr.io",
               "repository": "ggml-org/llama.cpp",
-              "tag": "server-vulkan-b7993",
-              "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe"
+              "tag": "server-vulkan-b9102",
+              "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c"
             },
-            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "actualTag": "server-vulkan-b7993",
+            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "actualTag": "server-vulkan-b9102",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -13154,22 +13139,22 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-h29gf",
-            "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+            "podName": "llama-7fwzp",
+            "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
             "containerName": "llama",
-            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "controllerKind": "DaemonSet",
             "controllerName": "llama",
             "hasImagePullSecrets": false,
             "imageInfo": {
               "registry": "ghcr.io",
               "repository": "ggml-org/llama.cpp",
-              "tag": "server-vulkan-b7993",
-              "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe"
+              "tag": "server-vulkan-b9102",
+              "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c"
             },
-            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "actualTag": "server-vulkan-b7993",
+            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "actualTag": "server-vulkan-b9102",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -13185,22 +13170,22 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-rc27h",
-            "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+            "podName": "llama-jgdlh",
+            "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
             "containerName": "llama",
-            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "controllerKind": "DaemonSet",
             "controllerName": "llama",
             "hasImagePullSecrets": false,
             "imageInfo": {
               "registry": "ghcr.io",
               "repository": "ggml-org/llama.cpp",
-              "tag": "server-vulkan-b7993",
-              "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe"
+              "tag": "server-vulkan-b9102",
+              "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c"
             },
-            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-            "actualTag": "server-vulkan-b7993",
+            "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+            "actualTag": "server-vulkan-b9102",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -13219,21 +13204,21 @@
             "context": "in-cluster",
             "namespace": "llm",
             "podName": "webui-0",
-            "uid": "8d06ace5-e9ab-4a2a-94cc-946140a16e2b",
+            "uid": "7307a985-3158-4d6e-93e1-baf9447f1b51",
             "containerName": "webui",
-            "image": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-            "imageId": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+            "image": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+            "imageId": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
             "controllerKind": "StatefulSet",
             "controllerName": "webui",
             "hasImagePullSecrets": false,
             "imageInfo": {
               "registry": "ghcr.io",
               "repository": "open-webui/open-webui",
-              "tag": "v0.7.2",
-              "digest": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b"
+              "tag": "v0.9.5",
+              "digest": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3"
             },
-            "originalImage": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-            "actualTag": "v0.7.2",
+            "originalImage": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+            "actualTag": "v0.9.5",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -14304,22 +14289,22 @@
           {
             "context": "in-cluster",
             "namespace": "driftmowers",
-            "podName": "driftmower-ui-7659b94976-z9xtw",
-            "uid": "760b04d5-194e-4332-99da-9c86348e355d",
+            "podName": "driftmower-ui-659fb8dc84-8rt8g",
+            "uid": "9c82fe1e-9131-4d00-979f-0a0428a65740",
             "containerName": "app",
-            "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-            "imageId": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
+            "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+            "imageId": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
             "controllerKind": "ReplicaSet",
-            "controllerName": "driftmower-ui-7659b94976",
+            "controllerName": "driftmower-ui-659fb8dc84",
             "hasImagePullSecrets": true,
             "imageInfo": {
               "registry": "zot.ee-lte-1.codemowers.io",
               "repository": "ua69abad191/driftmower-ui",
-              "tag": "b2f66a1-dirty",
-              "digest": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4"
+              "tag": "0.1.0",
+              "digest": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b"
             },
-            "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-            "actualTag": "b2f66a1-dirty",
+            "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+            "actualTag": "0.1.0",
             "allActualTags": [],
             "tagStatus": "digest_verification_failed",
             "digestSemver": null,
@@ -14769,27 +14754,24 @@
           {
             "context": "in-cluster",
             "namespace": "driftmowers",
-            "podName": "driftmower-be-7885f5cb84-n2wqd",
-            "uid": "b51f68aa-134e-4c3c-94da-7aff12e7c09c",
+            "podName": "driftmower-be-74958c4b7f-pl9dg",
+            "uid": "8efbdc75-8ce6-454a-8481-1e7788f0d9df",
             "containerName": "driftmower-be",
-            "image": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-            "imageId": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+            "image": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+            "imageId": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
             "controllerKind": "ReplicaSet",
-            "controllerName": "driftmower-be-7885f5cb84",
+            "controllerName": "driftmower-be-74958c4b7f",
             "hasImagePullSecrets": true,
             "imageInfo": {
               "registry": "docker.io",
               "repository": "codemowers/driftmower-be",
-              "tag": "v0.4.0",
-              "digest": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a"
+              "tag": "0.5.0",
+              "digest": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187"
             },
-            "originalImage": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-            "actualTag": "latest",
-            "allActualTags": [
-              "latest",
-              "v0.4.0"
-            ],
-            "tagStatus": "match",
+            "originalImage": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+            "actualTag": "0.5.0",
+            "allActualTags": [],
+            "tagStatus": "digest_verification_failed",
             "digestSemver": null,
             "workloadRootInfo": {
               "kind": "Deployment",
@@ -15724,8 +15706,8 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-2b9bg",
-            "uid": "b976b163-788e-4346-bd31-7643141369ec",
+            "podName": "llama-6cjhb",
+            "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
             "containerName": "model-downloader",
             "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
             "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -15757,8 +15739,8 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-2n58j",
-            "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+            "podName": "llama-6hxkl",
+            "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
             "containerName": "model-downloader",
             "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
             "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -15790,8 +15772,8 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-h29gf",
-            "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+            "podName": "llama-7fwzp",
+            "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
             "containerName": "model-downloader",
             "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
             "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -15823,8 +15805,8 @@
           {
             "context": "in-cluster",
             "namespace": "llm",
-            "podName": "llama-rc27h",
-            "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+            "podName": "llama-jgdlh",
+            "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
             "containerName": "model-downloader",
             "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
             "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -16871,70 +16853,6 @@
         ]
       },
       "mirror.gcr.io": {
-        "aquasec/trivy": [
-          {
-            "context": "in-cluster",
-            "namespace": "kube-system",
-            "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-            "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-            "containerName": "driftmower-be",
-            "image": "mirror.gcr.io/aquasec/trivy:0.69.3",
-            "imageId": null,
-            "controllerKind": "Job",
-            "controllerName": "scan-vulnerabilityreport-56c86496c7",
-            "hasImagePullSecrets": false,
-            "imageInfo": {
-              "registry": "mirror.gcr.io",
-              "repository": "aquasec/trivy",
-              "tag": "0.69.3",
-              "digest": null
-            },
-            "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3",
-            "actualTag": "0.69.3",
-            "allActualTags": [],
-            "tagStatus": "no_digest",
-            "digestSemver": null,
-            "workloadRootInfo": {
-              "kind": "Job",
-              "name": "scan-vulnerabilityreport-56c86496c7",
-              "namespace": "kube-system",
-              "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-              "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-            },
-            "releaseInfo": null
-          },
-          {
-            "context": "in-cluster",
-            "namespace": "kube-system",
-            "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-            "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-            "containerName": "a2a3d46b-6003-4f15-9f9f-9626bc961eb0",
-            "image": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-            "imageId": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-            "controllerKind": "Job",
-            "controllerName": "scan-vulnerabilityreport-56c86496c7",
-            "hasImagePullSecrets": false,
-            "imageInfo": {
-              "registry": "mirror.gcr.io",
-              "repository": "aquasec/trivy",
-              "tag": "0.69.3",
-              "digest": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
-            },
-            "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-            "actualTag": "0.69.3",
-            "allActualTags": [],
-            "tagStatus": "digest_verification_failed",
-            "digestSemver": null,
-            "workloadRootInfo": {
-              "kind": "Job",
-              "name": "scan-vulnerabilityreport-56c86496c7",
-              "namespace": "kube-system",
-              "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-              "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-            },
-            "releaseInfo": null
-          }
-        ],
         "aquasec/trivy-operator": [
           {
             "context": "in-cluster",
@@ -28829,7 +28747,11 @@
       "git.codemowers.io/uq69adc8851/driftmower-scraper": [],
       "git.codemowers.io/codemowers/driftmower-explorer": [],
       "git.codemowers.io/laurivosandi/netstatd": [],
-      "docker.io/codemowers/driftmower-be": [],
+      "docker.io/codemowers/driftmower-be": [
+        "latest",
+        "v0.3.1",
+        "v0.4.0"
+      ],
       "docker.io/emqx/emqx-operator-controller": [
         "0.1.0",
         "1.0.0",
@@ -30406,7 +30328,6 @@
         "v1.9.0-armv7"
       ],
       "docker.io/library/traefik": [],
-      "mirror.gcr.io/aquasec/trivy": [],
       "mirror.gcr.io/aquasec/trivy-operator": [],
       "mirror.gcr.io/prom/node-exporter": [],
       "reg.kyverno.io/kyverno/kyverno": [],
@@ -32631,6 +32552,9 @@
       "ghcr.io/topolvm/topolvm-with-sidecar": {
         "": "0.41.0"
       },
+      "docker.io/codemowers/driftmower-be": {
+        "": "v0.4.0"
+      },
       "docker.io/emqx/emqx-operator-controller": {
         "": "2.2.29",
         "rc.1": "2.2.26-rc.1",
@@ -32998,7 +32922,6 @@
       "docker.io/library/redis": [],
       "docker.io/traefik/whoami": [],
       "docker.io/library/traefik": [],
-      "mirror.gcr.io/aquasec/trivy": [],
       "mirror.gcr.io/aquasec/trivy-operator": [],
       "mirror.gcr.io/prom/node-exporter": [],
       "reg.kyverno.io/kyverno/kyverno": [],
@@ -44062,7 +43985,11 @@
       "git.codemowers.io/uq69adc8851/driftmower-scraper": [],
       "git.codemowers.io/codemowers/driftmower-explorer": [],
       "git.codemowers.io/laurivosandi/netstatd": [],
-      "docker.io/codemowers/driftmower-be": [],
+      "docker.io/codemowers/driftmower-be": [
+        "v0.4.0",
+        "v0.3.1",
+        "latest"
+      ],
       "docker.io/emqx/emqx-operator-controller": [
         "2.2.9",
         "2.2.8",
@@ -45639,7 +45566,6 @@
         "latest"
       ],
       "docker.io/library/traefik": [],
-      "mirror.gcr.io/aquasec/trivy": [],
       "mirror.gcr.io/aquasec/trivy-operator": [],
       "mirror.gcr.io/prom/node-exporter": [],
       "reg.kyverno.io/kyverno/kyverno": [],
@@ -45851,7 +45777,7 @@
     },
     "scrapeStatusMap": {
       "quay.io/jetstack/cert-manager-controller": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45859,7 +45785,7 @@
         "lastScrape": "2026-05-06T19:42:09Z"
       },
       "quay.io/jetstack/cert-manager-cainjector": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45867,7 +45793,7 @@
         "lastScrape": "2026-05-06T19:41:29Z"
       },
       "quay.io/jetstack/csi-node-driver-registrar": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45875,7 +45801,7 @@
         "lastScrape": "2026-05-06T19:35:45Z"
       },
       "quay.io/jetstack/livenessprobe": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45883,7 +45809,7 @@
         "lastScrape": "2026-05-06T19:35:44Z"
       },
       "quay.io/jetstack/cert-manager-csi-driver": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45891,7 +45817,7 @@
         "lastScrape": "2026-05-06T19:36:17Z"
       },
       "quay.io/jetstack/cert-manager-webhook": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45899,7 +45825,7 @@
         "lastScrape": "2026-05-06T19:41:55Z"
       },
       "quay.io/jetstack/trust-manager": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45907,7 +45833,7 @@
         "lastScrape": "2026-05-06T19:37:32Z"
       },
       "quay.io/jetstack/trust-pkg-debian-bookworm": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45915,15 +45841,15 @@
         "lastScrape": "2026-05-06T19:37:34Z"
       },
       "ghcr.io/cloudnative-pg/cloudnative-pg": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
         "filteredTagCount": 42,
-        "lastScrape": "2026-05-09T19:37:57Z"
+        "lastScrape": "2026-05-10T19:37:59Z"
       },
       "ghcr.io/cloudnative-pg/plugin-barman-cloud": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45931,7 +45857,7 @@
         "lastScrape": "2026-05-08T18:41:42Z"
       },
       "quay.io/jetstack/cert-manager-acmesolver": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45939,7 +45865,7 @@
         "lastScrape": "2026-05-06T20:40:39Z"
       },
       "zot.ee-lte-1.codemowers.io/ua69abad191/hello-world-cpp": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -45947,7 +45873,7 @@
         "lastScrape": null
       },
       "quay.io/brancz/kube-rbac-proxy": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -45955,7 +45881,7 @@
         "lastScrape": "2026-05-06T20:44:06Z"
       },
       "docker.dragonflydb.io/dragonflydb/operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -45963,7 +45889,7 @@
         "lastScrape": null
       },
       "git.codemowers.io/uq69adc8851/driftmower-be": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -45971,7 +45897,7 @@
         "lastScrape": null
       },
       "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -45979,15 +45905,15 @@
         "lastScrape": null
       },
       "docker.io/codemowers/driftmower-be": {
-        "timestamp": 1778414792,
-        "success": false,
+        "timestamp": 1778519127,
+        "success": true,
         "partial": false,
-        "reason": "pending",
+        "reason": "current",
         "filteredTagCount": 0,
-        "lastScrape": null
+        "lastScrape": "2026-05-10T12:06:17Z"
       },
       "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-explorer": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -45995,7 +45921,7 @@
         "lastScrape": null
       },
       "git.codemowers.io/uq69adc8851/driftmower-scraper": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46003,7 +45929,7 @@
         "lastScrape": null
       },
       "docker.io/emqx/emqx-operator-controller": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46011,7 +45937,7 @@
         "lastScrape": "2026-05-06T19:39:37Z"
       },
       "quay.io/cilium/cilium": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46019,7 +45945,7 @@
         "lastScrape": "2026-05-06T20:49:22Z"
       },
       "quay.io/cilium/operator-generic": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46027,7 +45953,7 @@
         "lastScrape": "2026-05-06T20:48:07Z"
       },
       "docker.io/rancher/mirrored-coredns-coredns": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46035,7 +45961,7 @@
         "lastScrape": "2026-05-06T19:38:11Z"
       },
       "git.codemowers.io/codemowers/driftmower-explorer": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46043,7 +45969,7 @@
         "lastScrape": null
       },
       "docker.io/rancher/klipper-helm": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46051,7 +45977,7 @@
         "lastScrape": "2026-05-06T19:41:50Z"
       },
       "quay.io/cilium/hubble-relay": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46059,7 +45985,7 @@
         "lastScrape": "2026-05-06T20:52:11Z"
       },
       "quay.io/cilium/hubble-ui": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46067,7 +45993,7 @@
         "lastScrape": "2026-05-06T20:50:13Z"
       },
       "quay.io/cilium/hubble-ui-backend": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46075,7 +46001,7 @@
         "lastScrape": "2026-05-06T20:51:00Z"
       },
       "quay.io/mittwald/kubernetes-secret-generator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46083,15 +46009,7 @@
         "lastScrape": "2026-05-06T20:51:20Z"
       },
       "git.codemowers.io/laurivosandi/netstatd": {
-        "timestamp": 1778414792,
-        "success": false,
-        "partial": false,
-        "reason": "forbidden",
-        "filteredTagCount": 0,
-        "lastScrape": null
-      },
-      "mirror.gcr.io/aquasec/trivy": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46099,7 +46017,7 @@
         "lastScrape": null
       },
       "mirror.gcr.io/aquasec/trivy-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46107,7 +46025,7 @@
         "lastScrape": null
       },
       "docker.io/locustbaby/trivy-ui": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46115,7 +46033,7 @@
         "lastScrape": "2026-05-06T19:38:17Z"
       },
       "ghcr.io/project-zot/zot": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46123,7 +46041,7 @@
         "lastScrape": "2026-05-06T19:37:31Z"
       },
       "reg.kyverno.io/kyverno/kyverno": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46131,7 +46049,7 @@
         "lastScrape": null
       },
       "reg.kyverno.io/kyverno/kyvernopre": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46139,7 +46057,7 @@
         "lastScrape": null
       },
       "reg.kyverno.io/kyverno/background-controller": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46147,7 +46065,7 @@
         "lastScrape": null
       },
       "reg.kyverno.io/kyverno/cleanup-controller": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46155,7 +46073,7 @@
         "lastScrape": null
       },
       "reg.kyverno.io/kyverno/kyverno-cli": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46163,7 +46081,7 @@
         "lastScrape": null
       },
       "reg.kyverno.io/kyverno/reports-controller": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46171,7 +46089,7 @@
         "lastScrape": null
       },
       "ghcr.io/kyverno/policy-reporter": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46179,7 +46097,7 @@
         "lastScrape": "2026-05-06T19:41:14Z"
       },
       "ghcr.io/kyverno/policy-reporter/kyverno-plugin": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46187,7 +46105,7 @@
         "lastScrape": "2026-05-06T19:36:42Z"
       },
       "ghcr.io/kyverno/policy-reporter-ui": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46195,7 +46113,7 @@
         "lastScrape": "2026-05-06T19:48:48Z"
       },
       "ghcr.io/ggml-org/llama.cpp": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46203,15 +46121,15 @@
         "lastScrape": "2026-05-06T19:38:16Z"
       },
       "docker.io/curlimages/curl": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
         "filteredTagCount": 0,
-        "lastScrape": "2026-05-09T19:37:11Z"
+        "lastScrape": "2026-05-10T19:37:09Z"
       },
       "ghcr.io/open-webui/open-webui": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46219,7 +46137,7 @@
         "lastScrape": "2026-05-06T19:56:36Z"
       },
       "docker.io/codemowers/memelord": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46227,7 +46145,7 @@
         "lastScrape": "2026-05-06T19:38:19Z"
       },
       "docker.dragonflydb.io/dragonflydb/dragonfly": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46235,7 +46153,7 @@
         "lastScrape": null
       },
       "docker.io/pgsty/minio": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46243,7 +46161,7 @@
         "lastScrape": "2026-05-08T18:41:28Z"
       },
       "docker.io/inseefrlab/s3-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46251,7 +46169,7 @@
         "lastScrape": "2026-05-06T19:39:12Z"
       },
       "quay.io/mongodb/mongodb-kubernetes-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46259,7 +46177,7 @@
         "lastScrape": "2026-05-07T00:28:29Z"
       },
       "quay.io/prometheus/alertmanager": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46267,7 +46185,7 @@
         "lastScrape": "2026-05-06T20:53:50Z"
       },
       "quay.io/prometheus-operator/prometheus-config-reloader": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46275,7 +46193,7 @@
         "lastScrape": "2026-05-06T21:03:17Z"
       },
       "docker.io/grafana/alloy": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46283,7 +46201,7 @@
         "lastScrape": "2026-05-06T21:03:57Z"
       },
       "quay.io/prometheus/blackbox-exporter": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": true,
         "reason": "failed",
@@ -46291,7 +46209,7 @@
         "lastScrape": "2026-05-06T20:28:34Z"
       },
       "docker.io/grafana/loki": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46299,7 +46217,7 @@
         "lastScrape": "2026-05-07T13:42:52Z"
       },
       "docker.io/kiwigrid/k8s-sidecar": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46307,7 +46225,7 @@
         "lastScrape": "2026-05-07T13:40:19Z"
       },
       "docker.io/codemowers/mikrotik-exporter": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46315,7 +46233,7 @@
         "lastScrape": "2026-05-06T19:39:48Z"
       },
       "mirror.gcr.io/prom/node-exporter": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46323,7 +46241,7 @@
         "lastScrape": null
       },
       "docker.io/codemowers/prometheus-textfile-collectors": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46331,7 +46249,7 @@
         "lastScrape": "2026-05-06T19:39:51Z"
       },
       "quay.io/prometheus/prometheus": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46339,7 +46257,7 @@
         "lastScrape": "2026-05-06T21:05:06Z"
       },
       "quay.io/thanos/thanos": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46347,7 +46265,7 @@
         "lastScrape": "2026-05-06T21:06:34Z"
       },
       "registry.k8s.io/nfd/node-feature-discovery": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46355,7 +46273,7 @@
         "lastScrape": "2026-05-06T19:37:26Z"
       },
       "docker.io/opensearchproject/opensearch-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46363,7 +46281,7 @@
         "lastScrape": "2026-05-10T10:05:17Z"
       },
       "ghcr.io/passmower/passmower": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46371,7 +46289,7 @@
         "lastScrape": "2026-05-06T19:42:16Z"
       },
       "docker.io/redis": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46379,7 +46297,7 @@
         "lastScrape": "2026-05-06T22:19:52Z"
       },
       "docker.io/traefik/whoami": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46387,7 +46305,7 @@
         "lastScrape": "2026-05-06T19:42:28Z"
       },
       "quay.io/prometheus-operator/prometheus-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46395,7 +46313,7 @@
         "lastScrape": "2026-05-06T21:14:02Z"
       },
       "registry.k8s.io/kube-state-metrics/kube-state-metrics": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46403,7 +46321,7 @@
         "lastScrape": "2026-05-06T19:36:39Z"
       },
       "ghcr.io/rabbitmq/messaging-topology-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46411,7 +46329,7 @@
         "lastScrape": "2026-05-06T19:42:31Z"
       },
       "ghcr.io/rabbitmq/cluster-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46419,7 +46337,7 @@
         "lastScrape": "2026-05-06T19:48:22Z"
       },
       "docker.redpanda.com/redpandadata/redpanda-operator": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": false,
         "partial": false,
         "reason": "forbidden",
@@ -46427,7 +46345,7 @@
         "lastScrape": null
       },
       "ghcr.io/topolvm/topolvm-with-sidecar": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46435,7 +46353,7 @@
         "lastScrape": "2026-05-06T19:51:23Z"
       },
       "docker.io/traefik": {
-        "timestamp": 1778414792,
+        "timestamp": 1778519127,
         "success": true,
         "partial": false,
         "reason": "current",
@@ -46506,7 +46424,6 @@
       "docker.io/library/redis": 0,
       "docker.io/traefik/whoami": 23,
       "docker.io/library/traefik": 0,
-      "mirror.gcr.io/aquasec/trivy": 0,
       "mirror.gcr.io/aquasec/trivy-operator": 0,
       "mirror.gcr.io/prom/node-exporter": 0,
       "reg.kyverno.io/kyverno/kyverno": 0,
@@ -47614,7 +47531,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.29.1",
-            "deployedTag": "1.29.0"
+            "deployedTag": "1.29.0",
+            "deployedBuiltAt": "2026-04-01T10:39:10Z",
+            "latestBuiltAt": "2026-05-08T14:37:53Z"
           }
         }
       ],
@@ -47923,29 +47842,26 @@
         {
           "context": "in-cluster",
           "namespace": "driftmowers",
-          "podName": "driftmower-be-7885f5cb84-n2wqd",
-          "uid": "b51f68aa-134e-4c3c-94da-7aff12e7c09c",
+          "podName": "driftmower-be-74958c4b7f-pl9dg",
+          "uid": "8efbdc75-8ce6-454a-8481-1e7788f0d9df",
           "containerName": "driftmower-be",
-          "image": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-          "imageId": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+          "image": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+          "imageId": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
           "controllerKind": "ReplicaSet",
-          "controllerName": "driftmower-be-7885f5cb84",
+          "controllerName": "driftmower-be-74958c4b7f",
           "hasImagePullSecrets": true,
           "imageInfo": {
             "registry": "docker.io",
             "repository": "codemowers/driftmower-be",
-            "tag": "v0.4.0",
-            "digest": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+            "tag": "0.5.0",
+            "digest": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
             "repositoryUrl": "https://hub.docker.com/r/codemowers/driftmower-be",
-            "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=v0.4.0"
+            "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=0.5.0"
           },
-          "originalImage": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-          "actualTag": "latest",
-          "allActualTags": [
-            "latest",
-            "v0.4.0"
-          ],
-          "tagStatus": "match",
+          "originalImage": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+          "actualTag": "0.5.0",
+          "allActualTags": [],
+          "tagStatus": "digest_verification_failed",
           "digestSemver": null,
           "workloadRootInfo": {
             "kind": "Deployment",
@@ -47956,8 +47872,12 @@
           },
           "releaseInfo": null,
           "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "v0.4.0"
+            "statusType": "ahead",
+            "majorDifference": 0,
+            "minorDifference": 0,
+            "patchDifference": 0,
+            "latestTag": "v0.4.0",
+            "deployedTag": "0.5.0"
           }
         }
       ],
@@ -48002,22 +47922,22 @@
         {
           "context": "in-cluster",
           "namespace": "driftmowers",
-          "podName": "driftmower-ui-7659b94976-z9xtw",
-          "uid": "760b04d5-194e-4332-99da-9c86348e355d",
+          "podName": "driftmower-ui-659fb8dc84-8rt8g",
+          "uid": "9c82fe1e-9131-4d00-979f-0a0428a65740",
           "containerName": "app",
-          "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-          "imageId": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
+          "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+          "imageId": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
           "controllerKind": "ReplicaSet",
-          "controllerName": "driftmower-ui-7659b94976",
+          "controllerName": "driftmower-ui-659fb8dc84",
           "hasImagePullSecrets": true,
           "imageInfo": {
             "registry": "zot.ee-lte-1.codemowers.io",
             "repository": "ua69abad191/driftmower-ui",
-            "tag": "b2f66a1-dirty",
-            "digest": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4"
+            "tag": "0.1.0",
+            "digest": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b"
           },
-          "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-          "actualTag": "b2f66a1-dirty",
+          "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+          "actualTag": "0.1.0",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -48030,8 +47950,8 @@
           },
           "releaseInfo": null,
           "versionStatus": {
-            "statusType": "no_version",
-            "deployedTag": "b2f66a1-dirty"
+            "statusType": "no_data",
+            "deployedTag": "0.1.0"
           }
         }
       ],
@@ -49972,7 +49892,8 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.14.3",
-            "deployedTag": "1.14.2"
+            "deployedTag": "1.14.2",
+            "deployedBuiltAt": "2026-03-06T06:35:26Z"
           }
         }
       ],
@@ -51443,78 +51364,6 @@
           }
         }
       ],
-      "Job/kube-system/scan-vulnerabilityreport-56c86496c7": [
-        {
-          "context": "in-cluster",
-          "namespace": "kube-system",
-          "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-          "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-          "containerName": "driftmower-be",
-          "image": "mirror.gcr.io/aquasec/trivy:0.69.3",
-          "imageId": null,
-          "controllerKind": "Job",
-          "controllerName": "scan-vulnerabilityreport-56c86496c7",
-          "hasImagePullSecrets": false,
-          "imageInfo": {
-            "registry": "mirror.gcr.io",
-            "repository": "aquasec/trivy",
-            "tag": "0.69.3",
-            "digest": null
-          },
-          "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3",
-          "actualTag": "0.69.3",
-          "allActualTags": [],
-          "tagStatus": "no_digest",
-          "digestSemver": null,
-          "workloadRootInfo": {
-            "kind": "Job",
-            "name": "scan-vulnerabilityreport-56c86496c7",
-            "namespace": "kube-system",
-            "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-            "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-          },
-          "releaseInfo": null,
-          "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "0.69.3"
-          }
-        },
-        {
-          "context": "in-cluster",
-          "namespace": "kube-system",
-          "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-          "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-          "containerName": "a2a3d46b-6003-4f15-9f9f-9626bc961eb0",
-          "image": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "imageId": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "controllerKind": "Job",
-          "controllerName": "scan-vulnerabilityreport-56c86496c7",
-          "hasImagePullSecrets": false,
-          "imageInfo": {
-            "registry": "mirror.gcr.io",
-            "repository": "aquasec/trivy",
-            "tag": "0.69.3",
-            "digest": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
-          },
-          "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "actualTag": "0.69.3",
-          "allActualTags": [],
-          "tagStatus": "digest_verification_failed",
-          "digestSemver": null,
-          "workloadRootInfo": {
-            "kind": "Job",
-            "name": "scan-vulnerabilityreport-56c86496c7",
-            "namespace": "kube-system",
-            "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-            "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-          },
-          "releaseInfo": null,
-          "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "0.69.3"
-          }
-        }
-      ],
       "Deployment/kube-system/trivy-operator": [
         {
           "context": "in-cluster",
@@ -51621,7 +51470,7 @@
           "context": "in-cluster",
           "namespace": "kube-system",
           "podName": "zot-0",
-          "uid": "869548ee-ff35-4335-b427-95db395ba57f",
+          "uid": "8579dbd7-786e-41a4-869f-f29130b099a2",
           "containerName": "zot",
           "image": "ghcr.io/project-zot/zot:v2.1.15@sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
           "imageId": "sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
@@ -51665,7 +51514,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "v2.1.16",
-            "deployedTag": "v2.1.15"
+            "deployedTag": "v2.1.15",
+            "deployedBuiltAt": "2026-03-08T22:36:42Z",
+            "latestBuiltAt": "2026-04-19T06:31:16Z"
           }
         }
       ],
@@ -52090,7 +51941,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "2.5.2",
-            "deployedTag": "2.5.1"
+            "deployedTag": "2.5.1",
+            "deployedBuiltAt": "2025-12-11T00:43:47Z",
+            "latestBuiltAt": "2026-04-23T11:01:57Z"
           }
         }
       ],
@@ -52098,23 +51951,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2b9bg",
-          "uid": "b976b163-788e-4346-bd31-7643141369ec",
+          "podName": "llama-6cjhb",
+          "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -52128,14 +51981,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2b9bg",
-          "uid": "b976b163-788e-4346-bd31-7643141369ec",
+          "podName": "llama-6cjhb",
+          "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -52177,23 +52030,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2n58j",
-          "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+          "podName": "llama-6hxkl",
+          "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -52207,14 +52060,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2n58j",
-          "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+          "podName": "llama-6hxkl",
+          "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -52256,23 +52109,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-h29gf",
-          "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+          "podName": "llama-7fwzp",
+          "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -52286,14 +52139,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-h29gf",
-          "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+          "podName": "llama-7fwzp",
+          "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -52335,23 +52188,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-rc27h",
-          "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+          "podName": "llama-jgdlh",
+          "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -52365,14 +52218,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-rc27h",
-          "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+          "podName": "llama-jgdlh",
+          "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -52417,22 +52270,22 @@
           "context": "in-cluster",
           "namespace": "llm",
           "podName": "webui-0",
-          "uid": "8d06ace5-e9ab-4a2a-94cc-946140a16e2b",
+          "uid": "7307a985-3158-4d6e-93e1-baf9447f1b51",
           "containerName": "webui",
-          "image": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-          "imageId": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+          "image": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+          "imageId": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
           "controllerKind": "StatefulSet",
           "controllerName": "webui",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "open-webui/open-webui",
-            "tag": "v0.7.2",
-            "digest": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+            "tag": "v0.9.5",
+            "digest": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
             "repositoryUrl": "https://ghcr.io/open-webui/open-webui"
           },
-          "originalImage": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-          "actualTag": "v0.7.2",
+          "originalImage": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+          "actualTag": "v0.9.5",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -52450,7 +52303,7 @@
             "minorDifference": 0,
             "patchDifference": 0,
             "latestTag": "v0.4.1",
-            "deployedTag": "v0.7.2"
+            "deployedTag": "v0.9.5"
           }
         }
       ],
@@ -53539,7 +53392,8 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "3.7.1",
-            "deployedTag": "3.6.7"
+            "deployedTag": "3.6.7",
+            "deployedBuiltAt": "2026-02-23T09:25:06Z"
           }
         },
         {
@@ -53591,7 +53445,9 @@
             "minorDifference": 2,
             "patchDifference": 0,
             "latestTag": "2.7.1",
-            "deployedTag": "2.5.0"
+            "deployedTag": "2.5.0",
+            "deployedBuiltAt": "2026-01-21T08:21:46Z",
+            "latestBuiltAt": "2026-04-27T07:40:33Z"
           }
         }
       ],
@@ -55147,7 +55003,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.19.1",
-            "deployedTag": "1.19.0"
+            "deployedTag": "1.19.0",
+            "deployedBuiltAt": "2026-03-11T17:10:20Z",
+            "latestBuiltAt": "2026-04-16T09:35:45Z"
           }
         }
       ],
@@ -55191,7 +55049,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "2.20.1",
-            "deployedTag": "2.20.0"
+            "deployedTag": "2.20.0",
+            "deployedBuiltAt": "2026-03-25T15:20:45Z",
+            "latestBuiltAt": "2026-04-16T09:31:59Z"
           }
         }
       ],
@@ -55327,7 +55187,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55378,7 +55240,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55429,7 +55293,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55480,7 +55346,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55531,7 +55399,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         }
       ],
@@ -55584,7 +55454,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55635,7 +55507,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55686,7 +55560,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55737,7 +55613,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55788,7 +55666,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55839,7 +55719,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55890,7 +55772,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55941,7 +55825,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -55992,7 +55878,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56043,7 +55931,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56094,7 +55984,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56145,7 +56037,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56196,7 +56090,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56247,7 +56143,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -56298,7 +56196,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         }
       ],
@@ -57485,7 +57385,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.29.1",
-            "deployedTag": "1.29.0"
+            "deployedTag": "1.29.0",
+            "deployedBuiltAt": "2026-04-01T10:39:10Z",
+            "latestBuiltAt": "2026-05-08T14:37:53Z"
           }
         }
       ],
@@ -57688,29 +57590,26 @@
         {
           "context": "in-cluster",
           "namespace": "driftmowers",
-          "podName": "driftmower-be-7885f5cb84-n2wqd",
-          "uid": "b51f68aa-134e-4c3c-94da-7aff12e7c09c",
+          "podName": "driftmower-be-74958c4b7f-pl9dg",
+          "uid": "8efbdc75-8ce6-454a-8481-1e7788f0d9df",
           "containerName": "driftmower-be",
-          "image": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-          "imageId": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+          "image": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+          "imageId": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
           "controllerKind": "ReplicaSet",
-          "controllerName": "driftmower-be-7885f5cb84",
+          "controllerName": "driftmower-be-74958c4b7f",
           "hasImagePullSecrets": true,
           "imageInfo": {
             "registry": "docker.io",
             "repository": "codemowers/driftmower-be",
-            "tag": "v0.4.0",
-            "digest": "sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
+            "tag": "0.5.0",
+            "digest": "sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
             "repositoryUrl": "https://hub.docker.com/r/codemowers/driftmower-be",
-            "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=v0.4.0"
+            "tagUrl": "https://hub.docker.com/r/codemowers/driftmower-be/tags?name=0.5.0"
           },
-          "originalImage": "codemowers/driftmower-be:v0.4.0@sha256:de10a7655a0eb8a46231f0675fc45ecc4dcb3b121d22202ba85a241201e17e2a",
-          "actualTag": "latest",
-          "allActualTags": [
-            "latest",
-            "v0.4.0"
-          ],
-          "tagStatus": "match",
+          "originalImage": "codemowers/driftmower-be:0.5.0@sha256:e364bc9ab629ce1b0175e03b417b840235776de9c5df5914e8cf9a1399921187",
+          "actualTag": "0.5.0",
+          "allActualTags": [],
+          "tagStatus": "digest_verification_failed",
           "digestSemver": null,
           "workloadRootInfo": {
             "kind": "Deployment",
@@ -57721,8 +57620,12 @@
           },
           "releaseInfo": null,
           "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "v0.4.0"
+            "statusType": "ahead",
+            "majorDifference": 0,
+            "minorDifference": 0,
+            "patchDifference": 0,
+            "latestTag": "v0.4.0",
+            "deployedTag": "0.5.0"
           }
         },
         {
@@ -57763,22 +57666,22 @@
         {
           "context": "in-cluster",
           "namespace": "driftmowers",
-          "podName": "driftmower-ui-7659b94976-z9xtw",
-          "uid": "760b04d5-194e-4332-99da-9c86348e355d",
+          "podName": "driftmower-ui-659fb8dc84-8rt8g",
+          "uid": "9c82fe1e-9131-4d00-979f-0a0428a65740",
           "containerName": "app",
-          "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-          "imageId": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
+          "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+          "imageId": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
           "controllerKind": "ReplicaSet",
-          "controllerName": "driftmower-ui-7659b94976",
+          "controllerName": "driftmower-ui-659fb8dc84",
           "hasImagePullSecrets": true,
           "imageInfo": {
             "registry": "zot.ee-lte-1.codemowers.io",
             "repository": "ua69abad191/driftmower-ui",
-            "tag": "b2f66a1-dirty",
-            "digest": "sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4"
+            "tag": "0.1.0",
+            "digest": "sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b"
           },
-          "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:b2f66a1-dirty@sha256:7f5ee591508e7b1273ba220d514a4d2bb4fc4b5e8732f21f19b6a713fa93a6a4",
-          "actualTag": "b2f66a1-dirty",
+          "originalImage": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui:0.1.0@sha256:c5f16b9c4fa685fdeacec51b94b218f5f989a6ef2b1b48d83392db920e25573b",
+          "actualTag": "0.1.0",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -57791,8 +57694,8 @@
           },
           "releaseInfo": null,
           "versionStatus": {
-            "statusType": "no_version",
-            "deployedTag": "b2f66a1-dirty"
+            "statusType": "no_data",
+            "deployedTag": "0.1.0"
           }
         },
         {
@@ -57870,7 +57773,8 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.14.3",
-            "deployedTag": "1.14.2"
+            "deployedTag": "1.14.2",
+            "deployedBuiltAt": "2026-03-06T06:35:26Z"
           }
         },
         {
@@ -59082,76 +58986,6 @@
         },
         {
           "context": "in-cluster",
-          "namespace": "kube-system",
-          "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-          "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-          "containerName": "driftmower-be",
-          "image": "mirror.gcr.io/aquasec/trivy:0.69.3",
-          "imageId": null,
-          "controllerKind": "Job",
-          "controllerName": "scan-vulnerabilityreport-56c86496c7",
-          "hasImagePullSecrets": false,
-          "imageInfo": {
-            "registry": "mirror.gcr.io",
-            "repository": "aquasec/trivy",
-            "tag": "0.69.3",
-            "digest": null
-          },
-          "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3",
-          "actualTag": "0.69.3",
-          "allActualTags": [],
-          "tagStatus": "no_digest",
-          "digestSemver": null,
-          "workloadRootInfo": {
-            "kind": "Job",
-            "name": "scan-vulnerabilityreport-56c86496c7",
-            "namespace": "kube-system",
-            "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-            "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-          },
-          "releaseInfo": null,
-          "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "0.69.3"
-          }
-        },
-        {
-          "context": "in-cluster",
-          "namespace": "kube-system",
-          "podName": "scan-vulnerabilityreport-56c86496c7-p5ssg",
-          "uid": "1bd7fe72-db78-45a4-8861-d5d4515f14bd",
-          "containerName": "a2a3d46b-6003-4f15-9f9f-9626bc961eb0",
-          "image": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "imageId": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "controllerKind": "Job",
-          "controllerName": "scan-vulnerabilityreport-56c86496c7",
-          "hasImagePullSecrets": false,
-          "imageInfo": {
-            "registry": "mirror.gcr.io",
-            "repository": "aquasec/trivy",
-            "tag": "0.69.3",
-            "digest": "sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
-          },
-          "originalImage": "mirror.gcr.io/aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c",
-          "actualTag": "0.69.3",
-          "allActualTags": [],
-          "tagStatus": "digest_verification_failed",
-          "digestSemver": null,
-          "workloadRootInfo": {
-            "kind": "Job",
-            "name": "scan-vulnerabilityreport-56c86496c7",
-            "namespace": "kube-system",
-            "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-            "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-          },
-          "releaseInfo": null,
-          "versionStatus": {
-            "statusType": "no_data",
-            "deployedTag": "0.69.3"
-          }
-        },
-        {
-          "context": "in-cluster",
           "namespace": "kyverno",
           "podName": "kyverno-migrate-resources-ds54q",
           "uid": "1e622ce1-058a-4e3d-befa-8668370c7110",
@@ -59188,23 +59022,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2b9bg",
-          "uid": "b976b163-788e-4346-bd31-7643141369ec",
+          "podName": "llama-6cjhb",
+          "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -59218,14 +59052,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2b9bg",
-          "uid": "b976b163-788e-4346-bd31-7643141369ec",
+          "podName": "llama-6cjhb",
+          "uid": "101f57dc-0a24-404b-a30d-c4314da33d55",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -59267,23 +59101,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2n58j",
-          "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+          "podName": "llama-6hxkl",
+          "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -59297,14 +59131,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-2n58j",
-          "uid": "edefecd0-4630-4b2b-bd0d-0c07894d4719",
+          "podName": "llama-6hxkl",
+          "uid": "462b148a-6fb7-42dd-83ac-e9b29ec6cc9b",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -59346,23 +59180,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-h29gf",
-          "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+          "podName": "llama-7fwzp",
+          "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -59376,14 +59210,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-h29gf",
-          "uid": "0071cf82-73d8-43d9-b2a0-e572bb1c4f2a",
+          "podName": "llama-7fwzp",
+          "uid": "4e63f5d7-4a53-4db9-b28c-4b13d5c14121",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -59425,23 +59259,23 @@
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-rc27h",
-          "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+          "podName": "llama-jgdlh",
+          "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
           "containerName": "llama",
-          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "imageId": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+          "image": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "imageId": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
           "controllerKind": "DaemonSet",
           "controllerName": "llama",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "ggml-org/llama.cpp",
-            "tag": "server-vulkan-b7993",
-            "digest": "sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
+            "tag": "server-vulkan-b9102",
+            "digest": "sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
             "repositoryUrl": "https://ghcr.io/ggml-org/llama.cpp"
           },
-          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b7993@sha256:42c7fbbe3939b1abb09a0cb2ab59f5d9a66b7dc5a781154f95dba3b1435361fe",
-          "actualTag": "server-vulkan-b7993",
+          "originalImage": "ghcr.io/ggml-org/llama.cpp:server-vulkan-b9102@sha256:344da4e781c7b98458641a3bd8ba88fab9055ffb458311514e5e3c544f1a1a3c",
+          "actualTag": "server-vulkan-b9102",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -59455,14 +59289,14 @@
           "releaseInfo": null,
           "versionStatus": {
             "statusType": "no_version",
-            "deployedTag": "server-vulkan-b7993"
+            "deployedTag": "server-vulkan-b9102"
           }
         },
         {
           "context": "in-cluster",
           "namespace": "llm",
-          "podName": "llama-rc27h",
-          "uid": "36adc9f0-d022-443d-8c0a-b3567f359823",
+          "podName": "llama-jgdlh",
+          "uid": "e62cf696-bb13-4298-9d87-69cfde3445c5",
           "containerName": "model-downloader",
           "image": "curlimages/curl:8.5.0@sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
           "imageId": "sha256:08e466006f0860e54fc299378de998935333e0e130a15f6f98482e9f8dab3058",
@@ -59505,22 +59339,22 @@
           "context": "in-cluster",
           "namespace": "llm",
           "podName": "webui-0",
-          "uid": "8d06ace5-e9ab-4a2a-94cc-946140a16e2b",
+          "uid": "7307a985-3158-4d6e-93e1-baf9447f1b51",
           "containerName": "webui",
-          "image": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-          "imageId": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+          "image": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+          "imageId": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
           "controllerKind": "StatefulSet",
           "controllerName": "webui",
           "hasImagePullSecrets": false,
           "imageInfo": {
             "registry": "ghcr.io",
             "repository": "open-webui/open-webui",
-            "tag": "v0.7.2",
-            "digest": "sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
+            "tag": "v0.9.5",
+            "digest": "sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
             "repositoryUrl": "https://ghcr.io/open-webui/open-webui"
           },
-          "originalImage": "ghcr.io/open-webui/open-webui:v0.7.2@sha256:16d9a3615b45f14a0c89f7ad7a3bf151f923ed32c2e68f9204eb17d1ce40774b",
-          "actualTag": "v0.7.2",
+          "originalImage": "ghcr.io/open-webui/open-webui:v0.9.5@sha256:e045bde3b004cc7f8c319412345eb56c87ea6ac57031534a31ca37ad5424beb3",
+          "actualTag": "v0.9.5",
           "allActualTags": [],
           "tagStatus": "digest_verification_failed",
           "digestSemver": null,
@@ -59538,7 +59372,7 @@
             "minorDifference": 0,
             "patchDifference": 0,
             "latestTag": "v0.4.1",
-            "deployedTag": "v0.7.2"
+            "deployedTag": "v0.9.5"
           }
         },
         {
@@ -61371,7 +61205,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "1.19.1",
-            "deployedTag": "1.19.0"
+            "deployedTag": "1.19.0",
+            "deployedBuiltAt": "2026-03-11T17:10:20Z",
+            "latestBuiltAt": "2026-04-16T09:35:45Z"
           }
         },
         {
@@ -61413,7 +61249,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "2.20.1",
-            "deployedTag": "2.20.0"
+            "deployedTag": "2.20.0",
+            "deployedBuiltAt": "2026-03-25T15:20:45Z",
+            "latestBuiltAt": "2026-04-16T09:31:59Z"
           }
         },
         {
@@ -63717,7 +63555,7 @@
           "context": "in-cluster",
           "namespace": "kube-system",
           "podName": "zot-0",
-          "uid": "869548ee-ff35-4335-b427-95db395ba57f",
+          "uid": "8579dbd7-786e-41a4-869f-f29130b099a2",
           "containerName": "zot",
           "image": "ghcr.io/project-zot/zot:v2.1.15@sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
           "imageId": "sha256:376cb38a335bab89571af306eff481547212746aff11828043c22f32637fe17b",
@@ -63761,7 +63599,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "v2.1.16",
-            "deployedTag": "v2.1.15"
+            "deployedTag": "v2.1.15",
+            "deployedBuiltAt": "2026-03-08T22:36:42Z",
+            "latestBuiltAt": "2026-04-19T06:31:16Z"
           }
         }
       ],
@@ -64139,7 +63979,9 @@
             "minorDifference": 0,
             "patchDifference": 1,
             "latestTag": "2.5.2",
-            "deployedTag": "2.5.1"
+            "deployedTag": "2.5.1",
+            "deployedBuiltAt": "2025-12-11T00:43:47Z",
+            "latestBuiltAt": "2026-04-23T11:01:57Z"
           }
         }
       ],
@@ -64298,7 +64140,8 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "3.7.1",
-            "deployedTag": "3.6.7"
+            "deployedTag": "3.6.7",
+            "deployedBuiltAt": "2026-02-23T09:25:06Z"
           }
         },
         {
@@ -64350,7 +64193,9 @@
             "minorDifference": 2,
             "patchDifference": 0,
             "latestTag": "2.7.1",
-            "deployedTag": "2.5.0"
+            "deployedTag": "2.5.0",
+            "deployedBuiltAt": "2026-01-21T08:21:46Z",
+            "latestBuiltAt": "2026-04-27T07:40:33Z"
           }
         }
       ],
@@ -65070,7 +64915,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65121,7 +64968,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65172,7 +65021,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65223,7 +65074,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65274,7 +65127,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65325,7 +65180,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65376,7 +65233,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65427,7 +65286,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65478,7 +65339,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65529,7 +65392,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65580,7 +65445,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65631,7 +65498,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65682,7 +65551,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65733,7 +65604,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65784,7 +65657,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65835,7 +65710,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65886,7 +65763,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65937,7 +65816,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -65988,7 +65869,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         },
         {
@@ -66039,7 +65922,9 @@
             "minorDifference": 1,
             "patchDifference": 0,
             "latestTag": "0.41.0",
-            "deployedTag": "0.40.2"
+            "deployedTag": "0.40.2",
+            "deployedBuiltAt": "2026-04-01T09:10:36Z",
+            "latestBuiltAt": "2026-05-01T08:14:12Z"
           }
         }
       ],
@@ -66202,7 +66087,6 @@
       "docker.io/library/redis": 0,
       "docker.io/traefik/whoami": 0,
       "docker.io/library/traefik": 0,
-      "mirror.gcr.io/aquasec/trivy": 0,
       "mirror.gcr.io/aquasec/trivy-operator": 0,
       "mirror.gcr.io/prom/node-exporter": 0,
       "reg.kyverno.io/kyverno/kyverno": 0,
@@ -66301,10 +66185,10 @@
       "kyverno/policy-reporter-5d658bffd6-76v6x/policy-reporter": 0,
       "kyverno/policy-reporter-kyverno-plugin-8cf456bd6-rhn9s/policy-reporter-kyverno-plugin": 0,
       "kyverno/policy-reporter-ui-5665d984f8-tsdl2/policy-reporter-ui": 0,
-      "llm/llama-2b9bg/llama": 0,
-      "llm/llama-2n58j/llama": 0,
-      "llm/llama-h29gf/llama": 0,
-      "llm/llama-rc27h/llama": 0,
+      "llm/llama-6cjhb/llama": 0,
+      "llm/llama-6hxkl/llama": 0,
+      "llm/llama-7fwzp/llama": 0,
+      "llm/llama-jgdlh/llama": 0,
       "llm/webui-0/webui": 0,
       "passmower/passmower-7d7fd9cdb6-4xx9g/passmower": 0,
       "rabbitmq-system/messaging-topology-operator-7cfcb698f9-2mgbl/manager": 0,
@@ -66332,7 +66216,7 @@
       "default/hello-world-cpp-nrhrp/app": 0,
       "rasmus/hello-world-cpp-25vdx/app": 0,
       "driftmower-ns/driftmower-ui-5757d9f554-vm9kd/driftmower-ui": 0,
-      "driftmowers/driftmower-ui-7659b94976-z9xtw/app": 0,
+      "driftmowers/driftmower-ui-659fb8dc84-8rt8g/app": 0,
       "driftmowers/driftmower-explorer-5b5fd9b86d-dvmxn/app": 0,
       "dragonfly-operator-system/dragonfly-operator-8fc6d946b-brtq4/manager": 0,
       "memelord-laurivosandi/memelord-memelord-laurivosandi-redis-0/dragonfly": 0,
@@ -66346,7 +66230,7 @@
       "kube-system/netstatd-9wtjh/netstatd": 0,
       "kube-system/netstatd-k6rqs/netstatd": 0,
       "kube-system/netstatd-q6kjl/netstatd": 0,
-      "driftmowers/driftmower-be-7885f5cb84-n2wqd/driftmower-be": 0,
+      "driftmowers/driftmower-be-74958c4b7f-pl9dg/driftmower-be": 0,
       "emqx-operator-system/emqx-operator-controller-manager-5f8978596b-4fm5q/manager": 0,
       "kube-system/coredns-596f5b4bf4-5n889/coredns": 0,
       "kube-system/helm-install-cert-manager-csi-driver-nvn8h/helm": 0,
@@ -66374,10 +66258,10 @@
       "kube-system/helm-install-trust-manager-mdrth/helm": 0,
       "kube-system/helm-install-zot-95zwn/helm": 0,
       "kube-system/trivy-ui-84c867bd5f-9c5d2/trivy-ui": 0,
-      "llm/llama-2b9bg/model-downloader": 4,
-      "llm/llama-2n58j/model-downloader": 4,
-      "llm/llama-h29gf/model-downloader": 4,
-      "llm/llama-rc27h/model-downloader": 4,
+      "llm/llama-6cjhb/model-downloader": 4,
+      "llm/llama-6hxkl/model-downloader": 4,
+      "llm/llama-7fwzp/model-downloader": 4,
+      "llm/llama-jgdlh/model-downloader": 4,
       "memelord-laurivosandi/memelord-memelord-laurivosandi-app-84959984b6-2ncll/memelord": 0,
       "memelord-laurivosandi/memelord-memelord-laurivosandi-app-84959984b6-5dxvv/memelord": 0,
       "memelord-laurivosandi/memelord-memelord-laurivosandi-app-84959984b6-srzm7/memelord": 0,
@@ -66405,8 +66289,6 @@
       "passmower/whoami-7c98b44d8d-fwzzm/whoami": 0,
       "traefik/traefik-56bcc474ff-gbt44/traefik": 0,
       "traefik/traefik-56bcc474ff-mplcj/traefik": 0,
-      "kube-system/scan-vulnerabilityreport-56c86496c7-p5ssg/driftmower-be": 0,
-      "kube-system/scan-vulnerabilityreport-56c86496c7-p5ssg/a2a3d46b-6003-4f15-9f9f-9626bc961eb0": 0,
       "kube-system/trivy-operator-5f6879ccc-jcp9g/trivy-operator": 0,
       "monitoring/node-exporter-2jbzw/node-exporter": 0,
       "monitoring/node-exporter-bw64j/node-exporter": 0,
@@ -66429,7 +66311,7 @@
       "prometheus-operator/prometheus-operator-kube-state-metrics-6757f74768-5mwm6/kube-state-metrics": 0,
       "redpanda/redpanda-operator-5fbd5b47fb-n56q8/manager": 0
     },
-    "totalContainers": 212,
+    "totalContainers": 210,
     "workloadScores": {
       "Deployment/cert-manager/cert-manager": {
         "groupKey": "Deployment/cert-manager/cert-manager",
@@ -67102,20 +66984,6 @@
         "distinctRepoCount": 1,
         "staleRepoCount": 0,
         "totalContainers": 4
-      },
-      "Job/kube-system/scan-vulnerabilityreport-56c86496c7": {
-        "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7",
-        "workloadRootInfo": {
-          "kind": "Job",
-          "name": "scan-vulnerabilityreport-56c86496c7",
-          "namespace": "kube-system",
-          "uid": "336d0206-891c-4580-bbf8-f8c79a9a382b",
-          "groupKey": "Job/kube-system/scan-vulnerabilityreport-56c86496c7"
-        },
-        "normalizedScore": 0,
-        "distinctRepoCount": 1,
-        "staleRepoCount": 0,
-        "totalContainers": 2
       },
       "Deployment/kube-system/trivy-operator": {
         "groupKey": "Deployment/kube-system/trivy-operator",
@@ -68166,12 +68034,6 @@
       "reason": "forbidden"
     },
     {
-      "image": "docker.io/codemowers/driftmower-be",
-      "type": "scraper_failed",
-      "message": "Could not get image info \u2014 unexpected error from the registry",
-      "reason": "pending"
-    },
-    {
       "image": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-explorer",
       "type": "unauthorized",
       "message": "Could not get image info \u2014 access denied by the registry",
@@ -68191,12 +68053,6 @@
     },
     {
       "image": "git.codemowers.io/laurivosandi/netstatd",
-      "type": "unauthorized",
-      "message": "Could not get image info \u2014 access denied by the registry",
-      "reason": "forbidden"
-    },
-    {
-      "image": "mirror.gcr.io/aquasec/trivy",
       "type": "unauthorized",
       "message": "Could not get image info \u2014 access denied by the registry",
       "reason": "forbidden"

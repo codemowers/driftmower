@@ -60,6 +60,8 @@ export type ImageUsage = {
     majorDifference: number
     minorDifference: number
     patchDifference: number
+    deployedBuiltAt?: string                           // ISO 8601, when present
+    latestBuiltAt?: string                             // ISO 8601, when present
   }
   workloadRootInfo: {
     kind: string
