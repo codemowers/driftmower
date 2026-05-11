@@ -1,0 +1,50 @@
+"use client"
+
+import { useState } from "react"
+import { cn } from "@/lib/utils"
+import type { ImageUsage, Issue } from "@/lib/cluster/reports"
+import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import ContainersTab from "./containers-tab"
+import PortsTab from "./ports-tab"
+import LogsTab from "./logs-tab"
+import MetadataTab from "./metadata-tab"
+
+const TABS = ["Containers", "Ports", "Logs", "Metadata"] as const
+type Tab = typeof TABS[number]
+
+type Props = {
+  pod: ExplorerResource
+  usages: ImageUsage[]
+  issues: Issue[]
+}
+
+export default function PodTabs({ pod, usages, issues }: Props) {
+  const [active, setActive] = useState<Tab>("Containers")
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex border-b border-gray-200">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActive(tab)}
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium transition-colors",
+              active === tab
+                ? "border-b-2 border-brand text-brand-text"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {active === "Containers" && <ContainersTab usages={usages} issues={issues} />}
+      {active === "Ports" && <PortsTab pod={pod} />}
+      {active === "Logs" && <LogsTab />}
+      {active === "Metadata" && <MetadataTab pod={pod} />}
+    </div>
+  )
+}

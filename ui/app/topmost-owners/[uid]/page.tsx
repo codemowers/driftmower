@@ -1,11 +1,13 @@
 "use client"
 
 import { useParams } from "next/navigation"
+import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
-import WorkloadHeader from "./components/workload-header"
+import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
+import NetworkCard from "@/app/components/network-card"
 import WorkloadTabs from "./components/workload-tabs"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -77,20 +79,28 @@ export default function WorkloadDetailPage() {
     : undefined
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
+  const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
+  const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
+  const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
+  const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
+  if (!isHelm) headerChips.push({ label: "standalone", tone: "muted" })
+
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-        <WorkloadHeader
-          kind={kind}
-          name={name}
-          namespace={namespace}
-          manager={{ kind: isHelm ? "helm" : "standalone" }}
-          totalContainers={totalContainers}
-          totalPods={totalPods}
-          worstStatus={worstStatus}
-          normalizedScore={normalizedScore}
+        <ResourceHeader
+          icon={Boxes}
+          iconAriaLabel="Workload"
+          title={name}
+          copyValue={name}
+          breadcrumbs={[
+            { label: "Topmost Owners", href: backHref },
+            { label: name },
+          ]}
+          chips={headerChips}
+          scoreChip={{ status: worstStatus, score: normalizedScore }}
           issueCount={issueCount}
-          reportId={reportId}
+          subtitle={`${namespace} · ${containerLabel} · ${podLabel}`}
         />
 
         <WorkloadStats
@@ -107,7 +117,12 @@ export default function WorkloadDetailPage() {
           <ManagerCard releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
         )}
 
-        <WorkloadTabs usages={usages} issues={data.issues} explorerResources={explorerResources} workloadUid={uid} />
+        <NetworkCard
+          href={reportId ? `/topmost-owners/${uid}/network-topology?report=${reportId}` : `/topmost-owners/${uid}/network-topology`}
+          scopeLabel={totalPods === 1 ? "1 pod" : `${totalPods} pods`}
+        />
+
+        <WorkloadTabs usages={usages} issues={data.issues} explorerResources={explorerResources} workloadUid={uid} reportId={reportId} />
       </main>
     </div>
   )

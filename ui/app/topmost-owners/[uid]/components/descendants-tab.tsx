@@ -1,9 +1,11 @@
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { ExplorerResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   explorerResources: ExplorerResource[] | null
   workloadUid: string
+  reportId: string | null
 }
 
 const PHASE_DOT: Record<string, string> = {
@@ -44,7 +46,7 @@ function buildRows(root: ExplorerResource, childIndex: Map<string, ExplorerResou
   return rows
 }
 
-export default function DescendantsTab({ explorerResources, workloadUid }: Props) {
+export default function DescendantsTab({ explorerResources, workloadUid, reportId }: Props) {
   if (explorerResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
@@ -79,19 +81,26 @@ export default function DescendantsTab({ explorerResources, workloadUid }: Props
           const isEmptyReplicaSet = r.kind === "ReplicaSet" && childCount === 0
           const dim = isEmptyReplicaSet
 
-          return (
-            <div
-              key={r.uid}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3",
-                idx > 0 && "border-t border-gray-100"
-              )}
-            >
+          const isPod = r.kind === "Pod"
+          const podHref = isPod
+            ? (reportId
+                ? `/topmost-owners/${workloadUid}/${r.uid}?report=${reportId}`
+                : `/topmost-owners/${workloadUid}/${r.uid}`)
+            : null
+
+          const rowClassName = cn(
+            "flex items-center gap-3 px-4 py-3",
+            idx > 0 && "border-t border-gray-100",
+            podHref && "transition-colors hover:bg-brand-bg/30",
+          )
+
+          const inner = (
+            <>
               {prefix && (
                 <span className="whitespace-pre text-gray-400">{prefix}</span>
               )}
 
-              {r.kind === "Pod" && (
+              {isPod && (
                 <span className={cn("size-2.5 shrink-0 rounded-full", PHASE_DOT[r.phase ?? ""] ?? "bg-gray-400")} />
               )}
 
@@ -117,7 +126,7 @@ export default function DescendantsTab({ explorerResources, workloadUid }: Props
                 <span className="text-xs text-muted-foreground">· {childCount} {childCount === 1 ? "pod" : "pods"}</span>
               )}
 
-              {r.kind === "Pod" && (r.nodeName || r.ips?.[0]) && (
+              {isPod && (r.nodeName || r.ips?.[0]) && (
                 <>
                   {r.nodeName && (
                     <span className="ml-auto text-xs text-muted-foreground">{r.nodeName}</span>
@@ -127,6 +136,16 @@ export default function DescendantsTab({ explorerResources, workloadUid }: Props
                   )}
                 </>
               )}
+            </>
+          )
+
+          return podHref ? (
+            <Link key={r.uid} href={podHref} className={rowClassName}>
+              {inner}
+            </Link>
+          ) : (
+            <div key={r.uid} className={rowClassName}>
+              {inner}
             </div>
           )
         })}

@@ -9,7 +9,7 @@ import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
 
-const TABS = ["Containers", "Pods", "Descendants", "Topology", "Metadata"] as const
+const TABS = ["Containers", "Pods", "Descendants", "Metadata"] as const
 type Tab = typeof TABS[number]
 
 type Props = {
@@ -17,9 +17,10 @@ type Props = {
   issues: Issue[]
   explorerResources: ExplorerResource[] | null
   workloadUid: string
+  reportId: string | null
 }
 
-export default function WorkloadTabs({ usages, issues, explorerResources, workloadUid }: Props) {
+export default function WorkloadTabs({ usages, issues, explorerResources, workloadUid, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -46,13 +47,10 @@ export default function WorkloadTabs({ usages, issues, explorerResources, worklo
         <ContainersTab usages={usages} issues={issues} />
       )}
       {active === "Pods" && (
-        <PodsTab explorerResources={explorerResources} workloadUid={workloadUid} />
+        <PodsTab explorerResources={explorerResources} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Descendants" && (
-        <DescendantsTab explorerResources={explorerResources} workloadUid={workloadUid} />
-      )}
-      {active === "Topology" && (
-        <p className="text-sm text-muted-foreground">Topology / Network view coming soon. (needs netstatd integration)</p>
+        <DescendantsTab explorerResources={explorerResources} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Metadata" && (
         <MetadataTab explorerResources={explorerResources} workloadUid={workloadUid} />

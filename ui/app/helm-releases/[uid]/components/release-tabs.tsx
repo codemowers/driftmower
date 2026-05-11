@@ -15,9 +15,10 @@ type Props = {
   issues: Issue[]
   explorerResources: ExplorerResource[] | null
   releaseInfo: ReleaseInfo
+  reportId: string | null
 }
 
-export default function ReleaseTabs({ usages, issues, explorerResources, releaseInfo }: Props) {
+export default function ReleaseTabs({ usages, issues, explorerResources, releaseInfo, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -41,10 +42,10 @@ export default function ReleaseTabs({ usages, issues, explorerResources, release
       </div>
 
       {active === "Containers" && (
-        <ContainersTab usages={usages} issues={issues} />
+        <ContainersTab usages={usages} issues={issues} reportId={reportId} />
       )}
       {active === "Resources" && (
-        <ResourcesTab usages={usages} explorerResources={explorerResources} releaseInfo={releaseInfo} />
+        <ResourcesTab usages={usages} explorerResources={explorerResources} releaseInfo={releaseInfo} reportId={reportId} />
       )}
       {active === "Values" && (
         <p className="text-sm text-muted-foreground">Values not available coming soon</p>

@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
@@ -5,6 +6,7 @@ import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
 type Props = {
   usages: ImageUsage[]
   issues: Issue[]
+  reportId: string | null
 }
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
@@ -17,7 +19,7 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Deployed", "Latest", "Status"]
 
-export default function ContainersTab({ usages, issues }: Props) {
+export default function ContainersTab({ usages, issues, reportId }: Props) {
 
   const workloadMap = usages.reduce<Map<string, ImageUsage[]>>((map, u) => {
     if (!u.workloadRootInfo) return map
@@ -36,7 +38,10 @@ export default function ContainersTab({ usages, issues }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {Array.from(workloadMap.entries()).map(([workloadKey, containers]) => {
-        const { kind, name, namespace } = containers[0].workloadRootInfo!
+        const { kind, name, namespace, uid: workloadUid } = containers[0].workloadRootInfo!
+        const workloadHref = reportId
+          ? `/topmost-owners/${workloadUid}?report=${reportId}`
+          : `/topmost-owners/${workloadUid}`
 
         const deduped = new Map<string, { usage: ImageUsage; count: number }>()
         for (const u of containers) {
@@ -48,14 +53,16 @@ export default function ContainersTab({ usages, issues }: Props) {
 
         return (
           <div key={workloadKey} className="overflow-hidden rounded-xl border border-gray-200">
-            {/* Workload header */}
-            <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
+            <Link
+              href={workloadHref}
+              className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5 transition-colors hover:bg-brand-bg/30"
+            >
               <span className="rounded bg-brand-bg px-1.5 py-0.5 text-xs font-semibold text-brand-label">
                 {kind}
               </span>
               <span className="text-sm font-semibold text-foreground">{name}</span>
               <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
-            </div>
+            </Link>
 
             {/* Column headers */}
             <div className={cn("grid gap-4 border-b border-gray-100 px-4 py-3", GRID)}>
