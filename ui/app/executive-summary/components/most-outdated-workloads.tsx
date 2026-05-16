@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
 
@@ -28,6 +29,7 @@ function worstStatus(usages: ImageUsage[]): StatusType {
 
 export type OutdatedWorkloadEntry = {
   key: string
+  uid: string
   kind: string
   name: string
   namespace: string
@@ -36,22 +38,29 @@ export type OutdatedWorkloadEntry = {
   statusType: StatusType
 }
 
-type Props = { entries: OutdatedWorkloadEntry[] }
+type Props = { entries: OutdatedWorkloadEntry[]; reportId: string | null }
 
-export default function MostOutdatedWorkloads({ entries }: Props) {
+export default function MostOutdatedWorkloads({ entries, reportId }: Props) {
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex flex-col rounded-xl border border-gray-200 bg-white py-5">
+      <p className="mb-4 px-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Top 5 Most Outdated Workloads
       </p>
       {entries.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data available.</p>
+        <p className="px-6 text-sm text-muted-foreground">No data available.</p>
       ) : (
         <div className="flex flex-col divide-y divide-gray-100">
           {entries.map(e => {
             const style = SEVERITY_STYLE[e.statusType]
+            const href = reportId
+              ? `/topmost-owners/${e.uid}?report=${reportId}`
+              : `/topmost-owners/${e.uid}`
             return (
-              <div key={e.key} className="flex items-center gap-4 py-2.5">
+              <Link
+                key={e.key}
+                href={href}
+                className="flex items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg/30"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-foreground">{e.name}</p>
                   <p className="font-mono text-xs text-muted-foreground">{e.namespace} · {e.kind}</p>
@@ -74,7 +83,7 @@ export default function MostOutdatedWorkloads({ entries }: Props) {
                     no data
                   </span>
                 )}
-              </div>
+              </Link>
             )
           })}
         </div>

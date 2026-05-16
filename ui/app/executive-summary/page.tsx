@@ -64,9 +64,10 @@ export default function ExecutiveSummaryPage() {
     .map(([key, workloadUsages]) => {
       const status = worstStatus(workloadUsages)
       const worstUsage = workloadUsages.find(u => u.versionStatus.statusType === status)
-      const { kind, name, namespace } = workloadUsages[0].workloadRootInfo!
+      const { kind, name, namespace, uid } = workloadUsages[0].workloadRootInfo!
       return {
         key,
+        uid,
         kind,
         name,
         namespace,
@@ -141,7 +142,7 @@ export default function ExecutiveSummaryPage() {
         <DriftBreakdown ok={okCount} patch={patchCount} minor={minorCount} major={majorCount} />
 
         <div className="grid grid-cols-[3fr_2fr] gap-5">
-          <MostOutdatedWorkloads entries={topOutdatedWorkloads} />
+          <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} />
           <ScraperIssues issues={data?.issues ?? []} />
         </div>
 
