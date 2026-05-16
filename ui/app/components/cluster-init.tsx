@@ -38,7 +38,7 @@ export default function ClusterInit() {
         } catch {}
 
         try {
-          const res = await fetch(EXPLORER_RESOURCES_URL)
+          const res = await fetch(EXPLORER_RESOURCES_URL, { cache: "no-store" })
           const data = await res.json()
           if (cancelled) return
           useClusterState.setState({ explorerResources: data })

@@ -15,6 +15,7 @@ export async function checkConnection(): Promise<void> {
     const res = await fetch(KUBERNETES_CONTEXTS_URL, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
+      cache: "no-store",
     })
 
     if (!res.ok) throw new Error("failed to connect to backend")
