@@ -12,6 +12,7 @@ spec:
       labels:
         app: driftmower-ui
     spec:
+      serviceAccountName: driftmower-ui
       nodeSelector:
         kubernetes.io/arch: amd64
       imagePullSecrets:

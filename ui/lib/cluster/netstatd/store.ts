@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { CONFIG_URL } from "../constants"
+import { NETSTATD_ENDPOINT_URL } from "../constants"
 import { useClusterState } from "../cluster-state"
 import { findDescendantPodUids, type WorkloadScope } from "./selectors"
 
@@ -188,10 +188,10 @@ export const useNetstatd = create<NetstatdState>(initial)
 let cachedNetstatdUrl: string | null = null
 async function fetchNetstatdUrl(): Promise<string> {
   if (cachedNetstatdUrl !== null) return cachedNetstatdUrl
-  const res = await fetch(CONFIG_URL, { cache: "no-store" })
-  if (!res.ok) throw new Error(`Failed to fetch runtime config: ${res.status}`)
-  const json = (await res.json()) as { netstatdPublicUrl?: string }
-  cachedNetstatdUrl = json.netstatdPublicUrl ?? ""
+  const res = await fetch(NETSTATD_ENDPOINT_URL, { cache: "no-store" })
+  if (!res.ok) throw new Error(`Failed to discover netstatd endpoint: ${res.status}`)
+  const json = (await res.json()) as { url?: string }
+  cachedNetstatdUrl = json.url ?? ""
   return cachedNetstatdUrl
 }
 
