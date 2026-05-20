@@ -34,7 +34,7 @@ export default function PortsTab({ pod }: Props) {
         ) : rows.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
             <p className="text-sm text-muted-foreground">
-              No listening ports observed. Netstatd only captures binds the agent witnesses live — pods that bound their ports before the agent started won&apos;t appear.
+              No listening ports observed.
             </p>
           </div>
         ) : (
