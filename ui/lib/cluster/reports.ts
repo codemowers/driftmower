@@ -39,12 +39,31 @@ export type WorkloadScore = {
   }
 }
 
+export type ScrapeStatus = {
+  timestamp: number
+  success: boolean
+  partial: boolean
+  reason: string
+  filteredTagCount: number
+  lastScrape: string
+}
+
 export type ImageUsage = {
+  context: string
   namespace: string
   podName: string
+  uid: string
   containerName: string
   image: string
+  originalImage: string
+  imageId: string
+  controllerKind: string
+  controllerName: string
+  hasImagePullSecrets: boolean
   actualTag: string
+  allActualTags: string[]
+  tagStatus: string
+  digestSemver: string | null
   imageInfo: {
     registry: string
     repository: string
@@ -52,6 +71,8 @@ export type ImageUsage = {
     digest: string
     repositoryUrl?: string
     tagUrl?: string
+    endOfLifeDate?: string                             // ISO date; only present for products tracked by an EOL data source
+    endOfActiveSupportDate?: string                    // ISO date; same caveat
   }
   versionStatus: {
     statusType: StatusType
@@ -60,8 +81,8 @@ export type ImageUsage = {
     majorDifference: number
     minorDifference: number
     patchDifference: number
-    deployedBuiltAt?: string                           // ISO 8601, when present
-    latestBuiltAt?: string                             // ISO 8601, when present
+    deployedBuiltAt?: string                           // ISO 8601; sparsely populated
+    latestBuiltAt?: string                             // ISO 8601; sparsely populated
   }
   workloadRootInfo: {
     kind: string
@@ -93,10 +114,17 @@ export type Report = {
     workloadGroupMap: Record<string, ImageUsage[]>
     registryRepoMap: Record<string, unknown>
     excludedContainerCount: number
+    availableTagsMap: Record<string, string[]>
+    consideredTagsMap: Record<string, string[]>
+    filteredTagsMap: Record<string, string[]>
+    irrelevantTagsMap: Record<string, string[]>
+    latestSemverMap: Record<string, string>
+    scrapeStatusMap: Record<string, ScrapeStatus>
   }
   rotenness: {
     normalizedScore: number
     totalContainers: number
+    containerScores: Record<string, unknown>
     releaseScores: Record<string, ReleaseScore>
     workloadScores: Record<string, WorkloadScore>
     repoScores: Record<string, unknown>
