@@ -88,7 +88,7 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
   const unknownTotal = aggregated.unknownOut.length
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <StickyHeader
         kind={kind}
         namespace={namespace}
@@ -97,6 +97,7 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
         lastFlushedAt={lastFlushedAt}
       />
 
+      <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
           { label: "Topmost Owners", href: ownersHref },
@@ -219,7 +220,8 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
           <PortMatrix matrix={matrix} />
         </div>
       </section>
-    </div>
+      </div>
+    </>
   )
 }
 

@@ -92,7 +92,7 @@ export default function NetworkTopologyClient({
   const unknownTotal = aggregated.unknownOut.length
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <StickyHeader
         kind="Pod"
         namespace={namespace}
@@ -101,6 +101,7 @@ export default function NetworkTopologyClient({
         lastFlushedAt={lastFlushedAt}
       />
 
+      <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
           { label: "Topmost Owners", href: ownersHref },
@@ -211,7 +212,8 @@ export default function NetworkTopologyClient({
       >
         <ExternalList rows={aggregated.external} />
       </Section>
-    </div>
+      </div>
+    </>
   )
 }
 

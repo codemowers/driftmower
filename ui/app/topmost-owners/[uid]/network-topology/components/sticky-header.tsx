@@ -46,7 +46,7 @@ export default function StickyHeader({ kind, namespace, name, status, lastFlushe
     <div
       className={cn(
         "sticky top-0 z-30 -mx-7 border-b border-transparent bg-white/95 px-7 backdrop-blur transition-all",
-        scrolled ? "border-gray-200 py-3" : "py-0",
+        scrolled ? "border-gray-200 py-3" : "py-0 -mb-6",
       )}
     >
       <div className={cn("flex items-center justify-between gap-6", scrolled ? "h-auto" : "h-0 opacity-0 overflow-hidden")}>
