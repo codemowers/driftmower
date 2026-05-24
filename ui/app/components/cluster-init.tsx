@@ -3,11 +3,9 @@
 import { useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { checkConnection } from "@/lib/cluster/check-connection"
-import { fetchLatestReport, fetchReport } from "@/lib/cluster/reports"
+import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
+import { startLiveDataFetching } from "@/lib/cluster/live-data"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { EXPLORER_RESOURCES_URL } from "@/lib/cluster/constants"
-
-const LIVE_DATA_FETCH_INTERVAL = 30000;
 
 export default function ClusterInit() {
   const searchParams = useSearchParams()
@@ -19,38 +17,12 @@ export default function ClusterInit() {
   useEffect(() => {
     async function init() {
       await checkConnection()
-      if (reportParam) {
-        await fetchReport(reportParam)
-      } else {
-        await fetchLatestReport()
-      }
+      await fetchDynamicData(reportParam)
     }
     void init()
   }, [reportParam])
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function liveDataFetching() {
-      while (!cancelled) {
-        try {
-          await checkConnection()
-        } catch {}
-
-        try {
-          const res = await fetch(EXPLORER_RESOURCES_URL, { cache: "no-store" })
-          const data = await res.json()
-          if (cancelled) return
-          useClusterState.setState({ explorerResources: data })
-        } catch {}
-
-        await new Promise(r => setTimeout(r, LIVE_DATA_FETCH_INTERVAL))
-      }
-    }
-
-    void liveDataFetching()
-    return () => { cancelled = true }
-  }, [])
+  useEffect(() => startLiveDataFetching(), [])
 
   useEffect(() => {
     if (!reportId) return

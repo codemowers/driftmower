@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
+import type { VulnerabilityReport } from "./vulnerability/types"
 
 export type ExplorerResource = {
   type: string
@@ -30,6 +31,7 @@ export type ClusterState = {
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
   explorerResources: ExplorerResource[] | null
+  vulnerabilityReports: Record<string, VulnerabilityReport> | null
 }
 
 export const useClusterState = create<ClusterState>(() => ({
@@ -44,4 +46,5 @@ export const useClusterState = create<ClusterState>(() => ({
   socketProgress: null,
   containerCount: null,
   explorerResources: null,
+  vulnerabilityReports: null,
 }))

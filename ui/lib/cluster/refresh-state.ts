@@ -1,7 +1,7 @@
 import { io, type Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
 import { ANALYZE_CLUSTER_URL, CONFIG_URL } from "./constants"
-import { fetchLatestReport } from "./reports"
+import { fetchDynamicData } from "./dynamic-data"
 
 export type { ImageUsage } from "./reports"
 
@@ -56,7 +56,7 @@ export async function refreshState(): Promise<void> {
     })
     if (!res.ok) throw new Error(`Failed to fetch cluster data: ${res.status}`)
     useClusterState.setState({ socketProgress: null })
-    await fetchLatestReport()
+    await fetchDynamicData()
     useClusterState.setState({ isLoading: false })
   } catch (e) {
     useClusterState.setState({
