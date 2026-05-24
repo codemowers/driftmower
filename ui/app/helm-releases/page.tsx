@@ -46,7 +46,7 @@ export default function HelmReleasesPage() {
         return {
           groupKey: score.groupKey,
           releaseInfo: score.releaseInfo,
-          normalizedScore: score.normalizedScore,
+          normalizedScore: score.distinctRepoCount > 0 ? score.staleRepoCount / score.distinctRepoCount : 0,
           staleRepoCount: score.staleRepoCount,
           distinctRepoCount: score.distinctRepoCount,
           totalContainers: score.totalContainers,

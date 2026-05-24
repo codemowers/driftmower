@@ -41,6 +41,8 @@ export default function HelmReleaseDetailPage() {
 
   const usages = data.report.releaseGroupMap[score.groupKey] ?? []
 
+  const normalizedScore = score.distinctRepoCount > 0 ? score.staleRepoCount / score.distinctRepoCount : 0
+
   const worstStatus = usages.reduce<StatusType>((worst, u) => {
     const s = u.versionStatus.statusType
     return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
@@ -67,13 +69,13 @@ export default function HelmReleaseDetailPage() {
             { label: score.releaseInfo.name },
           ]}
           chips={[{ label: score.releaseInfo.managementKind, tone: "brand" }]}
-          scoreChip={{ status: worstStatus, score: score.normalizedScore }}
+          scoreChip={{ status: worstStatus, score: normalizedScore }}
           issueCount={issueCount}
           subtitle={`${score.releaseInfo.namespace} · ${containerLabel} · ${workloadLabel}`}
         />
 
         <ReleaseStats
-          normalizedScore={score.normalizedScore}
+          normalizedScore={normalizedScore}
           staleRepoCount={score.staleRepoCount}
           distinctRepoCount={score.distinctRepoCount}
           totalContainers={score.totalContainers}
