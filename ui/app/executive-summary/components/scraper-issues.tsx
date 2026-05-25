@@ -1,21 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { Issue } from "@/lib/cluster/reports"
 
 const TYPE_STYLE: Record<string, { bg: string; text: string }> = {
   scraper_failed:  { bg: "bg-status-major-bg", text: "text-status-major-label" },
   unauthorized:    { bg: "bg-status-minor-bg", text: "text-status-minor-label" },
-  no_tags:         { bg: "bg-gray-100",         text: "text-muted-foreground" },
+  no_tags:         { bg: "bg-status-patch-bg",  text: "text-status-patch-label" },
 }
 
 function issueStyle(type: string) {
   return TYPE_STYLE[type] ?? { bg: "bg-gray-100", text: "text-muted-foreground" }
 }
 
-function shortImage(image: string): string {
-  return image.replace(/^[^/]+\//, "").split("@")[0]
+function splitImage(image: string): { registry: string | null; repo: string } {
+  const ref = image.split("@")[0]
+  const slash = ref.indexOf("/")
+  if (slash === -1) return { registry: null, repo: ref }
+  const registry = ref.slice(0, slash)
+  const isRegistry = registry.includes(".") || registry.includes(":")
+  return isRegistry ? { registry, repo: ref.slice(slash + 1) } : { registry: null, repo: ref }
 }
 
 const INITIAL_COUNT = 8
@@ -24,8 +31,22 @@ type Props = { issues: Issue[] }
 
 export default function ScraperIssues({ issues }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const data = useClusterState(s => s.data)
+  const reportId = useClusterState(s => s.reportId)
   const shown = expanded ? issues : issues.slice(0, INITIAL_COUNT)
   const overflow = issues.length - INITIAL_COUNT
+
+  const targetByImage = useMemo(() => {
+    const map = new Map<string, { uid: string; digest: string }>()
+    for (const u of data?.report.imageUsages ?? []) {
+      if (!u.workloadRootInfo) continue
+      const repo = `${u.imageInfo.registry}/${u.imageInfo.repository}`
+      const existing = map.get(repo)
+      if (existing && existing.digest) continue
+      map.set(repo, { uid: u.workloadRootInfo.uid, digest: u.imageInfo.digest })
+    }
+    return map
+  }, [data])
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white px-6 py-5">
@@ -38,15 +59,38 @@ export default function ScraperIssues({ issues }: Props) {
         <div className={cn("flex flex-col divide-y divide-gray-100", expanded && "max-h-160 overflow-y-auto")}>
           {shown.map((issue, i) => {
             const style = issueStyle(issue.type)
-            return (
-              <div key={i} className="flex items-center gap-3 py-2.5">
+            const { registry, repo } = splitImage(issue.image)
+            const target = targetByImage.get(issue.image)
+            const content = (
+              <>
                 <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", style.bg, style.text)}>
                   {issue.type.replace(/_/g, " ")}
                 </span>
-                <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                  {shortImage(issue.image)}
+                <span className="min-w-0 truncate font-mono text-xs">
+                  {registry && <span className="text-gray-400">{registry}/</span>}
+                  <span className="text-muted-foreground">{repo}</span>
                 </span>
-              </div>
+              </>
+            )
+            if (!target) {
+              return (
+                <div key={i} className="-mx-2 flex items-center gap-3 px-2 py-2.5">
+                  {content}
+                </div>
+              )
+            }
+            const reportQuery = reportId ? `?report=${reportId}` : ""
+            const href = target.digest
+              ? `/topmost-owners/${target.uid}/images/${encodeURIComponent(target.digest)}${reportQuery}`
+              : `/topmost-owners/${target.uid}${reportQuery}`
+            return (
+              <Link
+                key={i}
+                href={href}
+                className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-brand-bg/30"
+              >
+                {content}
+              </Link>
             )
           })}
         </div>
