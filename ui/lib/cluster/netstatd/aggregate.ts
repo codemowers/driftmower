@@ -1,5 +1,5 @@
 import type { ExplorerResource } from "../cluster-state"
-import type { AggregateBucket, HostInfo, ListeningPort } from "./store"
+import type { AggregateBucket, HostInfo, ListeningPort } from "./types"
 import { isPrivateOrSpecial } from "./rdns"
 
 export type AggRow = {

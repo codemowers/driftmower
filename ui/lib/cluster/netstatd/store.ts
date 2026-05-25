@@ -2,168 +2,19 @@ import { create } from "zustand"
 import { NETSTATD_ENDPOINT_URL } from "../constants"
 import { useClusterState } from "../cluster-state"
 import { findDescendantPodUids, type WorkloadScope } from "./selectors"
-
-export type Protocol = "TCP" | "UDP"
-
-export type ConnState =
-  | "ESTABLISHED" | "SYN_SENT" | "SYN_RECV" | "FIN_WAIT1" | "FIN_WAIT2"
-  | "TIME_WAIT" | "CLOSE" | "CLOSE_WAIT" | "LAST_ACK" | "LISTEN" | "CLOSING"
-
-type ConnectionEvent = {
-  type: "connection.event" | "connection.accepted"
-  timestamp: string
-  nodeName?: string
-  protocol: Protocol
-  state: ConnState
-  sockCookie: string | number
-  localIP: string
-  remoteIP: string
-  localPort?: number
-  remotePort?: number
-  pid?: number
-}
-
-type PortListeningEvent = {
-  type: "port.listening"
-  timestamp: string
-  nodeName?: string
-  protocol: Protocol
-  ip: string
-  port: number
-  netns: number
-  isHostNetNS: boolean
-}
-
-type ProcessMetainfoEvent = {
-  type: "process.metainfo"
-  timestamp: string
-  nodeName: string
-  pid: number
-  exe?: string
-  netns: number
-  isHostNetNS: boolean
-  cgroupSlice: string
-  containerUid?: string
-}
-
-type ContainerEvent = {
-  type: "container.added" | "container.metainfo"
-  timestamp: string
-  nodeName?: string
-  containerUid: string
-  name?: string
-  podName?: string
-  namespace?: string
-  podUid?: string
-  containerName?: string
-  image?: string
-  labels?: Record<string, string>
-}
-
-type HostInfoEvent = {
-  type: "host.info"
-  timestamp: string
-  nodeName?: string
-  hostIPs: string[]
-  hostNetNS: number
-  imageHash?: string
-}
-
-type NetstatdEvent =
-  | ConnectionEvent
-  | PortListeningEvent
-  | ProcessMetainfoEvent
-  | ContainerEvent
-  | HostInfoEvent
-
-export type Connection = {
-  sockCookie: string
-  protocol: Protocol
-  state: ConnState
-  nodeName?: string
-  localIP: string
-  remoteIP: string
-  localPort?: number
-  remotePort?: number
-  pid?: number
-  inbound: boolean
-  firstSeen: number
-  lastSeen: number
-  aggKey?: string
-}
-
-export type ListeningPort = {
-  key: string
-  protocol: Protocol
-  ip: string
-  port: number
-  nodeName?: string
-  netns: number
-  isHostNetNS: boolean
-  containerUid?: string
-}
-
-export type ContainerInfo = {
-  containerUid: string
-  podUid?: string
-  podName?: string
-  namespace?: string
-  containerName?: string
-  image?: string
-  nodeName?: string
-}
-
-export type ProcessInfo = {
-  key: string
-  pid: number
-  nodeName: string
-  netns: number
-  isHostNetNS: boolean
-  cgroupSlice: string
-  containerUid?: string
-  exe?: string
-}
-
-export type HostInfo = {
-  nodeName: string
-  hostIPs: Set<string>
-  hostNetNS: number
-}
-
-export type AggregateDirection = "inbound" | "outbound"
-
-export type AggregateBucket = {
-  key: string
-  direction: AggregateDirection
-  peerIP: string
-  port: number
-  protocol: Protocol
-  count: number
-  firstSeen: number
-  lastSeen: number
-  localIPs: Set<string>
-}
-
-export type NetstatdStatus = "idle" | "connecting" | "open" | "closed" | "error"
-
-export type NetstatdState = {
-  status: NetstatdStatus
-  error: string | null
-  rawEventCount: number
-  lastFlushedAt: number | null
-  revision: number
-
-  connections: Map<string, Connection>
-  aggregates: Map<string, AggregateBucket>
-  cookieToAgg: Map<string, string>
-  listening: Map<string, ListeningPort>
-  containersByUid: Map<string, ContainerInfo>
-  containersByPodUid: Map<string, Set<string>>
-  processes: Map<string, ProcessInfo>
-  pidByContainerUid: Map<string, Set<string>>
-  pidBySockCookie: Map<string, number>
-  hosts: Map<string, HostInfo>
-}
+import type {
+  AggregateDirection,
+  Connection,
+  ConnectionEvent,
+  ContainerEvent,
+  ContainerInfo,
+  HostInfoEvent,
+  NetstatdEvent,
+  NetstatdState,
+  PortListeningEvent,
+  ProcessMetainfoEvent,
+  Protocol,
+} from "./types"
 
 const initial = (): NetstatdState => ({
   status: "idle",
@@ -176,9 +27,7 @@ const initial = (): NetstatdState => ({
   cookieToAgg: new Map(),
   listening: new Map(),
   containersByUid: new Map(),
-  containersByPodUid: new Map(),
   processes: new Map(),
-  pidByContainerUid: new Map(),
   pidBySockCookie: new Map(),
   hosts: new Map(),
 })
@@ -206,7 +55,7 @@ const RECONNECT_BACKOFF_MS = [1_000, 2_000, 5_000]
 let socket: WebSocket | null = null
 let refCount = 0
 let currentWorkloadUid: string | null = null
-let scope: WorkloadScope = { podUids: new Set(), podIPs: new Set(), containerUidByPodUid: new Map() }
+let scope: WorkloadScope = { podUids: new Set(), podIPs: new Set() }
 let scopeUnsub: (() => void) | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectAttempt = 0
@@ -225,7 +74,7 @@ function scheduleFlush() {
 
 function recomputeScope() {
   if (currentWorkloadUid === null) {
-    scope = { podUids: new Set(), podIPs: new Set(), containerUidByPodUid: new Map() }
+    scope = { podUids: new Set(), podIPs: new Set() }
     return
   }
   scope = findDescendantPodUids(useClusterState.getState().explorerResources, currentWorkloadUid)
@@ -450,11 +299,6 @@ function applyProcessMetainfo(state: NetstatdState, event: ProcessMetainfoEvent)
     containerUid: event.containerUid,
     exe: event.exe,
   })
-  if (event.containerUid) {
-    const set = state.pidByContainerUid.get(event.containerUid) ?? new Set<string>()
-    set.add(key)
-    state.pidByContainerUid.set(event.containerUid, set)
-  }
   return state
 }
 
@@ -470,11 +314,6 @@ function applyContainer(state: NetstatdState, event: ContainerEvent): NetstatdSt
     nodeName: event.nodeName ?? prev?.nodeName,
   }
   state.containersByUid.set(event.containerUid, merged)
-  if (merged.podUid) {
-    const set = state.containersByPodUid.get(merged.podUid) ?? new Set<string>()
-    set.add(event.containerUid)
-    state.containersByPodUid.set(merged.podUid, set)
-  }
   return state
 }
 
@@ -496,9 +335,7 @@ function drainPending() {
   useNetstatd.setState(prev => {
     const state = { ...prev }
     state.containersByUid = new Map(prev.containersByUid)
-    state.containersByPodUid = new Map(prev.containersByPodUid)
     state.processes = new Map(prev.processes)
-    state.pidByContainerUid = new Map(prev.pidByContainerUid)
     state.pidBySockCookie = new Map(prev.pidBySockCookie)
     state.hosts = new Map(prev.hosts)
     state.connections = new Map(prev.connections)
@@ -741,7 +578,7 @@ function teardown() {
   holdingBuffer = []
   reconnectAttempt = 0
   currentWorkloadUid = null
-  scope = { podUids: new Set(), podIPs: new Set(), containerUidByPodUid: new Map() }
+  scope = { podUids: new Set(), podIPs: new Set() }
   useNetstatd.setState(initial())
 }
 
