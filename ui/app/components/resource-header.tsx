@@ -16,7 +16,7 @@ type Props = {
   copyValue?: string
   breadcrumbs: BreadcrumbItem[]
   chips?: Chip[]
-  scoreChip?: { status: StatusType; score: number } | null
+  scoreChip?: { status: StatusType; score: number; label?: string } | null
   issueCount?: number
   subtitle: ReactNode
 }
@@ -45,9 +45,11 @@ export default function ResourceHeader({
   subtitle,
 }: Props) {
   const scoreStyle = scoreChip ? SEVERITY_STYLE[scoreChip.status] : undefined
-  const scoreLabel = scoreChip && scoreChip.status !== "no_data" && scoreChip.status !== "no_version"
-    ? scoreChip.score.toFixed(2)
-    : "—"
+  const scoreLabel = scoreChip
+    ? scoreChip.label ?? (scoreChip.status === "no_data" || scoreChip.status === "no_version"
+        ? "—"
+        : scoreChip.score.toFixed(2))
+    : ""
 
   return (
     <header className="flex items-start justify-between gap-8">

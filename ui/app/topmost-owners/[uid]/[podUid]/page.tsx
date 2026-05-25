@@ -128,7 +128,7 @@ export default function PodDetailPage() {
 
         <IssuesCard issues={podIssues} />
 
-        <PodTabs pod={pod} usages={podUsages} issues={data.issues} />
+        <PodTabs pod={pod} usages={podUsages} issues={data.issues} workloadUid={workloadUid} reportId={reportId} />
       </main>
     </div>
   )

@@ -44,7 +44,7 @@ export default function WorkloadTabs({ usages, issues, explorerResources, worklo
       </div>
 
       {active === "Containers" && (
-        <ContainersTab usages={usages} issues={issues} />
+        <ContainersTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Pods" && (
         <PodsTab explorerResources={explorerResources} workloadUid={workloadUid} reportId={reportId} />

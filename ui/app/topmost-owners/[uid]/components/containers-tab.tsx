@@ -1,4 +1,5 @@
-import { AlertTriangle } from "lucide-react"
+import Link from "next/link"
+import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { relativeTimeFromNow } from "@/lib/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -25,6 +26,8 @@ function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
 type Props = {
   usages: ImageUsage[]
   issues: Issue[]
+  workloadUid: string
+  reportId: string | null
 }
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
@@ -37,7 +40,7 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Deployed", "Latest", "Status"]
 
-export default function ContainersTab({ usages, issues }: Props) {
+export default function ContainersTab({ usages, issues, workloadUid, reportId }: Props) {
   if (usages.length === 0) {
     return <p className="text-sm text-muted-foreground">No container data available.</p>
   }
@@ -80,9 +83,13 @@ export default function ContainersTab({ usages, issues }: Props) {
                     </span>
                   )}
                 </div>
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {u.imageInfo.registry}/{u.imageInfo.repository}
-                </span>
+                <Link
+                  href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${reportId ? `?report=${reportId}` : ""}`}
+                  className="group inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
+                >
+                  <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
+                  <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                </Link>
                 <TagCell tag={vs.deployedTag} builtAt={vs.deployedBuiltAt} />
                 <TagCell tag={vs.latestTag}   builtAt={vs.latestBuiltAt} />
                 <div>

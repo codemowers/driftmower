@@ -63,7 +63,7 @@ export type ImageUsage = {
   actualTag: string
   allActualTags: string[]
   tagStatus: string
-  digestSemver: string | null
+  digestSemver: { tag: string; versionTuple: [number, number, number]; suffix: string } | null
   imageInfo: {
     registry: string
     repository: string
@@ -71,8 +71,8 @@ export type ImageUsage = {
     digest: string
     repositoryUrl?: string
     tagUrl?: string
-    endOfLifeDate?: string                             // ISO date; only present for products tracked by an EOL data source
-    endOfActiveSupportDate?: string                    // ISO date; same caveat
+    endOfLifeDate?: string
+    endOfActiveSupportDate?: string
   }
   versionStatus: {
     statusType: StatusType
@@ -81,8 +81,8 @@ export type ImageUsage = {
     majorDifference: number
     minorDifference: number
     patchDifference: number
-    deployedBuiltAt?: string                           // ISO 8601; sparsely populated
-    latestBuiltAt?: string                             // ISO 8601; sparsely populated
+    deployedBuiltAt?: string
+    latestBuiltAt?: string
   }
   workloadRootInfo: {
     kind: string
@@ -143,6 +143,29 @@ function parseReportDate(createdAt: string): Date {
   return new Date(createdAt.replace(" ", "T") + "Z")
 }
 
+const ZERO_DATE_PREFIX = "0001-01-01"
+
+function normalizeBuiltAt(value?: string): string | undefined {
+  return value && !value.startsWith(ZERO_DATE_PREFIX) ? value : undefined
+}
+
+function normalizeReport(report: Report): Report {
+  const r = report.report
+  const usageLists: ImageUsage[][] = [
+    r.imageUsages,
+    ...Object.values(r.releaseGroupMap),
+    ...Object.values(r.workloadGroupMap),
+  ]
+  for (const usages of usageLists) {
+    for (const usage of usages) {
+      const vs = usage.versionStatus
+      vs.deployedBuiltAt = normalizeBuiltAt(vs.deployedBuiltAt)
+      vs.latestBuiltAt = normalizeBuiltAt(vs.latestBuiltAt)
+    }
+  }
+  return report
+}
+
 export async function fetchLatestReport(): Promise<void> {
   useClusterState.setState({ isFetchingReport: true, error: null })
   try {
@@ -154,6 +177,7 @@ export async function fetchLatestReport(): Promise<void> {
     const json: ReportsListResponse = await res.json()
     const report = json.data[0]
     if (!report) throw new Error("No reports found")
+    normalizeReport(report)
     useClusterState.setState({
       data: report,
       reportId: report.id,
@@ -171,6 +195,7 @@ export async function fetchReport(id: string): Promise<void> {
     const res = await fetch(`${REPORTS_URL}/${id}`)
     if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`)
     const report: Report = await res.json()
+    normalizeReport(report)
     useClusterState.setState({
       data: report,
       reportId: report.id,

@@ -16,9 +16,11 @@ type Props = {
   pod: ExplorerResource
   usages: ImageUsage[]
   issues: Issue[]
+  workloadUid: string
+  reportId: string | null
 }
 
-export default function PodTabs({ pod, usages, issues }: Props) {
+export default function PodTabs({ pod, usages, issues, workloadUid, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -41,7 +43,7 @@ export default function PodTabs({ pod, usages, issues }: Props) {
         ))}
       </div>
 
-      {active === "Containers" && <ContainersTab usages={usages} issues={issues} />}
+      {active === "Containers" && <ContainersTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />}
       {active === "Ports" && <PortsTab pod={pod} />}
       {active === "Logs" && <LogsTab />}
       {active === "Metadata" && <MetadataTab pod={pod} />}
