@@ -11,6 +11,13 @@ spec:
     - host: driftmower-ui.ee-lte-1.codemowers.io
       http:
         paths:
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: driftmower-be
+                port:
+                  number: 3030
           - path: /
             pathType: Prefix
             backend:

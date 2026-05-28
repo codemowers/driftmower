@@ -1,3 +1,16 @@
+import { Agent, type Dispatcher } from "undici"
+
+const noKeepAliveAgent = new Agent({
+  keepAliveTimeout: 1,
+  keepAliveMaxTimeout: 1,
+  pipelining: 0,
+  connect: { timeout: 5_000 },
+  headersTimeout: 30_000,
+  bodyTimeout: 60_000,
+})
+
+type FetchInit = RequestInit & { dispatcher?: Dispatcher }
+
 const HOP_BY_HOP = new Set([
   "host",
   "connection",
@@ -26,17 +39,27 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
     target.searchParams.append(key, value)
   })
 
-  const init: RequestInit = {
+  const init: FetchInit = {
     method: req.method,
     headers: filterHeaders(req.headers),
     cache: "no-store",
     redirect: "manual",
+    dispatcher: noKeepAliveAgent,
   }
   if (req.method !== "GET" && req.method !== "HEAD") {
     init.body = await req.arrayBuffer()
   }
 
-  const upstream = await fetch(target.toString(), init)
+  let upstream: Response
+  try {
+    upstream = await fetch(target.toString(), init)
+  } catch (e) {
+    return Response.json(
+      { error: "upstream unreachable", cause: String(e) },
+      { status: 502 },
+    )
+  }
+
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,

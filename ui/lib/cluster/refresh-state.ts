@@ -1,6 +1,6 @@
 import { io, type Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
-import { ANALYZE_CLUSTER_URL, CONFIG_URL } from "./constants"
+import { ANALYZE_CLUSTER_URL } from "./constants"
 import { fetchDynamicData } from "./dynamic-data"
 
 export type { ImageUsage } from "./reports"
@@ -13,20 +13,6 @@ export type AnalyzeClusterProgress = {
   image?: string
 }
 
-let cachedBackendPublicUrl: string | null = null
-
-async function getBackendPublicUrl(): Promise<string> {
-  if (cachedBackendPublicUrl !== null) return cachedBackendPublicUrl
-  const res = await fetch(CONFIG_URL, { cache: "no-store" })
-  if (!res.ok) throw new Error(`Failed to fetch runtime config: ${res.status}`)
-  const { backendPublicUrl } = (await res.json()) as { backendPublicUrl: string }
-  if (!backendPublicUrl) {
-    throw new Error("BACKEND_PUBLIC_URL is not configured on the server")
-  }
-  cachedBackendPublicUrl = backendPublicUrl
-  return backendPublicUrl
-}
-
 export async function refreshState(): Promise<void> {
   useClusterState.setState({
     isLoading: true,
@@ -37,8 +23,10 @@ export async function refreshState(): Promise<void> {
 
   let socket: Socket | null = null
   try {
-    const backendPublicUrl = await getBackendPublicUrl()
-    socket = io(backendPublicUrl, { transports: ["websocket"] })
+    const devWsUrl = process.env.NEXT_PUBLIC_BACKEND_PUBLIC_URL
+    socket = devWsUrl
+      ? io(devWsUrl, { transports: ["websocket"] })
+      : io({ transports: ["websocket"] })
     socket.on("analyze-cluster progress", (data: unknown) => {
       const progress =
         data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
