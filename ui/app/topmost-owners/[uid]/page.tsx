@@ -8,6 +8,7 @@ import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
 import NetworkCard from "@/app/components/network-card"
+import AiInsightsCard from "./components/ai-insights-card"
 import WorkloadTabs from "./components/workload-tabs"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -121,6 +122,8 @@ export default function WorkloadDetailPage() {
           href={reportId ? `/topmost-owners/${uid}/network-topology?report=${reportId}` : `/topmost-owners/${uid}/network-topology`}
           scopeLabel={totalPods === 1 ? "1 pod" : `${totalPods} pods`}
         />
+
+        <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
 
         <WorkloadTabs usages={usages} issues={data.issues} explorerResources={explorerResources} workloadUid={uid} reportId={reportId} />
       </main>
