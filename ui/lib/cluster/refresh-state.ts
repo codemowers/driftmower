@@ -1,8 +1,7 @@
-import { type Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
 import { ANALYZE_CLUSTER_URL } from "./constants"
 import { fetchDynamicData } from "./dynamic-data"
-import { getAnalysisSocket } from "./analysis-socket"
+import { getAnalysisSocket, waitForSocketConnect } from "./analysis-socket"
 
 export type { ImageUsage } from "./reports"
 
@@ -12,13 +11,6 @@ export type AnalyzeClusterProgress = {
   total?: number
   index?: number
   image?: string
-}
-
-function waitForSocketConnect(socket: Socket): Promise<void> {
-  if (socket.connected) return Promise.resolve()
-  return new Promise((resolve) => {
-    socket.once("connect", () => resolve())
-  })
 }
 
 export async function refreshState(): Promise<void> {

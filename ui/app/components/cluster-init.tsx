@@ -5,8 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { checkConnection } from "@/lib/cluster/check-connection"
 import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
 import { startLiveDataFetching } from "@/lib/cluster/live-data"
-import { getAnalysisSocket } from "@/lib/cluster/analysis-socket"
+import { getAnalysisSocket, waitForSocketConnect } from "@/lib/cluster/analysis-socket"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+
+const SOCKET_SLOT_WAIT_MS = 3000
 
 export default function ClusterInit() {
   const searchParams = useSearchParams()
@@ -21,6 +23,7 @@ export default function ClusterInit() {
 
   useEffect(() => {
     async function init() {
+      await waitForSocketConnect(getAnalysisSocket(), SOCKET_SLOT_WAIT_MS)
       await checkConnection()
       await fetchDynamicData(reportParam)
     }

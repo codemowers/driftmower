@@ -10,3 +10,14 @@ export function getAnalysisSocket(): Socket {
 
   return socket
 }
+
+export function waitForSocketConnect(socket: Socket, timeoutMs?: number): Promise<void> {
+  if (socket.connected) return Promise.resolve()
+  return new Promise((resolve) => {
+    socket.once("connect", () => {
+      console.log("Socket connected")
+      resolve()
+    })
+    if (timeoutMs != null) setTimeout(resolve, timeoutMs)
+  })
+}
