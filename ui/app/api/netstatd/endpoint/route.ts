@@ -30,7 +30,7 @@ function pickHost(items: IngressList["items"]): { host: string; tls: boolean } |
 }
 
 async function discover(): Promise<string> {
-  const override = process.env.NETSTATD_PUBLIC_URL
+  const override = process.env.NETSTATD_URL
   if (override) return override
 
   if (!isInCluster()) return ""
