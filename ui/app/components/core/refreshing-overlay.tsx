@@ -23,7 +23,7 @@ export default function RefreshingOverlay() {
             <div className="flex flex-col gap-5 mb-15 border border-gray-200 shadow-sm bg-white rounded-lg w-[600px] p-8 text-black">
                 {stage && stage == "analysis_complete" ? (
                     <>
-                        <h1 className="text-[20px] font-semibold">Analysis complete</h1>
+                        <h1 className="text-[20px] font-semibold">Analysis complete (Loading results)</h1>
                     </>
                 ) : (
                     <>

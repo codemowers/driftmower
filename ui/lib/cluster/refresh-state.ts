@@ -23,10 +23,7 @@ export async function refreshState(): Promise<void> {
 
   let socket: Socket | null = null
   try {
-    const devWsUrl = process.env.NEXT_PUBLIC_BACKEND_PUBLIC_URL
-    socket = devWsUrl
-      ? io(devWsUrl, { transports: ["websocket"] })
-      : io({ transports: ["websocket"] })
+    socket = io({ transports: ["websocket"] })
     socket.on("analyze-cluster progress", (data: unknown) => {
       const progress =
         data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
