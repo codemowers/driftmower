@@ -6,11 +6,6 @@ type KubernetesContextsResponse = {
 }
 
 export async function checkConnection(): Promise<void> {
-  useClusterState.setState({
-    isConnected: false,
-    clusterName: null,
-  })
-
   try {
     const res = await fetch(KUBERNETES_CONTEXTS_URL, {
       method: "GET",
@@ -27,6 +22,10 @@ export async function checkConnection(): Promise<void> {
       clusterName: data.contexts[0] ?? null,
     })
   } catch (e) {
+    useClusterState.setState({
+      isConnected: false,
+      clusterName: null,
+    })
     throw new Error("failed to connect to backend", { cause: e })
   }
 }

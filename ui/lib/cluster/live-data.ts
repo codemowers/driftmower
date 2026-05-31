@@ -2,9 +2,9 @@ import { checkConnection } from "./check-connection"
 import { useClusterState } from "./cluster-state"
 import { EXPLORER_RESOURCES_URL } from "./constants"
 
-const LIVE_DATA_FETCH_INTERVAL = 30000
+const CONNECTED_FETCH_INTERVAL = 30000
+const DISCONNECTED_FETCH_INTERVAL = 5000
 
-// Polls connection + explorer topology every 30s. Returns a stop function.
 export function startLiveDataFetching(): () => void {
   let cancelled = false
 
@@ -14,14 +14,21 @@ export function startLiveDataFetching(): () => void {
         await checkConnection()
       } catch {}
 
-      try {
-        const res = await fetch(EXPLORER_RESOURCES_URL, { cache: "no-store" })
-        const data = await res.json()
-        if (cancelled) return
-        useClusterState.setState({ explorerResources: data })
-      } catch {}
+      const { isConnected } = useClusterState.getState()
 
-      await new Promise(r => setTimeout(r, LIVE_DATA_FETCH_INTERVAL))
+      if (isConnected) {
+        try {
+          const res = await fetch(EXPLORER_RESOURCES_URL, { cache: "no-store" })
+          const data = await res.json()
+          if (cancelled) return
+          useClusterState.setState({ explorerResources: data })
+        } catch {}
+      }
+
+      const interval = isConnected
+        ? CONNECTED_FETCH_INTERVAL
+        : DISCONNECTED_FETCH_INTERVAL
+      await new Promise(r => setTimeout(r, interval))
     }
   }
 
