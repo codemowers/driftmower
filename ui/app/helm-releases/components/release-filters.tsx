@@ -77,7 +77,7 @@ export default function ReleaseFilters({
         <div className="flex items-center gap-3 whitespace-nowrap">
           <span className="text-xs text-muted-foreground">showing {filtered} of {total}</span>
           <button onClick={onClear} className={cn("text-xs", isFiltered ? "text-muted-foreground hover:text-brand-label hover:underline" : "text-white")}>
-            Clear
+            Reset
           </button>
         </div>
     </div>

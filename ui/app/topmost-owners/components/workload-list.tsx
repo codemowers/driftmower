@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, ExternalLink } from "lucide-react"
@@ -124,6 +124,8 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   const reportId = useClusterState(s => s.reportId)
   const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(new Set())
   const [showIssuesOnly, setShowIssuesOnly] = useState(false)
+  const [hideFinished, setHideFinished] = useState(false)
+  const [hideHelmManaged, setHideHelmManaged] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   function handleStatusToggle(status: StatusType) {
@@ -135,13 +137,22 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     })
   }
 
-  function handleClear() {
+  function handleReset() {
     setActiveStatuses(new Set())
     setShowIssuesOnly(false)
+    setHideFinished(false)
+    setHideHelmManaged(false)
     setSearchQuery("")
   }
 
-  const isFiltered = activeStatuses.size > 0 || showIssuesOnly || searchQuery !== ""
+  const counts = useMemo(() => ({
+    finished: entries.filter(e => e.kind === "Job").length,
+    helm: entries.filter(e => e.manager.kind === "helm").length,
+    issues: entries.filter(e => e.issueCount > 0).length,
+  }), [entries])
+
+  const isModified =
+    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || hideFinished || hideHelmManaged
 
   const q = searchQuery.toLowerCase()
   const filteredEntries = entries
@@ -151,6 +162,8 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
       return activeStatuses.has(e.worstStatus)
     })
     .filter(e => !showIssuesOnly || e.issueCount > 0)
+    .filter(e => !hideFinished || e.kind !== "Job")
+    .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e =>
       q === "" ||
       e.name.toLowerCase().includes(q) ||
@@ -163,14 +176,19 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
       <WorkloadFilters
         total={entries.length}
         filtered={filteredEntries.length}
-        isFiltered={isFiltered}
+        isModified={isModified}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         activeStatuses={activeStatuses}
         onStatusToggle={handleStatusToggle}
         showIssuesOnly={showIssuesOnly}
         onIssuesToggle={() => setShowIssuesOnly(v => !v)}
-        onClear={handleClear}
+        hideFinished={hideFinished}
+        onToggleFinished={() => setHideFinished(v => !v)}
+        hideHelmManaged={hideHelmManaged}
+        onToggleHelmManaged={() => setHideHelmManaged(v => !v)}
+        counts={counts}
+        onReset={handleReset}
       />
       <header className={cn("grid gap-4 border-b border-gray-100 pl-6 pr-4 py-4", GRID)}>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Kind</p>
