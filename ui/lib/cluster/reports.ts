@@ -106,6 +106,8 @@ export type Report = {
   sourceType: "cluster"
   clusterContext: string
   createdAt: string
+  updatedAt: string | null
+  status: string
   reportHash: string
   previousReportId: string | null
   report: {
