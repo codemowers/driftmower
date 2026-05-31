@@ -1,7 +1,8 @@
-import { io, type Socket } from "socket.io-client"
+import { type Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
 import { ANALYZE_CLUSTER_URL } from "./constants"
 import { fetchDynamicData } from "./dynamic-data"
+import { getAnalysisSocket } from "./analysis-socket"
 
 export type { ImageUsage } from "./reports"
 
@@ -13,6 +14,13 @@ export type AnalyzeClusterProgress = {
   image?: string
 }
 
+function waitForSocketConnect(socket: Socket): Promise<void> {
+  if (socket.connected) return Promise.resolve()
+  return new Promise((resolve) => {
+    socket.once("connect", () => resolve())
+  })
+}
+
 export async function refreshState(): Promise<void> {
   useClusterState.setState({
     isLoading: true,
@@ -21,18 +29,20 @@ export async function refreshState(): Promise<void> {
     containerCount: null,
   })
 
-  let socket: Socket | null = null
+  const socket = getAnalysisSocket()
+  const onProgress = (data: unknown) => {
+    const progress =
+      data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
+    const update: Partial<ClusterState> = { socketProgress: progress }
+    if (typeof progress?.containerCount === "number") {
+      update.containerCount = progress.containerCount
+    }
+    useClusterState.setState(update)
+  }
+  socket.on("analyze-cluster progress", onProgress)
+
   try {
-    socket = io({ transports: ["websocket"] })
-    socket.on("analyze-cluster progress", (data: unknown) => {
-      const progress =
-        data !== null && typeof data === "object" ? (data as AnalyzeClusterProgress) : null
-      const update: Partial<ClusterState> = { socketProgress: progress }
-      if (typeof progress?.containerCount === "number") {
-        update.containerCount = progress.containerCount
-      }
-      useClusterState.setState(update)
-    })
+    await waitForSocketConnect(socket)
 
     const res = await fetch(ANALYZE_CLUSTER_URL, {
       method: "POST",
@@ -51,6 +61,6 @@ export async function refreshState(): Promise<void> {
       containerCount: null,
     })
   } finally {
-    socket?.disconnect()
+    socket.off("analyze-cluster progress", onProgress)
   }
 }

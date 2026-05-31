@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { checkConnection } from "@/lib/cluster/check-connection"
 import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
 import { startLiveDataFetching } from "@/lib/cluster/live-data"
+import { getAnalysisSocket } from "@/lib/cluster/analysis-socket"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 
 export default function ClusterInit() {
@@ -13,6 +14,10 @@ export default function ClusterInit() {
   const reportId = useClusterState(state => state.reportId)
   const reportParam = searchParams.get("report")
   const searchQuery = searchParams.toString()
+
+  useEffect(() => {
+    getAnalysisSocket()
+  }, [])
 
   useEffect(() => {
     async function init() {
