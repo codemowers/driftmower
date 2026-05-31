@@ -66,7 +66,7 @@ export default function HelmReleaseDetailPage() {
           copyValue={score.releaseInfo.name}
           breadcrumbs={[
             { label: "Helm Releases", href: backHref },
-            { label: score.releaseInfo.name },
+            { label: `${score.releaseInfo.managementKind} ${score.releaseInfo.name}` },
           ]}
           chips={[{ label: score.releaseInfo.managementKind, tone: "brand" }]}
           scoreChip={{ status: worstStatus, score: normalizedScore }}

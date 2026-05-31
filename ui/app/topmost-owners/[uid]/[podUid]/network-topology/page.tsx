@@ -29,7 +29,9 @@ export default function PodNetworkTopologyPage() {
   }
 
   const [, workloadUsages] = workloadMatch
-  const workloadName = workloadUsages[0]?.workloadRootInfo?.name ?? "—"
+  const workloadRoot = workloadUsages[0]?.workloadRootInfo
+  const workloadName = workloadRoot?.name ?? "—"
+  const workloadKind = workloadRoot?.kind ?? "—"
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -38,6 +40,7 @@ export default function PodNetworkTopologyPage() {
           reportId={reportId}
           workloadUid={workloadUid}
           workloadName={workloadName}
+          workloadKind={workloadKind}
           podUid={podUid}
           podName={pod.name}
           namespace={pod.namespace}

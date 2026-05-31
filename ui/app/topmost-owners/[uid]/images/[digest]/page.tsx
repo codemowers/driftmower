@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation"
 import { Bookmark } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
+import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import ImageTagStats from "./components/image-tag-stats"
 import TagIdentity from "./components/tag-identity"
@@ -31,6 +31,7 @@ export default function ImageTagDetailPage() {
   const digest = decodeURIComponent(params.digest)
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
+  const explorerResources = useClusterState(s => s.explorerResources)
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -50,7 +51,11 @@ export default function ImageTagDetailPage() {
     )
   }
 
-  const workloadName = workloadMatch[1][0]?.workloadRootInfo?.name ?? "—"
+  const workloadRoot = workloadMatch[1][0]?.workloadRootInfo
+  const workloadName = workloadRoot?.name ?? "—"
+  const workloadKind = workloadRoot?.kind ?? "—"
+  const workloadNamespace = workloadRoot?.namespace ?? "—"
+  const apiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
   const { registry, repository, tag } = usage.imageInfo
   const repoLabel = `${registry}/${repository}`
   const fullRef = `${repoLabel}:${tag}@${digest}`
@@ -72,9 +77,10 @@ export default function ImageTagDetailPage() {
           title={repoLabel}
           copyValue={fullRef}
           breadcrumbs={[
-            { label: "Topmost Owners", href: rootHref },
-            { label: workloadName, href: workloadHref },
-            { label: repoLabel },
+            { label: "Workloads", href: rootHref },
+            { label: `Namespace ${workloadNamespace}` },
+            { label: `${workloadKindLabel(workloadKind, apiGroup)} ${workloadName}`, href: workloadHref },
+            { label: `Image ${repoLabel}` },
           ]}
           chips={[{ label: "Image Tag", tone: "brand" }]}
           scoreChip={{ status, score: 0, label: statusLabel(status) }}

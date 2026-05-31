@@ -17,17 +17,17 @@ export default function Breadcrumbs({ items }: Props) {
         {items.map((item, i) => {
           const isLast = i === items.length - 1
           return (
-            <li key={i} className="flex items-center gap-1">
+            <li key={i} className="flex min-w-0 items-center gap-1">
               {item.href && !isLast ? (
                 <Link
                   href={item.href}
-                  className="rounded px-1.5 py-0.5 font-medium text-muted-foreground transition-colors hover:bg-brand-bg hover:text-brand"
+                  className="rounded px-1.5 py-0.5 font-medium break-all text-muted-foreground transition-colors hover:bg-brand-bg hover:text-brand"
                 >
                   {item.label}
                 </Link>
               ) : (
                 <span
-                  className="px-1 py-0.5 font-medium text-foreground"
+                  className={`px-1 py-0.5 font-medium break-all ${isLast ? "text-foreground" : "text-muted-foreground/60"}`}
                   aria-current={isLast ? "page" : undefined}
                 >
                   {item.label}

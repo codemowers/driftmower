@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
+import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
@@ -81,6 +81,7 @@ export default function WorkloadDetailPage() {
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
   const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
+  const apiGroup = explorerResources?.find(r => r.uid === uid)?.apiGroup
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
   const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
@@ -95,8 +96,9 @@ export default function WorkloadDetailPage() {
           title={name}
           copyValue={name}
           breadcrumbs={[
-            { label: "Topmost Owners", href: backHref },
-            { label: name },
+            { label: "Workloads", href: backHref },
+            { label: `Namespace ${namespace}` },
+            { label: `${workloadKindLabel(kind, apiGroup)} ${name}` },
           ]}
           chips={headerChips}
           scoreChip={{ status: worstStatus, score: normalizedScore }}

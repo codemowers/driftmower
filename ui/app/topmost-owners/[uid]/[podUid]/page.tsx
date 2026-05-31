@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation"
 import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
+import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
 import PodStats from "./components/pod-stats"
@@ -47,7 +47,10 @@ export default function PodDetailPage() {
   }
 
   const [, workloadUsages] = workloadMatch
-  const workloadName = workloadUsages[0]?.workloadRootInfo?.name ?? "—"
+  const workloadRoot = workloadUsages[0]?.workloadRootInfo
+  const workloadName = workloadRoot?.name ?? "—"
+  const workloadKind = workloadRoot?.kind ?? "—"
+  const workloadApiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
 
   const podUsages: ImageUsage[] = data.report.imageUsages.filter(
     u => u.podName === pod.name && u.namespace === pod.namespace,
@@ -95,9 +98,10 @@ export default function PodDetailPage() {
           title={pod.name}
           copyValue={pod.name}
           breadcrumbs={[
-            { label: "Topmost Owners", href: reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners" },
-            { label: workloadName, href: backHref },
-            { label: pod.name },
+            { label: "Workloads", href: reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners" },
+            { label: `Namespace ${pod.namespace}` },
+            { label: `${workloadKindLabel(workloadKind, workloadApiGroup)} ${workloadName}`, href: backHref },
+            { label: `Pod ${pod.name}` },
           ]}
           chips={[
             { label: "Pod", tone: "brand" },

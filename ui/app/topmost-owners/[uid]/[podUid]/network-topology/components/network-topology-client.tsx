@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { workloadKindLabel } from "@/lib/cluster/reports"
 import {
   useNetstatd,
   type NetstatdStatus,
@@ -24,6 +25,7 @@ type Props = {
   reportId: string | null
   workloadUid: string
   workloadName: string
+  workloadKind: string
   podUid: string
   podName: string
   namespace: string
@@ -51,6 +53,7 @@ export default function NetworkTopologyClient({
   reportId,
   workloadUid,
   workloadName,
+  workloadKind,
   podUid,
   podName,
   namespace,
@@ -79,6 +82,7 @@ export default function NetworkTopologyClient({
 
   const listeningGroups = useMemo(() => groupListening(ourListening), [ourListening])
 
+  const apiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
   const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
   const ownerHref = reportId ? `/topmost-owners/${workloadUid}?report=${reportId}` : `/topmost-owners/${workloadUid}`
   const podDetailHref = reportId
@@ -104,9 +108,10 @@ export default function NetworkTopologyClient({
       <div className="flex flex-col gap-6">
       <Breadcrumbs
         items={[
-          { label: "Topmost Owners", href: ownersHref },
-          { label: workloadName, href: ownerHref },
-          { label: podName, href: podDetailHref },
+          { label: "Workloads", href: ownersHref },
+          { label: `Namespace ${namespace}` },
+          { label: `${workloadKindLabel(workloadKind, apiGroup)} ${workloadName}`, href: ownerHref },
+          { label: `Pod ${podName}`, href: podDetailHref },
           { label: "Network topology" },
         ]}
       />
