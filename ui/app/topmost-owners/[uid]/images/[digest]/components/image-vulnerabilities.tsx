@@ -107,6 +107,7 @@ export default function ImageVulnerabilities({ usage }: { usage: ImageUsage }) {
   const [showAll, setShowAll] = useState(false)
 
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
+  const vulnError = useClusterState(s => s.vulnerabilityReportsError)
   const vuln = vulnReports?.[usage.imageInfo.digest] ?? null
 
   const summary = vuln?.report.summary ?? null
@@ -133,11 +134,17 @@ export default function ImageVulnerabilities({ usage }: { usage: ImageUsage }) {
         )}
       </div>
 
-      {vulnReports === null && (
+      {vulnError && (
+        <p className="text-sm text-muted-foreground">
+          Vulnerability scanning unavailable. Trivy operator not installed
+        </p>
+      )}
+
+      {!vulnError && vulnReports === null && (
         <p className="text-sm text-muted-foreground">Loading scan…</p>
       )}
 
-      {vulnReports !== null && vuln === null && (
+      {!vulnError && vulnReports !== null && vuln === null && (
         <p className="text-sm text-muted-foreground">No Trivy scan for this digest</p>
       )}
 

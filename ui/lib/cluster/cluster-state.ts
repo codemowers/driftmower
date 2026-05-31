@@ -32,6 +32,7 @@ export type ClusterState = {
   containerCount: number | null
   explorerResources: ExplorerResource[] | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
+  vulnerabilityReportsError: boolean
 }
 
 export const useClusterState = create<ClusterState>(() => ({
@@ -47,4 +48,5 @@ export const useClusterState = create<ClusterState>(() => ({
   containerCount: null,
   explorerResources: null,
   vulnerabilityReports: null,
+  vulnerabilityReportsError: false,
 }))

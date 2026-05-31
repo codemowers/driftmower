@@ -94,6 +94,7 @@ function VulnBar({ summary }: { summary: VulnerabilitySummary }) {
 
 export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
+  const vulnError = useClusterState(s => s.vulnerabilityReportsError)
   const vuln = vulnReports?.[usage.imageInfo.digest] ?? null
 
   const vs = usage.versionStatus
@@ -146,10 +147,12 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
                 <span className="block">{vulnTotal} total · {fixable} fixable</span>
                 <span className="block">scanned {compactRelativeTimeFromNow(vuln.report.updateTimestamp)}</span>
               </>
-            : "no Trivy scan"}
+            : vulnError
+              ? "Trivy operator not installed"
+              : "no Trivy scan"}
         >
           {!vuln
-            ? <Value tone="muted">not scanned</Value>
+            ? <Value tone="muted">{vulnError ? "unavailable" : "not scanned"}</Value>
             : vulnTotal === 0
               ? <Value tone="ok">none</Value>
               : <VulnBar summary={summary!} />}
