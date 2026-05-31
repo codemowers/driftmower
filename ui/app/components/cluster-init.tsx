@@ -22,9 +22,9 @@ export default function ClusterInit() {
   }, [])
 
   useEffect(() => {
+    void waitForSocketConnect(getAnalysisSocket(), SOCKET_SLOT_WAIT_MS)
     async function init() {
-      await waitForSocketConnect(getAnalysisSocket(), SOCKET_SLOT_WAIT_MS)
-      await checkConnection()
+      await checkConnection().catch(() => {})
       await fetchDynamicData(reportParam)
     }
     void init()
