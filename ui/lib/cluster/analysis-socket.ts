@@ -5,6 +5,8 @@ let socket: Socket | null = null
 export function getAnalysisSocket(): Socket {
   if (!socket) {
     socket = io({ transports: ["websocket"] })
+    console.log("Socket initiated");
   }
+
   return socket
 }
