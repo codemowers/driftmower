@@ -1,9 +1,63 @@
+"use client"
+
 import Link from "next/link"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { relativeTimeFromNow } from "@/lib/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
+import type { VulnerabilityReport, VulnerabilitySeverity, Vulnerability } from "@/lib/cluster/vulnerability"
+
+const CVE_SEVERITY_STYLE: Record<VulnerabilitySeverity, { bg: string; text: string; label: string }> = {
+  CRITICAL: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Critical" },
+  HIGH:     { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "High" },
+  MEDIUM:   { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Medium" },
+  LOW:      { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "Low" },
+  UNKNOWN:  { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "Unknown" },
+  NONE:     { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "None" },
+}
+
+const CVE_SEVERITY_RANK: Record<VulnerabilitySeverity, number> = {
+  CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, UNKNOWN: 4, NONE: 5,
+}
+
+function worstVulnerability(report: VulnerabilityReport): Vulnerability | null {
+  const vulns = report.report.vulnerabilities
+  if (vulns.length === 0) return null
+  return [...vulns].sort((a, b) => {
+    const rankDiff = (CVE_SEVERITY_RANK[a.severity] ?? 5) - (CVE_SEVERITY_RANK[b.severity] ?? 5)
+    if (rankDiff !== 0) return rankDiff
+    return b.score - a.score
+  })[0]
+}
+
+function WorstCveCell({ report }: { report: VulnerabilityReport | null | undefined }) {
+  if (report === undefined) {
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+  if (report === null) {
+    return (
+      <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-muted-foreground">
+        No scan
+      </span>
+    )
+  }
+  const worst = worstVulnerability(report)
+  if (!worst) {
+    return (
+      <span className="rounded-md bg-status-ok-bg px-2 py-1 text-xs font-semibold text-status-ok-label">
+        Clean
+      </span>
+    )
+  }
+  const s = CVE_SEVERITY_STYLE[worst.severity]
+  return (
+    <span className={cn("rounded-md px-2 py-1 text-xs font-semibold whitespace-nowrap", s.bg, s.text)}>
+      {s.label}{worst.score > 0 && ` ${worst.score}`}
+    </span>
+  )
+}
 
 function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
   return (
@@ -37,10 +91,12 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
   up_to_date:   { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
 }
 
-const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
-const HEADERS = ["Container", "Image", "Running", "Available", "Status"]
+const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr_1.5fr]"
+const HEADERS = ["Container", "Image", "Running", "Available", "Version drift", "Worst CVE"]
 
 export default function ContainersTab({ usages, issues, workloadUid, reportId }: Props) {
+  const vulnReports = useClusterState(s => s.vulnerabilityReports)
+
   if (usages.length === 0) {
     return <p className="text-sm text-muted-foreground">No container data available.</p>
   }
@@ -66,6 +122,7 @@ export default function ContainersTab({ usages, issues, workloadUid, reportId }:
           const vs = u.versionStatus
           const statusStyle = SEVERITY_STYLE[vs.statusType]
           const issue = issues.find(i => u.image.includes(i.image))
+          const vulnReport = vulnReports === null ? undefined : vulnReports[u.imageInfo.digest] ?? null
 
           return (
             <div
@@ -102,6 +159,9 @@ export default function ContainersTab({ usages, issues, workloadUid, reportId }:
                       No data
                     </span>
                   )}
+                </div>
+                <div>
+                  <WorstCveCell report={vulnReport} />
                 </div>
               </div>
               {issue && (

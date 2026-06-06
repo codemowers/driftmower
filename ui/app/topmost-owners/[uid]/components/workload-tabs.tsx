@@ -9,7 +9,7 @@ import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
 
-const TABS = ["Containers", "Pods", "Descendants", "Metadata"] as const
+const TABS = ["Images", "Pods", "Descendants", "Metadata"] as const
 type Tab = typeof TABS[number]
 
 type Props = {
@@ -22,7 +22,7 @@ type Props = {
 }
 
 export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
-  const [active, setActive] = useState<Tab>("Containers")
+  const [active, setActive] = useState<Tab>("Images")
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,7 +44,7 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
         ))}
       </div>
 
-      {active === "Containers" && (
+      {active === "Images" && (
         <ContainersTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} reportId={reportId} />
       )}
       {active === "Pods" && (
