@@ -1,9 +1,12 @@
+import type { Socket } from "socket.io-client"
 import { useClusterState, type ClusterState } from "./cluster-state"
 import { ANALYZE_CLUSTER_URL } from "./constants"
 import { fetchDynamicData } from "./dynamic-data"
 import { getAnalysisSocket, waitForSocketConnect } from "./analysis-socket"
 
 export type { ImageUsage } from "./reports"
+
+const REPORT_CREATED_TIMEOUT_MS = 120000
 
 export type AnalyzeClusterProgress = {
   stage?: string
@@ -33,17 +36,20 @@ export async function refreshState(): Promise<void> {
   }
   socket.on("analyze-cluster progress", onProgress)
 
+  const newReportId = waitForReportCreated(socket)
+
   try {
     await waitForSocketConnect(socket)
 
-    const res = await fetch(ANALYZE_CLUSTER_URL, {
+    void fetch(ANALYZE_CLUSTER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
-    })
-    if (!res.ok) throw new Error(`Failed to fetch cluster data: ${res.status}`)
+    }).catch(() => {})
+
+    const reportId = await newReportId
     useClusterState.setState({ socketProgress: null })
-    await fetchDynamicData()
+    await fetchDynamicData(reportId)
     useClusterState.setState({ isLoading: false })
   } catch (e) {
     useClusterState.setState({
@@ -55,4 +61,23 @@ export async function refreshState(): Promise<void> {
   } finally {
     socket.off("analyze-cluster progress", onProgress)
   }
+}
+
+function waitForReportCreated(socket: Socket): Promise<string | null> {
+  return new Promise(resolve => {
+    function cleanup() {
+      clearTimeout(timeout)
+      socket.off("reports created", onReportCreated)
+    }
+    function onReportCreated(data: unknown) {
+      const report = data !== null && typeof data === "object" ? (data as { id?: string }) : null
+      cleanup()
+      resolve(report?.id ?? null)
+    }
+    const timeout = setTimeout(() => {
+      cleanup()
+      resolve(null)
+    }, REPORT_CREATED_TIMEOUT_MS)
+    socket.on("reports created", onReportCreated)
+  })
 }
