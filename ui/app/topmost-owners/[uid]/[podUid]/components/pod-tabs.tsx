@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ContainersTab from "./containers-tab"
 import PortsTab from "./ports-tab"
 import LogsTab from "./logs-tab"
@@ -13,7 +13,7 @@ const TABS = ["Containers", "Ports", "Logs", "Metadata"] as const
 type Tab = typeof TABS[number]
 
 type Props = {
-  pod: ExplorerResource
+  pod: ClusterResource
   usages: ImageUsage[]
   issues: Issue[]
   workloadUid: string

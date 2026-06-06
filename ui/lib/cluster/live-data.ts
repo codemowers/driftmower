@@ -1,6 +1,6 @@
 import { checkConnection } from "./check-connection"
 import { useClusterState } from "./cluster-state"
-import { EXPLORER_RESOURCES_URL } from "./constants"
+import { CLUSTER_RESOURCES_URL } from "./constants"
 
 const CONNECTED_FETCH_INTERVAL = 30000
 const DISCONNECTED_FETCH_INTERVAL = 5000
@@ -18,10 +18,10 @@ export function startLiveDataFetching(): () => void {
 
       if (isConnected) {
         try {
-          const res = await fetch(EXPLORER_RESOURCES_URL, { cache: "no-store" })
+          const res = await fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })
           const data = await res.json()
           if (cancelled) return
-          useClusterState.setState({ explorerResources: data })
+          useClusterState.setState({ clusterResources: data })
         } catch {}
       }
 

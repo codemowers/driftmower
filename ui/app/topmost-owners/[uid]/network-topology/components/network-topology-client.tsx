@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<NetstatdStatus, string> = {
 }
 
 export default function NetworkTopologyClient({ uid, reportId, kind, namespace, name }: Props) {
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
   const status = useNetstatd(s => s.status)
   const error = useNetstatd(s => s.error)
   const lastFlushedAt = useNetstatd(s => s.lastFlushedAt)
@@ -58,13 +58,13 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
   const hosts = useNetstatd(s => s.hosts)
 
   const scope = useMemo(
-    () => findDescendantPodUids(explorerResources, uid),
-    [explorerResources, uid],
+    () => findDescendantPodUids(clusterResources, uid),
+    [clusterResources, uid],
   )
 
   const aggregated = useMemo(
-    () => aggregate(aggregates, explorerResources, hosts),
-    [aggregates, explorerResources, hosts],
+    () => aggregate(aggregates, clusterResources, hosts),
+    [aggregates, clusterResources, hosts],
   )
 
   const ourListening = useMemo(
@@ -81,7 +81,7 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
 
   const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
   const ownerHref = reportId ? `/topmost-owners/${uid}?report=${reportId}` : `/topmost-owners/${uid}`
-  const apiGroup = explorerResources?.find(r => r.uid === uid)?.apiGroup
+  const apiGroup = clusterResources?.find(r => r.uid === uid)?.apiGroup
 
   const portTotal = listeningGroups.length
   const inboundCount = aggregated.inbound.length

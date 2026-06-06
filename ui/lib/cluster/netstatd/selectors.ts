@@ -1,4 +1,4 @@
-import type { ExplorerResource } from "../cluster-state"
+import type { ClusterResource } from "../cluster-state"
 
 export type WorkloadScope = {
   podUids: Set<string>
@@ -6,7 +6,7 @@ export type WorkloadScope = {
 }
 
 export function findDescendantPodUids(
-  resources: ExplorerResource[] | null,
+  resources: ClusterResource[] | null,
   rootUid: string,
 ): WorkloadScope {
   const podUids = new Set<string>()
@@ -16,7 +16,7 @@ export function findDescendantPodUids(
     return { podUids, podIPs }
   }
 
-  const childIndex = new Map<string, ExplorerResource[]>()
+  const childIndex = new Map<string, ClusterResource[]>()
   for (const r of resources) {
     if (!r.ownerUID) continue
     const list = childIndex.get(r.ownerUID) ?? []

@@ -31,7 +31,7 @@ export default function ImageTagDetailPage() {
   const digest = decodeURIComponent(params.digest)
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -55,7 +55,7 @@ export default function ImageTagDetailPage() {
   const workloadName = workloadRoot?.name ?? "—"
   const workloadKind = workloadRoot?.kind ?? "—"
   const workloadNamespace = workloadRoot?.namespace ?? "—"
-  const apiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const apiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
   const { registry, repository, tag } = usage.imageInfo
   const repoLabel = `${registry}/${repository}`
   const fullRef = `${repoLabel}:${tag}@${digest}`

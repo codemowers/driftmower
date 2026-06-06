@@ -23,10 +23,5 @@ spec:
           ports:
             - containerPort: 80
           env:
-            # In-cluster service URLs used by Next.js server-side proxy routes.
-            # Defaults assume backend and explorer live in the `driftmowers` namespace
-            # of the same cluster. Override if your setup differs.
             - name: BACKEND_URL
-              value: "http://driftmower-be.driftmowers:3030"
-            - name: EXPLORER_URL
-              value: "http://driftmower-explorer.driftmowers"
+              value: "http://driftmower-be:3030"

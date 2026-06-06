@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue, ReleaseInfo } from "@/lib/cluster/reports"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ContainersTab from "./containers-tab"
 import ResourcesTab from "./resources-tab"
 
@@ -13,12 +13,12 @@ type Tab = typeof TABS[number]
 type Props = {
   usages: ImageUsage[]
   issues: Issue[]
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   releaseInfo: ReleaseInfo
   reportId: string | null
 }
 
-export default function ReleaseTabs({ usages, issues, explorerResources, releaseInfo, reportId }: Props) {
+export default function ReleaseTabs({ usages, issues, clusterResources, releaseInfo, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -45,7 +45,7 @@ export default function ReleaseTabs({ usages, issues, explorerResources, release
         <ContainersTab usages={usages} issues={issues} reportId={reportId} />
       )}
       {active === "Resources" && (
-        <ResourcesTab usages={usages} explorerResources={explorerResources} releaseInfo={releaseInfo} reportId={reportId} />
+        <ResourcesTab usages={usages} clusterResources={clusterResources} releaseInfo={releaseInfo} reportId={reportId} />
       )}
       {active === "Values" && (
         <p className="text-sm text-muted-foreground">Values not available coming soon</p>

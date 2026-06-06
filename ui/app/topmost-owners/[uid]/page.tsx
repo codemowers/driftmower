@@ -27,7 +27,7 @@ export default function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
   const match = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -81,7 +81,7 @@ export default function WorkloadDetailPage() {
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
   const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
-  const apiGroup = explorerResources?.find(r => r.uid === uid)?.apiGroup
+  const apiGroup = clusterResources?.find(r => r.uid === uid)?.apiGroup
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
   const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
@@ -127,7 +127,7 @@ export default function WorkloadDetailPage() {
 
         <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
 
-        <WorkloadTabs usages={usages} issues={data.issues} explorerResources={explorerResources} workloadUid={uid} reportId={reportId} />
+        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} workloadUid={uid} reportId={reportId} />
       </main>
     </div>
   )

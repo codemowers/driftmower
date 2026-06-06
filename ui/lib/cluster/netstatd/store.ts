@@ -77,7 +77,7 @@ function recomputeScope() {
     scope = { podUids: new Set(), podIPs: new Set() }
     return
   }
-  scope = findDescendantPodUids(useClusterState.getState().explorerResources, currentWorkloadUid)
+  scope = findDescendantPodUids(useClusterState.getState().clusterResources, currentWorkloadUid)
 }
 
 function isOursOrPending(

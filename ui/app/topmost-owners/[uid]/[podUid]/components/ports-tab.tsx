@@ -1,10 +1,10 @@
 "use client"
 
 import { useNetstatd, filterListening } from "@/lib/cluster/netstatd"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
-  pod: ExplorerResource
+  pod: ClusterResource
 }
 
 export default function PortsTab({ pod }: Props) {

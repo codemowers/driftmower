@@ -1,9 +1,9 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   workloadUid: string
   reportId: string | null
 }
@@ -17,12 +17,12 @@ const PHASE_DOT: Record<string, string> = {
 }
 
 type TreeRow = {
-  resource: ExplorerResource
+  resource: ClusterResource
   prefix: string
   depth: number
 }
 
-function buildRows(root: ExplorerResource, childIndex: Map<string, ExplorerResource[]>): TreeRow[] {
+function buildRows(root: ClusterResource, childIndex: Map<string, ClusterResource[]>): TreeRow[] {
   const rows: TreeRow[] = [{ resource: root, prefix: "", depth: 0 }]
 
   function walk(parentUid: string, ancestorPipes: string) {
@@ -46,18 +46,18 @@ function buildRows(root: ExplorerResource, childIndex: Map<string, ExplorerResou
   return rows
 }
 
-export default function DescendantsTab({ explorerResources, workloadUid, reportId }: Props) {
-  if (explorerResources === null) {
+export default function DescendantsTab({ clusterResources, workloadUid, reportId }: Props) {
+  if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const root = explorerResources.find(r => r.uid === workloadUid)
+  const root = clusterResources.find(r => r.uid === workloadUid)
   if (!root) {
-    return <p className="text-sm text-muted-foreground">No data for this workload in the explorer.</p>
+    return <p className="text-sm text-muted-foreground">No data for this workload.</p>
   }
 
-  const childIndex = new Map<string, ExplorerResource[]>()
-  for (const r of explorerResources) {
+  const childIndex = new Map<string, ClusterResource[]>()
+  for (const r of clusterResources) {
     if (!r.ownerUID) continue
     const list = childIndex.get(r.ownerUID) ?? []
     list.push(r)

@@ -1,10 +1,10 @@
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   workloadUid: string
   reportId: string | null
 }
@@ -17,22 +17,27 @@ const PHASE_DOT: Record<string, string> = {
   Succeeded: "bg-gray-400",
 }
 
-export default function PodsTab({ explorerResources, workloadUid, reportId }: Props) {
-  if (explorerResources === null) {
+export default function PodsTab({ clusterResources, workloadUid, reportId }: Props) {
+  if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const resourceMap = new Map(explorerResources.map(r => [r.uid, r]))
-
-  function ownsWorkload(pod: ExplorerResource): boolean {
-    if (!pod.ownerUID) return false
-    if (pod.ownerUID === workloadUid) return true
-    const owner = resourceMap.get(pod.ownerUID)
-    if (owner?.kind === "ReplicaSet" && owner.ownerUID === workloadUid) return true
-    return false
+  const childIndex = new Map<string, ClusterResource[]>()
+  for (const r of clusterResources) {
+    if (!r.ownerUID) continue
+    const list = childIndex.get(r.ownerUID) ?? []
+    list.push(r)
+    childIndex.set(r.ownerUID, list)
   }
 
-  const pods = explorerResources.filter(r => r.kind === "Pod" && ownsWorkload(r))
+  const pods: ClusterResource[] = []
+  function collectPods(uid: string) {
+    for (const child of childIndex.get(uid) ?? []) {
+      if (child.kind === "Pod") pods.push(child)
+      collectPods(child.uid)
+    }
+  }
+  collectPods(workloadUid)
 
   if (pods.length === 0) {
     return <p className="text-sm text-muted-foreground">No pods found.</p>

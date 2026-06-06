@@ -8,9 +8,9 @@ export default function PodNetworkTopologyPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
-  const pod = explorerResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
+  const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(

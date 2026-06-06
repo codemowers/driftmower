@@ -60,7 +60,7 @@ export default function NetworkTopologyClient({
   nodeName,
   podIPs,
 }: Props) {
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
   const status = useNetstatd(s => s.status)
   const error = useNetstatd(s => s.error)
   const lastFlushedAt = useNetstatd(s => s.lastFlushedAt)
@@ -71,8 +71,8 @@ export default function NetworkTopologyClient({
   const podIPSet = useMemo(() => new Set(podIPs), [podIPs])
 
   const aggregated = useMemo(
-    () => aggregate(aggregates, explorerResources, hosts, podIPSet),
-    [aggregates, explorerResources, hosts, podIPSet],
+    () => aggregate(aggregates, clusterResources, hosts, podIPSet),
+    [aggregates, clusterResources, hosts, podIPSet],
   )
 
   const ourListening = useMemo(
@@ -82,7 +82,7 @@ export default function NetworkTopologyClient({
 
   const listeningGroups = useMemo(() => groupListening(ourListening), [ourListening])
 
-  const apiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const apiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
   const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
   const ownerHref = reportId ? `/topmost-owners/${workloadUid}?report=${reportId}` : `/topmost-owners/${workloadUid}`
   const podDetailHref = reportId

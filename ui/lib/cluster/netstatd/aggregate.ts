@@ -1,4 +1,4 @@
-import type { ExplorerResource } from "../cluster-state"
+import type { ClusterResource } from "../cluster-state"
 import type { AggregateBucket, HostInfo, ListeningPort } from "./types"
 import { isPrivateOrSpecial } from "./rdns"
 
@@ -19,7 +19,7 @@ export type Aggregated = {
 
 export function aggregate(
   aggregates: Map<string, AggregateBucket>,
-  resources: ExplorerResource[] | null,
+  resources: ClusterResource[] | null,
   hosts: Map<string, HostInfo>,
   localIPFilter?: Set<string>,
 ): Aggregated {
@@ -28,7 +28,7 @@ export function aggregate(
   const external: AggRow[] = []
   const inbound: AggRow[] = []
 
-  const podByIP = new Map<string, ExplorerResource>()
+  const podByIP = new Map<string, ClusterResource>()
   const hostIPs = new Set<string>()
 
   if (resources) {
@@ -42,7 +42,7 @@ export function aggregate(
     for (const ip of host.hostIPs) hostIPs.add(ip)
   }
 
-  const ownerByUid = new Map<string, ExplorerResource>(
+  const ownerByUid = new Map<string, ClusterResource>(
     resources ? resources.map(r => [r.uid, r]) : [],
   )
 
@@ -140,8 +140,8 @@ function stableSort(rows: AggRow[]): AggRow[] {
 
 function labelForPeer(
   ip: string,
-  podByIP: Map<string, ExplorerResource>,
-  ownerByUid: Map<string, ExplorerResource>,
+  podByIP: Map<string, ClusterResource>,
+  ownerByUid: Map<string, ClusterResource>,
 ): string {
   const pod = podByIP.get(ip)
   if (pod) return labelForOwner(pod, ownerByUid)
@@ -154,8 +154,8 @@ function intersects(a: Set<string>, b: Set<string>): boolean {
   return false
 }
 
-function labelForOwner(pod: ExplorerResource, ownerByUid: Map<string, ExplorerResource>): string {
-  let cur: ExplorerResource | undefined = pod
+function labelForOwner(pod: ClusterResource, ownerByUid: Map<string, ClusterResource>): string {
+  let cur: ClusterResource | undefined = pod
   while (cur?.ownerUID) {
     const next = ownerByUid.get(cur.ownerUID)
     if (!next) break

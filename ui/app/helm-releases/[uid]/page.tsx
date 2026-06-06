@@ -23,7 +23,7 @@ export default function HelmReleaseDetailPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
   const score = data
     ? Object.values(data.rotenness.releaseScores).find(s => s.releaseInfo.uid === uid)
@@ -86,7 +86,7 @@ export default function HelmReleaseDetailPage() {
 
         <ChartCard releaseInfo={score.releaseInfo} />
 
-        <ReleaseTabs usages={usages} issues={data.issues} explorerResources={explorerResources} releaseInfo={score.releaseInfo} reportId={reportId} />
+        <ReleaseTabs usages={usages} issues={data.issues} clusterResources={clusterResources} releaseInfo={score.releaseInfo} reportId={reportId} />
       </main>
     </div>
   )

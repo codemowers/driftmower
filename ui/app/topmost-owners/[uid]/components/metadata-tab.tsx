@@ -1,19 +1,19 @@
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   workloadUid: string
 }
 
-export default function MetadataTab({ explorerResources, workloadUid }: Props) {
-  if (explorerResources === null) {
+export default function MetadataTab({ clusterResources, workloadUid }: Props) {
+  if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const resource = explorerResources.find(r => r.uid === workloadUid)
+  const resource = clusterResources.find(r => r.uid === workloadUid)
 
   if (!resource) {
-    return <p className="text-sm text-muted-foreground">No data for this workload in the explorer.</p>
+    return <p className="text-sm text-muted-foreground">No data for this workload.</p>
   }
 
   const text = JSON.stringify(resource, null, 2)

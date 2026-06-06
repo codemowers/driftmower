@@ -1,11 +1,11 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, ReleaseInfo } from "@/lib/cluster/reports"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   usages: ImageUsage[]
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   releaseInfo: ReleaseInfo
   reportId: string | null
 }
@@ -18,8 +18,8 @@ const PHASE_DOT: Record<string, string> = {
   Succeeded: "bg-gray-400",
 }
 
-export default function ResourcesTab({ usages, explorerResources, releaseInfo, reportId }: Props) {
-  if (explorerResources === null) {
+export default function ResourcesTab({ usages, clusterResources, releaseInfo, reportId }: Props) {
+  if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Resource data not available</p>
   }
 
@@ -38,21 +38,21 @@ export default function ResourcesTab({ usages, explorerResources, releaseInfo, r
     return <p className="text-sm text-muted-foreground">No container data available.</p>
   }
 
-  const resourceMap = new Map(explorerResources.map(r => [r.uid, r]))
+  const resourceMap = new Map(clusterResources.map(r => [r.uid, r]))
   const managerKey = `helm-release:${releaseInfo.namespace}:${releaseInfo.name}`
 
-  const releasePods = explorerResources.filter(
+  const releasePods = clusterResources.filter(
     r => r.kind === "Pod" && r.managerUID === managerKey
   )
 
-  function resolveWorkloadUid(pod: ExplorerResource): string | undefined {
+  function resolveWorkloadUid(pod: ClusterResource): string | undefined {
     if (!pod.ownerUID) return undefined
     const owner = resourceMap.get(pod.ownerUID)
     if (owner?.kind === "ReplicaSet") return owner.ownerUID
     return pod.ownerUID
   }
 
-  const podsByWorkload = new Map<string, ExplorerResource[]>()
+  const podsByWorkload = new Map<string, ClusterResource[]>()
   for (const pod of releasePods) {
     const wUid = resolveWorkloadUid(pod)
     if (!wUid) continue

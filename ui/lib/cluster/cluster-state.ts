@@ -3,8 +3,7 @@ import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
 import type { VulnerabilityReport } from "./vulnerability/types"
 
-export type ExplorerResource = {
-  type: string
+export type ClusterResource = {
   uid: string
   kind: string
   apiGroup: string
@@ -16,7 +15,6 @@ export type ExplorerResource = {
   ips?: string[]
   nodeName?: string
   phase?: string
-  images?: { name: string; normalized: string; digest: string }[]
 }
 
 export type ClusterState = {
@@ -30,7 +28,7 @@ export type ClusterState = {
   lastRefreshed: Date | null
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: boolean
 }
@@ -46,7 +44,7 @@ export const useClusterState = create<ClusterState>(() => ({
   lastRefreshed: null,
   socketProgress: null,
   containerCount: null,
-  explorerResources: null,
+  clusterResources: null,
   vulnerabilityReports: null,
   vulnerabilityReportsError: false,
 }))

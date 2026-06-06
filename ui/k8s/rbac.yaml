@@ -25,3 +25,28 @@ subjects:
   - kind: ServiceAccount
     name: driftmower-ui
     namespace: driftmowers
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: driftmower-ui-cluster-resources
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: driftmower-ui-cluster-resources
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: driftmower-ui-cluster-resources
+subjects:
+  - kind: ServiceAccount
+    name: driftmower-ui
+    namespace: driftmowers

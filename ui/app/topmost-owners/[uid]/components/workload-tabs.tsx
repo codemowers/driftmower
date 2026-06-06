@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
-import type { ExplorerResource } from "@/lib/cluster/cluster-state"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ContainersTab from "./containers-tab"
 import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
@@ -15,12 +15,12 @@ type Tab = typeof TABS[number]
 type Props = {
   usages: ImageUsage[]
   issues: Issue[]
-  explorerResources: ExplorerResource[] | null
+  clusterResources: ClusterResource[] | null
   workloadUid: string
   reportId: string | null
 }
 
-export default function WorkloadTabs({ usages, issues, explorerResources, workloadUid, reportId }: Props) {
+export default function WorkloadTabs({ usages, issues, clusterResources, workloadUid, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -47,13 +47,13 @@ export default function WorkloadTabs({ usages, issues, explorerResources, worklo
         <ContainersTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Pods" && (
-        <PodsTab explorerResources={explorerResources} workloadUid={workloadUid} reportId={reportId} />
+        <PodsTab clusterResources={clusterResources} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Descendants" && (
-        <DescendantsTab explorerResources={explorerResources} workloadUid={workloadUid} reportId={reportId} />
+        <DescendantsTab clusterResources={clusterResources} workloadUid={workloadUid} reportId={reportId} />
       )}
       {active === "Metadata" && (
-        <MetadataTab explorerResources={explorerResources} workloadUid={workloadUid} />
+        <MetadataTab clusterResources={clusterResources} workloadUid={workloadUid} />
       )}
     </div>
   )

@@ -26,9 +26,9 @@ export default function PodDetailPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
-  const explorerResources = useClusterState(s => s.explorerResources)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
-  const pod = explorerResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
+  const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -50,7 +50,7 @@ export default function PodDetailPage() {
   const workloadRoot = workloadUsages[0]?.workloadRootInfo
   const workloadName = workloadRoot?.name ?? "—"
   const workloadKind = workloadRoot?.kind ?? "—"
-  const workloadApiGroup = explorerResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const workloadApiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
 
   const podUsages: ImageUsage[] = data.report.imageUsages.filter(
     u => u.podName === pod.name && u.namespace === pod.namespace,

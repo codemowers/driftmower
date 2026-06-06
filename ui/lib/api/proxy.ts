@@ -70,7 +70,3 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
 export function backendUrl(): string {
   return process.env.BACKEND_URL ?? "http://driftmower-be:3030"
 }
-
-export function explorerUrl(): string {
-  return process.env.EXPLORER_URL ?? "http://driftmower-explorer"
-}
