@@ -16,11 +16,12 @@ type Props = {
   usages: ImageUsage[]
   issues: Issue[]
   clusterResources: ClusterResource[] | null
-  workloadUid: string
+  reportWorkloadUid: string
+  liveWorkloadUid: string
   reportId: string | null
 }
 
-export default function WorkloadTabs({ usages, issues, clusterResources, workloadUid, reportId }: Props) {
+export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
   const [active, setActive] = useState<Tab>("Containers")
 
   return (
@@ -44,16 +45,16 @@ export default function WorkloadTabs({ usages, issues, clusterResources, workloa
       </div>
 
       {active === "Containers" && (
-        <ContainersTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />
+        <ContainersTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} reportId={reportId} />
       )}
       {active === "Pods" && (
-        <PodsTab clusterResources={clusterResources} workloadUid={workloadUid} reportId={reportId} />
+        <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} reportId={reportId} />
       )}
       {active === "Descendants" && (
-        <DescendantsTab clusterResources={clusterResources} workloadUid={workloadUid} reportId={reportId} />
+        <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} reportId={reportId} />
       )}
       {active === "Metadata" && (
-        <MetadataTab clusterResources={clusterResources} workloadUid={workloadUid} />
+        <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
       )}
     </div>
   )

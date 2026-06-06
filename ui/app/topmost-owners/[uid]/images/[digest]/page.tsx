@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation"
 import { Bookmark } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import ImageTagStats from "./components/image-tag-stats"
@@ -55,7 +56,7 @@ export default function ImageTagDetailPage() {
   const workloadName = workloadRoot?.name ?? "—"
   const workloadKind = workloadRoot?.kind ?? "—"
   const workloadNamespace = workloadRoot?.namespace ?? "—"
-  const apiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const apiGroup = workloadRoot ? findWorkloadRoot(clusterResources, workloadRoot)?.apiGroup : undefined
   const { registry, repository, tag } = usage.imageInfo
   const repoLabel = `${registry}/${repository}`
   const fullRef = `${repoLabel}:${tag}@${digest}`

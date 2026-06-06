@@ -2,15 +2,15 @@ import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   clusterResources: ClusterResource[] | null
-  workloadUid: string
+  liveWorkloadUid: string
 }
 
-export default function MetadataTab({ clusterResources, workloadUid }: Props) {
+export default function MetadataTab({ clusterResources, liveWorkloadUid }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const resource = clusterResources.find(r => r.uid === workloadUid)
+  const resource = clusterResources.find(r => r.uid === liveWorkloadUid)
 
   if (!resource) {
     return <p className="text-sm text-muted-foreground">No data for this workload.</p>

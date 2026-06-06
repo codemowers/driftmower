@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
@@ -82,7 +83,9 @@ export default function WorkloadDetailPage() {
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
   const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
-  const apiGroup = clusterResources?.find(r => r.uid === uid)?.apiGroup
+  const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
+  const apiGroup = root?.apiGroup
+  const liveWorkloadUid = root?.uid ?? uid
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
   const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
@@ -134,7 +137,7 @@ export default function WorkloadDetailPage() {
           </div>
         </div>
 
-        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} workloadUid={uid} reportId={reportId} />
+        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} reportId={reportId} />
       </main>
     </div>
   )

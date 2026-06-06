@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel } from "@/lib/cluster/reports"
 import {
   useNetstatd,
@@ -82,7 +83,7 @@ export default function NetworkTopologyClient({
 
   const listeningGroups = useMemo(() => groupListening(ourListening), [ourListening])
 
-  const apiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const apiGroup = findWorkloadRoot(clusterResources, { uid: workloadUid, kind: workloadKind, name: workloadName, namespace })?.apiGroup
   const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
   const ownerHref = reportId ? `/topmost-owners/${workloadUid}?report=${reportId}` : `/topmost-owners/${workloadUid}`
   const podDetailHref = reportId

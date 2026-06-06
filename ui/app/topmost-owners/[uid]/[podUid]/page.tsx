@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation"
 import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
@@ -51,7 +52,7 @@ export default function PodDetailPage() {
   const workloadRoot = workloadUsages[0]?.workloadRootInfo
   const workloadName = workloadRoot?.name ?? "—"
   const workloadKind = workloadRoot?.kind ?? "—"
-  const workloadApiGroup = clusterResources?.find(r => r.uid === workloadUid)?.apiGroup
+  const workloadApiGroup = workloadRoot ? findWorkloadRoot(clusterResources, workloadRoot)?.apiGroup : undefined
 
   const podUsages: ImageUsage[] = data.report.imageUsages.filter(
     u => u.podName === pod.name && u.namespace === pod.namespace,

@@ -5,7 +5,8 @@ import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   clusterResources: ClusterResource[] | null
-  workloadUid: string
+  reportWorkloadUid: string
+  liveWorkloadUid: string
   reportId: string | null
 }
 
@@ -17,7 +18,7 @@ const PHASE_DOT: Record<string, string> = {
   Succeeded: "bg-gray-400",
 }
 
-export default function PodsTab({ clusterResources, workloadUid, reportId }: Props) {
+export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
@@ -37,7 +38,7 @@ export default function PodsTab({ clusterResources, workloadUid, reportId }: Pro
       collectPods(child.uid)
     }
   }
-  collectPods(workloadUid)
+  collectPods(liveWorkloadUid)
 
   if (pods.length === 0) {
     return <p className="text-sm text-muted-foreground">No pods found.</p>
@@ -47,8 +48,8 @@ export default function PodsTab({ clusterResources, workloadUid, reportId }: Pro
     <div className="overflow-hidden rounded-xl border border-gray-200">
       {pods.map((pod, idx) => {
         const href = reportId
-          ? `/topmost-owners/${workloadUid}/${pod.uid}?report=${reportId}`
-          : `/topmost-owners/${workloadUid}/${pod.uid}`
+          ? `/topmost-owners/${reportWorkloadUid}/${pod.uid}?report=${reportId}`
+          : `/topmost-owners/${reportWorkloadUid}/${pod.uid}`
         return (
           <Link
             key={pod.uid}

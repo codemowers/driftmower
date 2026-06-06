@@ -4,7 +4,8 @@ import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   clusterResources: ClusterResource[] | null
-  workloadUid: string
+  reportWorkloadUid: string
+  liveWorkloadUid: string
   reportId: string | null
 }
 
@@ -46,12 +47,12 @@ function buildRows(root: ClusterResource, childIndex: Map<string, ClusterResourc
   return rows
 }
 
-export default function DescendantsTab({ clusterResources, workloadUid, reportId }: Props) {
+export default function DescendantsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const root = clusterResources.find(r => r.uid === workloadUid)
+  const root = clusterResources.find(r => r.uid === liveWorkloadUid)
   if (!root) {
     return <p className="text-sm text-muted-foreground">No data for this workload.</p>
   }
@@ -84,8 +85,8 @@ export default function DescendantsTab({ clusterResources, workloadUid, reportId
           const isPod = r.kind === "Pod"
           const podHref = isPod
             ? (reportId
-                ? `/topmost-owners/${workloadUid}/${r.uid}?report=${reportId}`
-                : `/topmost-owners/${workloadUid}/${r.uid}`)
+                ? `/topmost-owners/${reportWorkloadUid}/${r.uid}?report=${reportId}`
+                : `/topmost-owners/${reportWorkloadUid}/${r.uid}`)
             : null
 
           const rowClassName = cn(
