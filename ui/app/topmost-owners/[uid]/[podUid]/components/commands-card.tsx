@@ -26,7 +26,7 @@ function CommandRow({ label, value }: Command) {
       <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[12.5px] text-foreground">
+      <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-[12.5px] text-foreground">
         {value}
       </code>
       <CopyButton value={value} className="shrink-0" />
