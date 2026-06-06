@@ -6,6 +6,7 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
+import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
@@ -122,13 +123,19 @@ export default function PodDetailPage() {
           normalizedScore={normalizedScore}
         />
 
-        <NetworkCard
-          scopeLabel={containerLabel}
-          href={reportId
-            ? `/topmost-owners/${workloadUid}/${podUid}/network-topology?report=${reportId}`
-            : `/topmost-owners/${workloadUid}/${podUid}/network-topology`
-          }
-        />
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
+          <div className="md:col-span-3">
+            <CommandsCard namespace={pod.namespace} name={pod.name} />
+          </div>
+          <div className="md:col-span-2">
+            <NetworkCard
+              href={reportId
+                ? `/topmost-owners/${workloadUid}/${podUid}/network-topology?report=${reportId}`
+                : `/topmost-owners/${workloadUid}/${podUid}/network-topology`
+              }
+            />
+          </div>
+        </div>
 
         <IssuesCard issues={podIssues} />
 

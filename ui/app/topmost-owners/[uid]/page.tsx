@@ -9,6 +9,7 @@ import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
 import NetworkCard from "@/app/components/network-card"
 import AiInsightsCard from "./components/ai-insights-card"
+import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -120,12 +121,18 @@ export default function WorkloadDetailPage() {
           <ManagerCard releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
         )}
 
-        <NetworkCard
-          href={reportId ? `/topmost-owners/${uid}/network-topology?report=${reportId}` : `/topmost-owners/${uid}/network-topology`}
-          scopeLabel={totalPods === 1 ? "1 pod" : `${totalPods} pods`}
-        />
-
         <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
+
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
+          <div className="md:col-span-3">
+            <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={apiGroup} />
+          </div>
+          <div className="md:col-span-2">
+            <NetworkCard
+              href={reportId ? `/topmost-owners/${uid}/network-topology?report=${reportId}` : `/topmost-owners/${uid}/network-topology`}
+            />
+          </div>
+        </div>
 
         <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} workloadUid={uid} reportId={reportId} />
       </main>
