@@ -59,6 +59,7 @@ export default function ExecutiveSummaryPage() {
   const patchCount = usages.filter(u => u.versionStatus.statusType === "patch_behind").length
   const minorCount = usages.filter(u => u.versionStatus.statusType === "minor_behind").length
   const majorCount = usages.filter(u => u.versionStatus.statusType === "major_behind").length
+  const unknownCount = usages.length - (okCount + patchCount + minorCount + majorCount)
 
   const topOutdatedWorkloads: OutdatedWorkloadEntry[] = Array.from(workloadMap.entries())
     .map(([key, workloadUsages]) => {
@@ -107,7 +108,10 @@ export default function ExecutiveSummaryPage() {
           {/* Status counts */}
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-              Container drift · <span className="tabular-nums">{usages.length}</span> containers tracked
+              Container drift · <span className="tabular-nums">{usages.length}</span> tracked
+              {unknownCount > 0 && (
+                <> · <span className="tabular-nums">{unknownCount}</span> unknown</>
+              )}
             </p>
           <div className="grid grid-cols-4 gap-4">
             <StatCard value={okCount}    accent="ok"    valueTone="ok"    label="OK"    hint="up to date" />
