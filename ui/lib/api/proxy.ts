@@ -54,10 +54,15 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
   try {
     upstream = await fetch(target.toString(), init)
   } catch (e) {
+    console.error(`[be-proxy] ${req.method} ${target} -> unreachable:`, String(e))
     return Response.json(
       { error: "upstream unreachable", cause: String(e) },
       { status: 502 },
     )
+  }
+
+  if (upstream.status >= 500) {
+    console.error(`[be-proxy] ${req.method} ${target} -> ${upstream.status} ${upstream.statusText}`)
   }
 
   return new Response(upstream.body, {

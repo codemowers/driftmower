@@ -27,7 +27,10 @@ const SOURCES = [
 ] as const
 
 export async function getClusterResources(): Promise<ClusterResource[]> {
-  if (!isInCluster()) return []
+  if (!isInCluster()) {
+    console.warn("[kube-api] cluster-resources: Kubernetes API not reachable (KUBERNETES_SERVICE_HOST unset, e.g. localhost) — returning empty")
+    return []
+  }
 
   const lists = await Promise.all(
     SOURCES.map(async source => ({

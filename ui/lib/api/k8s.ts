@@ -49,12 +49,16 @@ export async function kubeApiGet<T>(path: string): Promise<T> {
               reject(new Error(`Kubernetes API ${path} returned non-JSON body: ${(e as Error).message}`))
             }
           } else {
+            console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${body.slice(0, 200)}`)
             reject(new Error(`Kubernetes API ${path} returned ${res.statusCode}: ${body.slice(0, 200)}`))
           }
         })
       },
     )
-    req.on("error", reject)
+    req.on("error", e => {
+      console.error(`[kube-api] GET ${path} -> request error:`, (e as Error).message)
+      reject(e)
+    })
     req.end()
   })
 }

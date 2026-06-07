@@ -33,7 +33,10 @@ async function discover(): Promise<string> {
   const override = process.env.NETSTATD_URL
   if (override) return override
 
-  if (!isInCluster()) return ""
+  if (!isInCluster()) {
+    console.warn("[kube-api] netstatd discovery: Kubernetes API not reachable (KUBERNETES_SERVICE_HOST unset, e.g. localhost) — returning empty")
+    return ""
+  }
 
   const list = await kubeApiGet<IngressList>(
     `/apis/networking.k8s.io/v1/ingresses?labelSelector=${encodeURIComponent(LABEL_SELECTOR)}`,
