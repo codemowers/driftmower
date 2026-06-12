@@ -4,7 +4,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import ContainersTab from "./containers-tab"
+import ImagesTab from "./images-tab"
 import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
@@ -45,7 +45,7 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
       </div>
 
       {active === "Images" && (
-        <ContainersTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} reportId={reportId} />
+        <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} reportId={reportId} />
       )}
       {active === "Pods" && (
         <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} reportId={reportId} />

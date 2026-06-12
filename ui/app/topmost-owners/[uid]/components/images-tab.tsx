@@ -94,7 +94,7 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Running", "Available", "Version drift", "Worst CVE"]
 
-export default function ContainersTab({ usages, issues, workloadUid, reportId }: Props) {
+export default function ImagesTab({ usages, issues, workloadUid, reportId }: Props) {
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
 
   if (usages.length === 0) {

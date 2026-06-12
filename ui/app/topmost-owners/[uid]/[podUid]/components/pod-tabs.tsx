@@ -4,12 +4,12 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import ContainersTab from "./containers-tab"
+import ImagesTab from "./images-tab"
 import PortsTab from "./ports-tab"
 import LogsTab from "./logs-tab"
 import MetadataTab from "./metadata-tab"
 
-const TABS = ["Containers", "Ports", "Logs", "Metadata"] as const
+const TABS = ["Images", "Ports", "Logs", "Metadata"] as const
 type Tab = typeof TABS[number]
 
 type Props = {
@@ -21,7 +21,7 @@ type Props = {
 }
 
 export default function PodTabs({ pod, usages, issues, workloadUid, reportId }: Props) {
-  const [active, setActive] = useState<Tab>("Containers")
+  const [active, setActive] = useState<Tab>("Images")
 
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +43,7 @@ export default function PodTabs({ pod, usages, issues, workloadUid, reportId }: 
         ))}
       </div>
 
-      {active === "Containers" && <ContainersTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />}
+      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />}
       {active === "Ports" && <PortsTab pod={pod} />}
       {active === "Logs" && <LogsTab />}
       {active === "Metadata" && <MetadataTab pod={pod} />}
