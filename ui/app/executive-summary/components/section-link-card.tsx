@@ -23,7 +23,7 @@ export default function SectionLinkCard({
     <Link
       href={href}
       className={cn(
-        "block min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-7 shadow-xs",
+        "group block min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-7 shadow-xs",
         "cursor-pointer transition-colors hover:border-brand/30 hover:bg-brand-bg/40",
       )}
     >
@@ -38,7 +38,10 @@ export default function SectionLinkCard({
           </p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
-        <span className="shrink-0 text-muted-foreground" aria-hidden>
+        <span
+          className="shrink-0 text-muted-foreground transition-colors group-hover:text-brand"
+          aria-hidden
+        >
           →
         </span>
       </div>
