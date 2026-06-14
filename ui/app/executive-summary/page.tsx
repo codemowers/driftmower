@@ -145,12 +145,13 @@ export default function ExecutiveSummaryPage() {
 
         <DriftBreakdown ok={okCount} patch={patchCount} minor={minorCount} major={majorCount} />
 
+        <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
+
         <div className="grid grid-cols-[3fr_2fr] gap-5">
           <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} />
           <ScraperIssues issues={data?.issues ?? []} />
         </div>
 
-        <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
       </main>
     </div>
   );
