@@ -1,13 +1,17 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Activity, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useNetstatd } from "@/lib/cluster/netstatd"
+import { useNetstatd, recentCounts, filterListening, groupListening } from "@/lib/cluster/netstatd"
 
 type Props = {
   href?: string
+  podIPs?: string[]
 }
+
+const RECENT_WINDOW_MS = 15_000
 
 const STATUS_DOT: Record<string, string> = {
   idle:       "bg-gray-400",
@@ -42,8 +46,32 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export default function NetworkCard({ href }: Props) {
+function ActivityLine({ active, listening }: { active: number; listening: number }) {
+  return (
+    <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+      {active} active
+      <span className="mx-1.5 text-muted-foreground">·</span>
+      {listening} listening
+    </span>
+  )
+}
+
+export default function NetworkCard({ href, podIPs }: Props) {
   const status = useNetstatd(s => s.status)
+  const aggregates = useNetstatd(s => s.aggregates)
+  const listening = useNetstatd(s => s.listening)
+
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const podIPSet = useMemo(() => (podIPs ? new Set(podIPs) : undefined), [podIPs])
+
+  const { inbound, outbound } = recentCounts(aggregates, now, RECENT_WINDOW_MS, podIPSet)
+  const listeningPorts = podIPSet ? filterListening(listening, podIPSet) : [...listening.values()]
+  const listeningCount = groupListening(listeningPorts).length
 
   const inner = (
     <>
@@ -52,8 +80,11 @@ export default function NetworkCard({ href }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">Network topology</p>
-        <div className="mt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
           <StatusBadge status={status} />
+          {status === "open" && (
+            <ActivityLine active={inbound + outbound} listening={listeningCount} />
+          )}
         </div>
       </div>
       {href && (

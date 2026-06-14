@@ -4,32 +4,23 @@ import { useClusterState } from "../cluster-state"
 import { findDescendantPodUids, type WorkloadScope } from "./selectors"
 import type {
   AggregateDirection,
-  Connection,
   ConnectionEvent,
-  ContainerEvent,
-  ContainerInfo,
   HostInfoEvent,
+  ListeningPort,
   NetstatdEvent,
   NetstatdState,
   PortListeningEvent,
-  ProcessMetainfoEvent,
   Protocol,
 } from "./types"
 
 const initial = (): NetstatdState => ({
   status: "idle",
   error: null,
-  rawEventCount: 0,
   lastFlushedAt: null,
-  revision: 0,
-  connections: new Map(),
   aggregates: new Map(),
-  cookieToAgg: new Map(),
   listening: new Map(),
-  containersByUid: new Map(),
-  processes: new Map(),
-  pidBySockCookie: new Map(),
   hosts: new Map(),
+  hiddenCount: 0,
 })
 
 export const useNetstatd = create<NetstatdState>(initial)
@@ -46,23 +37,26 @@ async function fetchNetstatdUrl(): Promise<string> {
 
 const HOLDING_BUFFER_MS = 10_000
 const PRUNE_INTERVAL_MS = 10_000
-const CONN_CAP = 200
-const AGG_CAP = 500
-const COOKIE_AGG_CAP = 5_000
+const AGG_CAP = 2_000
+const LISTENING_CAP = 2_000
 const FLUSH_DEBOUNCE_MS = 50
 const RECONNECT_BACKOFF_MS = [1_000, 2_000, 5_000]
+const COLD_START_CONNECT_FALLBACK_MS = 1_500
 
 let socket: WebSocket | null = null
 let refCount = 0
 let currentWorkloadUid: string | null = null
-let scope: WorkloadScope = { podUids: new Set(), podIPs: new Set() }
+let scope: WorkloadScope = { podUids: new Set(), podIPs: new Set(), nodes: new Set() }
 let scopeUnsub: (() => void) | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectAttempt = 0
 let pruneTimer: ReturnType<typeof setInterval> | null = null
 let flushTimer: ReturnType<typeof setTimeout> | null = null
+let coldStartTimer: ReturnType<typeof setTimeout> | null = null
 let pendingEvents: NetstatdEvent[] = []
 let holdingBuffer: { event: ConnectionEvent | PortListeningEvent; receivedAt: number }[] = []
+let connectedNodes: Set<string> = new Set()
+let connectGeneration = 0
 
 function scheduleFlush() {
   if (flushTimer !== null) return
@@ -72,189 +66,23 @@ function scheduleFlush() {
   }, FLUSH_DEBOUNCE_MS)
 }
 
-function recomputeScope() {
-  if (currentWorkloadUid === null) {
-    scope = { podUids: new Set(), podIPs: new Set() }
-    return
-  }
-  scope = findDescendantPodUids(useClusterState.getState().clusterResources, currentWorkloadUid)
+type AggParts = {
+  key: string
+  direction: AggregateDirection
+  peerIP: string
+  port: number
+  protocol: Protocol
+  localIP: string
 }
 
-function isOursOrPending(
-  event: ConnectionEvent | PortListeningEvent,
-  state: NetstatdState,
-): "ours" | "pending" | "drop" {
-  if (event.type === "port.listening") {
-    return classifyByPodIP(event.ip, undefined)
-  }
-
-  const sockCookieKey = String(event.sockCookie)
-  const pid = event.pid ?? state.pidBySockCookie.get(sockCookieKey)
-
-  if (pid !== undefined && event.nodeName) {
-    const procKey = `${event.nodeName}:${pid}`
-    const proc = state.processes.get(procKey)
-    if (proc?.containerUid) {
-      const ci = state.containersByUid.get(proc.containerUid)
-      if (ci?.podUid && scope.podUids.has(ci.podUid)) return "ours"
-      if (ci?.podUid) return "drop"
-    }
-  }
-
-  return classifyByPodIP(event.localIP, event.remoteIP)
-}
-
-function classifyByPodIP(localIP: string, remoteIP: string | undefined): "ours" | "pending" | "drop" {
-  if (scope.podIPs.has(localIP)) return "ours"
-  if (remoteIP !== undefined && scope.podIPs.has(remoteIP)) return "ours"
-  if (scope.podUids.size === 0) return "pending"
-  return "drop"
-}
-
-function computeAggKey(conn: Connection): string | null {
-  if (conn.inbound) {
-    if (conn.localPort === undefined || !conn.remoteIP) return null
-    return `in:${conn.remoteIP}:${conn.localPort}:${conn.protocol}`
-  }
-  if (conn.remotePort === undefined || !conn.remoteIP) return null
-  return `out:${conn.remoteIP}:${conn.remotePort}:${conn.protocol}`
-}
-
-function parseAggKey(key: string): { direction: AggregateDirection; peerIP: string; port: number; protocol: Protocol } | null {
-  const [dir, peerIP, portStr, protocol] = splitAggKey(key)
-  if (!dir || !peerIP || !portStr || !protocol) return null
-  const port = Number(portStr)
-  if (!Number.isFinite(port)) return null
-  return {
-    direction: dir === "in" ? "inbound" : "outbound",
-    peerIP,
-    port,
-    protocol: protocol as Protocol,
-  }
-}
-
-function splitAggKey(key: string): [string, string, string, string] {
-  const firstColon = key.indexOf(":")
-  const lastColon = key.lastIndexOf(":")
-  const middle = key.slice(firstColon + 1, lastColon)
-  const lastPortBreak = middle.lastIndexOf(":")
-  return [
-    key.slice(0, firstColon),
-    middle.slice(0, lastPortBreak),
-    middle.slice(lastPortBreak + 1),
-    key.slice(lastColon + 1),
-  ]
-}
-
-function incrementAggregate(state: NetstatdState, key: string, now: number, localIP: string): void {
-  const existing = state.aggregates.get(key)
-  if (existing) {
-    const localIPs = existing.localIPs.has(localIP) || !localIP
-      ? existing.localIPs
-      : new Set(existing.localIPs).add(localIP)
-    state.aggregates.set(key, { ...existing, count: existing.count + 1, lastSeen: now, localIPs })
-    return
-  }
-  const parsed = parseAggKey(key)
-  if (!parsed) return
-  state.aggregates.set(key, {
-    key,
-    direction: parsed.direction,
-    peerIP: parsed.peerIP,
-    port: parsed.port,
-    protocol: parsed.protocol,
-    count: 1,
-    firstSeen: now,
-    lastSeen: now,
-    localIPs: localIP ? new Set([localIP]) : new Set(),
-  })
-}
-
-function decrementAggregate(state: NetstatdState, key: string): void {
-  const existing = state.aggregates.get(key)
-  if (!existing) return
-  if (existing.count <= 1) {
-    state.aggregates.delete(key)
-    return
-  }
-  state.aggregates.set(key, { ...existing, count: existing.count - 1 })
-}
-
-function syncAggregateForConnection(
-  state: NetstatdState,
-  cookieKey: string,
-  conn: Connection,
-  now: number,
-): Connection {
-  const newKey = computeAggKey(conn)
-  const prevKey = state.cookieToAgg.get(cookieKey)
-
-  if (newKey === prevKey) {
-    if (newKey) {
-      const existing = state.aggregates.get(newKey)
-      if (existing) {
-        const localIPs = !conn.localIP || existing.localIPs.has(conn.localIP)
-          ? existing.localIPs
-          : new Set(existing.localIPs).add(conn.localIP)
-        state.aggregates.set(newKey, { ...existing, lastSeen: now, localIPs })
-      }
-    }
-    return { ...conn, aggKey: newKey ?? undefined }
-  }
-
-  if (prevKey) decrementAggregate(state, prevKey)
-  if (newKey) {
-    incrementAggregate(state, newKey, now, conn.localIP)
-    state.cookieToAgg.set(cookieKey, newKey)
-  } else if (prevKey) {
-    state.cookieToAgg.delete(cookieKey)
-  }
-
-  return { ...conn, aggKey: newKey ?? undefined }
-}
-
-function applyConnectionEvent(state: NetstatdState, event: ConnectionEvent, now: number): NetstatdState {
-  const sockCookieKey = String(event.sockCookie)
-  const isAccepted = event.type === "connection.accepted"
-
-  if (event.pid !== undefined && !state.pidBySockCookie.has(sockCookieKey)) {
-    state.pidBySockCookie.set(sockCookieKey, event.pid)
-  }
-
-  const prev = state.connections.get(sockCookieKey)
-  const localPort = event.localPort ?? prev?.localPort
-  const localIP = event.localIP || prev?.localIP || ""
-  const isLocalPortListening = matchesListeningPort(state, localIP, localPort, event.protocol)
-  const merged: Connection = {
-    sockCookie: sockCookieKey,
-    protocol: event.protocol,
-    state: event.state,
-    nodeName: event.nodeName ?? prev?.nodeName,
-    localIP,
-    remoteIP: event.remoteIP || prev?.remoteIP || "",
-    localPort,
-    remotePort: event.remotePort ?? prev?.remotePort,
-    pid: event.pid ?? prev?.pid,
-    inbound: prev?.inbound || isAccepted || isLocalPortListening,
-    firstSeen: prev?.firstSeen ?? now,
-    lastSeen: now,
-    aggKey: prev?.aggKey,
-  }
-
-  const synced = syncAggregateForConnection(state, sockCookieKey, merged, now)
-  state.connections.set(sockCookieKey, synced)
-
-  return state
-}
-
-function matchesListeningPort(
-  state: NetstatdState,
+function isLocalPortListening(
+  listening: Map<string, ListeningPort>,
   localIP: string,
   localPort: number | undefined,
   protocol: Protocol,
 ): boolean {
   if (localPort === undefined) return false
-  for (const port of state.listening.values()) {
+  for (const port of listening.values()) {
     if (port.protocol !== protocol) continue
     if (port.port !== localPort) continue
     if (port.ip === localIP) return true
@@ -263,7 +91,74 @@ function matchesListeningPort(
   return false
 }
 
-function applyPortListening(state: NetstatdState, event: PortListeningEvent, now: number): NetstatdState {
+function classifyEvent(event: ConnectionEvent, listening: Map<string, ListeningPort>): AggParts | null {
+  const localIP = event.localIP
+  if (!localIP) return null
+
+  let direction: AggregateDirection
+  let port: number | undefined
+  if (event.type === "connection.accepted") {
+    direction = "inbound"
+    port = event.localPort
+  } else if (isLocalPortListening(listening, localIP, event.localPort, event.protocol)) {
+    direction = "inbound"
+    port = event.localPort
+  } else {
+    direction = "outbound"
+    port = event.remotePort
+  }
+
+  const peerIP = event.remoteIP
+  if (!peerIP || port === undefined) return null
+
+  const dir = direction === "inbound" ? "in" : "out"
+  return {
+    key: `${dir}:${peerIP}:${port}:${event.protocol}`,
+    direction,
+    peerIP,
+    port,
+    protocol: event.protocol,
+    localIP,
+  }
+}
+
+function bumpAggregate(state: NetstatdState, parts: AggParts, now: number): void {
+  const existing = state.aggregates.get(parts.key)
+  if (existing) {
+    const localIPs = existing.localIPs.has(parts.localIP)
+      ? existing.localIPs
+      : new Set(existing.localIPs).add(parts.localIP)
+    state.aggregates.set(parts.key, {
+      ...existing,
+      count: existing.count + 1,
+      lastSeen: now,
+      localIPs,
+    })
+    return
+  }
+  state.aggregates.set(parts.key, {
+    key: parts.key,
+    direction: parts.direction,
+    peerIP: parts.peerIP,
+    port: parts.port,
+    protocol: parts.protocol,
+    count: 1,
+    firstSeen: now,
+    lastSeen: now,
+    localIPs: new Set([parts.localIP]),
+  })
+}
+
+function applyHostInfo(state: NetstatdState, event: HostInfoEvent): void {
+  if (!event.nodeName) return
+  state.hosts.set(event.nodeName, {
+    nodeName: event.nodeName,
+    hostIPs: new Set(event.hostIPs),
+    hostNetNS: event.hostNetNS,
+  })
+}
+
+function applyPortListening(state: NetstatdState, event: PortListeningEvent): void {
   const key = `${event.nodeName ?? ""}:${event.netns}:${event.protocol}:${event.ip}:${event.port}`
   state.listening.set(key, {
     key,
@@ -274,57 +169,6 @@ function applyPortListening(state: NetstatdState, event: PortListeningEvent, now
     netns: event.netns,
     isHostNetNS: event.isHostNetNS,
   })
-
-  for (const [cookie, conn] of state.connections) {
-    if (conn.inbound) continue
-    if (conn.protocol !== event.protocol) continue
-    if (conn.localPort !== event.port) continue
-    if (event.ip !== conn.localIP && event.ip !== "0.0.0.0" && event.ip !== "::") continue
-    const flipped = syncAggregateForConnection(state, cookie, { ...conn, inbound: true }, now)
-    state.connections.set(cookie, flipped)
-  }
-
-  return state
-}
-
-function applyProcessMetainfo(state: NetstatdState, event: ProcessMetainfoEvent): NetstatdState {
-  const key = `${event.nodeName}:${event.pid}`
-  state.processes.set(key, {
-    key,
-    pid: event.pid,
-    nodeName: event.nodeName,
-    netns: event.netns,
-    isHostNetNS: event.isHostNetNS,
-    cgroupSlice: event.cgroupSlice,
-    containerUid: event.containerUid,
-    exe: event.exe,
-  })
-  return state
-}
-
-function applyContainer(state: NetstatdState, event: ContainerEvent): NetstatdState {
-  const prev = state.containersByUid.get(event.containerUid)
-  const merged: ContainerInfo = {
-    containerUid: event.containerUid,
-    podUid: event.podUid ?? prev?.podUid,
-    podName: event.podName ?? prev?.podName,
-    namespace: event.namespace ?? prev?.namespace,
-    containerName: event.containerName ?? prev?.containerName,
-    image: event.image ?? prev?.image,
-    nodeName: event.nodeName ?? prev?.nodeName,
-  }
-  state.containersByUid.set(event.containerUid, merged)
-  return state
-}
-
-function applyHostInfo(state: NetstatdState, event: HostInfoEvent): NetstatdState {
-  if (!event.nodeName) return state
-  state.hosts.set(event.nodeName, {
-    nodeName: event.nodeName,
-    hostIPs: new Set(event.hostIPs),
-    hostNetNS: event.hostNetNS,
-  })
-  return state
 }
 
 function drainPending() {
@@ -333,72 +177,71 @@ function drainPending() {
   pendingEvents = []
 
   useNetstatd.setState(prev => {
-    const state = { ...prev }
-    state.containersByUid = new Map(prev.containersByUid)
-    state.processes = new Map(prev.processes)
-    state.pidBySockCookie = new Map(prev.pidBySockCookie)
-    state.hosts = new Map(prev.hosts)
-    state.connections = new Map(prev.connections)
-    state.listening = new Map(prev.listening)
-    state.aggregates = new Map(prev.aggregates)
-    state.cookieToAgg = new Map(prev.cookieToAgg)
-
+    const state: NetstatdState = {
+      ...prev,
+      aggregates: new Map(prev.aggregates),
+      listening: new Map(prev.listening),
+      hosts: new Map(prev.hosts),
+    }
     const now = Date.now()
-    let lookupChanged = false
+    const scopeReady = scope.podUids.size > 0
 
     for (const event of events) {
-      state.rawEventCount++
       switch (event.type) {
-        case "container.added":
-        case "container.metainfo":
-          applyContainer(state, event)
-          lookupChanged = true
-          break
-        case "process.metainfo":
-          applyProcessMetainfo(state, event)
-          lookupChanged = true
-          break
         case "host.info":
           applyHostInfo(state, event)
-          lookupChanged = true
+          break
+        case "port.listening":
+          if (!scopeReady) holdingBuffer.push({ event, receivedAt: now })
+          else if (scope.podIPs.has(event.ip)) applyPortListening(state, event)
           break
         case "connection.event":
-        case "connection.accepted": {
-          const verdict = isOursOrPending(event, state)
-          if (verdict === "ours") applyConnectionEvent(state, event, now)
-          else if (verdict === "pending") holdingBuffer.push({ event, receivedAt: now })
+        case "connection.accepted":
+          if (!scopeReady) {
+            holdingBuffer.push({ event, receivedAt: now })
+          } else if (scope.podIPs.has(event.localIP)) {
+            const parts = classifyEvent(event, state.listening)
+            if (parts) bumpAggregate(state, parts, now)
+          }
           break
-        }
-        case "port.listening": {
-          const verdict = isOursOrPending(event, state)
-          if (verdict === "ours") applyPortListening(state, event, now)
-          else if (verdict === "pending") holdingBuffer.push({ event, receivedAt: now })
-          break
-        }
       }
     }
 
-    if (lookupChanged) replayHoldingBuffer(state, now)
+    if (scopeReady && holdingBuffer.length > 0) replayHoldingBuffer(state, now)
 
     state.lastFlushedAt = now
-    state.revision = prev.revision + 1
     return state
   })
 }
 
 function replayHoldingBuffer(state: NetstatdState, now: number) {
-  const next: typeof holdingBuffer = []
   for (const item of holdingBuffer) {
     if (now - item.receivedAt > HOLDING_BUFFER_MS) continue
-    const verdict = isOursOrPending(item.event, state)
-    if (verdict === "ours") {
-      if (item.event.type === "port.listening") applyPortListening(state, item.event, now)
-      else applyConnectionEvent(state, item.event, now)
-    } else if (verdict === "pending") {
-      next.push(item)
+    const event = item.event
+    if (event.type === "port.listening") {
+      if (scope.podIPs.has(event.ip)) applyPortListening(state, event)
+    } else if (scope.podIPs.has(event.localIP)) {
+      const parts = classifyEvent(event, state.listening)
+      if (parts) bumpAggregate(state, parts, now)
     }
   }
-  holdingBuffer = next
+  holdingBuffer = []
+}
+
+function flushHoldingBuffer() {
+  if (holdingBuffer.length === 0) return
+  useNetstatd.setState(prev => {
+    const state: NetstatdState = {
+      ...prev,
+      aggregates: new Map(prev.aggregates),
+      listening: new Map(prev.listening),
+      hosts: new Map(prev.hosts),
+    }
+    const now = Date.now()
+    replayHoldingBuffer(state, now)
+    state.lastFlushedAt = now
+    return state
+  })
 }
 
 function prune() {
@@ -407,97 +250,67 @@ function prune() {
     holdingBuffer = holdingBuffer.filter(item => now - item.receivedAt <= HOLDING_BUFFER_MS)
 
     let mutated = false
-    let connections = prev.connections
     let aggregates = prev.aggregates
-    let cookieToAgg = prev.cookieToAgg
-
-    if (connections.size > CONN_CAP) {
-      const sorted = [...connections.entries()].sort((a, b) => a[1].lastSeen - b[1].lastSeen)
-      const toDrop = sorted.length - CONN_CAP
-      connections = new Map(connections)
-      for (let i = 0; i < toDrop; i++) connections.delete(sorted[i][0])
-      mutated = true
-    }
+    let listening = prev.listening
+    let hiddenCount = prev.hiddenCount
 
     if (aggregates.size > AGG_CAP) {
       const sorted = [...aggregates.entries()].sort((a, b) => a[1].lastSeen - b[1].lastSeen)
       const toDrop = sorted.length - AGG_CAP
       aggregates = new Map(aggregates)
-      const dropped = new Set<string>()
-      for (let i = 0; i < toDrop; i++) {
-        aggregates.delete(sorted[i][0])
-        dropped.add(sorted[i][0])
-      }
-      cookieToAgg = new Map(cookieToAgg)
-      for (const [cookie, aggKey] of cookieToAgg) {
-        if (dropped.has(aggKey)) cookieToAgg.delete(cookie)
-      }
+      for (let i = 0; i < toDrop; i++) aggregates.delete(sorted[i][0])
+      hiddenCount += toDrop
       mutated = true
     }
 
-    if (cookieToAgg.size > COOKIE_AGG_CAP) {
-      const excess = cookieToAgg.size - COOKIE_AGG_CAP
-      cookieToAgg = new Map(cookieToAgg)
-      const it = cookieToAgg.keys()
-      for (let i = 0; i < excess; i++) {
-        const next = it.next()
-        if (next.done) break
-        cookieToAgg.delete(next.value)
-      }
+    if (listening.size > LISTENING_CAP) {
+      const keys = [...listening.keys()]
+      const toDrop = listening.size - LISTENING_CAP
+      listening = new Map(listening)
+      for (let i = 0; i < toDrop; i++) listening.delete(keys[i])
       mutated = true
     }
 
     if (!mutated) return prev
-    return { ...prev, connections, aggregates, cookieToAgg, revision: prev.revision + 1 }
+    return { ...prev, aggregates, listening, hiddenCount }
   })
 }
 
-function refilterAfterScopeChange() {
-  useNetstatd.setState(prev => {
-    const keptConnections = new Map<string, Connection>()
-    const droppedCookies: string[] = []
-    for (const [key, c] of prev.connections) {
-      const isOurs =
-        scope.podIPs.has(c.localIP) ||
-        scope.podIPs.has(c.remoteIP) ||
-        (c.pid !== undefined && c.nodeName && (() => {
-          const proc = prev.processes.get(`${c.nodeName}:${c.pid}`)
-          if (!proc?.containerUid) return false
-          const ci = prev.containersByUid.get(proc.containerUid)
-          return ci?.podUid !== undefined && scope.podUids.has(ci.podUid)
-        })())
-      if (isOurs) keptConnections.set(key, c)
-      else droppedCookies.push(key)
-    }
+function mergeScope(): boolean {
+  if (currentWorkloadUid === null) return false
+  const candidate = findDescendantPodUids(useClusterState.getState().clusterResources, currentWorkloadUid)
+  if (candidate.podUids.size === 0) return false
 
-    if (droppedCookies.length === 0) return prev
+  const prevNodeCount = scope.nodes.size
+  const podUids = new Set(scope.podUids)
+  const podIPs = new Set(scope.podIPs)
+  const nodes = new Set(scope.nodes)
+  for (const u of candidate.podUids) podUids.add(u)
+  for (const ip of candidate.podIPs) podIPs.add(ip)
+  for (const n of candidate.nodes) nodes.add(n)
+  scope = { podUids, podIPs, nodes }
 
-    const cookieToAgg = new Map(prev.cookieToAgg)
-    const aggregates = new Map(prev.aggregates)
-    for (const cookie of droppedCookies) {
-      const aggKey = cookieToAgg.get(cookie)
-      if (aggKey) {
-        const existing = aggregates.get(aggKey)
-        if (existing) {
-          if (existing.count <= 1) aggregates.delete(aggKey)
-          else aggregates.set(aggKey, { ...existing, count: existing.count - 1 })
-        }
-        cookieToAgg.delete(cookie)
-      }
-    }
-
-    return { ...prev, connections: keptConnections, aggregates, cookieToAgg, revision: prev.revision + 1 }
-  })
+  return nodes.size > prevNodeCount
 }
 
-function connect() {
-  const state = useNetstatd.getState()
-  if (state.status === "connecting" || state.status === "open") return
+function deriveNodeQuery(nodeSet: Set<string>): string {
+  if (nodeSet.size === 0) return ""
+  const list = [...nodeSet].sort().join(",")
+  return `?match=any&nodes=${encodeURIComponent(list)}`
+}
 
+function openSocket() {
+  if (coldStartTimer !== null) {
+    clearTimeout(coldStartTimer)
+    coldStartTimer = null
+  }
   useNetstatd.setState({ status: "connecting", error: null })
+  const gen = ++connectGeneration
+  const nodesForThisConnect = new Set(scope.nodes)
 
   fetchNetstatdUrl()
     .then(url => {
+      if (gen !== connectGeneration) return
       if (!url) {
         useNetstatd.setState({ status: "error", error: "Netstatd not configured" })
         return
@@ -507,11 +320,12 @@ function connect() {
         .replace(/^http:\/\//, "ws://")
         .replace(/^https:\/\//, "wss://")
       try {
-        socket = new WebSocket(`${wsUrl}/conntrack`)
+        socket = new WebSocket(`${wsUrl}/conntrack${deriveNodeQuery(nodesForThisConnect)}`)
       } catch (e) {
         useNetstatd.setState({ status: "error", error: String(e) })
         return
       }
+      connectedNodes = nodesForThisConnect
 
       socket.onopen = () => {
         reconnectAttempt = 0
@@ -548,8 +362,56 @@ function connect() {
       }
     })
     .catch(e => {
+      if (gen !== connectGeneration) return
       useNetstatd.setState({ status: "error", error: String(e) })
     })
+}
+
+function connect() {
+  const status = useNetstatd.getState().status
+  if (status === "connecting" || status === "open") return
+  openSocket()
+}
+
+function reconnectWithCurrentScope() {
+  if (socket !== null) {
+    socket.onclose = null
+    socket.onmessage = null
+    socket.onerror = null
+    socket.onopen = null
+    try {
+      socket.close()
+    } catch {
+      // ignore
+    }
+    socket = null
+  }
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  reconnectAttempt = 0
+  openSocket()
+}
+
+function maybeReconnectForNodes() {
+  if (socket === null) return
+  for (const n of scope.nodes) {
+    if (!connectedNodes.has(n)) {
+      reconnectWithCurrentScope()
+      return
+    }
+  }
+}
+
+function onClusterStateChange() {
+  const grew = mergeScope()
+  if (scope.podUids.size > 0 && holdingBuffer.length > 0) flushHoldingBuffer()
+  const status = useNetstatd.getState().status
+  if ((status === "idle" || status === "closed") && socket === null && scope.nodes.size > 0) {
+    connect()
+  }
+  if (grew) maybeReconnectForNodes()
 }
 
 function teardown() {
@@ -565,9 +427,20 @@ function teardown() {
     clearTimeout(flushTimer)
     flushTimer = null
   }
+  if (coldStartTimer !== null) {
+    clearTimeout(coldStartTimer)
+    coldStartTimer = null
+  }
   if (socket !== null) {
     socket.onclose = null
-    socket.close()
+    socket.onmessage = null
+    socket.onerror = null
+    socket.onopen = null
+    try {
+      socket.close()
+    } catch {
+      // ignore
+    }
     socket = null
   }
   if (scopeUnsub !== null) {
@@ -577,8 +450,9 @@ function teardown() {
   pendingEvents = []
   holdingBuffer = []
   reconnectAttempt = 0
+  connectedNodes = new Set()
   currentWorkloadUid = null
-  scope = { podUids: new Set(), podIPs: new Set() }
+  scope = { podUids: new Set(), podIPs: new Set(), nodes: new Set() }
   useNetstatd.setState(initial())
 }
 
@@ -586,26 +460,26 @@ export function openNetstatdSession(workloadUid: string): () => void {
   refCount++
   if (refCount === 1) {
     currentWorkloadUid = workloadUid
-    recomputeScope()
-    scopeUnsub = useClusterState.subscribe(s => {
-      void s
-      const before = scope
-      recomputeScope()
-      if (
-        before.podUids.size !== scope.podUids.size ||
-        before.podIPs.size !== scope.podIPs.size ||
-        ![...scope.podUids].every(u => before.podUids.has(u)) ||
-        ![...scope.podIPs].every(ip => before.podIPs.has(ip))
-      ) {
-        refilterAfterScopeChange()
-      }
-    })
+    scope = { podUids: new Set(), podIPs: new Set(), nodes: new Set() }
+    mergeScope()
+    scopeUnsub = useClusterState.subscribe(onClusterStateChange)
     pruneTimer = setInterval(prune, PRUNE_INTERVAL_MS)
-    connect()
+    if (scope.nodes.size > 0) {
+      connect()
+    } else {
+      coldStartTimer = setTimeout(() => {
+        coldStartTimer = null
+        connect()
+      }, COLD_START_CONNECT_FALLBACK_MS)
+    }
   } else if (currentWorkloadUid !== workloadUid) {
     currentWorkloadUid = workloadUid
-    recomputeScope()
-    refilterAfterScopeChange()
+    scope = { podUids: new Set(), podIPs: new Set(), nodes: new Set() }
+    pendingEvents = []
+    holdingBuffer = []
+    mergeScope()
+    useNetstatd.setState(initial())
+    reconnectWithCurrentScope()
   }
 
   return () => {

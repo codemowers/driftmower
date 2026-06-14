@@ -86,6 +86,23 @@ export function aggregate(
   }
 }
 
+export function recentCounts(
+  aggregates: Map<string, AggregateBucket>,
+  now: number,
+  windowMs: number,
+  podIPs?: Set<string>,
+): { inbound: number; outbound: number } {
+  let inbound = 0
+  let outbound = 0
+  for (const bucket of aggregates.values()) {
+    if (now - bucket.lastSeen > windowMs) continue
+    if (podIPs && !intersects(bucket.localIPs, podIPs)) continue
+    if (bucket.direction === "inbound") inbound++
+    else outbound++
+  }
+  return { inbound, outbound }
+}
+
 export function filterListening(
   listening: Map<string, ListeningPort>,
   ourPodIPs: Set<string>,

@@ -68,6 +68,7 @@ export default function NetworkTopologyClient({
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
   const hosts = useNetstatd(s => s.hosts)
+  const hiddenCount = useNetstatd(s => s.hiddenCount)
 
   const podIPSet = useMemo(() => new Set(podIPs), [podIPs])
 
@@ -149,6 +150,11 @@ export default function NetworkTopologyClient({
             <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
               live · netstatd · /conntrack
             </p>
+            {hiddenCount > 0 && (
+              <p className="font-mono text-[10px] tracking-wider text-muted-foreground/70 tabular-nums">
+                {hiddenCount.toLocaleString()} more not shown
+              </p>
+            )}
           </div>
         </div>
 

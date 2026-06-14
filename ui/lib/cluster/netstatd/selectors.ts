@@ -3,6 +3,7 @@ import type { ClusterResource } from "../cluster-state"
 export type WorkloadScope = {
   podUids: Set<string>
   podIPs: Set<string>
+  nodes: Set<string>
 }
 
 export function findDescendantPodUids(
@@ -11,9 +12,10 @@ export function findDescendantPodUids(
 ): WorkloadScope {
   const podUids = new Set<string>()
   const podIPs = new Set<string>()
+  const nodes = new Set<string>()
 
   if (!resources) {
-    return { podUids, podIPs }
+    return { podUids, podIPs, nodes }
   }
 
   const childIndex = new Map<string, ClusterResource[]>()
@@ -30,11 +32,12 @@ export function findDescendantPodUids(
       if (child.kind === "Pod") {
         podUids.add(child.uid)
         for (const ip of child.ips ?? []) podIPs.add(ip)
+        if (child.nodeName) nodes.add(child.nodeName)
       }
       walk(child.uid)
     }
   }
   walk(rootUid)
 
-  return { podUids, podIPs }
+  return { podUids, podIPs, nodes }
 }

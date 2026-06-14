@@ -70,22 +70,6 @@ export type NetstatdEvent =
   | ContainerEvent
   | HostInfoEvent
 
-export type Connection = {
-  sockCookie: string
-  protocol: Protocol
-  state: ConnState
-  nodeName?: string
-  localIP: string
-  remoteIP: string
-  localPort?: number
-  remotePort?: number
-  pid?: number
-  inbound: boolean
-  firstSeen: number
-  lastSeen: number
-  aggKey?: string
-}
-
 export type ListeningPort = {
   key: string
   protocol: Protocol
@@ -95,27 +79,6 @@ export type ListeningPort = {
   netns: number
   isHostNetNS: boolean
   containerUid?: string
-}
-
-export type ContainerInfo = {
-  containerUid: string
-  podUid?: string
-  podName?: string
-  namespace?: string
-  containerName?: string
-  image?: string
-  nodeName?: string
-}
-
-export type ProcessInfo = {
-  key: string
-  pid: number
-  nodeName: string
-  netns: number
-  isHostNetNS: boolean
-  cgroupSlice: string
-  containerUid?: string
-  exe?: string
 }
 
 export type HostInfo = {
@@ -143,16 +106,10 @@ export type NetstatdStatus = "idle" | "connecting" | "open" | "closed" | "error"
 export type NetstatdState = {
   status: NetstatdStatus
   error: string | null
-  rawEventCount: number
   lastFlushedAt: number | null
-  revision: number
 
-  connections: Map<string, Connection>
   aggregates: Map<string, AggregateBucket>
-  cookieToAgg: Map<string, string>
   listening: Map<string, ListeningPort>
-  containersByUid: Map<string, ContainerInfo>
-  processes: Map<string, ProcessInfo>
-  pidBySockCookie: Map<string, number>
   hosts: Map<string, HostInfo>
+  hiddenCount: number
 }

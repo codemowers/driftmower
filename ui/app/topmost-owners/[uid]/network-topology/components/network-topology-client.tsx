@@ -57,6 +57,7 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
   const hosts = useNetstatd(s => s.hosts)
+  const hiddenCount = useNetstatd(s => s.hiddenCount)
 
   const scope = useMemo(
     () => findDescendantPodUids(clusterResources, uid),
@@ -139,6 +140,11 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
             <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
               live · netstatd · /conntrack
             </p>
+            {hiddenCount > 0 && (
+              <p className="font-mono text-[10px] tracking-wider text-muted-foreground/70 tabular-nums">
+                {hiddenCount.toLocaleString()} more not shown
+              </p>
+            )}
           </div>
         </div>
 

@@ -107,7 +107,6 @@ export default function PodDetailPage() {
           ]}
           chips={[
             { label: "Pod", tone: "brand" },
-            { label: pod.phase ?? "Unknown", tone: "muted" },
           ]}
           scoreChip={{ status: worstStatus, score: normalizedScore }}
           issueCount={podIssues.length}
@@ -134,6 +133,7 @@ export default function PodDetailPage() {
                 ? `/topmost-owners/${workloadUid}/${podUid}/network-topology?report=${reportId}`
                 : `/topmost-owners/${workloadUid}/${podUid}/network-topology`
               }
+              podIPs={pod.ips ?? []}
             />
           </div>
         </div>
