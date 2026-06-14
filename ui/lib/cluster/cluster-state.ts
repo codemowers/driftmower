@@ -12,6 +12,7 @@ export type ClusterResource = {
   labels?: Record<string, string>
   ownerUID?: string
   managerUID?: string
+  argoApp?: { name: string; url?: string; kind?: string; resourceRef?: string }
   ips?: string[]
   nodeName?: string
   phase?: string

@@ -25,3 +25,5 @@ spec:
           env:
             - name: BACKEND_URL
               value: "http://driftmower-be:3030"
+            - name: ARGO_URL
+              value: "https://argocd.ee-west-1.codemowers.io/"

@@ -4,6 +4,7 @@ import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import WorkloadList, { type WorkloadEntry } from "./components/workload-list"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import type { StatusType } from "@/lib/cluster/reports"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -30,6 +31,7 @@ const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_beh
 
 export default function TopmostOwnersPage() {
   const data = useClusterState(s => s.data)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
   const releaseUidByGroupKey = new Map<string, string>()
   if (data) {
@@ -51,9 +53,15 @@ export default function TopmostOwnersPage() {
 
           const ri = usages[0]?.releaseInfo
           const releaseUid = ri ? releaseUidByGroupKey.get(ri.groupKey) : undefined
-          const manager: WorkloadEntry["manager"] = ri?.managementKind === "helm" && releaseUid
-            ? { kind: "helm", name: ri.name, uid: releaseUid }
-            : { kind: "standalone" }
+          const argoApp = usages[0]?.workloadRootInfo
+            ? findWorkloadRoot(clusterResources, usages[0].workloadRootInfo)?.argoApp
+            : undefined
+          const manager: WorkloadEntry["manager"] =
+            ri?.managementKind === "helm" && releaseUid
+              ? { kind: "helm", name: ri.name, uid: releaseUid }
+              : argoApp
+                ? { kind: "argo", name: argoApp.name, url: argoApp.url }
+                : { kind: "standalone" }
 
           const repoStatus = new Map<string, StatusType>()
           for (const u of usages) {

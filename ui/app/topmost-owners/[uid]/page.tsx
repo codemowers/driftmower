@@ -85,11 +85,13 @@ export default function WorkloadDetailPage() {
   const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
   const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
   const apiGroup = root?.apiGroup
+  const argoApp = root?.argoApp
+  const isArgo = !isHelm && !!argoApp
   const liveWorkloadUid = root?.uid ?? uid
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
   const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
-  if (!isHelm) headerChips.push({ label: "standalone", tone: "muted" })
+  if (!isHelm && !isArgo) headerChips.push({ label: "standalone", tone: "muted" })
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -120,9 +122,11 @@ export default function WorkloadDetailPage() {
           worstStatus={worstStatus}
         />
 
-        {isHelm && ri && releaseUid && (
-          <ManagerCard releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
-        )}
+        {isHelm && ri && releaseUid ? (
+          <ManagerCard kind="helm" releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
+        ) : isArgo && argoApp ? (
+          <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
+        ) : null}
 
         <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
 

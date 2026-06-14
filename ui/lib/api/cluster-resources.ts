@@ -26,11 +26,15 @@ const SOURCES = [
   { path: "/apis/apps/v1/daemonsets", kind: "DaemonSet", apiGroup: "apps/v1" },
 ] as const
 
+type ManagerInfo = { managerUID: string; argoApp?: { name: string; url?: string; kind?: string; resourceRef?: string } }
+
 export async function getClusterResources(): Promise<ClusterResource[]> {
   if (!isInCluster()) {
     console.warn("[kube-api] cluster-resources: Kubernetes API not reachable (KUBERNETES_SERVICE_HOST unset, e.g. localhost) — returning empty")
     return []
   }
+
+  const argoUrl = process.env.ARGO_URL?.trim().replace(/\/+$/, "")
 
   const lists = await Promise.all(
     SOURCES.map(async source => ({
@@ -44,13 +48,13 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
   )
 
   const ownerOf = new Map<string, string | undefined>()
-  const directManager = new Map<string, string | undefined>()
+  const directManager = new Map<string, ManagerInfo | undefined>()
   for (const { obj } of raws) {
     ownerOf.set(obj.metadata.uid, obj.metadata.ownerReferences?.[0]?.uid)
-    directManager.set(obj.metadata.uid, managerFromAnnotations(obj.metadata.annotations))
+    directManager.set(obj.metadata.uid, managerFromAnnotations(obj.metadata.annotations, argoUrl))
   }
 
-  function resolveManager(uid: string | undefined, seen = new Set<string>()): string | undefined {
+  function resolveManager(uid: string | undefined, seen = new Set<string>()): ManagerInfo | undefined {
     if (!uid || seen.has(uid)) return undefined
     seen.add(uid)
     const own = directManager.get(uid)
@@ -66,27 +70,51 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
   return resources
 }
 
-function managerFromAnnotations(annotations?: Record<string, string>): string | undefined {
+function managerFromAnnotations(
+  annotations: Record<string, string> | undefined,
+  argoUrl: string | undefined,
+): ManagerInfo | undefined {
   if (!annotations) return undefined
 
   const releaseName = annotations["meta.helm.sh/release-name"]
   const releaseNamespace = annotations["meta.helm.sh/release-namespace"]
-  if (releaseName && releaseNamespace) return `helm-release:${releaseNamespace}:${releaseName}`
+  if (releaseName && releaseNamespace) {
+    return { managerUID: `helm-release:${releaseNamespace}:${releaseName}` }
+  }
 
   const trackingId = annotations["argocd.argoproj.io/tracking-id"]
   if (trackingId) {
-    const appName = trackingId.split(":")[0]
-    if (appName) return `argo-app:argocd:${appName}`
+    const parts = trackingId.split(":")
+    const appName = parts[0]
+    if (appName) {
+      const managerUID = `argo-app:argocd:${appName}`
+      const argoApp: { name: string; url?: string; kind?: string; resourceRef?: string } = {
+        name: appName,
+      }
+      if (parts.length >= 3) {
+        argoApp.kind = parts[1].split("/").pop()
+        argoApp.resourceRef = parts[2]
+      }
+      if (argoUrl) argoApp.url = buildArgoUrl(parts, argoUrl)
+      return { managerUID, argoApp }
+    }
   }
 
   return undefined
+}
+
+function buildArgoUrl(parts: string[], argoUrl: string): string {
+  const appUrl = `${argoUrl}/applications/argocd/${parts[0]}`
+  if (parts.length < 3) return appUrl
+  const node = encodeURIComponent(`${parts.slice(1).join("/")}/0`)
+  return `${appUrl}?view=tree&orphaned=false&resource=&node=${node}`
 }
 
 function toClusterResource(
   obj: RawObject,
   kind: string,
   apiGroup: string,
-  managerUID: string | undefined,
+  manager: ManagerInfo | undefined,
 ): ClusterResource {
   const meta = obj.metadata
   const resource: ClusterResource = {
@@ -100,7 +128,10 @@ function toClusterResource(
 
   const ownerUID = meta.ownerReferences?.[0]?.uid
   if (ownerUID) resource.ownerUID = ownerUID
-  if (managerUID) resource.managerUID = managerUID
+  if (manager) {
+    resource.managerUID = manager.managerUID
+    if (manager.argoApp) resource.argoApp = manager.argoApp
+  }
 
   if (kind === "Pod") {
     const ips = obj.status?.podIPs?.map(entry => entry.ip).filter(Boolean)

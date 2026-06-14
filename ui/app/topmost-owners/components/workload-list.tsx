@@ -15,7 +15,10 @@ export type WorkloadEntry = {
   kind: string
   name: string
   namespace: string
-  manager: { kind: "helm"; name: string; uid: string } | { kind: "standalone" }
+  manager:
+    | { kind: "helm"; name: string; uid: string }
+    | { kind: "argo"; name: string; url?: string }
+    | { kind: "standalone" }
   containerCount: number
   staleRepoCount: number
   distinctRepoCount: number
@@ -43,9 +46,17 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
   const { uid, kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
 
-  const managerHref = manager.kind === "helm"
-    ? (reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
-    : null
+  const managerLinkable = manager.kind === "helm" || (manager.kind === "argo" && !!manager.url)
+
+  function openManager(e: React.MouseEvent | React.KeyboardEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (manager.kind === "helm") {
+      router.push(reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
+    } else if (manager.kind === "argo" && manager.url) {
+      window.open(manager.url, "_blank", "noopener")
+    }
+  }
 
   const href = reportId
     ? `/topmost-owners/${uid}?report=${reportId}`
@@ -76,19 +87,21 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
 
       {/* Manager */}
       <div className="min-w-0">
-        {managerHref ? (
+        {manager.kind === "standalone" ? (
+          <span className="font-mono text-sm text-muted-foreground">Standalone</span>
+        ) : managerLinkable ? (
           <span
             role="link"
             tabIndex={0}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(managerHref) }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); router.push(managerHref) } }}
+            onClick={openManager}
+            onKeyDown={(e) => { if (e.key === "Enter") openManager(e) }}
             className="group inline-flex items-center gap-1.5 max-w-full text-sm text-foreground hover:text-brand-text hover:underline cursor-pointer"
           >
-            <span className="font-mono truncate">{manager.kind === "helm" ? manager.name : ""}</span>
+            <span className="font-mono truncate">{manager.name}</span>
             <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
           </span>
         ) : (
-          <span className="font-mono text-sm text-muted-foreground">Standalone</span>
+          <span className="font-mono text-sm text-foreground truncate">{manager.name}</span>
         )}
       </div>
 
@@ -126,6 +139,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   const [showIssuesOnly, setShowIssuesOnly] = useState(false)
   const [hideFinished, setHideFinished] = useState(false)
   const [hideHelmManaged, setHideHelmManaged] = useState(false)
+  const [hideArgoManaged, setHideArgoManaged] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   function handleStatusToggle(status: StatusType) {
@@ -142,17 +156,19 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     setShowIssuesOnly(false)
     setHideFinished(false)
     setHideHelmManaged(false)
+    setHideArgoManaged(false)
     setSearchQuery("")
   }
 
   const counts = useMemo(() => ({
     finished: entries.filter(e => e.kind === "Job").length,
     helm: entries.filter(e => e.manager.kind === "helm").length,
+    argo: entries.filter(e => e.manager.kind === "argo").length,
     issues: entries.filter(e => e.issueCount > 0).length,
   }), [entries])
 
   const isModified =
-    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || hideFinished || hideHelmManaged
+    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || hideFinished || hideHelmManaged || hideArgoManaged
 
   const q = searchQuery.toLowerCase()
   const filteredEntries = entries
@@ -164,11 +180,12 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     .filter(e => !showIssuesOnly || e.issueCount > 0)
     .filter(e => !hideFinished || e.kind !== "Job")
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
+    .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
     .filter(e =>
       q === "" ||
       e.name.toLowerCase().includes(q) ||
       e.namespace.toLowerCase().includes(q) ||
-      (e.manager.kind === "helm" && e.manager.name.toLowerCase().includes(q))
+      (e.manager.kind !== "standalone" && e.manager.name.toLowerCase().includes(q))
     )
 
   return (
@@ -187,6 +204,8 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
         onToggleFinished={() => setHideFinished(v => !v)}
         hideHelmManaged={hideHelmManaged}
         onToggleHelmManaged={() => setHideHelmManaged(v => !v)}
+        hideArgoManaged={hideArgoManaged}
+        onToggleArgoManaged={() => setHideArgoManaged(v => !v)}
         counts={counts}
         onReset={handleReset}
       />

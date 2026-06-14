@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils"
 export default function CopyButton({ value, className }: { value: string; className?: string }) {
   const [copied, setCopied] = useState(false)
 
-  function handleCopy() {
+  function handleCopy(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
     navigator.clipboard.writeText(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
