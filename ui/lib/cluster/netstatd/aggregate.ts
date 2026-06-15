@@ -2,12 +2,16 @@ import type { ClusterResource } from "../cluster-state"
 import type { AggregateBucket, HostInfo, ListeningPort } from "./types"
 import { isPrivateOrSpecial } from "./rdns"
 
+export type PeerKind = "workload" | "unknown" | "external"
+
 export type AggRow = {
   key: string
   label: string
   port: number | string
   protocol: string
   count: number
+  lastSeen: number
+  kind: PeerKind
 }
 
 export type Aggregated = {
@@ -49,33 +53,23 @@ export function aggregate(
   for (const bucket of aggregates.values()) {
     if (localIPFilter && !intersects(bucket.localIPs, localIPFilter)) continue
 
+    const peerPod = podByIP.get(bucket.peerIP)
+    const kind = classifyPeer(bucket.peerIP, peerPod, hostIPs)
+
     const row: AggRow = {
       key: bucket.key,
-      label: bucket.peerIP,
+      label: peerPod ? labelForOwner(peerPod, ownerByUid) : bucket.peerIP || "?",
       port: bucket.port,
       protocol: bucket.protocol,
       count: bucket.count,
+      lastSeen: bucket.lastSeen,
+      kind,
     }
 
-    if (bucket.direction === "inbound") {
-      row.label = labelForPeer(bucket.peerIP, podByIP, ownerByUid)
-      inbound.push(row)
-      continue
-    }
-
-    const peerPod = podByIP.get(bucket.peerIP)
-    if (peerPod) {
-      row.label = labelForOwner(peerPod, ownerByUid)
-      inClusterOut.push(row)
-      continue
-    }
-
-    if (hostIPs.has(bucket.peerIP) || isPrivateOrSpecial(bucket.peerIP)) {
-      unknownOut.push(row)
-      continue
-    }
-
-    external.push(row)
+    if (bucket.direction === "inbound") inbound.push(row)
+    else if (kind === "workload") inClusterOut.push(row)
+    else if (kind === "unknown") unknownOut.push(row)
+    else external.push(row)
   }
 
   return {
@@ -141,7 +135,12 @@ function mergeByLabel(rows: AggRow[]): AggRow[] {
   for (const row of rows) {
     const key = `${row.label}::${row.port}::${row.protocol}`
     const prev = merged.get(key)
-    if (prev) merged.set(key, { ...prev, count: prev.count + row.count })
+    if (prev)
+      merged.set(key, {
+        ...prev,
+        count: prev.count + row.count,
+        lastSeen: Math.max(prev.lastSeen, row.lastSeen),
+      })
     else merged.set(key, { ...row, key })
   }
   return [...merged.values()]
@@ -155,14 +154,14 @@ function stableSort(rows: AggRow[]): AggRow[] {
   })
 }
 
-function labelForPeer(
+function classifyPeer(
   ip: string,
-  podByIP: Map<string, ClusterResource>,
-  ownerByUid: Map<string, ClusterResource>,
-): string {
-  const pod = podByIP.get(ip)
-  if (pod) return labelForOwner(pod, ownerByUid)
-  return ip || "?"
+  peerPod: ClusterResource | undefined,
+  hostIPs: Set<string>,
+): PeerKind {
+  if (peerPod) return "workload"
+  if (hostIPs.has(ip) || isPrivateOrSpecial(ip)) return "unknown"
+  return "external"
 }
 
 function intersects(a: Set<string>, b: Set<string>): boolean {

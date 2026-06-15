@@ -2,7 +2,8 @@
 
 import { useParams } from "next/navigation"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import NetworkTopologyClient from "./components/network-topology-client"
+import NetworkTopologyHeader from "./components/network-topology-header"
+import NetworkTopologyGraph from "./components/network-topology-graph"
 
 export default function PodNetworkTopologyPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
@@ -34,9 +35,9 @@ export default function PodNetworkTopologyPage() {
   const workloadKind = workloadRoot?.kind ?? "—"
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-        <NetworkTopologyClient
+    <div className="flex min-h-full flex-col">
+      <main className="flex w-full min-h-0 flex-1 flex-col gap-6 px-7 py-8">
+        <NetworkTopologyHeader
           reportId={reportId}
           workloadUid={workloadUid}
           workloadName={workloadName}
@@ -47,6 +48,9 @@ export default function PodNetworkTopologyPage() {
           nodeName={pod.nodeName ?? null}
           podIPs={pod.ips ?? []}
         />
+        <div className="min-h-0 flex-1">
+          <NetworkTopologyGraph podName={pod.name} podNamespace={pod.namespace} podIPs={pod.ips ?? []} />
+        </div>
       </main>
     </div>
   )

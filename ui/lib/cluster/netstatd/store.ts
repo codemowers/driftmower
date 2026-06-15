@@ -26,7 +26,7 @@ const initial = (): NetstatdState => ({
 export const useNetstatd = create<NetstatdState>(initial)
 
 let cachedNetstatdUrl: string | null = null
-async function fetchNetstatdUrl(): Promise<string> {
+export async function fetchNetstatdUrl(): Promise<string> {
   if (cachedNetstatdUrl !== null) return cachedNetstatdUrl
   const res = await fetch(NETSTATD_ENDPOINT_URL, { cache: "no-store" })
   if (!res.ok) throw new Error(`Failed to discover netstatd endpoint: ${res.status}`)
