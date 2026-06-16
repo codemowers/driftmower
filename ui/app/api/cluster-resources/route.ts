@@ -1,4 +1,4 @@
-import { getClusterResources } from "@/lib/api/cluster-resources"
+import { getClusterResources } from "@/lib/api/cluster-resources/resources"
 
 export const dynamic = "force-dynamic"
 

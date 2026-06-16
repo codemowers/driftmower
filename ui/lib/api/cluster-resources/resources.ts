@@ -1,4 +1,4 @@
-import { isInCluster, kubeApiGet } from "./k8s"
+import { isInCluster, kubeApiGet } from "../k8s"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type OwnerRef = { apiVersion: string; kind: string; name: string; uid: string }

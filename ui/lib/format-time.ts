@@ -46,3 +46,18 @@ export function compactRelativeTimeFromNow(iso: string): string {
   }
   return future ? "soon" : "just now"
 }
+
+// kubectl-style age: day-centric
+export function kubectlAge(iso: string): string {
+  const ms = Date.now() - Date.parse(iso)
+  if (Number.isNaN(ms)) return "—"
+  const s = Math.floor(ms / 1000)
+  const m = Math.floor(s / 60)
+  const h = Math.floor(m / 60)
+  const d = Math.floor(h / 24)
+  if (s < 60) return `${s}s`
+  if (m < 60) return `${m}m`
+  if (h < 48) return `${h}h`
+  if (d < 365 * 2) return `${d}d`
+  return `${Math.floor(d / 365)}y`
+}

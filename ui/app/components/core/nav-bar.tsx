@@ -8,6 +8,7 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import {
     Boxes,
     BarChart3,
+    Cpu,
     PanelLeft,
     Server,
     ServerOff,
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
     { name: "OIDC Applications", href: "/oidc-applications", icon: ShieldCheck },
     { name: "Topmost Owners", href: "/topmost-owners", icon: Boxes },
     { name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
+    { name: "Cluster", href: "/cluster", icon: Cpu },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {

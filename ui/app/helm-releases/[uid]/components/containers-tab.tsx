@@ -37,7 +37,7 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
 }
 
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
-const HEADERS = ["Container", "Image", "Running", "Available", "Status"]
+const HEADERS = ["Container", "Image", "Running", "Available", "Version drift"]
 
 export default function ContainersTab({ usages, issues, reportId }: Props) {
 

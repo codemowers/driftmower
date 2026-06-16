@@ -10,7 +10,7 @@ export default function Refreshbutton() {
   return (
     <div className="flex items-start gap-3">
       <div className="flex flex-col items-end">
-        <span className="text-sm text-gray-400">
+        <span className="whitespace-nowrap text-sm text-gray-400">
           {`Updated ${
             lastRefreshed != null
               ? lastRefreshed.toLocaleTimeString(undefined, {

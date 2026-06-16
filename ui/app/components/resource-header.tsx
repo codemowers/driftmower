@@ -53,7 +53,7 @@ export default function ResourceHeader({
 
   return (
     <header className="flex items-start justify-between gap-8">
-      <div className="flex flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
         <Breadcrumbs items={breadcrumbs} />
 
         <div className="flex items-center gap-3">
@@ -104,7 +104,7 @@ export default function ResourceHeader({
         </div>
       </div>
 
-      <div className="p-1">
+      <div className="shrink-0 p-1">
         <Refreshbutton />
       </div>
     </header>

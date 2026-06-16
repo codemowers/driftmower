@@ -2,6 +2,7 @@ import { create } from "zustand"
 import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
 import type { VulnerabilityReport } from "./vulnerability/types"
+import type { ClusterNodesResponse } from "@/lib/api/cluster-resources/types"
 
 export type ClusterResource = {
   uid: string
@@ -30,6 +31,7 @@ export type ClusterState = {
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
   clusterResources: ClusterResource[] | null
+  nodeDrift: ClusterNodesResponse | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: boolean
 }
@@ -46,6 +48,7 @@ export const useClusterState = create<ClusterState>(() => ({
   socketProgress: null,
   containerCount: null,
   clusterResources: null,
+  nodeDrift: null,
   vulnerabilityReports: null,
   vulnerabilityReportsError: false,
 }))
