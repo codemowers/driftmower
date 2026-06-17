@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 export type StatAccent = "ok" | "patch" | "minor" | "major" | "brand"
 
 export type StatValueTone =

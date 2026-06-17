@@ -1,12 +1,12 @@
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   clusterResources: ClusterResource[] | null
   reportWorkloadUid: string
   liveWorkloadUid: string
-  reportId: string | null
+  contextQuery: string
 }
 
 const PHASE_DOT: Record<string, string> = {
@@ -47,7 +47,7 @@ function buildRows(root: ClusterResource, childIndex: Map<string, ClusterResourc
   return rows
 }
 
-export default function DescendantsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
+export default function DescendantsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, contextQuery }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
@@ -84,9 +84,7 @@ export default function DescendantsTab({ clusterResources, reportWorkloadUid, li
 
           const isPod = r.kind === "Pod"
           const podHref = isPod
-            ? (reportId
-                ? `/topmost-owners/${reportWorkloadUid}/${r.uid}?report=${reportId}`
-                : `/topmost-owners/${reportWorkloadUid}/${r.uid}`)
+            ? `/topmost-owners/${reportWorkloadUid}/${r.uid}${contextQuery}`
             : null
 
           const rowClassName = cn(

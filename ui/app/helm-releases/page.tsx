@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import ReleaseList, { type ReleaseEntry } from "./components/release-list"
@@ -16,7 +17,6 @@ const SEVERITY_ORDER: Record<StatusType, number> = {
   no_version:   -1,
 }
 
-// Sort order for display: Major → Minor → Patch → OK → No data
 const DISPLAY_ORDER: Record<StatusType, number> = {
   major_behind: 0,
   minor_behind: 1,
@@ -77,7 +77,9 @@ export default function HelmReleasesPage() {
           statusCounts={statusCounts}
           noDataCount={noDataCount}
         />
-        <ReleaseList entries={entries} />
+        <Suspense>
+          <ReleaseList entries={entries} />
+        </Suspense>
       </main>
     </div>
   )

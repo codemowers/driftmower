@@ -7,7 +7,6 @@ import NetworkTopologyClient from "./components/network-topology-client"
 export default function NetworkTopologyPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
-  const reportId = useClusterState(s => s.reportId)
 
   const match = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -33,7 +32,6 @@ export default function NetworkTopologyPage() {
       <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
         <NetworkTopologyClient
           uid={uid}
-          reportId={reportId}
           kind={kind}
           namespace={namespace}
           name={name}

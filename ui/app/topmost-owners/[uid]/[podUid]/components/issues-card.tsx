@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { Issue } from "@/lib/cluster/reports"
 
 type Props = {

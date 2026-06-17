@@ -5,6 +5,7 @@ import { Bookmark } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import ImageTagStats from "./components/image-tag-stats"
 import TagIdentity from "./components/tag-identity"
@@ -31,8 +32,8 @@ export default function ImageTagDetailPage() {
   const workloadUid = params.uid
   const digest = decodeURIComponent(params.digest)
   const data = useClusterState(s => s.data)
-  const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const { linkTo } = useContextHref()
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -64,10 +65,8 @@ export default function ImageTagDetailPage() {
   const imageIssues = data.issues.filter(i => usage.image.includes(i.image))
   const status = usage.versionStatus.statusType
 
-  const rootHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
-  const workloadHref = reportId
-    ? `/topmost-owners/${workloadUid}?report=${reportId}`
-    : `/topmost-owners/${workloadUid}`
+  const rootHref = linkTo("/topmost-owners")
+  const workloadHref = linkTo(`/topmost-owners/${workloadUid}`)
 
   return (
     <div className="min-h-full flex flex-col items-center">

@@ -2,7 +2,7 @@ import { RefreshCw } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { refreshState } from "@/lib/cluster/refresh-state"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 
 export default function Refreshbutton() {
   const { lastRefreshed, isFetchingReport } = useClusterState()

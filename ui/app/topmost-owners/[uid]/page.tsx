@@ -5,6 +5,7 @@ import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
@@ -30,6 +31,7 @@ export default function WorkloadDetailPage() {
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const { linkTo } = useContextHref()
 
   const match = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -82,7 +84,7 @@ export default function WorkloadDetailPage() {
     : undefined
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
-  const backHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
+  const backHref = linkTo("/topmost-owners")
   const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
   const apiGroup = root?.apiGroup
   const argoApp = root?.argoApp
@@ -136,12 +138,12 @@ export default function WorkloadDetailPage() {
           </div>
           <div className="md:col-span-2">
             <NetworkCard
-              href={reportId ? `/topmost-owners/${uid}/network-topology?report=${reportId}` : `/topmost-owners/${uid}/network-topology`}
+              href={linkTo(`/topmost-owners/${uid}/network-topology`)}
             />
           </div>
         </div>
 
-        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} reportId={reportId} />
+        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} />
       </main>
     </div>
   )

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Activity, ArrowRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import { useNetstatd, recentCounts, filterListening, groupListening } from "@/lib/cluster/netstatd"
 
 type Props = {

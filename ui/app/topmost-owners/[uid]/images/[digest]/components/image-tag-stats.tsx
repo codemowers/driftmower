@@ -1,8 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { cn } from "@/lib/utils"
-import { relativeTimeFromNow, compactRelativeTimeFromNow } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { relativeTimeFromNow, compactRelativeTimeFromNow } from "@/lib/utils/format-time"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import type { VulnerabilitySummary } from "@/lib/cluster/vulnerability"

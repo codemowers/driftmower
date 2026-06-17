@@ -23,13 +23,12 @@ import NetworkTopologyHeader from "./network-topology-header"
 
 type Props = {
   uid: string
-  reportId: string | null
   kind: string
   namespace: string
   name: string
 }
 
-export default function NetworkTopologyClient({ uid, reportId, kind, namespace, name }: Props) {
+export default function NetworkTopologyClient({ uid, kind, namespace, name }: Props) {
   const clusterResources = useClusterState(s => s.clusterResources)
   const status = useNetstatd(s => s.status)
   const error = useNetstatd(s => s.error)
@@ -81,7 +80,6 @@ export default function NetworkTopologyClient({ uid, reportId, kind, namespace, 
 
       <div className="flex flex-col gap-6">
         <NetworkTopologyHeader
-          reportId={reportId}
           uid={uid}
           kind={kind}
           namespace={namespace}

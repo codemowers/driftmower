@@ -8,7 +8,6 @@ import NetworkTopologyGraph from "./components/network-topology-graph"
 export default function PodNetworkTopologyPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
   const data = useClusterState(s => s.data)
-  const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
 
   const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
@@ -38,7 +37,6 @@ export default function PodNetworkTopologyPage() {
     <div className="flex min-h-full flex-col">
       <main className="flex w-full min-h-0 flex-1 flex-col gap-6 px-7 py-8">
         <NetworkTopologyHeader
-          reportId={reportId}
           workloadUid={workloadUid}
           workloadName={workloadName}
           workloadKind={workloadKind}

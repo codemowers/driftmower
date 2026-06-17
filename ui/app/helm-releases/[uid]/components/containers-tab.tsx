@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { AlertTriangle, ExternalLink } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { relativeTimeFromNow } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
 

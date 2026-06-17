@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useClusterState } from "@/lib/cluster/cluster-state"
+import { cn } from "@/lib/utils/cn"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"
+import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import ReleaseFilters from "./release-filters"
 
 export type ReleaseEntry = {
@@ -33,13 +35,11 @@ function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
   return "text-status-minor-label"
 }
 
-function ReleaseItem({ entry, reportId }: { entry: ReleaseEntry; reportId: string | null }) {
+function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: (path: string) => string }) {
   const { releaseInfo, staleRepoCount, distinctRepoCount, totalContainers, totalWorkloadCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
   const showAppVersion = releaseInfo.chartAppVersion && releaseInfo.chartAppVersion !== releaseInfo.chartVersion
-  const href = reportId
-    ? `/helm-releases/${releaseInfo.uid}?report=${reportId}`
-    : `/helm-releases/${releaseInfo.uid}`
+  const href = linkTo(`/helm-releases/${releaseInfo.uid}`)
 
   return (
     <Link
@@ -99,10 +99,29 @@ function ReleaseItem({ entry, reportId }: { entry: ReleaseEntry; reportId: strin
 }
 
 export default function ReleaseList({ entries }: { entries: ReleaseEntry[] }) {
-  const reportId = useClusterState(state => state.reportId)
-  const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(new Set())
-  const [showIssuesOnly, setShowIssuesOnly] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { linkTo } = useContextHref()
+  const initialTokens = parseFilterTokens(searchParams.get("filters"))
+  const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(() => statusesFromTokens(initialTokens))
+  const [showIssuesOnly, setShowIssuesOnly] = useState(() => initialTokens.has("issues"))
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
+
+  useEffect(() => {
+    const filters = [
+      ...statusTokens(activeStatuses),
+      ...(showIssuesOnly ? ["issues"] : []),
+    ].join(",")
+    const params = new URLSearchParams(searchParams.toString())
+    if (filters) params.set("filters", filters)
+    else params.delete("filters")
+    if (searchQuery) params.set("q", searchQuery)
+    else params.delete("q")
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `?${next}` : window.location.pathname)
+    }
+  }, [activeStatuses, showIssuesOnly, searchQuery, searchParams, router])
 
   function handleStatusToggle(status: StatusType) {
     setActiveStatuses(prev => {
@@ -163,7 +182,7 @@ export default function ReleaseList({ entries }: { entries: ReleaseEntry[] }) {
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <ReleaseItem key={entry.groupKey} entry={entry} reportId={reportId} />
+            <ReleaseItem key={entry.groupKey} entry={entry} linkTo={linkTo} />
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No releases match your filters</p>

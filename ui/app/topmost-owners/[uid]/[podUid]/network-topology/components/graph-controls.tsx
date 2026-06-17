@@ -1,7 +1,7 @@
 "use client"
 
 import { Plus, Minus, Maximize } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 
 type Props = {
   onZoomIn: () => void

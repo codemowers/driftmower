@@ -1,13 +1,13 @@
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   clusterResources: ClusterResource[] | null
   reportWorkloadUid: string
   liveWorkloadUid: string
-  reportId: string | null
+  contextQuery: string
 }
 
 const PHASE_DOT: Record<string, string> = {
@@ -18,7 +18,7 @@ const PHASE_DOT: Record<string, string> = {
   Succeeded: "bg-gray-400",
 }
 
-export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, reportId }: Props) {
+export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, contextQuery }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
@@ -47,9 +47,7 @@ export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkl
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200">
       {pods.map((pod, idx) => {
-        const href = reportId
-          ? `/topmost-owners/${reportWorkloadUid}/${pod.uid}?report=${reportId}`
-          : `/topmost-owners/${reportWorkloadUid}/${pod.uid}`
+        const href = `/topmost-owners/${reportWorkloadUid}/${pod.uid}${contextQuery}`
         return (
           <Link
             key={pod.uid}

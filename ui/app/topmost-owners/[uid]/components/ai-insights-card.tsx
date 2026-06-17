@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import { buildInsightDetails, fetchAiInsights, type AiInsights, type InsightDetails } from "@/lib/cluster/ai-insights"
 
 type Props = {

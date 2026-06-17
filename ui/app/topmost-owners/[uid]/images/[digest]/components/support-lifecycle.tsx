@@ -1,7 +1,7 @@
 "use client"
 
-import { cn } from "@/lib/utils"
-import { relativeTimeFromNow } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import type { ImageUsage } from "@/lib/cluster/reports"
 
 type Tone = "ok" | "minor" | "major"

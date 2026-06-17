@@ -4,6 +4,7 @@ import { useParams } from "next/navigation"
 import { ShipWheel } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
@@ -24,6 +25,7 @@ export default function HelmReleaseDetailPage() {
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const { linkTo } = useContextHref()
 
   const score = data
     ? Object.values(data.rotenness.releaseScores).find(s => s.releaseInfo.uid === uid)
@@ -52,7 +54,7 @@ export default function HelmReleaseDetailPage() {
     usages.some(u => u.image.includes(i.image))
   ).length
 
-  const backHref = reportId ? `/helm-releases?report=${reportId}` : "/helm-releases"
+  const backHref = linkTo("/helm-releases")
   const containerLabel = score.totalContainers === 1 ? "1 container" : `${score.totalContainers} containers`
   const workloadLabel = score.totalWorkloadCount === 1 ? "1 workload" : `${score.totalWorkloadCount} workloads`
 

@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { AlertTriangle, ExternalLink } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { relativeTimeFromNow } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
@@ -81,7 +81,7 @@ type Props = {
   usages: ImageUsage[]
   issues: Issue[]
   workloadUid: string
-  reportId: string | null
+  contextQuery: string
 }
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
@@ -94,7 +94,7 @@ const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; lab
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Running", "Available", "Version drift", "Worst CVE"]
 
-export default function ImagesTab({ usages, issues, workloadUid, reportId }: Props) {
+export default function ImagesTab({ usages, issues, workloadUid, contextQuery }: Props) {
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
 
   if (usages.length === 0) {
@@ -141,7 +141,7 @@ export default function ImagesTab({ usages, issues, workloadUid, reportId }: Pro
                   )}
                 </div>
                 <Link
-                  href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${reportId ? `?report=${reportId}` : ""}`}
+                  href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
                   className="group inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
                 >
                   <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>

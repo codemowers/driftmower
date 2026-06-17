@@ -4,12 +4,12 @@ import { useEffect, useState } from "react"
 import { ExternalLink } from "lucide-react"
 import { workloadKindLabel } from "@/lib/cluster/reports"
 import { type NetstatdStatus, fetchNetstatdUrl } from "@/lib/cluster/netstatd"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import Breadcrumbs from "@/app/components/breadcrumbs"
 import LiveAge from "./live-age"
 
 type Props = {
-  reportId: string | null
   uid: string
   kind: string
   namespace: string
@@ -42,7 +42,6 @@ const STATUS_LABEL: Record<NetstatdStatus, string> = {
 }
 
 export default function NetworkTopologyHeader({
-  reportId,
   uid,
   kind,
   namespace,
@@ -57,8 +56,9 @@ export default function NetworkTopologyHeader({
   externalTotal,
   portTotal,
 }: Props) {
-  const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
-  const ownerHref = reportId ? `/topmost-owners/${uid}?report=${reportId}` : `/topmost-owners/${uid}`
+  const { linkTo } = useContextHref()
+  const ownersHref = linkTo("/topmost-owners")
+  const ownerHref = linkTo(`/topmost-owners/${uid}`)
 
   return (
     <header className="flex flex-col gap-3 border-b border-gray-200 pb-5">

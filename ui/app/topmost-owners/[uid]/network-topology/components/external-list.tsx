@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import { useRdns, lookupRdns, type AggRow, type RdnsEntry } from "@/lib/cluster/netstatd"
 
 type Props = {

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
 
 type StatusType = ImageUsage["versionStatus"]["statusType"]

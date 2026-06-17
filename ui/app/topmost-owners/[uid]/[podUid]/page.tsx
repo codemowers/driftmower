@@ -5,6 +5,7 @@ import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
 import CommandsCard from "./components/commands-card"
@@ -27,8 +28,8 @@ const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_beh
 export default function PodDetailPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
   const data = useClusterState(s => s.data)
-  const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const { linkTo } = useContextHref()
 
   const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
 
@@ -87,9 +88,7 @@ export default function PodDetailPage() {
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const nodeLabel = pod.nodeName ?? "—"
 
-  const backHref = reportId
-    ? `/topmost-owners/${workloadUid}?report=${reportId}`
-    : `/topmost-owners/${workloadUid}`
+  const backHref = linkTo(`/topmost-owners/${workloadUid}`)
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -100,7 +99,7 @@ export default function PodDetailPage() {
           title={pod.name}
           copyValue={pod.name}
           breadcrumbs={[
-            { label: "Workloads", href: reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners" },
+            { label: "Workloads", href: linkTo("/topmost-owners") },
             { label: `Namespace ${pod.namespace}` },
             { label: `${workloadKindLabel(workloadKind, workloadApiGroup)} ${workloadName}`, href: backHref },
             { label: `Pod ${pod.name}` },
@@ -129,10 +128,7 @@ export default function PodDetailPage() {
           </div>
           <div className="md:col-span-2">
             <NetworkCard
-              href={reportId
-                ? `/topmost-owners/${workloadUid}/${podUid}/network-topology?report=${reportId}`
-                : `/topmost-owners/${workloadUid}/${podUid}/network-topology`
-              }
+              href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/network-topology`)}
               podIPs={pod.ips ?? []}
             />
           </div>
@@ -140,7 +136,7 @@ export default function PodDetailPage() {
 
         <IssuesCard issues={podIssues} />
 
-        <PodTabs pod={pod} usages={podUsages} issues={data.issues} workloadUid={workloadUid} reportId={reportId} />
+        <PodTabs pod={pod} usages={podUsages} issues={data.issues} workloadUid={workloadUid} />
       </main>
     </div>
   )

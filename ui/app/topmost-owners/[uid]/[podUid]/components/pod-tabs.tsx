@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ImagesTab from "./images-tab"
@@ -17,11 +18,11 @@ type Props = {
   usages: ImageUsage[]
   issues: Issue[]
   workloadUid: string
-  reportId: string | null
 }
 
-export default function PodTabs({ pod, usages, issues, workloadUid, reportId }: Props) {
+export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
   const [active, setActive] = useState<Tab>("Images")
+  const { suffix: contextQuery } = useContextHref()
 
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +44,7 @@ export default function PodTabs({ pod, usages, issues, workloadUid, reportId }: 
         ))}
       </div>
 
-      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} reportId={reportId} />}
+      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
       {active === "Ports" && <PortsTab pod={pod} />}
       {active === "Logs" && <LogsTab />}
       {active === "Metadata" && <MetadataTab pod={pod} />}

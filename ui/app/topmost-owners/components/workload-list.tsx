@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, ExternalLink } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
+import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
 
 export type WorkloadEntry = {
@@ -41,7 +43,7 @@ function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
 
 const GRID = "grid-cols-[95px_3fr_2fr_1fr_0.9fr_1fr]"
 
-function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: string | null }) {
+function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; reportId: string | null; linkTo: (path: string) => string }) {
   const router = useRouter()
   const { uid, kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
@@ -58,9 +60,7 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
     }
   }
 
-  const href = reportId
-    ? `/topmost-owners/${uid}?report=${reportId}`
-    : `/topmost-owners/${uid}`
+  const href = linkTo(`/topmost-owners/${uid}`)
 
   return (
     <Link href={href} className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}>
@@ -135,12 +135,35 @@ function WorkloadRow({ entry, reportId }: { entry: WorkloadEntry; reportId: stri
 
 export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) {
   const reportId = useClusterState(s => s.reportId)
-  const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(new Set())
-  const [showIssuesOnly, setShowIssuesOnly] = useState(false)
-  const [hideFinished, setHideFinished] = useState(false)
-  const [hideHelmManaged, setHideHelmManaged] = useState(false)
-  const [hideArgoManaged, setHideArgoManaged] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { linkTo } = useContextHref()
+  const initialTokens = parseFilterTokens(searchParams.get("filters"))
+  const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(() => statusesFromTokens(initialTokens))
+  const [showIssuesOnly, setShowIssuesOnly] = useState(() => initialTokens.has("issues"))
+  const [hideFinished, setHideFinished] = useState(() => initialTokens.has("hidefinished"))
+  const [hideHelmManaged, setHideHelmManaged] = useState(() => initialTokens.has("hidehelm"))
+  const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
+
+  useEffect(() => {
+    const filters = [
+      ...statusTokens(activeStatuses),
+      ...(showIssuesOnly ? ["issues"] : []),
+      ...(hideFinished ? ["hidefinished"] : []),
+      ...(hideHelmManaged ? ["hidehelm"] : []),
+      ...(hideArgoManaged ? ["hideargo"] : []),
+    ].join(",")
+    const params = new URLSearchParams(searchParams.toString())
+    if (filters) params.set("filters", filters)
+    else params.delete("filters")
+    if (searchQuery) params.set("q", searchQuery)
+    else params.delete("q")
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `?${next}` : window.location.pathname)
+    }
+  }, [activeStatuses, showIssuesOnly, hideFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router])
 
   function handleStatusToggle(status: StatusType) {
     setActiveStatuses(prev => {
@@ -220,7 +243,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <WorkloadRow key={entry.groupKey} entry={entry} reportId={reportId} />
+            <WorkloadRow key={entry.groupKey} entry={entry} reportId={reportId} linkTo={linkTo} />
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No workloads match your filters</p>

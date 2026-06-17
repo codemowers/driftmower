@@ -13,12 +13,12 @@ import {
   filterListening,
   groupListening,
 } from "@/lib/cluster/netstatd"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
+import { useContextHref } from "@/lib/hooks/use-context-href"
 import Breadcrumbs from "@/app/components/breadcrumbs"
 import LiveAge from "@/app/topmost-owners/[uid]/network-topology/components/live-age"
 
 type Props = {
-  reportId: string | null
   workloadUid: string
   workloadName: string
   workloadKind: string
@@ -46,7 +46,6 @@ const STATUS_LABEL: Record<NetstatdStatus, string> = {
 }
 
 export default function NetworkTopologyHeader({
-  reportId,
   workloadUid,
   workloadName,
   workloadKind,
@@ -88,11 +87,10 @@ export default function NetworkTopologyHeader({
     namespace,
   })?.apiGroup
 
-  const ownersHref = reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"
-  const ownerHref = reportId ? `/topmost-owners/${workloadUid}?report=${reportId}` : `/topmost-owners/${workloadUid}`
-  const podDetailHref = reportId
-    ? `/topmost-owners/${workloadUid}/${podUid}?report=${reportId}`
-    : `/topmost-owners/${workloadUid}/${podUid}`
+  const { linkTo } = useContextHref()
+  const ownersHref = linkTo("/topmost-owners")
+  const ownerHref = linkTo(`/topmost-owners/${workloadUid}`)
+  const podDetailHref = linkTo(`/topmost-owners/${workloadUid}/${podUid}`)
 
   return (
     <header className="flex flex-col gap-3 border-b border-gray-200 pb-5">

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 
 const CHIPS: { status: StatusType; label: string; bg: string; text: string }[] = [

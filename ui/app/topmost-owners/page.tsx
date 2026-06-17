@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import WorkloadList, { type WorkloadEntry } from "./components/workload-list"
@@ -123,7 +124,9 @@ export default function TopmostOwnersPage() {
           statusCounts={statusCounts}
           noDataCount={noDataCount}
         />
-        <WorkloadList entries={workloads} />
+        <Suspense>
+          <WorkloadList entries={workloads} />
+        </Suspense>
       </main>
     </div>
   )

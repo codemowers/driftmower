@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { ListeningGroup } from "@/lib/cluster/netstatd"
 
 type Props = {

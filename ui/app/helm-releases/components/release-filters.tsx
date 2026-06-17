@@ -1,7 +1,7 @@
 "use client"
 
 import { Search, AlertTriangle } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 
 const CHIPS: { key: StatusType; label: string }[] = [

@@ -1,7 +1,7 @@
 "use client"
 
 import { Search, SlidersHorizontal } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { StatusType } from "@/lib/cluster/reports"

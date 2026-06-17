@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react"
 import Refreshbutton from "@/app/components/core/refresh-button"
 import CopyButton from "@/app/components/copy-button"
 import Breadcrumbs, { type BreadcrumbItem } from "@/app/components/breadcrumbs"
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 
 type Chip = { label: string; tone?: "brand" | "muted" }

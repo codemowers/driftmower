@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils"
-import { kubectlAge } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { kubectlAge } from "@/lib/utils/format-time"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { NodeDrift, Readiness } from "@/lib/api/cluster-resources/types"
 

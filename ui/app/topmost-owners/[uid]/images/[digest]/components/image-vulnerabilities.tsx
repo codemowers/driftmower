@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { ExternalLink } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { compactRelativeTimeFromNow } from "@/lib/format-time"
+import { cn } from "@/lib/utils/cn"
+import { compactRelativeTimeFromNow } from "@/lib/utils/format-time"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage } from "@/lib/cluster/reports"
 import type { VulnerabilitySeverity, Vulnerability } from "@/lib/cluster/vulnerability"

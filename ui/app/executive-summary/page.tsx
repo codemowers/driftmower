@@ -8,7 +8,7 @@ import TechnicalDebtEstimate from "./components/technical-debt-estimate";
 import MostOutdatedWorkloads, { worstStatus, type OutdatedWorkloadEntry } from "./components/most-outdated-workloads";
 import ScraperIssues from "./components/scraper-issues";
 import PageHeader from "../components/page-header";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/cn";
 import { Boxes, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
 
