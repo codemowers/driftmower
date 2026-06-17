@@ -1,4 +1,4 @@
-import { generateText, streamText } from "ai"
+import { generateText, streamText, type JSONValue } from "ai"
 import { llama } from "./config"
 import { MODELS, type ModelKey, type ModelSpec } from "./models"
 
@@ -18,6 +18,9 @@ function callParams({ model, userPrompt, systemPrompt }: QueryArgs) {
     maxOutputTokens: spec.maxOutputTokens,
     topP: spec.topP,
     presencePenalty: spec.presencePenalty,
+    providerOptions: spec.extraBody
+      ? { llama: spec.extraBody as Record<string, JSONValue> }
+      : undefined,
   }
 }
 

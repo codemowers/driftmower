@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
+import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
+import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import WorkloadStats from "./components/workload-stats"
@@ -31,7 +33,24 @@ export default function WorkloadDetailPage() {
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
+
+  useEffect(() => {
+    if (!data) return
+    const entry = Object.entries(data.report.workloadGroupMap).find(
+      ([, u]) => u[0]?.workloadRootInfo?.uid === uid,
+    )
+    if (!entry) return
+    const byPod = new Map<string, ImageUsage[]>()
+    for (const u of entry[1]) {
+      const key = `${u.namespace}/${u.podName}`
+      const list = byPod.get(key)
+      if (list) list.push(u)
+      else byPod.set(key, [u])
+    }
+    void prewarmStaticSummaries([...byPod.values()], vulnerabilityReports)
+  }, [uid, data, vulnerabilityReports])
 
   const match = data
     ? Object.entries(data.report.workloadGroupMap).find(

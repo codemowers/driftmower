@@ -26,10 +26,15 @@ export const MODELS = {
     presencePenalty: 0.5,
     extraBody: { chat_template_kwargs: { enable_thinking: false } },
   },
+  "qwen3.6-think": {
+    id: "Qwen3.6-35B-A3B-UD-Q4_K_M",
+    label: "Qwen3.6 35B",
+    temperature: 1,
+    maxOutputTokens: 4096,
+    topP: 0.9,
+    presencePenalty: 0.5,
+    extraBody: { chat_template_kwargs: { enable_thinking: true } },
+  },
 } satisfies Record<string, ModelSpec>
 
 export type ModelKey = keyof typeof MODELS
-
-export function extraBodyForId(id: string): Record<string, unknown> | undefined {
-  return (Object.values(MODELS) as ModelSpec[]).find(spec => spec.id === id)?.extraBody
-}

@@ -10,6 +10,7 @@ import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
+import PodLlmSummary from "./components/pod-llm-summary"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
 
@@ -121,6 +122,8 @@ export default function PodDetailPage() {
           worstStatus={worstStatus}
           normalizedScore={normalizedScore}
         />
+
+        <PodLlmSummary pod={pod} />
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
