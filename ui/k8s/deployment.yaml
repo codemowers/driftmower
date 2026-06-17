@@ -27,3 +27,10 @@ spec:
               value: "http://driftmower-be:3030"
             - name: ARGO_URL
               value: "https://argocd.ee-west-1.codemowers.io/"
+            - name: LLM_BASE_URL
+              value: "https://llama-api.ee-lte-1.codemowers.io/v1"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llama-api-token
+                  key: token
