@@ -5,6 +5,7 @@ import type { VulnerabilityReport } from "./vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/api/cluster-resources/types"
 import type { AlertsResult } from "./prometheus/alerts"
 import type { ClusterMetrics } from "./prometheus/metrics"
+import type { NodeStorageMap } from "./prometheus/node-storage"
 
 export type ClusterResource = {
   uid: string
@@ -38,6 +39,7 @@ export type ClusterState = {
   vulnerabilityReportsError: boolean
   prometheusAlerts: AlertsResult | null
   clusterMetrics: ClusterMetrics | null
+  nodeStorage: NodeStorageMap | null
 }
 
 export const useClusterState = create<ClusterState>(() => ({
@@ -57,4 +59,5 @@ export const useClusterState = create<ClusterState>(() => ({
   vulnerabilityReportsError: false,
   prometheusAlerts: null,
   clusterMetrics: null,
+  nodeStorage: null,
 }))

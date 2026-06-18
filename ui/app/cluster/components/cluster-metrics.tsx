@@ -52,7 +52,7 @@ export default function ClusterMetrics() {
   const hasStats = metrics.pods !== null || metrics.cpuLoad !== null
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
+    <div className="min-h-[300px] rounded-xl border border-gray-200 bg-white">
       <header className="border-b border-gray-200 px-5 py-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Cluster resources
@@ -65,7 +65,7 @@ export default function ClusterMetrics() {
             label="LVM Storage"
             value={metrics.storage.used}
             total={metrics.storage.total}
-            valueLabel={`${formatBytes(metrics.storage.used)} used`}
+            valueLabel={`${formatBytes(metrics.storage.used)} allocated`}
             totalLabel={formatBytes(metrics.storage.total)}
           />
         )}

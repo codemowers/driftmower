@@ -3,6 +3,7 @@ import { useClusterState } from "./cluster-state"
 import { CLUSTER_RESOURCES_URL, CLUSTER_NODES_URL } from "./constants"
 import { fetchClusterAlerts } from "./prometheus/alerts"
 import { fetchClusterMetrics } from "./prometheus/metrics"
+import { fetchNodeStorage } from "./prometheus/node-storage"
 
 const CONNECTED_FETCH_INTERVAL = 30000
 const DISCONNECTED_FETCH_INTERVAL = 5000
@@ -24,6 +25,9 @@ export function startLiveDataFetching(): () => void {
           .catch(() => {}),
         fetchClusterMetrics()
           .then(data => { if (!cancelled) useClusterState.setState({ clusterMetrics: data }) })
+          .catch(() => {}),
+        fetchNodeStorage()
+          .then(data => { if (!cancelled) useClusterState.setState({ nodeStorage: data }) })
           .catch(() => {}),
         ...(isConnected ? [
           fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })

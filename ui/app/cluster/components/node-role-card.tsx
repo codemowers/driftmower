@@ -1,10 +1,13 @@
+"use client"
+
 import { cn } from "@/lib/utils/cn"
 import { kubectlAge } from "@/lib/utils/format-time"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { NodeDrift, Readiness } from "@/lib/api/cluster-resources/types"
+import { useClusterState } from "@/lib/cluster/cluster-state"
 
-const GRID = "grid-cols-[1.6fr_2fr_0.8fr_1.8fr_2.4fr]"
-const HEADERS = ["Name", "State", "Age", "Version", "Version drift"]
+const GRID = "grid-cols-[1.4fr_1.6fr_2.3fr_1.6fr_1.8fr_0.3fr]"
+const HEADERS = ["Name", "State", "Storage", "Version", "Version drift", "Age"]
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
   major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Major" },
@@ -53,8 +56,11 @@ export default function NodeRoleCard({ role, nodes, isControlPlane }: Props) {
       </header>
 
       <div className={cn("grid gap-4 border-b border-gray-100 py-3 pl-8 pr-7", GRID)}>
-        {HEADERS.map(h => (
-          <p key={h} className="text-xs font-medium text-muted-foreground">{h}</p>
+        {HEADERS.map((h, i) => (
+          <p
+            key={h}
+            className={cn("text-xs font-medium text-muted-foreground", i === HEADERS.length - 1 && "text-right")}
+          >{h}</p>
         ))}
       </div>
 
@@ -68,6 +74,7 @@ export default function NodeRoleCard({ role, nodes, isControlPlane }: Props) {
 function Node({ node }: { node: NodeDrift }) {
   const badge = SEVERITY_STYLE[node.statusType]
   const showArrow = BEHIND.includes(node.statusType) && node.target
+  const storage = useClusterState(s => s.nodeStorage?.[node.name] ?? null)
 
   return (
     <div className={cn("rounded-l-md border border-gray-200 border-l-4", SPINE[node.statusType] ?? "border-l-gray-300")}>
@@ -76,9 +83,10 @@ function Node({ node }: { node: NodeDrift }) {
 
         <State readiness={node.readiness} schedulable={node.schedulable} />
 
-        <span className="font-mono text-sm text-muted-foreground tabular-nums">
-          {node.creationTimestamp ? kubectlAge(node.creationTimestamp) : "—"}
-        </span>
+        {storage
+          ? <StorageBar used={storage.used} total={storage.total} />
+          : <span />
+        }
 
         <Version version={node.version} />
 
@@ -92,6 +100,10 @@ function Node({ node }: { node: NodeDrift }) {
             <span className="font-mono text-xs text-muted-foreground">→ {node.target}</span>
           )}
         </div>
+
+        <span className="font-mono text-sm text-muted-foreground tabular-nums text-right">
+          {node.creationTimestamp ? kubectlAge(node.creationTimestamp) : "—"}
+        </span>
       </div>
     </div>
   )
@@ -106,6 +118,35 @@ function State({ readiness, schedulable }: { readiness: Readiness; schedulable: 
       <span className="truncate text-sm text-foreground">
         {readiness}
         {!schedulable && <span className="text-muted-foreground">,SchedulingDisabled</span>}
+      </span>
+    </div>
+  )
+}
+
+function formatBytes(bytes: number): string {
+  const tb = bytes / 1e12
+  if (tb >= 1) return `${tb.toFixed(1)} TB`
+  return `${Math.round(bytes / 1e9)} GB`
+}
+
+function barColor(pct: number): string {
+  if (pct < 0.7) return "bg-status-ok"
+  if (pct < 0.85) return "bg-status-minor"
+  return "bg-status-major"
+}
+
+function StorageBar({ used, total }: { used: number; total: number }) {
+  const pct = total > 0 ? used / total : 0
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 w-[120px] shrink-0 overflow-hidden rounded-full bg-gray-100">
+        <div
+          className={cn("h-full rounded-full", barColor(pct))}
+          style={{ width: `${Math.min(pct * 100, 100)}%` }}
+        />
+      </div>
+      <span className="font-mono text-xs text-muted-foreground">
+        {formatBytes(used)} / {formatBytes(total)}
       </span>
     </div>
   )

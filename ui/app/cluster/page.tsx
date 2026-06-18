@@ -66,7 +66,7 @@ export default function ClusterPage() {
           <>
             <ClusterHeader reference={nodeDrift.reference} nodeCount={nodes.length} />
 
-            <div className="grid grid-cols-[3fr_2fr] gap-4 items-stretch">
+            <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
               <PrometheusAlerts />
               <ClusterMetrics />
             </div>
