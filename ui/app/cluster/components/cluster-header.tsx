@@ -1,6 +1,6 @@
 import type { K8sReference } from "@/lib/api/cluster-resources/types"
 
-export default function ClusterHeader({ reference }: { reference: K8sReference | null }) {
+export default function ClusterHeader({ reference, nodeCount }: { reference: K8sReference | null; nodeCount: number }) {
   if (!reference) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm text-muted-foreground">
@@ -15,6 +15,12 @@ export default function ClusterHeader({ reference }: { reference: K8sReference |
       <Ref label="stable" version={reference.stable} />
       <span className="text-gray-200">·</span>
       <Ref label="latest" version={reference.latest} />
+      {nodeCount > 0 && (
+        <>
+          <span className="text-gray-200">·</span>
+          <Ref label="nodes" version={String(nodeCount)} />
+        </>
+      )}
     </div>
   )
 }

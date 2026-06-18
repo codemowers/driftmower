@@ -1,6 +1,8 @@
 import { checkConnection } from "./check-connection"
 import { useClusterState } from "./cluster-state"
 import { CLUSTER_RESOURCES_URL, CLUSTER_NODES_URL } from "./constants"
+import { fetchClusterAlerts } from "./prometheus/alerts"
+import { fetchClusterMetrics } from "./prometheus/metrics"
 
 const CONNECTED_FETCH_INTERVAL = 30000
 const DISCONNECTED_FETCH_INTERVAL = 5000
@@ -16,8 +18,14 @@ export function startLiveDataFetching(): () => void {
 
       const { isConnected } = useClusterState.getState()
 
-      if (isConnected) {
-        await Promise.all([
+      await Promise.all([
+        fetchClusterAlerts()
+          .then(data => { if (!cancelled) useClusterState.setState({ prometheusAlerts: data }) })
+          .catch(() => {}),
+        fetchClusterMetrics()
+          .then(data => { if (!cancelled) useClusterState.setState({ clusterMetrics: data }) })
+          .catch(() => {}),
+        ...(isConnected ? [
           fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })
             .then(res => res.json())
             .then(data => { if (!cancelled) useClusterState.setState({ clusterResources: data }) })
@@ -26,8 +34,8 @@ export function startLiveDataFetching(): () => void {
             .then(res => res.json())
             .then(data => { if (!cancelled) useClusterState.setState({ nodeDrift: data }) })
             .catch(() => {}),
-        ])
-      }
+        ] : []),
+      ])
 
       const interval = isConnected
         ? CONNECTED_FETCH_INTERVAL

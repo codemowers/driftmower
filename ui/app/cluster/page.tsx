@@ -4,6 +4,8 @@ import type { ReactNode } from "react"
 import PageHeader from "../components/page-header"
 import ClusterHeader from "./components/cluster-header"
 import NodeRoleCard from "./components/node-role-card"
+import PrometheusAlerts from "./components/prometheus-alerts"
+import ClusterMetrics from "./components/cluster-metrics"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { NodeDrift } from "@/lib/api/cluster-resources/types"
@@ -62,7 +64,12 @@ export default function ClusterPage() {
           </p>
         ) : (
           <>
-            <ClusterHeader reference={nodeDrift.reference} />
+            <ClusterHeader reference={nodeDrift.reference} nodeCount={nodes.length} />
+
+            <div className="grid grid-cols-[3fr_2fr] gap-4 items-stretch">
+              <PrometheusAlerts />
+              <ClusterMetrics />
+            </div>
             {nodeDrift.error ? (
               <Notice>{nodeDrift.error}</Notice>
             ) : nodes.length === 0 ? (

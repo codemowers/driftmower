@@ -3,6 +3,8 @@ import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
 import type { VulnerabilityReport } from "./vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/api/cluster-resources/types"
+import type { AlertsResult } from "./prometheus/alerts"
+import type { ClusterMetrics } from "./prometheus/metrics"
 
 export type ClusterResource = {
   uid: string
@@ -34,6 +36,8 @@ export type ClusterState = {
   nodeDrift: ClusterNodesResponse | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: boolean
+  prometheusAlerts: AlertsResult | null
+  clusterMetrics: ClusterMetrics | null
 }
 
 export const useClusterState = create<ClusterState>(() => ({
@@ -51,4 +55,6 @@ export const useClusterState = create<ClusterState>(() => ({
   nodeDrift: null,
   vulnerabilityReports: null,
   vulnerabilityReportsError: false,
+  prometheusAlerts: null,
+  clusterMetrics: null,
 }))
