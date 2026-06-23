@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -26,9 +26,21 @@ const SEVERITY_STYLE: Record<AlertSeverity, { border: string; bg: string; text: 
   },
 }
 
-export default function PrometheusAlerts() {
+export default function PrometheusAlerts({ onCollapsedHeight }: { onCollapsedHeight?: (height: number) => void }) {
   const result = useClusterState(s => s.prometheusAlerts)
   const [expanded, setExpanded] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (expanded) return
+    const el = cardRef.current
+    if (!el) return
+    const update = () => onCollapsedHeight?.(el.offsetHeight)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [expanded, result, onCollapsedHeight])
 
   if (!result || result.groups.length === 0) return null
 
@@ -37,7 +49,7 @@ export default function PrometheusAlerts() {
   const hidden = groups.length - MAX_VISIBLE
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
+    <div ref={cardRef} className="rounded-xl border border-gray-200 bg-white">
       <header className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Firing alerts

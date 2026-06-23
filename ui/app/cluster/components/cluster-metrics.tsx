@@ -2,6 +2,15 @@
 
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import type { ClusterMetrics } from "@/lib/cluster/prometheus/metrics"
+
+type Memory = NonNullable<ClusterMetrics["memory"]>
+
+const MEMORY_SEGMENTS = [
+  { key: "used",    label: "Allocated", fill: "bg-status-ok-bg" },
+  { key: "buffers", label: "Buffers",   fill: "bg-brand-bg" },
+  { key: "cached",  label: "Cached",    fill: "bg-status-patch-bg" },
+] as const
 
 function formatBytes(bytes: number): string {
   const tb = bytes / 1e12
@@ -11,9 +20,9 @@ function formatBytes(bytes: number): string {
 }
 
 function barColor(pct: number): string {
-  if (pct < 0.7) return "bg-status-ok"
-  if (pct < 0.85) return "bg-status-minor"
-  return "bg-status-major"
+  if (pct < 0.7) return "bg-status-ok-bg"
+  if (pct < 0.85) return "bg-status-minor-bg"
+  return "bg-status-major-bg"
 }
 
 type UsageBarProps = {
@@ -33,18 +42,45 @@ function UsageBar({ label, value, total, valueLabel, totalLabel }: UsageBarProps
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         <span className="font-mono text-xs text-muted-foreground">{totalLabel}</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="flex h-3 w-full items-stretch gap-1">
         <div
-          className={cn("h-full rounded-full transition-all", barColor(pct))}
+          className={cn("rounded-full transition-all", barColor(pct))}
           style={{ width: `${Math.min(pct * 100, 100)}%` }}
         />
+        <div className="flex-1 rounded-full bg-gray-100" />
       </div>
       <span className="font-mono text-xs text-muted-foreground">{valueLabel}</span>
     </div>
   )
 }
 
-export default function ClusterMetrics() {
+function MemoryBar({ memory }: { memory: Memory }) {
+  const pct = (value: number) => (memory.total > 0 ? (value / memory.total) * 100 : 0)
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-medium text-muted-foreground">Memory</span>
+        <span className="font-mono text-xs text-muted-foreground">{formatBytes(memory.total)}</span>
+      </div>
+      <div className="flex h-3 w-full items-stretch gap-1">
+        {MEMORY_SEGMENTS.filter(seg => memory[seg.key] > 0).map(seg => (
+          <div key={seg.key} className={cn("rounded-full", seg.fill)} style={{ width: `${pct(memory[seg.key])}%` }} />
+        ))}
+        <div className="flex-1 rounded-full bg-gray-100" />
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {MEMORY_SEGMENTS.map(seg => (
+          <span key={seg.key} className="font-mono text-xs text-muted-foreground">
+            {seg.label} {formatBytes(memory[seg.key])}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function ClusterMetrics({ matchHeight }: { matchHeight?: number | null }) {
   const metrics = useClusterState(s => s.clusterMetrics)
 
   if (!metrics || (metrics.storage === null && metrics.memory === null && metrics.pods === null && metrics.cpuLoad === null)) return null
@@ -52,14 +88,17 @@ export default function ClusterMetrics() {
   const hasStats = metrics.pods !== null || metrics.cpuLoad !== null
 
   return (
-    <div className="min-h-[300px] rounded-xl border border-gray-200 bg-white">
+    <div
+      className="rounded-xl border border-gray-200 bg-white"
+      style={matchHeight ? { minHeight: matchHeight } : undefined}
+    >
       <header className="border-b border-gray-200 px-5 py-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Cluster resources
         </span>
       </header>
 
-      <div className="flex flex-col gap-5 px-5 py-4">
+      <div className="flex flex-col gap-4 px-5 py-4">
         {metrics.storage && (
           <UsageBar
             label="LVM Storage"
@@ -69,15 +108,7 @@ export default function ClusterMetrics() {
             totalLabel={formatBytes(metrics.storage.total)}
           />
         )}
-        {metrics.memory && (
-          <UsageBar
-            label="Memory cache"
-            value={metrics.memory.cached}
-            total={metrics.memory.total}
-            valueLabel={`${formatBytes(metrics.memory.cached)} cached`}
-            totalLabel={formatBytes(metrics.memory.total)}
-          />
-        )}
+        {metrics.memory && <MemoryBar memory={metrics.memory} />}
         {hasStats && (
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
             {metrics.pods && (

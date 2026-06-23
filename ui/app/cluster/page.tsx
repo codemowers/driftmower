@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import PageHeader from "../components/page-header"
 import ClusterHeader from "./components/cluster-header"
 import NodeRoleCard from "./components/node-role-card"
@@ -49,6 +49,7 @@ function groupByRole(nodes: NodeDrift[]): RoleGroup[] {
 export default function ClusterPage() {
   const nodeDrift = useClusterState(s => s.nodeDrift)
   const isConnected = useClusterState(s => s.isConnected)
+  const [alertsHeight, setAlertsHeight] = useState<number | null>(null)
 
   const nodes = nodeDrift?.nodes ?? []
   const groups = groupByRole(nodes)
@@ -67,8 +68,8 @@ export default function ClusterPage() {
             <ClusterHeader reference={nodeDrift.reference} nodeCount={nodes.length} />
 
             <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
-              <PrometheusAlerts />
-              <ClusterMetrics />
+              <PrometheusAlerts onCollapsedHeight={setAlertsHeight} />
+              <ClusterMetrics matchHeight={alertsHeight} />
             </div>
             {nodeDrift.error ? (
               <Notice>{nodeDrift.error}</Notice>
