@@ -27,7 +27,7 @@ type Props = {
   onStatusToggle: (status: StatusType) => void
   showIssuesOnly: boolean
   onIssuesToggle: () => void
-  hideFinished: boolean
+  showFinished: boolean
   onToggleFinished: () => void
   hideHelmManaged: boolean
   onToggleHelmManaged: () => void
@@ -71,12 +71,12 @@ export default function WorkloadFilters({
   searchQuery, onSearchChange,
   activeStatuses, onStatusToggle,
   showIssuesOnly, onIssuesToggle,
-  hideFinished, onToggleFinished,
+  showFinished, onToggleFinished,
   hideHelmManaged, onToggleHelmManaged,
   hideArgoManaged, onToggleArgoManaged,
   counts, onReset,
 }: Props) {
-  const menuFilterCount = (hideFinished ? 1 : 0) + (hideHelmManaged ? 1 : 0) + (hideArgoManaged ? 1 : 0) + (showIssuesOnly ? 1 : 0)
+  const menuFilterCount = (showFinished ? 1 : 0) + (hideHelmManaged ? 1 : 0) + (hideArgoManaged ? 1 : 0) + (showIssuesOnly ? 1 : 0)
 
   return (
     <div className="flex items-center gap-7 border-b border-gray-200 px-5 py-3.5">
@@ -123,7 +123,7 @@ export default function WorkloadFilters({
             )}
           </PopoverTrigger>
           <PopoverContent align="end" className="w-72 gap-0.5 p-2">
-            <FilterToggle checked={hideFinished} onToggle={onToggleFinished} label="Hide finished workloads" count={counts.finished} />
+            <FilterToggle checked={showFinished} onToggle={onToggleFinished} label="Show finished workloads" count={counts.finished} />
             <FilterToggle checked={hideHelmManaged} onToggle={onToggleHelmManaged} label="Hide Helm-managed" count={counts.helm} />
             <FilterToggle checked={hideArgoManaged} onToggle={onToggleArgoManaged} label="Hide ArgoCD-managed" count={counts.argo} />
             <FilterToggle checked={showIssuesOnly} onToggle={onIssuesToggle} label="Only with issues" count={counts.issues} />

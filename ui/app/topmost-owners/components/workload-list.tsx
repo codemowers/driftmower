@@ -141,7 +141,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   const initialTokens = parseFilterTokens(searchParams.get("filters"))
   const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(() => statusesFromTokens(initialTokens))
   const [showIssuesOnly, setShowIssuesOnly] = useState(() => initialTokens.has("issues"))
-  const [hideFinished, setHideFinished] = useState(() => initialTokens.has("hidefinished"))
+  const [showFinished, setShowFinished] = useState(() => initialTokens.has("showfinished"))
   const [hideHelmManaged, setHideHelmManaged] = useState(() => initialTokens.has("hidehelm"))
   const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
@@ -150,7 +150,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     const filters = [
       ...statusTokens(activeStatuses),
       ...(showIssuesOnly ? ["issues"] : []),
-      ...(hideFinished ? ["hidefinished"] : []),
+      ...(showFinished ? ["showfinished"] : []),
       ...(hideHelmManaged ? ["hidehelm"] : []),
       ...(hideArgoManaged ? ["hideargo"] : []),
     ].join(",")
@@ -163,7 +163,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     if (next !== searchParams.toString()) {
       router.replace(next ? `?${next}` : window.location.pathname)
     }
-  }, [activeStatuses, showIssuesOnly, hideFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router])
+  }, [activeStatuses, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router])
 
   function handleStatusToggle(status: StatusType) {
     setActiveStatuses(prev => {
@@ -177,7 +177,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   function handleReset() {
     setActiveStatuses(new Set())
     setShowIssuesOnly(false)
-    setHideFinished(false)
+    setShowFinished(false)
     setHideHelmManaged(false)
     setHideArgoManaged(false)
     setSearchQuery("")
@@ -191,7 +191,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   }), [entries])
 
   const isModified =
-    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || hideFinished || hideHelmManaged || hideArgoManaged
+    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || showFinished || hideHelmManaged || hideArgoManaged
 
   const q = searchQuery.toLowerCase()
   const filteredEntries = entries
@@ -201,7 +201,7 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
       return activeStatuses.has(e.worstStatus)
     })
     .filter(e => !showIssuesOnly || e.issueCount > 0)
-    .filter(e => !hideFinished || e.kind !== "Job")
+    .filter(e => showFinished || e.kind !== "Job")
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
     .filter(e =>
@@ -223,8 +223,8 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
         onStatusToggle={handleStatusToggle}
         showIssuesOnly={showIssuesOnly}
         onIssuesToggle={() => setShowIssuesOnly(v => !v)}
-        hideFinished={hideFinished}
-        onToggleFinished={() => setHideFinished(v => !v)}
+        showFinished={showFinished}
+        onToggleFinished={() => setShowFinished(v => !v)}
         hideHelmManaged={hideHelmManaged}
         onToggleHelmManaged={() => setHideHelmManaged(v => !v)}
         hideArgoManaged={hideArgoManaged}
