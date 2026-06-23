@@ -1,26 +1,29 @@
 import type { K8sReference } from "@/lib/api/cluster-resources/types"
 
-export default function ClusterHeader({ reference, nodeCount }: { reference: K8sReference | null; nodeCount: number }) {
+export default function ClusterHeader({
+  reference,
+  provider,
+  nodeCount,
+}: {
+  reference: K8sReference | null
+  provider: string
+  nodeCount: number
+}) {
   if (!reference) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm text-muted-foreground">
-        Version reference unavailable. Drift cannot be computed.
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-1 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm">
+        <span className="font-mono font-medium text-foreground">{provider}</span>
+        <span className="text-muted-foreground">Version reference unavailable.</span>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm">
-      <span className="font-mono text-xs uppercase tracking-wide text-muted-foreground">Target</span>
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-1 rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm">
+      <span className="font-mono font-medium text-foreground">{provider}</span>
       <Ref label="stable" version={reference.stable} />
-      <span className="text-gray-200">·</span>
       <Ref label="latest" version={reference.latest} />
-      {nodeCount > 0 && (
-        <>
-          <span className="text-gray-200">·</span>
-          <Ref label="nodes" version={String(nodeCount)} />
-        </>
-      )}
+      {nodeCount > 0 && <Ref label="nodes" version={String(nodeCount)} />}
     </div>
   )
 }

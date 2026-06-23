@@ -1,5 +1,6 @@
 import { isInCluster, kubeApiGet } from "../k8s"
-import { classifyDrift, detectDistro, resolveReference, type Distro } from "./k8s-versions"
+import { detectDistro, resolveReference, type Distro } from "./k8s-versions"
+import { classifySupport, detectProvider, fetchEolReleases } from "./eol"
 import type { ClusterNodesResponse, NodeDrift } from "./types"
 
 type RawNode = {
@@ -46,7 +47,7 @@ function nodeLoadError(e: unknown): string {
 
 export async function getClusterNodes(): Promise<ClusterNodesResponse> {
   if (!isInCluster()) {
-    return { nodes: [], reference: await resolveReference(envDistro() ?? "vanilla") }
+    return { nodes: [], reference: await resolveReference(envDistro() ?? "vanilla"), provider: "Kubernetes" }
   }
 
   let items: RawNode[] | null = null
@@ -58,11 +59,14 @@ export async function getClusterNodes(): Promise<ClusterNodesResponse> {
   }
 
   // Resolve the reference independently of the node listing so the header survives a
-  // node-list failure (e.g. RBAC 403). Distro comes from the nodes when available, else env/vanilla.
-  const detected = detectDistro(items?.find(n => n.status?.nodeInfo?.kubeletVersion)?.status?.nodeInfo?.kubeletVersion ?? "")
-  const reference = await resolveReference(envDistro() ?? detected)
+  // node-list failure (e.g. RBAC 403). Distro/provider come from the nodes when available.
+  const firstVersion = items?.find(n => n.status?.nodeInfo?.kubeletVersion)?.status?.nodeInfo?.kubeletVersion ?? ""
+  const reference = await resolveReference(envDistro() ?? detectDistro(firstVersion))
+  const provider = detectProvider(firstVersion)
 
-  if (!items) return { nodes: [], reference, error }
+  if (!items) return { nodes: [], reference, provider: provider.name, error }
+
+  const releases = await fetchEolReleases(provider.eolProduct)
 
   const nodes: NodeDrift[] = items.map(node => {
     const version = node.status?.nodeInfo?.kubeletVersion ?? ""
@@ -73,10 +77,9 @@ export async function getClusterNodes(): Promise<ClusterNodesResponse> {
       schedulable: !(node.spec?.unschedulable ?? false),
       version,
       creationTimestamp: node.metadata.creationTimestamp ?? null,
-      statusType: reference ? classifyDrift(version, reference.stable) : "no_data",
-      target: reference?.stable ?? null,
+      support: classifySupport(version, releases),
     }
   })
 
-  return { nodes, reference }
+  return { nodes, reference, provider: provider.name }
 }

@@ -1,4 +1,3 @@
-import type { StatusType } from "@/lib/cluster/reports"
 import type { K8sReference } from "./types"
 
 export type Distro = "k3s" | "rke2" | "vanilla"
@@ -21,18 +20,6 @@ export function parseKubeVersion(raw: string): [number, number, number] | null {
   const [major, minor, patch] = core.split(".").map(Number)
   if (![major, minor].every(Number.isFinite)) return null
   return [major, minor, Number.isFinite(patch) ? patch : 0]
-}
-
-export function classifyDrift(running: string, target: string): StatusType {
-  const r = parseKubeVersion(running)
-  const t = parseKubeVersion(target)
-  if (!r || !t) return "no_data"
-  for (let i = 0; i < 3; i++) {
-    if (r[i] === t[i]) continue
-    if (r[i] > t[i]) return "ahead"
-    return (["major_behind", "minor_behind", "patch_behind"] as const)[i]
-  }
-  return "up_to_date"
 }
 
 async function fetchText(url: string): Promise<string> {

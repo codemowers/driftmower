@@ -1,31 +1,31 @@
 "use client"
 
+import { Fragment } from "react"
 import { cn } from "@/lib/utils/cn"
 import { kubectlAge } from "@/lib/utils/format-time"
-import type { StatusType } from "@/lib/cluster/reports"
-import type { NodeDrift, Readiness } from "@/lib/api/cluster-resources/types"
+import type { NodeDrift, Readiness, SupportSeverity } from "@/lib/api/cluster-resources/types"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 
-const GRID = "grid-cols-[1.4fr_1.6fr_2.3fr_1.6fr_1.8fr_0.3fr]"
-const HEADERS = ["Name", "State", "Storage", "Version", "Version drift", "Age"]
+const GRID = "grid-cols-[1.8fr_1.6fr_2.3fr_1.6fr_1.3fr_0.3fr]"
+const HEADERS = ["Name", "State", "Storage", "Version", "Support", "Age"]
 
-const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Major" },
-  minor_behind: { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "Minor" },
-  patch_behind: { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Patch" },
-  up_to_date:   { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
-  ahead:        { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "Ahead" },
+const PILL: Record<SupportSeverity, { bg: string; text: string }> = {
+  ok:       { bg: "bg-status-ok-bg",    text: "text-status-ok-label" },
+  ending:   { bg: "bg-status-patch-bg", text: "text-status-patch-label" },
+  urgent:   { bg: "bg-status-minor-bg", text: "text-status-minor-label" },
+  extended: { bg: "bg-status-minor-bg", text: "text-status-minor-label" },
+  eol:      { bg: "bg-status-major-bg", text: "text-status-major-label" },
+  unknown:  { bg: "bg-gray-100",        text: "text-muted-foreground" },
 }
 
-const SPINE: Partial<Record<StatusType, string>> = {
-  up_to_date:   "border-l-status-ok",
-  ahead:        "border-l-status-ok",
-  patch_behind: "border-l-status-patch",
-  minor_behind: "border-l-status-minor",
-  major_behind: "border-l-status-major",
+const SPINE: Record<SupportSeverity, string> = {
+  ok:       "border-l-status-ok",
+  ending:   "border-l-status-patch",
+  urgent:   "border-l-status-minor",
+  extended: "border-l-status-minor",
+  eol:      "border-l-status-major",
+  unknown:  "border-l-gray-300",
 }
-
-const BEHIND: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 
 type Props = {
   role: string
@@ -72,33 +72,27 @@ export default function NodeRoleCard({ role, nodes, isControlPlane }: Props) {
 }
 
 function Node({ node }: { node: NodeDrift }) {
-  const badge = SEVERITY_STYLE[node.statusType]
-  const showArrow = BEHIND.includes(node.statusType) && node.target
+  const pill = PILL[node.support.severity]
   const storage = useClusterState(s => s.nodeStorage?.[node.name] ?? null)
 
   return (
-    <div className={cn("rounded-l-md border border-gray-200 border-l-4", SPINE[node.statusType] ?? "border-l-gray-300")}>
+    <div className={cn("rounded-l-md border border-gray-200 border-l-4", SPINE[node.support.severity])}>
       <div className={cn("grid items-center gap-4 px-4 py-2.5", GRID)}>
-        <span className="truncate font-mono text-sm font-semibold text-foreground">{node.name}</span>
+        <NodeName name={node.name} />
 
         <State readiness={node.readiness} schedulable={node.schedulable} />
 
         {storage
           ? <StorageBar used={storage.used} total={storage.total} />
-          : <span />
+          : <span className="font-mono text-xs text-muted-foreground">—</span>
         }
 
         <Version version={node.version} />
 
-        <div className="flex items-center gap-2">
-          {badge ? (
-            <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", badge.bg, badge.text)}>{badge.label}</span>
-          ) : (
-            <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-muted-foreground">No data</span>
-          )}
-          {showArrow && (
-            <span className="font-mono text-xs text-muted-foreground">→ {node.target}</span>
-          )}
+        <div>
+          <span className={cn("rounded-md px-2.5 py-1.5 text-xs font-semibold", pill.bg, pill.text)}>
+            {node.support.label}{node.support.relative && ` · ${node.support.relative}`}
+          </span>
         </div>
 
         <span className="font-mono text-sm text-muted-foreground tabular-nums text-right">
@@ -106,6 +100,24 @@ function Node({ node }: { node: NodeDrift }) {
         </span>
       </div>
     </div>
+  )
+}
+
+function withBreaks(text: string) {
+  const segments = text.split(/(?<=[-.])/)
+  return segments.map((segment, i) => (
+    <Fragment key={i}>
+      {segment}
+      {i < segments.length - 1 && <wbr />}
+    </Fragment>
+  ))
+}
+
+function NodeName({ name }: { name: string }) {
+  return (
+    <span className="break-words font-mono text-sm font-semibold text-foreground">
+      {withBreaks(name)}
+    </span>
   )
 }
 

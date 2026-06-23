@@ -7,17 +7,15 @@ import NodeRoleCard from "./components/node-role-card"
 import PrometheusAlerts from "./components/prometheus-alerts"
 import ClusterMetrics from "./components/cluster-metrics"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
-import type { NodeDrift } from "@/lib/api/cluster-resources/types"
+import type { NodeDrift, SupportSeverity } from "@/lib/api/cluster-resources/types"
 
-const DISPLAY_ORDER: Record<StatusType, number> = {
-  major_behind: 0,
-  minor_behind: 1,
-  patch_behind: 2,
-  up_to_date:   3,
-  ahead:        4,
-  no_data:      5,
-  no_version:   5,
+const DISPLAY_ORDER: Record<SupportSeverity, number> = {
+  eol:      0,
+  extended: 1,
+  urgent:   2,
+  ending:   3,
+  ok:       4,
+  unknown:  5,
 }
 
 const NOT_IN_CLUSTER =
@@ -36,7 +34,7 @@ function groupByRole(nodes: NodeDrift[]): RoleGroup[] {
   return Array.from(map.entries())
     .map(([role, groupNodes]) => ({
       role,
-      nodes: groupNodes.sort((a, b) => DISPLAY_ORDER[a.statusType] - DISPLAY_ORDER[b.statusType]),
+      nodes: groupNodes.sort((a, b) => DISPLAY_ORDER[a.support.severity] - DISPLAY_ORDER[b.support.severity]),
       isControlPlane: role.includes("control-plane"),
     }))
     .sort((a, b) =>
@@ -57,7 +55,7 @@ export default function ClusterPage() {
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Cluster" subtitle="Nodes and Kubernetes version drift" />
+        <PageHeader title="Cluster" subtitle="Nodes and Kubernetes support lifecycle" />
 
         {nodeDrift === null ? (
           <p className="text-sm text-muted-foreground">
@@ -65,7 +63,7 @@ export default function ClusterPage() {
           </p>
         ) : (
           <>
-            <ClusterHeader reference={nodeDrift.reference} nodeCount={nodes.length} />
+            <ClusterHeader reference={nodeDrift.reference} provider={nodeDrift.provider} nodeCount={nodes.length} />
 
             <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
               <PrometheusAlerts onCollapsedHeight={setAlertsHeight} />
