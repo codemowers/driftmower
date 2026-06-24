@@ -6,14 +6,16 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { podMetricQueries } from "@/lib/cluster/prometheus/pod-metrics"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
+import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
 import PodLlmSummary from "./components/pod-llm-summary"
-import ResourceUsageCard from "./components/resource-usage-card"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
+import { usePodMetrics } from "./hooks/use-pod-metrics"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
   major_behind: 4,
@@ -34,6 +36,7 @@ export default function PodDetailPage() {
   const { linkTo } = useContextHref()
 
   const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
+  const podMetrics = usePodMetrics(pod?.namespace ?? "", pod?.name ?? "")
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -126,7 +129,11 @@ export default function PodDetailPage() {
 
         <PodLlmSummary pod={pod} />
 
-        <ResourceUsageCard namespace={pod.namespace} name={pod.name} phase={pod.phase} />
+        <PrometheusResourceUsageCard
+          metrics={podMetrics}
+          graphQueries={podMetricQueries(pod.namespace, pod.name)}
+          emptyHint={pod.phase && pod.phase !== "Running" ? `pod is ${pod.phase}` : undefined}
+        />
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">

@@ -1,14 +1,6 @@
-export type ResourceTriplet = {
-  usage: number | null
-  limit: number | null
-  request: number | null
-}
+import { pairVolumes, queryScalar, queryVector, type PodVolume, type ResourceTriplet } from "./query"
 
-export type PodVolume = {
-  name: string
-  used: number
-  capacity: number
-}
+export type { PodVolume, ResourceTriplet } from "./query"
 
 export type PodMetrics = {
   memory: ResourceTriplet
@@ -16,8 +8,6 @@ export type PodMetrics = {
   volumes: PodVolume[]
   qosClass: string | null
 }
-
-type VectorRow = { metric: Record<string, string>; value: [number, string] }
 
 export function podMetricQueries(namespace: string, pod: string) {
   const sel = `namespace="${namespace}",pod="${pod}"`
@@ -33,48 +23,6 @@ export function podMetricQueries(namespace: string, pod: string) {
     volCapacity: `kubelet_volume_stats_capacity_bytes and on(namespace,persistentvolumeclaim) ${pvcInfo}`,
     qos: `kube_pod_status_qos_class{${sel}}`,
   }
-}
-
-async function queryScalar(promql: string): Promise<number | null> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return null
-  const json = await res.json() as { data?: { result?: { value?: [number, string] }[] } }
-  const raw = json.data?.result?.[0]?.value?.[1]
-  if (raw === undefined) return null
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : null
-}
-
-async function queryVector(promql: string): Promise<VectorRow[]> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return []
-  const json = await res.json() as { data?: { result?: VectorRow[] } }
-  return json.data?.result ?? []
-}
-
-function pairVolumes(usedRows: VectorRow[], capacityRows: VectorRow[]): PodVolume[] {
-  const capacityByPvc = new Map<string, number>()
-  for (const row of capacityRows) {
-    const pvc = row.metric.persistentvolumeclaim
-    const value = Number(row.value[1])
-    if (pvc && Number.isFinite(value)) capacityByPvc.set(pvc, value)
-  }
-
-  const volumes: PodVolume[] = []
-  for (const row of usedRows) {
-    const pvc = row.metric.persistentvolumeclaim
-    if (!pvc) continue
-    const used = Number(row.value[1])
-    const capacity = capacityByPvc.get(pvc)
-    if (!Number.isFinite(used) || capacity === undefined) continue
-    volumes.push({ name: pvc, used, capacity })
-  }
-
-  return volumes.sort((a, b) => fullness(b) - fullness(a))
-}
-
-function fullness(volume: PodVolume): number {
-  return volume.capacity > 0 ? volume.used / volume.capacity : 0
 }
 
 export async function fetchPodMetrics(namespace: string, pod: string): Promise<PodMetrics | null> {

@@ -1,18 +1,10 @@
+import { queryScalar } from "./query"
+
 export type ClusterMetrics = {
   storage: { used: number; total: number } | null
   memory: { total: number; used: number; buffers: number; cached: number } | null
   pods: { running: number; total: number; pending: number } | null
   cpuLoad: number | null
-}
-
-async function queryScalar(promql: string): Promise<number | null> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return null
-  const json = await res.json() as { data?: { result?: { value?: [number, string] }[] } }
-  const raw = json.data?.result?.[0]?.value?.[1]
-  if (!raw) return null
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : null
 }
 
 export async function fetchClusterMetrics(): Promise<ClusterMetrics> {

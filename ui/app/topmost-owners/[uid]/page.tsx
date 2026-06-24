@@ -8,13 +8,16 @@ import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { workloadMetricQueries } from "@/lib/cluster/prometheus/workload-metrics"
 import ResourceHeader from "@/app/components/resource-header"
+import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
 import NetworkCard from "@/app/components/network-card"
 import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
+import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
   major_behind: 4,
@@ -57,6 +60,10 @@ export default function WorkloadDetailPage() {
         ([, usages]) => usages[0]?.workloadRootInfo?.uid === uid,
       )
     : undefined
+
+  const metricsNamespace = match ? match[0].split("/")[1] : ""
+  const podNames = match ? [...new Set(match[1].map(u => u.podName))] : []
+  const workloadMetrics = useWorkloadMetrics(metricsNamespace, podNames)
 
   if (!data || !match) {
     return (
@@ -150,6 +157,18 @@ export default function WorkloadDetailPage() {
         ) : null}
 
         <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
+
+        <PrometheusResourceUsageCard
+          metrics={workloadMetrics}
+          graphQueries={workloadMetricQueries(namespace, podNames)}
+          podCount={podNames.length}
+          perPod={workloadMetrics?.perPod}
+          qosBreakdown={workloadMetrics?.qosBreakdown}
+          podHref={podName => {
+            const podRes = clusterResources?.find(r => r.kind === "Pod" && r.name === podName && r.namespace === namespace)
+            return podRes ? linkTo(`/topmost-owners/${uid}/${podRes.uid}`) : null
+          }}
+        />
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
