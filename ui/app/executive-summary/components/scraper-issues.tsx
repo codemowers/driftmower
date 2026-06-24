@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -27,14 +27,26 @@ function splitImage(image: string): { registry: string | null; repo: string } {
 
 const INITIAL_COUNT = 8
 
-type Props = { issues: Issue[] }
+type Props = { issues: Issue[]; onCollapsedHeight?: (height: number) => void }
 
-export default function ScraperIssues({ issues }: Props) {
+export default function ScraperIssues({ issues, onCollapsedHeight }: Props) {
   const [expanded, setExpanded] = useState(false)
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
+  const cardRef = useRef<HTMLDivElement>(null)
   const shown = expanded ? issues : issues.slice(0, INITIAL_COUNT)
   const overflow = issues.length - INITIAL_COUNT
+
+  useLayoutEffect(() => {
+    if (expanded) return
+    const el = cardRef.current
+    if (!el) return
+    const update = () => onCollapsedHeight?.(el.offsetHeight)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [expanded, issues, onCollapsedHeight])
 
   const targetByImage = useMemo(() => {
     const map = new Map<string, { uid: string; digest: string }>()
@@ -49,7 +61,7 @@ export default function ScraperIssues({ issues }: Props) {
   }, [data])
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white px-6 py-5">
+    <div ref={cardRef} className="flex flex-col rounded-xl border border-gray-200 bg-white px-6 py-5">
       <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Scraper Issues
       </p>

@@ -38,11 +38,14 @@ export type OutdatedWorkloadEntry = {
   statusType: StatusType
 }
 
-type Props = { entries: OutdatedWorkloadEntry[]; reportId: string | null }
+type Props = { entries: OutdatedWorkloadEntry[]; reportId: string | null; matchHeight?: number | null }
 
-export default function MostOutdatedWorkloads({ entries, reportId }: Props) {
+export default function MostOutdatedWorkloads({ entries, reportId, matchHeight }: Props) {
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white py-5">
+    <div
+      className="flex flex-col rounded-xl border border-gray-200 bg-white py-5"
+      style={matchHeight ? { minHeight: matchHeight } : undefined}
+    >
       <p className="mb-4 px-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Top 5 Most Outdated Workloads
       </p>

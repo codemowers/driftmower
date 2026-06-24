@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
 import StatCard, { type StatValueTone } from "./components/stat-card";
 import SectionLinkCard from "./components/section-link-card";
@@ -44,6 +45,7 @@ const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 
 
 export default function ExecutiveSummaryPage() {
   const { data, reportId } = useClusterState();
+  const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = rottennessValueTone(rottennessScore)
 
@@ -147,9 +149,9 @@ export default function ExecutiveSummaryPage() {
 
         <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
 
-        <div className="grid grid-cols-[3fr_2fr] gap-5">
-          <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} />
-          <ScraperIssues issues={data?.issues ?? []} />
+        <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
+          <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />
+          <ScraperIssues issues={data?.issues ?? []} onCollapsedHeight={setIssuesHeight} />
         </div>
 
       </main>
