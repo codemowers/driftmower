@@ -1,6 +1,6 @@
 import { useSearchParams } from "next/navigation"
 
-const CARRY = ["report", "filters", "q"] as const
+const CARRY = ["report", "filters", "q", "wtab", "ptab", "htab"] as const
 
 export function useContextHref() {
   const searchParams = useSearchParams()

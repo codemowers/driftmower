@@ -1,14 +1,13 @@
 "use client"
 
-import { useState } from "react"
 import { cn } from "@/lib/utils/cn"
+import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue, ReleaseInfo } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ContainersTab from "./containers-tab"
 import ResourcesTab from "./resources-tab"
 
 const TABS = ["Containers", "Resources", "Values", "Manifest"] as const
-type Tab = typeof TABS[number]
 
 type Props = {
   usages: ImageUsage[]
@@ -19,7 +18,7 @@ type Props = {
 }
 
 export default function ReleaseTabs({ usages, issues, clusterResources, releaseInfo, reportId }: Props) {
-  const [active, setActive] = useState<Tab>("Containers")
+  const [active, setActive] = useTabParam("htab", TABS)
 
   return (
     <div className="flex flex-col gap-4">

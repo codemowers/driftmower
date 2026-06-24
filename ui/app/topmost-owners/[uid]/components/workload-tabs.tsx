@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import ImagesTab from "./images-tab"
@@ -11,7 +11,6 @@ import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
 
 const TABS = ["Images", "Pods", "Descendants", "Metadata"] as const
-type Tab = typeof TABS[number]
 
 type Props = {
   usages: ImageUsage[]
@@ -22,7 +21,7 @@ type Props = {
 }
 
 export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid }: Props) {
-  const [active, setActive] = useState<Tab>("Images")
+  const [active, setActive] = useTabParam("wtab", TABS)
   const { suffix: contextQuery } = useContextHref()
 
   return (
