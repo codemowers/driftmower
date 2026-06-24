@@ -45,18 +45,20 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
         ))}
       </div>
 
-      {active === "Images" && (
-        <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} contextQuery={contextQuery} />
-      )}
-      {active === "Pods" && (
-        <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
-      )}
-      {active === "Descendants" && (
-        <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
-      )}
-      {active === "Metadata" && (
-        <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
-      )}
+      <div className="min-h-[60vh]">
+        {active === "Images" && (
+          <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} contextQuery={contextQuery} />
+        )}
+        {active === "Pods" && (
+          <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+        )}
+        {active === "Descendants" && (
+          <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+        )}
+        {active === "Metadata" && (
+          <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
+        )}
+      </div>
     </div>
   )
 }

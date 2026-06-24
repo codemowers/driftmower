@@ -41,18 +41,20 @@ export default function ReleaseTabs({ usages, issues, clusterResources, releaseI
         ))}
       </div>
 
-      {active === "Containers" && (
-        <ContainersTab usages={usages} issues={issues} reportId={reportId} />
-      )}
-      {active === "Resources" && (
-        <ResourcesTab usages={usages} clusterResources={clusterResources} releaseInfo={releaseInfo} reportId={reportId} />
-      )}
-      {active === "Values" && (
-        <p className="text-sm text-muted-foreground">Values not available coming soon</p>
-      )}
-      {active === "Manifest" && (
-        <p className="text-sm text-muted-foreground">Manifest not available coming soon</p>
-      )}
+      <div className="min-h-[60vh]">
+        {active === "Containers" && (
+          <ContainersTab usages={usages} issues={issues} reportId={reportId} />
+        )}
+        {active === "Resources" && (
+          <ResourcesTab usages={usages} clusterResources={clusterResources} releaseInfo={releaseInfo} reportId={reportId} />
+        )}
+        {active === "Values" && (
+          <p className="text-sm text-muted-foreground">Values not available coming soon</p>
+        )}
+        {active === "Manifest" && (
+          <p className="text-sm text-muted-foreground">Manifest not available coming soon</p>
+        )}
+      </div>
     </div>
   )
 }
