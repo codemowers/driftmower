@@ -44,10 +44,12 @@ export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
         ))}
       </div>
 
-      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
-      {active === "Ports" && <PortsTab pod={pod} />}
-      {active === "Logs" && <LogsTab />}
-      {active === "Metadata" && <MetadataTab pod={pod} />}
+      <div className="min-h-[60vh]">
+        {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
+        {active === "Ports" && <PortsTab pod={pod} />}
+        {active === "Logs" && <LogsTab />}
+        {active === "Metadata" && <MetadataTab pod={pod} />}
+      </div>
     </div>
   )
 }

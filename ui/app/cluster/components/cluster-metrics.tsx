@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils/cn"
+import { formatBytes } from "@/lib/utils/format-bytes"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ClusterMetrics } from "@/lib/cluster/prometheus/metrics"
 
@@ -11,13 +12,6 @@ const MEMORY_SEGMENTS = [
   { key: "buffers", label: "Buffers",   fill: "bg-brand-bg" },
   { key: "cached",  label: "Cached",    fill: "bg-status-patch-bg" },
 ] as const
-
-function formatBytes(bytes: number): string {
-  const tb = bytes / 1e12
-  if (tb >= 1) return `${tb.toFixed(1)} TB`
-  const gb = bytes / 1e9
-  return `${Math.round(gb)} GB`
-}
 
 function barColor(pct: number): string {
   if (pct < 0.7) return "bg-status-ok-bg"

@@ -11,6 +11,7 @@ import NetworkCard from "@/app/components/network-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
 import PodLlmSummary from "./components/pod-llm-summary"
+import ResourceUsageCard from "./components/resource-usage-card"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
 
@@ -124,6 +125,8 @@ export default function PodDetailPage() {
         />
 
         <PodLlmSummary pod={pod} />
+
+        <ResourceUsageCard namespace={pod.namespace} name={pod.name} phase={pod.phase} />
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
