@@ -24,17 +24,17 @@ export function isInCluster(): boolean {
   return typeof process.env.KUBERNETES_SERVICE_HOST === "string" && process.env.KUBERNETES_SERVICE_HOST !== ""
 }
 
-export async function kubeApiGet<T>(path: string): Promise<T> {
+async function kubeRequestText(path: string, accept: string): Promise<string> {
   const host = process.env.KUBERNETES_SERVICE_HOST
   const port = process.env.KUBERNETES_SERVICE_PORT ?? "443"
   if (!host) throw new Error("Not running inside a Kubernetes pod (KUBERNETES_SERVICE_HOST unset)")
   const [token, ca] = await Promise.all([readToken(), readCa()])
   const headers: OutgoingHttpHeaders = {
     Authorization: `Bearer ${token}`,
-    Accept: "application/json",
+    Accept: accept,
   }
 
-  return await new Promise<T>((resolve, reject) => {
+  return await new Promise<string>((resolve, reject) => {
     const req = request(
       { host, port: Number(port), path, method: "GET", headers, ca },
       res => {
@@ -43,11 +43,7 @@ export async function kubeApiGet<T>(path: string): Promise<T> {
         res.on("end", () => {
           const body = Buffer.concat(chunks).toString("utf8")
           if (res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300) {
-            try {
-              resolve(JSON.parse(body) as T)
-            } catch (e) {
-              reject(new Error(`Kubernetes API ${path} returned non-JSON body: ${(e as Error).message}`))
-            }
+            resolve(body)
           } else {
             console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${body.slice(0, 200)}`)
             reject(new Error(`Kubernetes API ${path} returned ${res.statusCode}: ${body.slice(0, 200)}`))
@@ -61,4 +57,17 @@ export async function kubeApiGet<T>(path: string): Promise<T> {
     })
     req.end()
   })
+}
+
+export async function kubeApiGet<T>(path: string): Promise<T> {
+  const body = await kubeRequestText(path, "application/json")
+  try {
+    return JSON.parse(body) as T
+  } catch (e) {
+    throw new Error(`Kubernetes API ${path} returned non-JSON body: ${(e as Error).message}`)
+  }
+}
+
+export async function kubeApiGetText(path: string): Promise<string> {
+  return await kubeRequestText(path, "text/plain")
 }
