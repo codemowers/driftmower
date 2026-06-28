@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import TabBar from "@/app/components/core/tab-bar"
 import ImagesTab from "./images-tab"
 import PortsTab from "./ports-tab"
 import LogsTab from "./logs-tab"
@@ -60,34 +60,19 @@ export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
   }, [active])
 
   return (
-    <div ref={rootRef} className="flex flex-col gap-4">
-      <div className="flex border-b border-gray-200">
-        {TABS.map(tab => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => {
-              scrollOnLogsRef.current = tab === "Logs"
-              setActive(tab)
-            }}
-            className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors",
-              active === tab
-                ? "border-b-2 border-brand text-brand-text"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="min-h-[60vh]">
-        {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
-        {active === "Ports" && <PortsTab pod={pod} />}
-        {active === "Logs" && <LogsTab ns={pod.namespace} pod={pod.name} uid={pod.uid} />}
-        {active === "Metadata" && <MetadataTab pod={pod} />}
-      </div>
-    </div>
+    <TabBar
+      tabs={TABS}
+      active={active}
+      onSelect={tab => {
+        scrollOnLogsRef.current = tab === "Logs"
+        setActive(tab)
+      }}
+      rootRef={rootRef}
+    >
+      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
+      {active === "Ports" && <PortsTab pod={pod} />}
+      {active === "Logs" && <LogsTab ns={pod.namespace} pod={pod.name} uid={pod.uid} />}
+      {active === "Metadata" && <MetadataTab pod={pod} />}
+    </TabBar>
   )
 }
