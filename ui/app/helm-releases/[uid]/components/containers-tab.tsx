@@ -3,7 +3,8 @@ import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { ImageUsage, Issue, StatusType } from "@/lib/cluster/reports"
+import type { ImageUsage, Issue } from "@/lib/cluster/reports"
+import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
 
 function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
   return (
@@ -27,13 +28,6 @@ type Props = {
   usages: ImageUsage[]
   issues: Issue[]
   reportId: string | null
-}
-
-const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Major" },
-  minor_behind:  { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "Minor" },
-  patch_behind:  { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Patch" },
-  up_to_date:    { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
 }
 
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
