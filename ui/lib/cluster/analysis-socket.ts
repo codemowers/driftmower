@@ -5,7 +5,6 @@ let socket: Socket | null = null
 export function getAnalysisSocket(): Socket {
   if (!socket) {
     socket = io({ transports: ["polling", "websocket"] })
-    console.log("Socket initiated");
   }
 
   return socket
@@ -14,10 +13,7 @@ export function getAnalysisSocket(): Socket {
 export function waitForSocketConnect(socket: Socket, timeoutMs?: number): Promise<void> {
   if (socket.connected) return Promise.resolve()
   return new Promise((resolve) => {
-    socket.once("connect", () => {
-      console.log("Socket connected")
-      resolve()
-    })
+    socket.once("connect", () => resolve())
     if (timeoutMs != null) setTimeout(resolve, timeoutMs)
   })
 }
