@@ -17,12 +17,20 @@ export default function ClusterInit() {
   const reportParam = searchParams.get("report")
   const searchQuery = searchParams.toString()
 
-  useEffect(() => {
-    getAnalysisSocket()
-  }, [])
+  // Start the polled live-data loop once for the app's lifetime.
+  useEffect(() => startLiveDataFetching(), [])
 
+  // Load the report (the one named by ?report=, else the latest) whenever the
+  // param changes. We pre-warm the analysis socket in the background so it's
+  // connected before the user triggers a refresh — not awaited here on purpose.
   useEffect(() => {
     void waitForSocketConnect(getAnalysisSocket(), SOCKET_SLOT_WAIT_MS)
+
+    // Skip when the param already matches the loaded report: this fires after the
+    // URL-sync effect below reflects a freshly loaded report, and re-fetching it
+    // would be redundant.
+    if (reportParam && reportParam === useClusterState.getState().reportId) return
+
     async function init() {
       await checkConnection().catch(() => {})
       await fetchDynamicData(reportParam)
@@ -30,8 +38,7 @@ export default function ClusterInit() {
     void init()
   }, [reportParam])
 
-  useEffect(() => startLiveDataFetching(), [])
-
+  // Reflect the loaded report id into the URL so the view is shareable/refreshable.
   useEffect(() => {
     if (!reportId) return
     const params = new URLSearchParams(searchQuery)

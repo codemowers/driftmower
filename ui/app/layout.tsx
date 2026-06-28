@@ -1,27 +1,27 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { Inter, JetBrains_Mono } from "next/font/google";
-import NavBar from "./components/core/nav-bar";
-import RefreshingOverlay from "./components/core/refreshing-overlay";
-import ClusterInit from "./components/cluster-init";
-import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import "./globals.css";
+import type { Metadata } from "next"
+import { Suspense } from "react"
+import { Inter, JetBrains_Mono } from "next/font/google"
+import NavBar from "./components/core/nav-bar"
+import RefreshingOverlay from "./components/core/refreshing-overlay"
+import ClusterInit from "./components/cluster-init"
+import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import "./globals.css"
 
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-});
+})
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-});
+})
 
 export const metadata: Metadata = {
   title: "Driftmower",
   description: "Monitor container image drift across your cluster",
-};
+}
 
 export default function RootLayout({
   children,
@@ -56,5 +56,5 @@ export default function RootLayout({
         </TooltipProvider>
       </body>
     </html>
-  );
+  )
 }
