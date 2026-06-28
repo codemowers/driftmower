@@ -1,5 +1,6 @@
 import { useClusterState } from "./cluster-state"
 import { REPORTS_URL } from "./constants"
+import { fetchJson } from "@/lib/utils/fetch-json"
 
 export type StatusType = "up_to_date" | "patch_behind" | "minor_behind" | "major_behind" | "ahead" | "no_data" | "no_version"
 
@@ -161,7 +162,7 @@ function normalizeBuiltAt(value?: string): string | undefined {
   return value && !value.startsWith(ZERO_DATE_PREFIX) ? value : undefined
 }
 
-function normalizeReport(report: Report): Report {
+function normalizeReport(report: Report): void {
   const r = report.report
   const usageLists: ImageUsage[][] = [
     r.imageUsages,
@@ -175,46 +176,36 @@ function normalizeReport(report: Report): Report {
       vs.latestBuiltAt = normalizeBuiltAt(vs.latestBuiltAt)
     }
   }
-  return report
 }
 
-export async function fetchLatestReport(): Promise<void> {
+async function loadReport(getReport: () => Promise<Report>): Promise<void> {
   useClusterState.setState({ isFetchingReport: true, error: null })
   try {
+    const report = await getReport()
+    normalizeReport(report)
+    useClusterState.setState({
+      data: report,
+      reportId: report.id,
+      lastRefreshed: parseReportDate(report.createdAt),
+      isFetchingReport: false,
+    })
+  } catch (e) {
+    useClusterState.setState({ error: String(e), isFetchingReport: false })
+  }
+}
+
+export function fetchLatestReport(): Promise<void> {
+  return loadReport(async () => {
     const clusterName = useClusterState.getState().clusterName
-    const res = await fetch(
-      `${REPORTS_URL}?$limit=1&$sort[createdAt]=-1&clusterContext=${clusterName}`,
-    )
-    if (!res.ok) throw new Error(`Failed to fetch reports: ${res.status}`)
-    const json: ReportsListResponse = await res.json()
+    let url = `${REPORTS_URL}?$limit=1&$sort[createdAt]=-1`
+    if (clusterName) url += `&clusterContext=${encodeURIComponent(clusterName)}`
+    const json = await fetchJson<ReportsListResponse>(url)
     const report = json.data[0]
     if (!report) throw new Error("No reports found")
-    normalizeReport(report)
-    useClusterState.setState({
-      data: report,
-      reportId: report.id,
-      lastRefreshed: parseReportDate(report.createdAt),
-      isFetchingReport: false,
-    })
-  } catch (e) {
-    useClusterState.setState({ error: String(e), isFetchingReport: false })
-  }
+    return report
+  })
 }
 
-export async function fetchReport(id: string): Promise<void> {
-  useClusterState.setState({ isFetchingReport: true, error: null })
-  try {
-    const res = await fetch(`${REPORTS_URL}/${id}`)
-    if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`)
-    const report: Report = await res.json()
-    normalizeReport(report)
-    useClusterState.setState({
-      data: report,
-      reportId: report.id,
-      lastRefreshed: parseReportDate(report.createdAt),
-      isFetchingReport: false,
-    })
-  } catch (e) {
-    useClusterState.setState({ error: String(e), isFetchingReport: false })
-  }
+export function fetchReport(id: string): Promise<void> {
+  return loadReport(() => fetchJson<Report>(`${REPORTS_URL}/${id}`))
 }
