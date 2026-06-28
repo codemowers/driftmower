@@ -4,6 +4,7 @@ import { Fragment, useState, type ReactNode } from "react"
 import { ChevronRight, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes, formatCores } from "@/lib/utils/format-bytes"
+import { usageBarColor } from "@/lib/utils/usage-color"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { PodVolume, ResourceTriplet } from "@/lib/cluster/prometheus/query"
 import type { PerPodMetrics } from "@/lib/cluster/prometheus/workload-metrics"
@@ -28,11 +29,6 @@ type Props = {
   podHref?: (podName: string) => string | null
 }
 
-function barColor(pct: number): string {
-  if (pct < 0.7) return "bg-status-ok"
-  if (pct < 0.85) return "bg-status-minor"
-  return "bg-status-major"
-}
 
 function metricHasBar(metric: ResourceTriplet): boolean {
   return metric.usage !== null && metric.limit !== null && metric.limit > 0
@@ -227,7 +223,7 @@ function UsageBar({ usage, limit, request, fmt, height }: { usage: number; limit
     <div className="relative">
       <div className={cn("w-full overflow-hidden rounded-full bg-gray-100", height)}>
         <div
-          className={cn("h-full rounded-full", barColor(usage / limit))}
+          className={cn("h-full rounded-full", usageBarColor(usage / limit))}
           style={{ width: `${Math.min((usage / limit) * 100, 100)}%` }}
         />
       </div>
@@ -377,7 +373,7 @@ function VolumeRow({ volume }: { volume: PodVolume }) {
         {withBreaks(volume.name)}
       </span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-        <div className={cn("h-full rounded-full", barColor(pct))} style={{ width: `${Math.min(pct * 100, 100)}%` }} />
+        <div className={cn("h-full rounded-full", usageBarColor(pct))} style={{ width: `${Math.min(pct * 100, 100)}%` }} />
       </div>
       <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
         {formatBytes(volume.used)} / {formatBytes(volume.capacity)}

@@ -3,6 +3,8 @@
 import { Fragment } from "react"
 import { cn } from "@/lib/utils/cn"
 import { kubectlAge } from "@/lib/utils/format-time"
+import { formatBytes } from "@/lib/utils/format-bytes"
+import { usageBarColor } from "@/lib/utils/usage-color"
 import type { NodeDrift, Readiness, SupportSeverity } from "@/lib/api/cluster-resources/types"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 
@@ -135,25 +137,13 @@ function State({ readiness, schedulable }: { readiness: Readiness; schedulable: 
   )
 }
 
-function formatBytes(bytes: number): string {
-  const tb = bytes / 1e12
-  if (tb >= 1) return `${tb.toFixed(1)} TB`
-  return `${Math.round(bytes / 1e9)} GB`
-}
-
-function barColor(pct: number): string {
-  if (pct < 0.7) return "bg-status-ok"
-  if (pct < 0.85) return "bg-status-minor"
-  return "bg-status-major"
-}
-
 function StorageBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? used / total : 0
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-[120px] shrink-0 overflow-hidden rounded-full bg-gray-100">
         <div
-          className={cn("h-full rounded-full", barColor(pct))}
+          className={cn("h-full rounded-full", usageBarColor(pct))}
           style={{ width: `${Math.min(pct * 100, 100)}%` }}
         />
       </div>
