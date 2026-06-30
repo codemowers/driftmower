@@ -29,7 +29,6 @@ type Props = {
   podHref?: (podName: string) => string | null
 }
 
-
 function metricHasBar(metric: ResourceTriplet): boolean {
   return metric.usage !== null && metric.limit !== null && metric.limit > 0
 }

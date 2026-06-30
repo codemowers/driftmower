@@ -4,10 +4,6 @@ import type { StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
 import CopyButton from "@/app/components/copy-button"
 
-// Shared building blocks for the resource stats cards (release / workload / pod).
-// All three are a 4-column grid; the Drift Score and Namespace cells are
-// identical, the middle two cells vary per resource.
-
 const CELL_LABEL = "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
 
 export function StatGrid({ children }: { children: ReactNode }) {

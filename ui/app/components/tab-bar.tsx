@@ -8,12 +8,9 @@ type Props<T extends string> = {
   active: T
   onSelect: (tab: T) => void
   children: ReactNode
-  // Forwarded to the root element, e.g. so a panel can locate its scroll parent.
   rootRef?: Ref<HTMLDivElement>
 }
 
-// Underlined tab strip + panel area. Pair with useTabParam for URL-backed state;
-// render the active panel as children.
 export default function TabBar<T extends string>({ tabs, active, onSelect, children, rootRef }: Props<T>) {
   return (
     <div ref={rootRef} className="flex flex-col gap-4">

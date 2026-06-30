@@ -2,15 +2,11 @@ import { isInCluster } from "./k8s"
 
 const INTERNAL_URL = "http://prometheus-operated.monitoring:9090"
 
-// In-cluster we always talk to the operated Prometheus service; locally we fall
-// back to an explicit PROMETHEUS_URL override (null = not reachable).
 export function resolvePrometheusUrl(): string | null {
   if (isInCluster()) return INTERNAL_URL
   return process.env.PROMETHEUS_URL || null
 }
 
-// Proxy a GET to the Prometheus HTTP API and pass the JSON response through,
-// mapping unreachable/non-JSON upstreams to 5xx. Shared by the query/alerts routes.
 export async function proxyPrometheusJson(
   path: string,
   searchParams?: URLSearchParams,

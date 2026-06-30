@@ -1,5 +1,5 @@
 import { isInCluster, kubeApiGet } from "@/lib/api/k8s"
-import { createTtlCache } from "@/lib/api/ttl-cache"
+import { createTtlCache } from "@/lib/utils/ttl-cache"
 
 export const dynamic = "force-dynamic"
 

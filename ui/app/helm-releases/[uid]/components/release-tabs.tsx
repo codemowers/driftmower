@@ -3,7 +3,7 @@
 import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue, ReleaseInfo } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import TabBar from "@/app/components/core/tab-bar"
+import TabBar from "@/app/components/tab-bar"
 import ContainersTab from "./containers-tab"
 import ResourcesTab from "./resources-tab"
 

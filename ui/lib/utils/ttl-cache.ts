@@ -1,6 +1,4 @@
-// Memoize a single async value for `ttlMs`. Failures are not cached: if the
-// loader throws, nothing is stored and the next call retries. Intended for
-// module-scoped use in route handlers (e.g. ingress endpoint discovery).
+// Failures aren't cached; the next call retries.
 export function createTtlCache<T>(ttlMs: number, loader: () => Promise<T>): () => Promise<T> {
   let cached: { value: T; expiresAt: number } | null = null
   return async () => {

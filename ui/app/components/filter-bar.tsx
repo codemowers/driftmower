@@ -4,9 +4,6 @@ import { Search } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 
-// Shared pieces for the list filter bars (releases / workloads). The chip styles
-// are exported so each bar can style its own extra toggles (Issues button,
-// Filters popover) consistently.
 export const FILTER_ACTIVE = "bg-brand-bg text-brand-label rounded-xl border-b-2 border-brand"
 export const FILTER_INACTIVE = "bg-gray-100 text-muted-foreground rounded-xl hover:bg-gray-200"
 
