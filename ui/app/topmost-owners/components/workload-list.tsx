@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
+import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
 
@@ -26,13 +27,6 @@ export type WorkloadEntry = {
   distinctRepoCount: number
   worstStatus: StatusType
   issueCount: number
-}
-
-const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Major" },
-  minor_behind:  { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "Minor" },
-  patch_behind:  { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Patch" },
-  up_to_date:    { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
 }
 
 function staleColor(staleRepoCount: number, distinctRepoCount: number): string {

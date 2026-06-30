@@ -1,5 +1,6 @@
 import { useClusterState } from "./cluster-state"
 import { KUBERNETES_CONTEXTS_URL } from "./constants"
+import { fetchJson } from "@/lib/utils/fetch-json"
 
 type KubernetesContextsResponse = {
   contexts: string[]
@@ -7,15 +8,7 @@ type KubernetesContextsResponse = {
 
 export async function checkConnection(): Promise<void> {
   try {
-    const res = await fetch(KUBERNETES_CONTEXTS_URL, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    })
-
-    if (!res.ok) throw new Error("failed to connect to backend")
-
-    const data: KubernetesContextsResponse = await res.json()
+    const data = await fetchJson<KubernetesContextsResponse>(KUBERNETES_CONTEXTS_URL)
 
     useClusterState.setState({
       isConnected: true,

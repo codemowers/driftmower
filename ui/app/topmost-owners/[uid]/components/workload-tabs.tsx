@@ -1,10 +1,10 @@
 "use client"
 
-import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import TabBar from "@/app/components/tab-bar"
 import ImagesTab from "./images-tab"
 import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
@@ -25,39 +25,19 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
   const { suffix: contextQuery } = useContextHref()
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex border-b border-gray-200">
-        {TABS.map(tab => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActive(tab)}
-            className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors",
-              active === tab
-                ? "border-b-2 border-brand text-brand-text"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="min-h-[60vh]">
-        {active === "Images" && (
-          <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} contextQuery={contextQuery} />
-        )}
-        {active === "Pods" && (
-          <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
-        )}
-        {active === "Descendants" && (
-          <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
-        )}
-        {active === "Metadata" && (
-          <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
-        )}
-      </div>
-    </div>
+    <TabBar tabs={TABS} active={active} onSelect={setActive}>
+      {active === "Images" && (
+        <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} contextQuery={contextQuery} />
+      )}
+      {active === "Pods" && (
+        <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+      )}
+      {active === "Descendants" && (
+        <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+      )}
+      {active === "Metadata" && (
+        <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
+      )}
+    </TabBar>
   )
 }

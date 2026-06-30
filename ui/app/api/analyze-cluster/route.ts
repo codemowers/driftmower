@@ -1,5 +1,5 @@
 import { Agent } from "undici"
-import { backendUrl } from "@/lib/api/proxy"
+import { backendUrl, type FetchInit } from "@/lib/api/proxy"
 
 export const dynamic = "force-dynamic"
 
@@ -12,13 +12,14 @@ const triggerAgent = new Agent({
 export async function POST(req: Request) {
   const body = await req.arrayBuffer()
 
-  void fetch(`${backendUrl()}/analyze-cluster`, {
+  const init: FetchInit = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
     cache: "no-store",
     dispatcher: triggerAgent,
-  } as RequestInit & { dispatcher: Agent }).catch(e => {
+  }
+  void fetch(`${backendUrl()}/analyze-cluster`, init).catch(e => {
     console.error("[analyze-cluster] trigger failed:", String(e))
   })
 

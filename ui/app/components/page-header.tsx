@@ -1,6 +1,6 @@
 "use client"
 
-import Refreshbutton from "./core/refresh-button"
+import RefreshButton from "./core/refresh-button"
 
 type Props = {
   title: string
@@ -15,7 +15,7 @@ export default function PageHeader({ title, subtitle }: Props) {
         <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
       </div>
       <div className="shrink-0 p-1">
-        <Refreshbutton />
+        <RefreshButton />
       </div>
 
     </header>

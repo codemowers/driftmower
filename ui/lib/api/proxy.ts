@@ -9,7 +9,7 @@ const noKeepAliveAgent = new Agent({
   bodyTimeout: 60_000,
 })
 
-type FetchInit = RequestInit & { dispatcher?: Dispatcher }
+export type FetchInit = RequestInit & { dispatcher?: Dispatcher }
 
 const HOP_BY_HOP = new Set([
   "host",
@@ -75,8 +75,4 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
 
 export function backendUrl(): string {
   return process.env.BACKEND_URL ?? "http://driftmower-be:3030"
-}
-
-export function prometheusUrl(): string | undefined {
-  return process.env.PROMETHEUS_URL
 }

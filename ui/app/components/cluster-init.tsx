@@ -17,12 +17,16 @@ export default function ClusterInit() {
   const reportParam = searchParams.get("report")
   const searchQuery = searchParams.toString()
 
-  useEffect(() => {
-    getAnalysisSocket()
-  }, [])
+  // Start the polled live-data loop once for the app's lifetime.
+  useEffect(() => startLiveDataFetching(), [])
 
+  // Load ?report= (else latest) when the param changes; pre-warm the socket, not awaited.
   useEffect(() => {
     void waitForSocketConnect(getAnalysisSocket(), SOCKET_SLOT_WAIT_MS)
+
+    // Param already matches the loaded report; skip the redundant re-fetch.
+    if (reportParam && reportParam === useClusterState.getState().reportId) return
+
     async function init() {
       await checkConnection().catch(() => {})
       await fetchDynamicData(reportParam)
@@ -30,8 +34,7 @@ export default function ClusterInit() {
     void init()
   }, [reportParam])
 
-  useEffect(() => startLiveDataFetching(), [])
-
+  // Mirror the loaded report id into ?report= for shareable URLs.
   useEffect(() => {
     if (!reportId) return
     const params = new URLSearchParams(searchQuery)

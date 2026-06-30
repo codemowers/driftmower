@@ -4,7 +4,7 @@ import { refreshState } from "@/lib/cluster/refresh-state"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils/cn"
 
-export default function Refreshbutton() {
+export default function RefreshButton() {
   const { lastRefreshed, isFetchingReport } = useClusterState()
 
   return (
@@ -34,7 +34,7 @@ export default function Refreshbutton() {
         size="icon"
         className="border-gray-200 bg-white hover:bg-gray-50"
         aria-label="Refresh"
-        onClick={() => refreshState()}
+        onClick={() => void refreshState()}
       >
         <RefreshCw className={cn("size-4", isFetchingReport && "animate-spin")} aria-hidden />
       </Button>

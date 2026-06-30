@@ -1,11 +1,12 @@
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { AlertTriangle } from "lucide-react"
-import Refreshbutton from "@/app/components/core/refresh-button"
+import RefreshButton from "@/app/components/core/refresh-button"
 import CopyButton from "@/app/components/copy-button"
 import Breadcrumbs, { type BreadcrumbItem } from "@/app/components/breadcrumbs"
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
 
 type Chip = { label: string; tone?: "brand" | "muted" }
 
@@ -19,13 +20,6 @@ type Props = {
   scoreChip?: { status: StatusType; score: number; label?: string } | null
   issueCount?: number
   subtitle: ReactNode
-}
-
-const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string }>> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label" },
-  minor_behind:  { bg: "bg-status-minor-bg", text: "text-status-minor-label" },
-  patch_behind:  { bg: "bg-status-patch-bg", text: "text-status-patch-label" },
-  up_to_date:    { bg: "bg-status-ok-bg",    text: "text-status-ok-label" },
 }
 
 const CHIP_TONE: Record<NonNullable<Chip["tone"]>, string> = {
@@ -105,7 +99,7 @@ export default function ResourceHeader({
       </div>
 
       <div className="shrink-0 p-1">
-        <Refreshbutton />
+        <RefreshButton />
       </div>
     </header>
   )

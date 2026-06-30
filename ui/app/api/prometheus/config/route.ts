@@ -1,4 +1,5 @@
 import { isInCluster, kubeApiGet } from "@/lib/api/k8s"
+import { createTtlCache } from "@/lib/utils/ttl-cache"
 
 export const dynamic = "force-dynamic"
 
@@ -10,7 +11,6 @@ type Ingress = {
 }
 
 const CACHE_TTL_MS = 30_000
-let cached: { url: string; expiresAt: number } | null = null
 
 function pickHost(ingress: Ingress): string {
   const tlsHost = ingress.spec?.tls?.flatMap(t => t.hosts ?? [])[0]
@@ -32,14 +32,11 @@ async function discover(): Promise<string> {
   return pickHost(ingress)
 }
 
+const getPrometheusUrl = createTtlCache(CACHE_TTL_MS, discover)
+
 export async function GET() {
-  const now = Date.now()
-  if (cached && cached.expiresAt > now) {
-    return Response.json({ url: cached.url }, { headers: { "Cache-Control": "no-store" } })
-  }
   try {
-    const url = await discover()
-    cached = { url, expiresAt: now + CACHE_TTL_MS }
+    const url = await getPrometheusUrl()
     return Response.json({ url }, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
     return Response.json(
