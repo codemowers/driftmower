@@ -10,8 +10,6 @@ import type { LiveFacts, StaticFacts } from "@/lib/llm/pod-summary/types"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-// Minimal structural guards covering the fields the prompt builders iterate, so
-// a malformed body returns 400 rather than throwing a 500 mid-build.
 function isStaticFacts(facts: object): facts is StaticFacts {
   return Array.isArray((facts as StaticFacts).images)
 }
@@ -21,6 +19,7 @@ function isLiveFacts(facts: object): facts is LiveFacts {
   return (
     typeof f.pod === "object" && f.pod !== null &&
     typeof f.net === "object" && f.net !== null &&
+    typeof f.net.inbound === "object" && f.net.inbound !== null &&
     Array.isArray(f.net.listening) &&
     Array.isArray(f.net.outboundWorkloads) &&
     Array.isArray(f.net.externalInboundPeers)
