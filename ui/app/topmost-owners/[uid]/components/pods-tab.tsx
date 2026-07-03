@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { collectOwnedPods } from "@/lib/cluster/workload-root"
 
 type Props = {
   clusterResources: ClusterResource[] | null
@@ -23,22 +24,7 @@ export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkl
     return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
   }
 
-  const childIndex = new Map<string, ClusterResource[]>()
-  for (const r of clusterResources) {
-    if (!r.ownerUID) continue
-    const list = childIndex.get(r.ownerUID) ?? []
-    list.push(r)
-    childIndex.set(r.ownerUID, list)
-  }
-
-  const pods: ClusterResource[] = []
-  function collectPods(uid: string) {
-    for (const child of childIndex.get(uid) ?? []) {
-      if (child.kind === "Pod") pods.push(child)
-      collectPods(child.uid)
-    }
-  }
-  collectPods(liveWorkloadUid)
+  const pods = collectOwnedPods(clusterResources, liveWorkloadUid)
 
   if (pods.length === 0) {
     return <p className="text-sm text-muted-foreground">No pods found.</p>

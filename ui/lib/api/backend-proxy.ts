@@ -1,5 +1,8 @@
 import { Agent, type Dispatcher } from "undici"
 
+import { getSession } from "@/lib/auth/session"
+import { getValidAccessToken } from "@/lib/auth/tokens"
+
 const noKeepAliveAgent = new Agent({
   keepAliveTimeout: 1,
   keepAliveMaxTimeout: 1,
@@ -39,9 +42,19 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
     target.searchParams.append(key, value)
   })
 
+  const session = await getSession()
+  const accessToken = await getValidAccessToken(session)
+
+  if (!accessToken) {
+    return Response.json({ error: "not authenticated" }, { status: 401 })
+  }
+
+  const headers = filterHeaders(req.headers)
+  headers.set("authorization", `Bearer ${accessToken}`)
+
   const init: FetchInit = {
     method: req.method,
-    headers: filterHeaders(req.headers),
+    headers,
     cache: "no-store",
     redirect: "manual",
     dispatcher: noKeepAliveAgent,

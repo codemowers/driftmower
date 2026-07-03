@@ -88,7 +88,7 @@ export default function HelmReleaseDetailPage() {
 
         <ChartCard releaseInfo={score.releaseInfo} />
 
-        <ReleaseTabs usages={usages} issues={data.issues} clusterResources={clusterResources} releaseInfo={score.releaseInfo} reportId={reportId} />
+        <ReleaseTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportId={reportId} />
       </main>
     </div>
   )

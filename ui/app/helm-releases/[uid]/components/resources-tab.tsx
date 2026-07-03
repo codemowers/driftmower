@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
-import type { ImageUsage, ReleaseInfo } from "@/lib/cluster/reports"
+import type { ImageUsage } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 
 type Props = {
   usages: ImageUsage[]
   clusterResources: ClusterResource[] | null
-  releaseInfo: ReleaseInfo
   reportId: string | null
 }
 
@@ -18,7 +18,7 @@ const PHASE_DOT: Record<string, string> = {
   Succeeded: "bg-gray-400",
 }
 
-export default function ResourcesTab({ usages, clusterResources, releaseInfo, reportId }: Props) {
+export default function ResourcesTab({ usages, clusterResources, reportId }: Props) {
   if (clusterResources === null) {
     return <p className="text-sm text-muted-foreground">Resource data not available</p>
   }
@@ -38,33 +38,11 @@ export default function ResourcesTab({ usages, clusterResources, releaseInfo, re
     return <p className="text-sm text-muted-foreground">No container data available.</p>
   }
 
-  const resourceMap = new Map(clusterResources.map(r => [r.uid, r]))
-  const managerKey = `helm-release:${releaseInfo.namespace}:${releaseInfo.name}`
-
-  const releasePods = clusterResources.filter(
-    r => r.kind === "Pod" && r.managerUID === managerKey
-  )
-
-  function resolveWorkloadUid(pod: ClusterResource): string | undefined {
-    if (!pod.ownerUID) return undefined
-    const owner = resourceMap.get(pod.ownerUID)
-    if (owner?.kind === "ReplicaSet") return owner.ownerUID
-    return pod.ownerUID
-  }
-
-  const podsByWorkload = new Map<string, ClusterResource[]>()
-  for (const pod of releasePods) {
-    const wUid = resolveWorkloadUid(pod)
-    if (!wUid) continue
-    const list = podsByWorkload.get(wUid) ?? []
-    list.push(pod)
-    podsByWorkload.set(wUid, list)
-  }
-
   return (
     <div className="flex flex-col gap-6">
       {workloadRoots.map(w => {
-        const pods = podsByWorkload.get(w.uid) ?? []
+        const liveRoot = findWorkloadRoot(clusterResources, w)
+        const pods = liveRoot ? collectOwnedPods(clusterResources, liveRoot.uid) : []
         const workloadHref = reportId
           ? `/topmost-owners/${w.uid}?report=${reportId}`
           : `/topmost-owners/${w.uid}`

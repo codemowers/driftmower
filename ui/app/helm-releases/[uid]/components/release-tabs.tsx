@@ -1,7 +1,7 @@
 "use client"
 
 import { useTabParam } from "@/lib/hooks/use-tab-param"
-import type { ImageUsage, Issue, ReleaseInfo } from "@/lib/cluster/reports"
+import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import TabBar from "@/app/components/tab-bar"
 import ContainersTab from "./containers-tab"
@@ -13,11 +13,10 @@ type Props = {
   usages: ImageUsage[]
   issues: Issue[]
   clusterResources: ClusterResource[] | null
-  releaseInfo: ReleaseInfo
   reportId: string | null
 }
 
-export default function ReleaseTabs({ usages, issues, clusterResources, releaseInfo, reportId }: Props) {
+export default function ReleaseTabs({ usages, issues, clusterResources, reportId }: Props) {
   const [active, setActive] = useTabParam("htab", TABS)
 
   return (
@@ -26,7 +25,7 @@ export default function ReleaseTabs({ usages, issues, clusterResources, releaseI
         <ContainersTab usages={usages} issues={issues} reportId={reportId} />
       )}
       {active === "Resources" && (
-        <ResourcesTab usages={usages} clusterResources={clusterResources} releaseInfo={releaseInfo} reportId={reportId} />
+        <ResourcesTab usages={usages} clusterResources={clusterResources} reportId={reportId} />
       )}
       {active === "Values" && (
         <p className="text-sm text-muted-foreground">Values not available coming soon</p>

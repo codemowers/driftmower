@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
 import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -61,9 +61,12 @@ export default function WorkloadDetailPage() {
       )
     : undefined
 
-  const metricsNamespace = match ? match[0].split("/")[1] : ""
-  const podNames = match ? [...new Set(match[1].map(u => u.podName))] : []
-  const workloadMetrics = useWorkloadMetrics(metricsNamespace, podNames)
+  const [kind = "", namespace = "", name = ""] = match ? match[0].split("/") : []
+  const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
+  const livePodNames = clusterResources && root ? collectOwnedPods(clusterResources, root.uid).map(p => p.name) : []
+  const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
+  const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
+  const workloadMetrics = useWorkloadMetrics(namespace, podNames)
 
   if (!data || !match) {
     return (
@@ -76,8 +79,6 @@ export default function WorkloadDetailPage() {
   }
 
   const [groupKey, usages] = match
-  const parts = groupKey.split("/")
-  const [kind, namespace, name] = parts
 
   const repoStatus = new Map<string, StatusType>()
   for (const u of usages) {
@@ -111,7 +112,6 @@ export default function WorkloadDetailPage() {
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
   const backHref = linkTo("/topmost-owners")
-  const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
   const apiGroup = root?.apiGroup
   const argoApp = root?.argoApp
   const isArgo = !isHelm && !!argoApp

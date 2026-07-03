@@ -1,4 +1,4 @@
-import { backendUrl, proxyRequest } from "@/lib/api/proxy"
+import { backendUrl, proxyRequest } from "@/lib/api/backend-proxy"
 
 export const dynamic = "force-dynamic"
 

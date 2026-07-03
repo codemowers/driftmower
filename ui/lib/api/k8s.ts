@@ -24,10 +24,11 @@ export function isInCluster(): boolean {
   return typeof process.env.KUBERNETES_SERVICE_HOST === "string" && process.env.KUBERNETES_SERVICE_HOST !== ""
 }
 
+const KUBE_API_HOST = "kubernetes.default.svc"
+
 async function kubeRequestText(path: string, accept: string): Promise<string> {
-  const host = process.env.KUBERNETES_SERVICE_HOST
   const port = process.env.KUBERNETES_SERVICE_PORT ?? "443"
-  if (!host) throw new Error("Not running inside a Kubernetes pod (KUBERNETES_SERVICE_HOST unset)")
+  if (!isInCluster()) throw new Error("Not running inside a Kubernetes pod (KUBERNETES_SERVICE_HOST unset)")
   const [token, ca] = await Promise.all([readToken(), readCa()])
   const headers: OutgoingHttpHeaders = {
     Authorization: `Bearer ${token}`,
@@ -36,7 +37,7 @@ async function kubeRequestText(path: string, accept: string): Promise<string> {
 
   return await new Promise<string>((resolve, reject) => {
     const req = request(
-      { host, port: Number(port), path, method: "GET", headers, ca },
+      { host: KUBE_API_HOST, port: Number(port), path, method: "GET", headers, ca },
       res => {
         const chunks: Buffer[] = []
         res.on("data", chunk => chunks.push(chunk))

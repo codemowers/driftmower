@@ -1,0 +1,32 @@
+# Registers driftmower-ui as a confidential OIDC client with passmower.
+# passmower's operator watches this CRD and generates the Secret
+# `oidc-client-driftmower-ui-owner-secrets` in this namespace, containing
+# OIDC_CLIENT_ID / OIDC_CLIENT_SECRET / OIDC_IDP_URI / OIDC_IDP_WELL_KNOWN_URI.
+# Both driftmower-ui (OIDC client) and driftmower-be (resource server, reads
+# OIDC_IDP_URI as its issuer) consume that secret.
+apiVersion: codemowers.cloud/v1beta1
+kind: OIDCClient
+metadata:
+  name: driftmower-ui
+  namespace: driftmowers
+spec:
+  displayName: Driftmower
+  uri: https://driftmower-ui.ee-lte-1.codemowers.io/
+  redirectUris:
+    - https://driftmower-ui.ee-lte-1.codemowers.io/api/auth/callback
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  # Request the full group list (not allowed_groups) so driftmower can do its
+  # own per-project authorization against passmower group membership.
+  # email claims are delivered under the `profile` scope in passmower; `email`
+  # is not a separately-requestable scope.
+  availableScopes:
+    - openid
+    - profile
+    - groups
+    - offline_access
+  tokenEndpointAuthMethod: client_secret_basic
+  pkce: true

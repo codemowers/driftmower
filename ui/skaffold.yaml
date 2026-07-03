@@ -9,7 +9,7 @@ deploy:
 
 build:
   artifacts:
-    - image: zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui
+    - image: zot.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
       platforms:
         - linux/amd64
       docker:
@@ -17,6 +17,7 @@ build:
 
 manifests:
   rawYaml:
+    - k8s/oidcclient.yaml
     - k8s/rbac.yaml
     - k8s/deployment.yaml
     - k8s/service.yaml

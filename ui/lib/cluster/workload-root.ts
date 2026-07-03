@@ -10,3 +10,23 @@ export function findWorkloadRoot(
     resources.find(r => r.kind === root.kind && r.name === root.name && r.namespace === root.namespace)
   )
 }
+
+export function collectOwnedPods(resources: ClusterResource[], rootUid: string): ClusterResource[] {
+  const childIndex = new Map<string, ClusterResource[]>()
+  for (const r of resources) {
+    if (!r.ownerUID) continue
+    const list = childIndex.get(r.ownerUID)
+    if (list) list.push(r)
+    else childIndex.set(r.ownerUID, [r])
+  }
+
+  const pods: ClusterResource[] = []
+  function collect(uid: string) {
+    for (const child of childIndex.get(uid) ?? []) {
+      if (child.kind === "Pod") pods.push(child)
+      collect(child.uid)
+    }
+  }
+  collect(rootUid)
+  return pods
+}

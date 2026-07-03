@@ -60,9 +60,12 @@ export default function PodDetailPage() {
   const workloadKind = workloadRoot?.kind ?? "—"
   const workloadApiGroup = workloadRoot ? findWorkloadRoot(clusterResources, workloadRoot)?.apiGroup : undefined
 
-  const podUsages: ImageUsage[] = data.report.imageUsages.filter(
+  const ownUsages = data.report.imageUsages.filter(
     u => u.podName === pod.name && u.namespace === pod.namespace,
   )
+  const podUsages: ImageUsage[] = ownUsages.length > 0
+    ? ownUsages
+    : [...new Map(workloadUsages.map(u => [`${u.containerName}/${u.image}`, u])).values()]
 
   const repoStatus = new Map<string, StatusType>()
   for (const u of podUsages) {

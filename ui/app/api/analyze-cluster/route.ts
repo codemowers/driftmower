@@ -1,5 +1,7 @@
 import { Agent } from "undici"
-import { backendUrl, type FetchInit } from "@/lib/api/proxy"
+import { backendUrl, type FetchInit } from "@/lib/api/backend-proxy"
+import { getSession } from "@/lib/auth/session"
+import { getValidAccessToken } from "@/lib/auth/tokens"
 
 export const dynamic = "force-dynamic"
 
@@ -10,11 +12,17 @@ const triggerAgent = new Agent({
 })
 
 export async function POST(req: Request) {
+  const session = await getSession()
+  const accessToken = await getValidAccessToken(session)
+  if (!accessToken) {
+    return Response.json({ error: "not authenticated" }, { status: 401 })
+  }
+
   const body = await req.arrayBuffer()
 
   const init: FetchInit = {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", authorization: `Bearer ${accessToken}` },
     body,
     cache: "no-store",
     dispatcher: triggerAgent,

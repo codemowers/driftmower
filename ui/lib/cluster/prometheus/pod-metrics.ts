@@ -13,10 +13,10 @@ export function podMetricQueries(namespace: string, pod: string) {
   const sel = `namespace="${namespace}",pod="${pod}"`
   const pvcInfo = `kube_pod_spec_volumes_persistentvolumeclaims_info{${sel}}`
   return {
-    memUsage: `sum(container_memory_working_set_bytes{${sel},container!=""})`,
+    memUsage: `sum by (pod)(container_memory_working_set_bytes{${sel},container!=""})`,
     memLimit: `sum(kube_pod_container_resource_limits{${sel},resource="memory"})`,
     memRequest: `sum(kube_pod_container_resource_requests{${sel},resource="memory"})`,
-    cpuUsage: `sum(rate(container_cpu_usage_seconds_total{${sel},container!=""}[5m]))`,
+    cpuUsage: `sum by (pod)(rate(container_cpu_usage_seconds_total{${sel},container!=""}[5m]))`,
     cpuLimit: `sum(kube_pod_container_resource_limits{${sel},resource="cpu"})`,
     cpuRequest: `sum(kube_pod_container_resource_requests{${sel},resource="cpu"})`,
     volUsed: `kubelet_volume_stats_used_bytes and on(namespace,persistentvolumeclaim) ${pvcInfo}`,

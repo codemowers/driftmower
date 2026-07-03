@@ -18,7 +18,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"
+import type { SessionClaims } from "@/lib/auth/session"
 import DriftmowerLogo from "./driftmower-logo"
+import NavUser from "./nav-user"
 
 type NavItem = {
   name: string
@@ -41,7 +43,7 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function NavBar() {
+export default function NavBar({ claims }: { claims: SessionClaims }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const { isConnected, clusterName, reportId } = useClusterState()
   const pathname = usePathname()
@@ -241,8 +243,7 @@ export default function NavBar() {
         )}
       </footer>
 
-
-
+      <NavUser claims={claims} isExpanded={isExpanded} />
     </div>
   )
 }
