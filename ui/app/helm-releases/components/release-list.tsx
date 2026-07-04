@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils/cn"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
 import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
-import { useContextHref } from "@/lib/hooks/use-context-href"
+import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import ReleaseFilters from "./release-filters"
 
 export type ReleaseEntry = {
@@ -29,11 +29,11 @@ function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
   return "text-status-minor-label"
 }
 
-function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: (path: string) => string }) {
+function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: LinkTo }) {
   const { releaseInfo, staleRepoCount, distinctRepoCount, totalContainers, totalWorkloadCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
   const showAppVersion = releaseInfo.chartAppVersion && releaseInfo.chartAppVersion !== releaseInfo.chartVersion
-  const href = linkTo(`/helm-releases/${releaseInfo.uid}`)
+  const href = linkTo(`/helm-releases/${releaseInfo.uid}`, { drop: ["htab"] })
 
   return (
     <Link

@@ -9,7 +9,7 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
 import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
-import { useContextHref } from "@/lib/hooks/use-context-href"
+import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
 
 export type WorkloadEntry = {
@@ -37,7 +37,7 @@ function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
 
 const GRID = "grid-cols-[95px_3fr_2fr_1fr_0.9fr_1fr]"
 
-function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; reportId: string | null; linkTo: (path: string) => string }) {
+function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; reportId: string | null; linkTo: LinkTo }) {
   const router = useRouter()
   const { uid, kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
@@ -54,7 +54,7 @@ function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; report
     }
   }
 
-  const href = linkTo(`/topmost-owners/${uid}`)
+  const href = linkTo(`/topmost-owners/${uid}`, { drop: ["wtab"] })
 
   return (
     <Link href={href} className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}>

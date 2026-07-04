@@ -22,7 +22,7 @@ type Props = {
 
 export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid }: Props) {
   const [active, setActive] = useTabParam("wtab", TABS)
-  const { suffix: contextQuery } = useContextHref()
+  const { linkTo, suffix: contextQuery } = useContextHref()
 
   return (
     <TabBar tabs={TABS} active={active} onSelect={setActive}>
@@ -30,10 +30,10 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
         <ImagesTab usages={usages} issues={issues} workloadUid={reportWorkloadUid} contextQuery={contextQuery} />
       )}
       {active === "Pods" && (
-        <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+        <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} linkTo={linkTo} />
       )}
       {active === "Descendants" && (
-        <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} contextQuery={contextQuery} />
+        <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} linkTo={linkTo} />
       )}
       {active === "Metadata" && (
         <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />

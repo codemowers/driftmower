@@ -166,7 +166,7 @@ export default function WorkloadDetailPage() {
           qosBreakdown={workloadMetrics?.qosBreakdown}
           podHref={podName => {
             const podRes = clusterResources?.find(r => r.kind === "Pod" && r.name === podName && r.namespace === namespace)
-            return podRes ? linkTo(`/topmost-owners/${uid}/${podRes.uid}`) : null
+            return podRes ? linkTo(`/topmost-owners/${uid}/${podRes.uid}`, { drop: ["ptab"] }) : null
           }}
         />
 
