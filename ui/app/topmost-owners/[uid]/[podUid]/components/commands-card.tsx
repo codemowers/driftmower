@@ -8,11 +8,12 @@ import CopyButton from "@/app/components/copy-button"
 type Props = {
   namespace: string
   name: string
+  ports?: { port: number; protocol: string }[]
 }
 
 type Command = { label: string; value: string }
 
-function buildCommands(namespace: string, name: string): Command[] {
+function buildInspectCommands(namespace: string, name: string): Command[] {
   return [
     { label: "get", value: `kubectl get pod -n ${namespace} ${name} -o yaml` },
     { label: "logs", value: `kubectl logs -n ${namespace} ${name}` },
@@ -20,10 +21,17 @@ function buildCommands(namespace: string, name: string): Command[] {
   ]
 }
 
+function buildForwardCommands(namespace: string, name: string, ports: number[]): Command[] {
+  return ports.map(port => ({
+    label: `forward ${port}`,
+    value: `kubectl port-forward -n ${namespace} ${name} ${port}:${port}`,
+  }))
+}
+
 function CommandRow({ label, value }: Command) {
   return (
     <div className="flex items-center gap-3 rounded-lg bg-gray-100 px-3 py-2">
-      <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="w-24 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-[12.5px] text-foreground">
@@ -34,9 +42,16 @@ function CommandRow({ label, value }: Command) {
   )
 }
 
-export default function CommandsCard({ namespace, name }: Props) {
+export default function CommandsCard({ namespace, name, ports }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const commands = buildCommands(namespace, name)
+  const tcpPorts = [...new Set((ports ?? []).filter(p => p.protocol === "TCP").map(p => p.port))]
+    .sort((a, b) => a - b)
+
+  const inspect = buildInspectCommands(namespace, name)
+  const forward = buildForwardCommands(namespace, name, tcpPorts)
+
+  const summaryParts = ["inspect", "logs", "events"]
+  if (forward.length) summaryParts.push("forward")
 
   return (
     <div>
@@ -55,7 +70,9 @@ export default function CommandsCard({ namespace, name }: Props) {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-foreground">kubectl</span>
-            <span className="block font-mono text-xs text-muted-foreground">inspect, logs, events</span>
+            <span className="block font-mono text-xs text-muted-foreground">
+              {summaryParts.join(", ")}
+            </span>
           </span>
           <ChevronRight
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -65,10 +82,18 @@ export default function CommandsCard({ namespace, name }: Props) {
         {expanded && (
           <div className="border-t border-gray-200 px-5 pb-4 pt-3">
             <div className="flex flex-col gap-2.5">
-              {commands.map(c => (
+              {inspect.map(c => (
                 <CommandRow key={c.label} {...c} />
               ))}
             </div>
+
+            {forward.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2.5 border-t border-gray-200 pt-3">
+                {forward.map(c => (
+                  <CommandRow key={c.label} {...c} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

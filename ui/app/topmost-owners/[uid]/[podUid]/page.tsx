@@ -140,7 +140,7 @@ export default function PodDetailPage() {
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
-            <CommandsCard namespace={pod.namespace} name={pod.name} />
+            <CommandsCard namespace={pod.namespace} name={pod.name} ports={pod.declaredPorts} />
           </div>
           <div className="md:col-span-2">
             <NetworkCard

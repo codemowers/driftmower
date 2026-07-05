@@ -18,6 +18,7 @@ export type ClusterResource = {
   managerUID?: string
   argoApp?: { name: string; url?: string; kind?: string; resourceRef?: string }
   ips?: string[]
+  declaredPorts?: { container: string; name?: string; port: number; protocol: string }[]
   nodeName?: string
   phase?: string
   podStatus?: { display: string; ready: boolean; restarts: number }

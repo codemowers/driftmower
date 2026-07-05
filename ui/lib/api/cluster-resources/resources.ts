@@ -5,6 +5,12 @@ import { derivePodStatus, type ContainerStatus } from "./pod-status"
 
 type OwnerRef = { apiVersion: string; kind: string; name: string; uid: string }
 
+type RawContainer = {
+  name: string
+  restartPolicy?: string
+  ports?: { containerPort: number; name?: string; protocol?: string }[]
+}
+
 type RawObject = {
   metadata: {
     uid: string
@@ -15,7 +21,11 @@ type RawObject = {
     ownerReferences?: OwnerRef[]
     deletionTimestamp?: string
   }
-  spec?: { nodeName?: string }
+  spec?: {
+    nodeName?: string
+    containers?: RawContainer[]
+    initContainers?: RawContainer[]
+  }
   status?: {
     phase?: string
     reason?: string
@@ -105,12 +115,27 @@ function toClusterResource(
     const ips = obj.status?.podIPs?.map(entry => entry.ip).filter(Boolean)
       ?? (obj.status?.podIP ? [obj.status.podIP] : [])
     if (ips.length) resource.ips = ips
+    const declaredPorts = declaredPodPorts(obj.spec)
+    if (declaredPorts.length) resource.declaredPorts = declaredPorts
     if (obj.spec?.nodeName) resource.nodeName = obj.spec.nodeName
     if (obj.status?.phase) resource.phase = obj.status.phase
     resource.podStatus = derivePodStatus(meta.deletionTimestamp, obj.status)
   }
 
   return resource
+}
+
+function declaredPodPorts(spec: RawObject["spec"]) {
+  const sidecars = spec?.initContainers?.filter(c => c.restartPolicy === "Always") ?? []
+  const containers = [...(spec?.containers ?? []), ...sidecars]
+  return containers.flatMap(container =>
+    (container.ports ?? []).map(port => ({
+      container: container.name,
+      ...(port.name ? { name: port.name } : {}),
+      port: port.containerPort,
+      protocol: port.protocol ?? "TCP",
+    })),
+  )
 }
 
 function addCrdStubs(resources: ClusterResource[], raws: { obj: RawObject }[]): void {
