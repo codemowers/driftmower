@@ -10,6 +10,7 @@ const DISCONNECTED_FETCH_INTERVAL = 5000
 
 export function startLiveDataFetching(): () => void {
   let cancelled = false
+  let lastResourcesFetch = 0
 
   async function loop() {
     while (!cancelled) {
@@ -18,6 +19,9 @@ export function startLiveDataFetching(): () => void {
       } catch {}
 
       const { isConnected } = useClusterState.getState()
+
+      const shouldFetchResources = Date.now() - lastResourcesFetch >= CONNECTED_FETCH_INTERVAL
+      if (shouldFetchResources) lastResourcesFetch = Date.now()
 
       await Promise.all([
         fetchClusterAlerts()
@@ -29,11 +33,13 @@ export function startLiveDataFetching(): () => void {
         fetchNodeStorage()
           .then(data => { if (!cancelled) useClusterState.setState({ nodeStorage: data }) })
           .catch(() => {}),
-        ...(isConnected ? [
+        ...(shouldFetchResources ? [
           fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })
             .then(res => res.json())
             .then(data => { if (!cancelled) useClusterState.setState({ clusterResources: data }) })
             .catch(() => {}),
+        ] : []),
+        ...(isConnected ? [
           fetch(CLUSTER_NODES_URL, { cache: "no-store" })
             .then(res => res.json())
             .then(data => { if (!cancelled) useClusterState.setState({ nodeDrift: data }) })

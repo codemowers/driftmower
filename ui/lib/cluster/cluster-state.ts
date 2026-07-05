@@ -20,6 +20,7 @@ export type ClusterResource = {
   ips?: string[]
   nodeName?: string
   phase?: string
+  podStatus?: { display: string; ready: boolean; restarts: number }
 }
 
 export type ClusterState = {

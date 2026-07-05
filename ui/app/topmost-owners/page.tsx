@@ -1,11 +1,19 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, startTransition, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
-import WorkloadList, { type WorkloadEntry } from "./components/workload-list"
+import WorkloadList from "./components/workload-list"
+import FocusSelect from "./components/focus-select"
+import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./focus"
+import type { FocusKey, WorkloadEntry } from "./focus/types"
+import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "./utils/pod-summary"
+import { liveWorkloadEntries } from "./utils/live-entries"
+import { reportWorkloadRoots } from "./utils/report-roots"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { parseFilterTokens } from "@/lib/utils/filter-params"
 import type { StatusType } from "@/lib/cluster/reports"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -18,21 +26,52 @@ const SEVERITY_ORDER: Record<StatusType, number> = {
   no_version:   -1,
 }
 
-const DISPLAY_ORDER: Record<StatusType, number> = {
-  major_behind: 0,
-  minor_behind: 1,
-  patch_behind: 2,
-  up_to_date:   3,
-  ahead:        4,
-  no_data:      5,
-  no_version:   5,
-}
-
 const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 
 export default function TopmostOwnersPage() {
+  return (
+    <Suspense>
+      <TopmostOwnersContent />
+    </Suspense>
+  )
+}
+
+function TopmostOwnersContent() {
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const isLoading = useClusterState(s => s.isLoading)
+  const isFetchingReport = useClusterState(s => s.isFetchingReport)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [storedFocus, setStoredFocus] = useState<string | null>(null)
+  useEffect(() => {
+    const stored = localStorage.getItem(FOCUS_STORAGE_KEY)
+    if (stored) startTransition(() => setStoredFocus(stored))
+  }, [])
+
+  const focusKey = resolveFocusKey(searchParams.get("focus"), storedFocus)
+  const focus = FOCUSES[focusKey]
+
+  function handleFocusChange(key: FocusKey) {
+    if (key === focusKey) return
+    localStorage.setItem(FOCUS_STORAGE_KEY, key)
+    setStoredFocus(key)
+
+    const params = new URLSearchParams(searchParams.toString())
+    if (key === DEFAULT_FOCUS) params.delete("focus")
+    else params.set("focus", key)
+
+    const previousTokens = new Set(focus.scale.map(l => l.token))
+    const keptFilters = [...parseFilterTokens(params.get("filters"))].filter(t => !previousTokens.has(t))
+    if (keptFilters.length) params.set("filters", keptFilters.join(","))
+    else params.delete("filters")
+
+    const next = params.toString()
+    router.replace(next ? `?${next}` : window.location.pathname)
+  }
+
+  const podSummaries = useMemo(() => summarizePodsByRoot(clusterResources), [clusterResources])
 
   const releaseUidByGroupKey = new Map<string, string>()
   if (data) {
@@ -41,22 +80,17 @@ export default function TopmostOwnersPage() {
     }
   }
 
-  const workloads: WorkloadEntry[] = data
-    ? Object.entries(data.report.workloadGroupMap)
-        .filter(([key]) => key !== "unknown")
-        .map(([key, usages]): WorkloadEntry | null => {
-          const parts = key.split("/")
-          if (parts.length < 3) return null
-          const [kind, namespace, name] = parts
+  const resolvedLiveUids = new Set<string>()
 
-          const uid = usages[0]?.workloadRootInfo?.uid
-          if (!uid) return null
-
+  const reportEntries: WorkloadEntry[] = reportWorkloadRoots(data)
+    .map(({ groupKey, kind, namespace, name, uid, usages }): WorkloadEntry => {
           const ri = usages[0]?.releaseInfo
           const releaseUid = ri ? releaseUidByGroupKey.get(ri.groupKey) : undefined
-          const argoApp = usages[0]?.workloadRootInfo
-            ? findWorkloadRoot(clusterResources, usages[0].workloadRootInfo)?.argoApp
+          const liveRoot = usages[0]?.workloadRootInfo
+            ? findWorkloadRoot(clusterResources, usages[0].workloadRootInfo)
             : undefined
+          if (liveRoot) resolvedLiveUids.add(liveRoot.uid)
+          const argoApp = liveRoot?.argoApp
           const manager: WorkloadEntry["manager"] =
             ri?.managementKind === "helm" && releaseUid
               ? { kind: "helm", name: ri.name, uid: releaseUid }
@@ -81,36 +115,45 @@ export default function TopmostOwnersPage() {
             return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
           }, "no_data")
 
-          const issueCount = data.issues.filter(i =>
+          const issueCount = (data?.issues ?? []).filter(i =>
             usages.some(u => u.image.includes(i.image))
           ).length
 
+          const pods = liveRoot
+            ? podSummaries.get(liveRoot.uid) ?? EMPTY_POD_SUMMARY
+            : undefined
+
           return {
-            groupKey: key,
+            groupKey,
             uid,
             kind,
             name,
             namespace,
             manager,
-            containerCount: usages.length,
-            staleRepoCount,
-            distinctRepoCount,
             worstStatus,
             issueCount,
+            inReport: true,
+            drift: {
+              containerCount: usages.length,
+              staleRepoCount,
+              distinctRepoCount,
+            },
+            pods,
           }
         })
-        .filter((w): w is WorkloadEntry => w !== null)
-        .sort((a, b) => DISPLAY_ORDER[a.worstStatus] - DISPLAY_ORDER[b.worstStatus])
+
+  const reportSettled = data !== null || (!isLoading && !isFetchingReport)
+  const excludeUids = new Set(resolvedLiveUids)
+  const excludeGroupKeys = new Set<string>()
+  for (const entry of reportEntries) {
+    excludeUids.add(entry.uid)
+    excludeGroupKeys.add(entry.groupKey)
+  }
+  const liveEntries = reportSettled
+    ? liveWorkloadEntries(clusterResources, podSummaries, excludeUids, excludeGroupKeys)
     : []
 
-  const totalContainers = workloads.reduce((s, w) => s + w.containerCount, 0)
-
-  const statusCounts = Object.fromEntries(
-    (["up_to_date", "patch_behind", "minor_behind", "major_behind"] as StatusType[])
-      .map(s => [s, workloads.filter(w => w.worstStatus === s).length])
-  ) as Partial<Record<StatusType, number>>
-
-  const noDataCount = workloads.filter(w => w.worstStatus === "no_data" || w.worstStatus === "no_version").length
+  const workloads = [...reportEntries, ...liveEntries]
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -119,14 +162,11 @@ export default function TopmostOwnersPage() {
         <StatusSummaryBar
           totalLabel="workloads"
           totalCount={workloads.length}
-          secondaryLabel="containers"
-          secondaryCount={totalContainers}
-          statusCounts={statusCounts}
-          noDataCount={noDataCount}
+          secondary={focus.secondary(workloads)}
+          pills={focus.pills(workloads)}
+          leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
-        <Suspense>
-          <WorkloadList entries={workloads} />
-        </Suspense>
+        <WorkloadList entries={workloads} focus={focus} />
       </main>
     </div>
   )

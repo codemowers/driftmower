@@ -121,7 +121,7 @@ export default function PodDetailPage() {
         />
 
         <PodStats
-          phase={pod.phase ?? "Unknown"}
+          pod={pod}
           nodeName={nodeLabel}
           totalContainers={totalContainers}
           staleContainerCount={staleContainerCount}

@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { classifyPod, podStateLabel, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
 import {
   StatGrid,
   StatCell,
@@ -10,7 +12,7 @@ import {
 } from "@/app/components/stats-card"
 
 type Props = {
-  phase: string
+  pod: ClusterResource
   nodeName: string
   totalContainers: number
   staleContainerCount: number
@@ -19,16 +21,8 @@ type Props = {
   normalizedScore: number
 }
 
-const PHASE_DOT: Record<string, string> = {
-  Running:   "bg-status-ok",
-  Pending:   "bg-status-patch",
-  Failed:    "bg-status-major",
-  Unknown:   "bg-status-major",
-  Succeeded: "bg-gray-400",
-}
-
 export default function PodStats({
-  phase,
+  pod,
   nodeName,
   totalContainers,
   staleContainerCount,
@@ -43,17 +37,24 @@ export default function PodStats({
         ? "all up to date"
         : `${staleContainerCount} stale`
 
+  const severity = classifyPod(pod)
+  const display = podStateLabel(severity, pod.podStatus?.display ?? pod.phase)
+  const restarts = pod.podStatus?.restarts ?? 0
+  const statusCaption = restarts > 0
+    ? `${restarts} ${restarts === 1 ? "restart" : "restarts"} · ${nodeName}`
+    : nodeName
+
   return (
     <StatGrid>
       <DriftScoreCell worstStatus={worstStatus} normalizedScore={normalizedScore} />
 
-      <StatCell label="Phase">
+      <StatCell label="State">
         <div className="flex items-center gap-2 mt-0.5">
-          <span className={cn("size-2 rounded-full", PHASE_DOT[phase] ?? "bg-gray-400")} />
-          <p className="text-xl font-semibold text-foreground">{phase}</p>
+          <span className={cn("size-2 rounded-full", POD_SEVERITY_STYLE[severity].solid)} />
+          <p className="text-xl font-semibold text-foreground">{display}</p>
         </div>
-        <p className="font-mono text-xs text-muted-foreground truncate" title={nodeName}>
-          {nodeName}
+        <p className="font-mono text-xs text-muted-foreground truncate" title={statusCaption}>
+          {statusCaption}
         </p>
       </StatCell>
 

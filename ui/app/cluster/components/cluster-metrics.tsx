@@ -1,8 +1,10 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes } from "@/lib/utils/format-bytes"
-import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
+import { classifyPod } from "@/lib/cluster/pod-status-style"
 import type { ClusterMetrics } from "@/lib/cluster/prometheus/metrics"
 
 type Memory = NonNullable<ClusterMetrics["memory"]>
@@ -74,12 +76,39 @@ function MemoryBar({ memory }: { memory: Memory }) {
   )
 }
 
+type PodStats = { total: number; healthy: number; failed: number; unknown: number; pending: number }
+
+function countPods(resources: ClusterResource[] | null): PodStats | null {
+  if (!resources) return null
+  const stats: PodStats = { total: 0, healthy: 0, failed: 0, unknown: 0, pending: 0 }
+  for (const resource of resources) {
+    if (resource.kind !== "Pod") continue
+    stats.total++
+    const severity = classifyPod(resource)
+    if (severity !== "succeeded") stats[severity]++
+  }
+  return stats
+}
+
+const ATTENTION_SEVERITIES = ["failed", "unknown", "pending"] as const
+
+function attentionLabel(stats: PodStats): ReactNode {
+  const parts = ATTENTION_SEVERITIES
+    .filter(severity => stats[severity] > 0)
+    .map(severity => `${stats[severity]} ${severity}`)
+  if (parts.length === 0) return <span className="text-muted-foreground">none</span>
+  return parts.join(" · ")
+}
+
 export default function ClusterMetrics({ matchHeight }: { matchHeight?: number | null }) {
   const metrics = useClusterState(s => s.clusterMetrics)
+  const clusterResources = useClusterState(s => s.clusterResources)
 
-  if (!metrics || (metrics.storage === null && metrics.memory === null && metrics.pods === null && metrics.cpuLoad === null)) return null
+  const podStats = countPods(clusterResources)
+  const metricsEmpty = !metrics || (metrics.storage === null && metrics.memory === null && metrics.cpuLoad === null)
+  if (metricsEmpty && !podStats) return null
 
-  const hasStats = metrics.pods !== null || metrics.cpuLoad !== null
+  const hasStats = podStats !== null || (metrics?.cpuLoad ?? null) !== null
 
   return (
     <div
@@ -93,7 +122,7 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
       </header>
 
       <div className="flex flex-col gap-4 px-5 py-4">
-        {metrics.storage && (
+        {metrics?.storage && (
           <UsageBar
             label="LVM Storage"
             value={metrics.storage.used}
@@ -102,16 +131,16 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
             totalLabel={formatBytes(metrics.storage.total)}
           />
         )}
-        {metrics.memory && <MemoryBar memory={metrics.memory} />}
+        {metrics?.memory && <MemoryBar memory={metrics.memory} />}
         {hasStats && (
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
-            {metrics.pods && (
+            {podStats && (
               <>
-                <StatRow label="Pending pods" value={String(metrics.pods.pending)} />
-                <StatRow label="Running pods" value={`${metrics.pods.running} / ${metrics.pods.total}`} />
+                <StatRow label="Pods" value={`${podStats.healthy} healthy / ${podStats.total}`} />
+                <StatRow label="Attention" value={attentionLabel(podStats)} />
               </>
             )}
-            {metrics.cpuLoad !== null && (
+            {metrics && metrics.cpuLoad !== null && (
               <StatRow label="CPU load avg" value={`${metrics.cpuLoad.toFixed(2)} / core`} />
             )}
           </div>
@@ -121,7 +150,7 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
   )
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between">
       <span className="text-xs text-muted-foreground">{label}</span>

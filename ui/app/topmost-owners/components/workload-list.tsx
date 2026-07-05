@@ -5,49 +5,41 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
-import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
+import type { FocusDefinition, WorkloadEntry } from "../focus/types"
 
-export type WorkloadEntry = {
-  groupKey: string
-  uid: string
-  kind: string
-  name: string
-  namespace: string
-  manager:
-    | { kind: "helm"; name: string; uid: string }
-    | { kind: "argo"; name: string; url?: string }
-    | { kind: "standalone" }
-  containerCount: number
-  staleRepoCount: number
-  distinctRepoCount: number
-  worstStatus: StatusType
-  issueCount: number
+export type { WorkloadEntry } from "../focus/types"
+
+function isFinished(e: WorkloadEntry): boolean {
+  if (e.kind !== "Job") return false
+  if (!e.pods || e.pods.total === 0) return true
+  return e.pods.worst.severity === "succeeded"
 }
 
-function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
-  if (staleRepoCount === 0) return "text-muted-foreground"
-  if (staleRepoCount === distinctRepoCount) return "text-status-major-label"
-  return "text-status-minor-label"
-}
-
-const GRID = "grid-cols-[95px_3fr_2fr_1fr_0.9fr_1fr]"
-
-function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; reportId: string | null; linkTo: LinkTo }) {
+function WorkloadRow({
+  entry,
+  focus,
+  reportId,
+  linkTo,
+}: {
+  entry: WorkloadEntry
+  focus: FocusDefinition
+  reportId: string | null
+  linkTo: LinkTo
+}) {
   const router = useRouter()
-  const { uid, kind, name, namespace, manager, containerCount, staleRepoCount, distinctRepoCount, worstStatus, issueCount } = entry
-  const style = SEVERITY_STYLE[worstStatus]
+  const { uid, kind, name, namespace, manager, issueCount } = entry
 
-  const managerLinkable = manager.kind === "helm" || (manager.kind === "argo" && !!manager.url)
+  const managerLinkable = (manager.kind === "helm" && !!manager.uid) || (manager.kind === "argo" && !!manager.url)
 
   function openManager(e: React.MouseEvent | React.KeyboardEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (manager.kind === "helm") {
+    if (manager.kind === "helm" && manager.uid) {
       router.push(reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
     } else if (manager.kind === "argo" && manager.url) {
       window.open(manager.url, "_blank", "noopener")
@@ -56,8 +48,8 @@ function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; report
 
   const href = linkTo(`/topmost-owners/${uid}`, { drop: ["wtab"] })
 
-  return (
-    <Link href={href} className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}>
+  const cells = (
+    <>
       {/* Kind */}
       <div className="self-start text-right">
         <span className="rounded-md bg-brand-bg px-2.5 py-1 text-xs font-semibold text-brand-label">
@@ -99,50 +91,59 @@ function WorkloadRow({ entry, reportId, linkTo }: { entry: WorkloadEntry; report
         )}
       </div>
 
-      {/* Contents */}
-      <div>
-        <span className="text-sm tabular-nums text-foreground">{containerCount} {containerCount === 1 ? "container" : "containers"}</span>
-      </div>
+      {focus.renderCells(entry)}
+    </>
+  )
 
-      {/* Stale repos */}
-      <div>
-        <span className={cn("text-sm tabular-nums font-medium", staleColor(staleRepoCount, distinctRepoCount))}>
-          {staleRepoCount}/{distinctRepoCount}
-        </span>
-      </div>
+  const rowClass = cn("grid items-center gap-4 pl-6 pr-4 py-4", focus.gridCols)
 
-      {/* Drift */}
-      <div className="flex items-center">
-        {style ? (
-          <span className={cn("text-center rounded-md px-3 py-1.5 text-xs font-semibold", style.bg, style.text)}>
-            {style.label}
-          </span>
-        ) : (
-          <span className="text-center rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-            No data
-          </span>
-        )}
-      </div>
+  if (!entry.inReport) {
+    return (
+      <Tooltip delayDuration={500}>
+        <TooltipTrigger asChild>
+          <div className={cn(rowClass, "bg-gray-50/60")}>
+            {cells}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          Not in the latest report. Shown live from the cluster. A refresh may include it.
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return (
+    <Link href={href} className={cn(rowClass, "hover:bg-brand-bg/40 transition-colors")}>
+      {cells}
     </Link>
   )
 }
 
-export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) {
+export default function WorkloadList({ entries, focus }: { entries: WorkloadEntry[]; focus: FocusDefinition }) {
   const reportId = useClusterState(s => s.reportId)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { linkTo } = useContextHref()
   const initialTokens = parseFilterTokens(searchParams.get("filters"))
-  const [activeStatuses, setActiveStatuses] = useState<Set<StatusType>>(() => statusesFromTokens(initialTokens))
+  const [activeTokens, setActiveTokens] = useState<Set<string>>(
+    () => new Set([...initialTokens].filter(t => focus.scale.some(l => l.token === t))),
+  )
   const [showIssuesOnly, setShowIssuesOnly] = useState(() => initialTokens.has("issues"))
   const [showFinished, setShowFinished] = useState(() => initialTokens.has("showfinished"))
   const [hideHelmManaged, setHideHelmManaged] = useState(() => initialTokens.has("hidehelm"))
   const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
 
+  const [prevFocusKey, setPrevFocusKey] = useState(focus.key)
+  if (prevFocusKey !== focus.key) {
+    setPrevFocusKey(focus.key)
+    const valid = new Set(focus.scale.map(l => l.token))
+    setActiveTokens(prev => new Set([...prev].filter(t => valid.has(t))))
+  }
+
   useEffect(() => {
     const filters = [
-      ...statusTokens(activeStatuses),
+      ...focus.scale.filter(l => activeTokens.has(l.token)).map(l => l.token),
       ...(showIssuesOnly ? ["issues"] : []),
       ...(showFinished ? ["showfinished"] : []),
       ...(hideHelmManaged ? ["hidehelm"] : []),
@@ -157,19 +158,19 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
     if (next !== searchParams.toString()) {
       router.replace(next ? `?${next}` : window.location.pathname)
     }
-  }, [activeStatuses, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router])
+  }, [activeTokens, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
 
-  function handleStatusToggle(status: StatusType) {
-    setActiveStatuses(prev => {
+  function handleTokenToggle(token: string) {
+    setActiveTokens(prev => {
       const next = new Set(prev)
-      if (next.has(status)) next.delete(status)
-      else next.add(status)
+      if (next.has(token)) next.delete(token)
+      else next.add(token)
       return next
     })
   }
 
   function handleReset() {
-    setActiveStatuses(new Set())
+    setActiveTokens(new Set())
     setShowIssuesOnly(false)
     setShowFinished(false)
     setHideHelmManaged(false)
@@ -178,24 +179,23 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
   }
 
   const counts = useMemo(() => ({
-    finished: entries.filter(e => e.kind === "Job").length,
+    finished: entries.filter(isFinished).length,
     helm: entries.filter(e => e.manager.kind === "helm").length,
     argo: entries.filter(e => e.manager.kind === "argo").length,
     issues: entries.filter(e => e.issueCount > 0).length,
   }), [entries])
 
   const isModified =
-    activeStatuses.size > 0 || searchQuery !== "" || showIssuesOnly || showFinished || hideHelmManaged || hideArgoManaged
+    activeTokens.size > 0 || searchQuery !== "" || showIssuesOnly || showFinished || hideHelmManaged || hideArgoManaged
 
+  const sortedEntries = useMemo(() => [...entries].sort(focus.compare), [entries, focus])
+
+  const activeScale = focus.scale.filter(l => activeTokens.has(l.token))
   const q = searchQuery.toLowerCase()
-  const filteredEntries = entries
-    .filter(e => {
-      if (activeStatuses.size === 0) return true
-      if (activeStatuses.has("no_data") && (e.worstStatus === "no_data" || e.worstStatus === "no_version")) return true
-      return activeStatuses.has(e.worstStatus)
-    })
+  const filteredEntries = sortedEntries
+    .filter(e => activeScale.length === 0 || activeScale.some(l => l.match(e)))
     .filter(e => !showIssuesOnly || e.issueCount > 0)
-    .filter(e => showFinished || e.kind !== "Job")
+    .filter(e => showFinished || !isFinished(e))
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
     .filter(e =>
@@ -213,8 +213,9 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
         isModified={isModified}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        activeStatuses={activeStatuses}
-        onStatusToggle={handleStatusToggle}
+        chips={focus.scale}
+        activeTokens={activeTokens}
+        onTokenToggle={handleTokenToggle}
         showIssuesOnly={showIssuesOnly}
         onIssuesToggle={() => setShowIssuesOnly(v => !v)}
         showFinished={showFinished}
@@ -226,18 +227,18 @@ export default function WorkloadList({ entries }: { entries: WorkloadEntry[] }) 
         counts={counts}
         onReset={handleReset}
       />
-      <header className={cn("grid gap-4 border-b border-gray-100 pl-6 pr-4 py-4", GRID)}>
+      <header className={cn("grid gap-4 border-b border-gray-100 pl-6 pr-4 py-4", focus.gridCols)}>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Kind</p>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workload</p>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Manager</p>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contents</p>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stale repos</p>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Drift</p>
+        {focus.headers.map(header => (
+          <p key={header} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{header}</p>
+        ))}
       </header>
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <WorkloadRow key={entry.groupKey} entry={entry} reportId={reportId} linkTo={linkTo} />
+            <WorkloadRow key={entry.groupKey} entry={entry} focus={focus} reportId={reportId} linkTo={linkTo} />
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No workloads match your filters</p>

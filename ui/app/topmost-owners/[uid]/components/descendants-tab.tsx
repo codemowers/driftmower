@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
 
 type Props = {
@@ -8,14 +9,6 @@ type Props = {
   reportWorkloadUid: string
   liveWorkloadUid: string
   linkTo: LinkTo
-}
-
-const PHASE_DOT: Record<string, string> = {
-  Running:   "bg-status-ok",
-  Pending:   "bg-status-patch",
-  Failed:    "bg-status-major",
-  Unknown:   "bg-status-major",
-  Succeeded: "bg-gray-400",
 }
 
 type TreeRow = {
@@ -101,7 +94,7 @@ export default function DescendantsTab({ clusterResources, reportWorkloadUid, li
               )}
 
               {isPod && (
-                <span className={cn("size-2.5 shrink-0 rounded-full", PHASE_DOT[r.phase ?? ""] ?? "bg-gray-400")} />
+                <span className={cn("size-2.5 shrink-0 rounded-full", POD_SEVERITY_STYLE[classifyPod(r)].solid)} />
               )}
 
               {isRoot ? (

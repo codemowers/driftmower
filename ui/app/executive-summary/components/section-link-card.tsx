@@ -6,6 +6,7 @@ export type SectionLinkCardProps = {
   href: string
   title: string
   count: number
+  total?: number
   countEntity: string
   hint: string
   icon: LucideIcon
@@ -15,6 +16,7 @@ export default function SectionLinkCard({
   href,
   title,
   count,
+  total,
   countEntity,
   hint,
   icon: Icon,
@@ -34,7 +36,7 @@ export default function SectionLinkCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-brand-text">{title}</p>
           <p className="font-mono text-sm tabular-nums text-foreground">
-            {count} {countEntity} tracked
+            {total !== undefined && total > count ? `${count} of ${total}` : count} {countEntity} tracked
           </p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>

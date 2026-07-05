@@ -3,13 +3,41 @@
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
+import { statusTokens, statusesFromTokens } from "@/lib/utils/filter-params"
 import {
   FilterSearchInput,
-  StatusChips,
+  FilterChips,
   FilterFooter,
   FILTER_ACTIVE,
   FILTER_INACTIVE,
 } from "@/app/components/filter-bar"
+
+const DRIFT_CHIPS: { token: string; label: string }[] = [
+  { token: "ok",     label: "OK" },
+  { token: "patch",  label: "Patch" },
+  { token: "minor",  label: "Minor" },
+  { token: "major",  label: "Major" },
+  { token: "nodata", label: "No data" },
+]
+
+function StatusChips({
+  activeStatuses,
+  onToggle,
+}: {
+  activeStatuses: Set<StatusType>
+  onToggle: (status: StatusType) => void
+}) {
+  return (
+    <FilterChips
+      chips={DRIFT_CHIPS}
+      active={new Set(statusTokens(activeStatuses))}
+      onToggle={token => {
+        const [status] = statusesFromTokens(new Set([token]))
+        if (status) onToggle(status)
+      }}
+    />
+  )
+}
 
 type Props = {
   total: number

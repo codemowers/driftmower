@@ -5,6 +5,7 @@ import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import ReleaseList, { type ReleaseEntry } from "./components/release-list"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { driftSummaryPills } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 const SEVERITY_ORDER: Record<StatusType, number> = {
@@ -72,10 +73,8 @@ export default function HelmReleasesPage() {
         <StatusSummaryBar
           totalLabel="releases"
           totalCount={entries.length}
-          secondaryLabel="containers"
-          secondaryCount={totalContainers}
-          statusCounts={statusCounts}
-          noDataCount={noDataCount}
+          secondary={{ label: "containers", count: totalContainers }}
+          pills={driftSummaryPills(statusCounts, noDataCount)}
         />
         <Suspense>
           <ReleaseList entries={entries} />

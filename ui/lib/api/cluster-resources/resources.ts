@@ -1,5 +1,7 @@
 import { isInCluster, kubeApiGet } from "../k8s"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { managerFromAnnotations, type ManagerInfo } from "./manager"
+import { derivePodStatus, type ContainerStatus } from "./pod-status"
 
 type OwnerRef = { apiVersion: string; kind: string; name: string; uid: string }
 
@@ -11,9 +13,17 @@ type RawObject = {
     labels?: Record<string, string>
     annotations?: Record<string, string>
     ownerReferences?: OwnerRef[]
+    deletionTimestamp?: string
   }
   spec?: { nodeName?: string }
-  status?: { phase?: string; podIP?: string; podIPs?: { ip: string }[] }
+  status?: {
+    phase?: string
+    reason?: string
+    podIP?: string
+    podIPs?: { ip: string }[]
+    containerStatuses?: ContainerStatus[]
+    initContainerStatuses?: ContainerStatus[]
+  }
 }
 
 type KubeList = { items: RawObject[] }
@@ -25,8 +35,6 @@ const SOURCES = [
   { path: "/apis/apps/v1/statefulsets", kind: "StatefulSet", apiGroup: "apps/v1" },
   { path: "/apis/apps/v1/daemonsets", kind: "DaemonSet", apiGroup: "apps/v1" },
 ] as const
-
-type ManagerInfo = { managerUID: string; argoApp?: { name: string; url?: string; kind?: string; resourceRef?: string } }
 
 export async function getClusterResources(): Promise<ClusterResource[]> {
   if (!isInCluster()) {
@@ -70,46 +78,6 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
   return resources
 }
 
-function managerFromAnnotations(
-  annotations: Record<string, string> | undefined,
-  argoUrl: string | undefined,
-): ManagerInfo | undefined {
-  if (!annotations) return undefined
-
-  const releaseName = annotations["meta.helm.sh/release-name"]
-  const releaseNamespace = annotations["meta.helm.sh/release-namespace"]
-  if (releaseName && releaseNamespace) {
-    return { managerUID: `helm-release:${releaseNamespace}:${releaseName}` }
-  }
-
-  const trackingId = annotations["argocd.argoproj.io/tracking-id"]
-  if (trackingId) {
-    const parts = trackingId.split(":")
-    const appName = parts[0]
-    if (appName) {
-      const managerUID = `argo-app:argocd:${appName}`
-      const argoApp: { name: string; url?: string; kind?: string; resourceRef?: string } = {
-        name: appName,
-      }
-      if (parts.length >= 3) {
-        argoApp.kind = parts[1].split("/").pop()
-        argoApp.resourceRef = parts[2]
-      }
-      if (argoUrl) argoApp.url = buildArgoUrl(parts, argoUrl)
-      return { managerUID, argoApp }
-    }
-  }
-
-  return undefined
-}
-
-function buildArgoUrl(parts: string[], argoUrl: string): string {
-  const appUrl = `${argoUrl}/applications/argocd/${parts[0]}`
-  if (parts.length < 3) return appUrl
-  const node = encodeURIComponent(`${parts.slice(1).join("/")}/0`)
-  return `${appUrl}?view=tree&orphaned=false&resource=&node=${node}`
-}
-
 function toClusterResource(
   obj: RawObject,
   kind: string,
@@ -139,6 +107,7 @@ function toClusterResource(
     if (ips.length) resource.ips = ips
     if (obj.spec?.nodeName) resource.nodeName = obj.spec.nodeName
     if (obj.status?.phase) resource.phase = obj.status.phase
+    resource.podStatus = derivePodStatus(meta.deletionTimestamp, obj.status)
   }
 
   return resource

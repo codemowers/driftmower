@@ -2,20 +2,13 @@ import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 
 type Props = {
   usages: ImageUsage[]
   clusterResources: ClusterResource[] | null
   reportId: string | null
-}
-
-const PHASE_DOT: Record<string, string> = {
-  Running:   "bg-status-ok",
-  Pending:   "bg-status-patch",
-  Failed:    "bg-status-major",
-  Unknown:   "bg-status-major",
-  Succeeded: "bg-gray-400",
 }
 
 export default function ResourcesTab({ usages, clusterResources, reportId }: Props) {
@@ -74,7 +67,7 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
                       idx > 0 && "border-t border-gray-100",
                     )}
                   >
-                    <span className={cn("w-2 h-2 rounded-full shrink-0", PHASE_DOT[pod.phase ?? ""] ?? "bg-gray-400")} />
+                    <span className={cn("w-2 h-2 rounded-full shrink-0", POD_SEVERITY_STYLE[classifyPod(pod)].solid)} />
                     <span className="truncate font-mono text-sm text-foreground">{pod.name}</span>
                     <span className="font-mono text-xs text-muted-foreground">{pod.nodeName ?? "—"}</span>
                     <span className="font-mono text-xs text-muted-foreground">{pod.ips?.[0] ?? "—"}</span>

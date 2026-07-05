@@ -12,6 +12,7 @@ import PageHeader from "../components/page-header";
 import { cn } from "@/lib/utils/cn";
 import { Boxes, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
+import { countTopmostOwners } from "@/app/topmost-owners/utils/owner-counts";
 
 function rottennessValueTone(score: number): StatValueTone {
   if (score < 0.15) return "ok"
@@ -44,7 +45,7 @@ function groupByWorkload(usages: ImageUsage[]): Map<string, ImageUsage[]> {
 const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 2, patch_behind: 1 }
 
 export default function ExecutiveSummaryPage() {
-  const { data, reportId } = useClusterState();
+  const { data, reportId, clusterResources } = useClusterState();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = rottennessValueTone(rottennessScore)
@@ -52,7 +53,7 @@ export default function ExecutiveSummaryPage() {
   const usages = data?.report.imageUsages ?? []
 
   const workloadMap = groupByWorkload(usages)
-  const topmostOwnerCount = workloadMap.size
+  const owners = countTopmostOwners(data, clusterResources)
   const helmReleaseCount = new Set(
     usages.flatMap(u => u.releaseInfo?.managementKind === "helm" ? [u.releaseInfo.groupKey] : [])
   ).size
@@ -130,7 +131,8 @@ export default function ExecutiveSummaryPage() {
           <SectionLinkCard
             href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
             title="Topmost Owners"
-            count={topmostOwnerCount}
+            count={owners.tracked}
+            total={owners.total}
             countEntity="owners"
             hint="Controllers at the root of each workload subtree"
             icon={Boxes}

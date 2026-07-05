@@ -2,18 +2,9 @@
 
 import { Search } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import type { StatusType } from "@/lib/cluster/reports"
 
 export const FILTER_ACTIVE = "bg-brand-bg text-brand-label rounded-xl border-b-2 border-brand"
 export const FILTER_INACTIVE = "bg-gray-100 text-muted-foreground rounded-xl hover:bg-gray-200"
-
-const CHIPS: { key: StatusType; label: string }[] = [
-  { key: "up_to_date",   label: "OK" },
-  { key: "patch_behind", label: "Patch" },
-  { key: "minor_behind", label: "Minor" },
-  { key: "major_behind", label: "Major" },
-  { key: "no_data",      label: "No data" },
-]
 
 export function FilterSearchInput({
   value,
@@ -38,22 +29,24 @@ export function FilterSearchInput({
   )
 }
 
-export function StatusChips({
-  activeStatuses,
+export function FilterChips({
+  chips,
+  active,
   onToggle,
 }: {
-  activeStatuses: Set<StatusType>
-  onToggle: (status: StatusType) => void
+  chips: { token: string; label: string }[]
+  active: Set<string>
+  onToggle: (token: string) => void
 }) {
   return (
     <>
-      {CHIPS.map(({ key, label }) => (
+      {chips.map(({ token, label }) => (
         <button
-          key={key}
-          onClick={() => onToggle(key)}
+          key={token}
+          onClick={() => onToggle(token)}
           className={cn(
             "px-3 py-1.5 text-xs font-semibold transition-colors",
-            activeStatuses.has(key) ? FILTER_ACTIVE : FILTER_INACTIVE,
+            active.has(token) ? FILTER_ACTIVE : FILTER_INACTIVE,
           )}
         >
           {label}

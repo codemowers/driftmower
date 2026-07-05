@@ -4,10 +4,9 @@ import { SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import type { StatusType } from "@/lib/cluster/reports"
 import {
   FilterSearchInput,
-  StatusChips,
+  FilterChips,
   FilterFooter,
   FILTER_ACTIVE,
   FILTER_INACTIVE,
@@ -19,8 +18,9 @@ type Props = {
   isModified: boolean
   searchQuery: string
   onSearchChange: (q: string) => void
-  activeStatuses: Set<StatusType>
-  onStatusToggle: (status: StatusType) => void
+  chips: { token: string; label: string }[]
+  activeTokens: Set<string>
+  onTokenToggle: (token: string) => void
   showIssuesOnly: boolean
   onIssuesToggle: () => void
   showFinished: boolean
@@ -65,7 +65,7 @@ function FilterToggle({
 export default function WorkloadFilters({
   total, filtered, isModified,
   searchQuery, onSearchChange,
-  activeStatuses, onStatusToggle,
+  chips, activeTokens, onTokenToggle,
   showIssuesOnly, onIssuesToggle,
   showFinished, onToggleFinished,
   hideHelmManaged, onToggleHelmManaged,
@@ -83,7 +83,7 @@ export default function WorkloadFilters({
       />
 
       <div className="flex items-center gap-2">
-        <StatusChips activeStatuses={activeStatuses} onToggle={onStatusToggle} />
+        <FilterChips chips={chips} active={activeTokens} onToggle={onTokenToggle} />
 
         <div className="mx-1 h-5 w-px bg-gray-200" />
 
