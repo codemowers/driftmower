@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ShipWheel, GitGraph, ArrowRight, ExternalLink } from "lucide-react"
+import { ShipWheel, Anchor, ArrowRight, ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 
@@ -56,7 +56,7 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
   const inner = (
     <>
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
-        <GitGraph className="size-6" strokeWidth={2} />
+        <Anchor className="size-6" strokeWidth={2} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
