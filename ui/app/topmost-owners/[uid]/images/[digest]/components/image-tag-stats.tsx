@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
-import { relativeTimeFromNow, compactRelativeTimeFromNow } from "@/lib/utils/format-time"
+import { relativeTimeFromNow, compactRelativeTimeFromNow, durationFromNow } from "@/lib/utils/format-time"
+import { OCI_CREATED } from "../utils/oci-labels"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import type { VulnerabilitySummary } from "@/lib/cluster/vulnerability"
@@ -103,8 +104,13 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
     ? `${vs.deployedTag ?? "—"} → ${vs.latestTag}`
     : vs.deployedTag ?? "—"
   const behind = Math.max(vs.majorDifference, vs.minorDifference, vs.patchDifference)
+  const isBehind = Boolean(vs.latestTag && vs.latestTag !== vs.deployedTag)
+  const driftSubParts = [
+    ...(behind > 1 ? [`${behind} behind`] : []),
+    ...(isBehind && vs.latestBuiltAt ? [`available for ${durationFromNow(vs.latestBuiltAt)}`] : []),
+  ]
 
-  const builtAt = vs.deployedBuiltAt
+  const builtAt = vs.deployedBuiltAt ?? usage.imageInfo.labels?.[OCI_CREATED]
   const integrity = integrityInfo(usage.tagStatus)
 
   const summary = vuln?.report.summary ?? null
@@ -123,7 +129,7 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
               <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", driftStyle.bg, driftStyle.text)}>
                 {driftStyle.label}
               </span>
-              {behind > 1 && <span>{behind} behind</span>}
+              {driftSubParts.length > 0 && <span>{driftSubParts.join(" · ")}</span>}
             </div>
           }
         >

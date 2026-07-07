@@ -82,6 +82,7 @@ export type ImageUsage = {
     digest: string
     repositoryUrl?: string
     tagUrl?: string
+    labels?: Record<string, string>
     endOfLifeDate?: string
     endOfActiveSupportDate?: string
   }

@@ -1,4 +1,3 @@
-import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { Issue } from "@/lib/cluster/reports"
 
@@ -8,6 +7,8 @@ const TYPE_STYLE: Record<string, { bg: string; text: string }> = {
   scraper_failed:             { bg: "bg-status-minor-bg", text: "text-status-minor-label" },
   no_tags:                    { bg: "bg-status-patch-bg", text: "text-status-patch-label" },
 }
+
+const FALLBACK_STYLE = { bg: "bg-gray-100", text: "text-muted-foreground" }
 
 export default function ImageIssues({ issues }: { issues: Issue[] }) {
   if (issues.length === 0) return null
@@ -22,16 +23,13 @@ export default function ImageIssues({ issues }: { issues: Issue[] }) {
 
       <ul className="flex flex-col gap-2.5">
         {sorted.map((issue, idx) => {
-          const badge = TYPE_STYLE[issue.type] ?? { bg: "bg-gray-100", text: "text-muted-foreground" }
+          const badge = TYPE_STYLE[issue.type] ?? FALLBACK_STYLE
           return (
-            <li key={idx} className="flex items-center gap-2.5 text-sm">
-              <AlertTriangle className={cn("size-3.5 shrink-0", badge.text)} aria-hidden />
-              <p className="min-w-0 flex-1">
-                <span className={cn("mr-2 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide", badge.bg, badge.text)}>
-                  {issue.type}
-                </span>
-                <span className="text-foreground">{issue.message || issue.reason}</span>
-              </p>
+            <li key={idx} className="flex items-start gap-2 text-sm">
+              <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide", badge.bg, badge.text)}>
+                {issue.type}
+              </span>
+              <span className="min-w-0 flex-1 text-foreground">{issue.message || issue.reason}</span>
             </li>
           )
         })}

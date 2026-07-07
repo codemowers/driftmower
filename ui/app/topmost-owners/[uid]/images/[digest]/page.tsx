@@ -7,9 +7,11 @@ import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
+import CopyButton from "@/app/components/copy-button"
 import ImageTagStats from "./components/image-tag-stats"
 import TagIdentity from "./components/tag-identity"
 import SupportLifecycle from "./components/support-lifecycle"
+import SourceCard from "./components/source-card"
 import ImageIssues from "./components/image-issues"
 import ImageVulnerabilities from "./components/image-vulnerabilities"
 
@@ -85,21 +87,25 @@ export default function ImageTagDetailPage() {
           chips={[{ label: "Image Tag", tone: "brand" }]}
           scoreChip={{ status, score: 0, label: statusLabel(status) }}
           issueCount={imageIssues.length}
-          subtitle={digest}
+          subtitle={
+            <span className="flex items-center gap-1.5">
+              <span>digest:</span>
+              <span className="break-all font-mono">{digest}</span>
+              <CopyButton value={digest} />
+            </span>
+          }
         />
 
         <ImageTagStats usage={usage} />
 
-        <TagIdentity usage={usage} />
-
-        {imageIssues.length > 0 ? (
-          <div className="grid gap-6 items-start md:grid-cols-[1.4fr_1fr]">
+        <div className="grid gap-6 items-start md:grid-cols-[1fr_420px]">
+          <TagIdentity usage={usage} />
+          <div className="flex flex-col gap-6">
             <ImageIssues issues={imageIssues} />
             <SupportLifecycle usage={usage} />
+            <SourceCard usage={usage} />
           </div>
-        ) : (
-          <SupportLifecycle usage={usage} />
-        )}
+        </div>
 
         <ImageVulnerabilities usage={usage} />
       </main>

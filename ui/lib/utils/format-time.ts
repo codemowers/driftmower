@@ -22,6 +22,20 @@ export function relativeTimeFromNow(iso: string): string {
   return RTF.format(Math.round(diffMs / 1000), "second")
 }
 
+// Bare duration since a past timestamp: "4 weeks", "3 months".
+export function durationFromNow(iso: string): string {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return iso
+  const absMs = Math.abs(Date.now() - t)
+  for (const [unit, ms] of UNITS) {
+    if (absMs >= ms) {
+      const n = Math.round(absMs / ms)
+      return `${n} ${unit}${n === 1 ? "" : "s"}`
+    }
+  }
+  return "less than a minute"
+}
+
 const COMPACT_UNITS: Array<[string, number]> = [
   ["y",  365 * 24 * 60 * 60 * 1000],
   ["mo",  30 * 24 * 60 * 60 * 1000],

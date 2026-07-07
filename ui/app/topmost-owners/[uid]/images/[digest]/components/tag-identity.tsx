@@ -1,28 +1,37 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import Link from "next/link"
 import { ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils/cn"
+import { OCI_BASE_NAME, sortedLabelEntries, stripOciPrefix } from "../utils/oci-labels"
 import type { ImageUsage } from "@/lib/cluster/reports"
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+const COLLAPSED_LABEL_COUNT = 8
+
+const LABEL_PILL_CLASS =
+  "max-w-full rounded bg-gray-100 px-1.5 py-px text-xs text-gray-600 [overflow-wrap:anywhere]"
+
+function Row({ label, children, top }: { label: string; children: ReactNode; top?: boolean }) {
   return (
     <>
-      <p className="text-sm text-gray-600">{label}</p>
-      <div className="min-w-0 font-mono text-sm text-foreground">{children}</div>
+      <p className={cn("text-sm text-gray-600", top && "self-start")}>{label}</p>
+      <div className={cn("min-w-0 font-mono text-sm text-foreground", top && "self-start")}>{children}</div>
     </>
   )
 }
 
-function ComingSoon() {
-  return <span className="text-muted-foreground">Coming soon</span>
-}
-
 export default function TagIdentity({ usage }: { usage: ImageUsage }) {
-  const { tag, digest, registry, repositoryUrl } = usage.imageInfo
+  const { tag, digest, registry, repositoryUrl, labels } = usage.imageInfo
   const semver = usage.digestSemver?.tag ?? "—"
   const sameImageId = usage.imageId === digest
+  const baseImage = labels?.[OCI_BASE_NAME]
+  const labelEntries = sortedLabelEntries(labels)
+  const [labelsExpanded, setLabelsExpanded] = useState(false)
+  const visibleLabels = labelsExpanded ? labelEntries : labelEntries.slice(0, COLLAPSED_LABEL_COUNT)
+  const hiddenLabelCount = labelEntries.length - COLLAPSED_LABEL_COUNT
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
@@ -35,13 +44,6 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
 
         <Row label="Semver">
           <span className={semver === "—" ? "text-muted-foreground" : undefined}>{semver}</span>
-        </Row>
-
-        <Row label="Digest">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="break-all">{digest}</span>
-            <CopyButton value={digest} />
-          </span>
         </Row>
 
         <Row label="Image ID">
@@ -80,8 +82,59 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
       </div>
 
       <div className="-mx-6 mt-5 grid grid-cols-[140px_1fr] items-center gap-x-4 gap-y-4 border-t border-gray-200 px-6 pt-4">
-        <Row label="Base image"><ComingSoon /></Row>
-        <Row label="Labels"><ComingSoon /></Row>
+        <Row label="Base image">
+          {baseImage ? (
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="break-all text-xs text-gray-600">{baseImage}</span>
+              <CopyButton value={baseImage} />
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </Row>
+
+        <Row label="Labels" top>
+          {labelEntries.length > 0 ? (
+            <TooltipProvider delayDuration={300}>
+              <span className="flex flex-wrap items-center gap-1.5">
+                {visibleLabels.map(([key, value]) => {
+                  const displayKey = stripOciPrefix(key)
+                  if (displayKey === key) {
+                    return (
+                      <span key={key} className={LABEL_PILL_CLASS}>
+                        {key}={value}
+                      </span>
+                    )
+                  }
+                  return (
+                    <Tooltip key={key}>
+                      <TooltipTrigger asChild>
+                        <span className={LABEL_PILL_CLASS}>
+                          {displayKey}={value}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="font-mono">{key}</TooltipContent>
+                    </Tooltip>
+                  )
+                })}
+                {hiddenLabelCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setLabelsExpanded(v => !v)}
+                    className={cn(
+                      LABEL_PILL_CLASS,
+                      "font-medium transition-colors hover:bg-gray-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+                    )}
+                  >
+                    {labelsExpanded ? "show less" : `+${hiddenLabelCount} more`}
+                  </button>
+                )}
+              </span>
+            </TooltipProvider>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </Row>
       </div>
     </div>
   )

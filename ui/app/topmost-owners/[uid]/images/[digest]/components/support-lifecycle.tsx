@@ -61,8 +61,8 @@ export default function SupportLifecycle({ usage }: { usage: ImageUsage }) {
       </p>
 
       {tracked ? (
-        <div className="grid grid-cols-[180px_1fr] items-center gap-x-4 gap-y-4">
-          <Row label="Active support ends" date={endOfActiveSupportDate} tone={activeSupportTone} />
+        <div className="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+          <Row label="Support ends" date={endOfActiveSupportDate} tone={activeSupportTone} />
           <Row label="End of life" date={endOfLifeDate} tone={eolTone} />
         </div>
       ) : (
