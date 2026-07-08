@@ -10,7 +10,6 @@ import type { NodeStorageMap } from "./prometheus/node-storage"
 export type ClusterResource = {
   uid: string
   kind: string
-  apiGroup: string
   name: string
   namespace: string
   labels?: Record<string, string>

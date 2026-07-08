@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
+import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { workloadMetricQueries } from "@/lib/cluster/prometheus/workload-metrics"
@@ -61,7 +61,11 @@ export default function WorkloadDetailPage() {
       )
     : undefined
 
-  const [kind = "", namespace = "", name = ""] = match ? match[0].split("/") : []
+  const rootInfo = match?.[1][0]?.workloadRootInfo
+  const kind = rootInfo?.kind ?? ""
+  const namespace = rootInfo?.namespace ?? ""
+  const name = rootInfo?.name ?? ""
+  const kindLabel = rootInfo?.qualifiedKind ?? kind
   const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
   const livePodNames = clusterResources && root ? collectOwnedPods(clusterResources, root.uid).map(p => p.name) : []
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
@@ -112,7 +116,6 @@ export default function WorkloadDetailPage() {
   const isHelm = ri?.managementKind === "helm" && releaseUid
 
   const backHref = linkTo("/topmost-owners")
-  const apiGroup = root?.apiGroup
   const argoApp = root?.argoApp
   const isArgo = !isHelm && !!argoApp
   const liveWorkloadUid = root?.uid ?? uid
@@ -132,7 +135,7 @@ export default function WorkloadDetailPage() {
           breadcrumbs={[
             { label: "Workloads", href: backHref },
             { label: `Namespace ${namespace}` },
-            { label: `${workloadKindLabel(kind, apiGroup)} ${name}` },
+            { label: `${kindLabel} ${name}` },
           ]}
           chips={headerChips}
           scoreChip={{ status: worstStatus, score: normalizedScore }}
@@ -172,7 +175,7 @@ export default function WorkloadDetailPage() {
 
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
-            <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={apiGroup} />
+            <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={rootInfo?.apiGroup} />
           </div>
           <div className="md:col-span-2">
             <NetworkCard

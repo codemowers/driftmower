@@ -3,8 +3,7 @@
 import { useParams } from "next/navigation"
 import { Bookmark } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { workloadKindLabel, type StatusType } from "@/lib/cluster/reports"
+import type { StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import CopyButton from "@/app/components/copy-button"
@@ -34,7 +33,6 @@ export default function ImageTagDetailPage() {
   const workloadUid = params.uid
   const digest = decodeURIComponent(params.digest)
   const data = useClusterState(s => s.data)
-  const clusterResources = useClusterState(s => s.clusterResources)
   const { linkTo } = useContextHref()
 
   const workloadMatch = data
@@ -59,7 +57,7 @@ export default function ImageTagDetailPage() {
   const workloadName = workloadRoot?.name ?? "—"
   const workloadKind = workloadRoot?.kind ?? "—"
   const workloadNamespace = workloadRoot?.namespace ?? "—"
-  const apiGroup = workloadRoot ? findWorkloadRoot(clusterResources, workloadRoot)?.apiGroup : undefined
+  const workloadKindLabel = workloadRoot?.qualifiedKind ?? workloadKind
   const { registry, repository, tag } = usage.imageInfo
   const repoLabel = `${registry}/${repository}`
   const fullRef = `${repoLabel}:${tag}@${digest}`
@@ -81,7 +79,7 @@ export default function ImageTagDetailPage() {
           breadcrumbs={[
             { label: "Workloads", href: rootHref },
             { label: `Namespace ${workloadNamespace}` },
-            { label: `${workloadKindLabel(workloadKind, apiGroup)} ${workloadName}`, href: workloadHref },
+            { label: `${workloadKindLabel} ${workloadName}`, href: workloadHref },
             { label: `Image ${repoLabel}` },
           ]}
           chips={[{ label: "Image Tag", tone: "brand" }]}

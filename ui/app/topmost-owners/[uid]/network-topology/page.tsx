@@ -24,17 +24,17 @@ export default function NetworkTopologyPage() {
     )
   }
 
-  const [groupKey] = match
-  const [kind, namespace, name] = groupKey.split("/")
+  const root = match[1][0]?.workloadRootInfo
 
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
         <NetworkTopologyClient
           uid={uid}
-          kind={kind}
-          namespace={namespace}
-          name={name}
+          kind={root?.kind ?? ""}
+          kindLabel={root?.qualifiedKind ?? root?.kind ?? ""}
+          namespace={root?.namespace ?? ""}
+          name={root?.name ?? ""}
         />
       </main>
     </div>

@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { ExternalLink } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { workloadKindLabel } from "@/lib/cluster/reports"
 import {
   useNetstatd,
   type NetstatdStatus,
@@ -80,13 +78,6 @@ export default function NetworkTopologyHeader({
   const externalTotal = aggregated.external.length
   const portTotal = listeningGroups.length
 
-  const apiGroup = findWorkloadRoot(clusterResources, {
-    uid: workloadUid,
-    kind: workloadKind,
-    name: workloadName,
-    namespace,
-  })?.apiGroup
-
   const { linkTo } = useContextHref()
   const ownersHref = linkTo("/topmost-owners")
   const ownerHref = linkTo(`/topmost-owners/${workloadUid}`)
@@ -98,7 +89,7 @@ export default function NetworkTopologyHeader({
         items={[
           { label: "Workloads", href: ownersHref },
           { label: `Namespace ${namespace}` },
-          { label: `${workloadKindLabel(workloadKind, apiGroup)} ${workloadName}`, href: ownerHref },
+          { label: `${workloadKind} ${workloadName}`, href: ownerHref },
           { label: `Pod ${podName}`, href: podDetailHref },
           { label: "Network topology" },
         ]}

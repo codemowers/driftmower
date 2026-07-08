@@ -3,8 +3,7 @@
 import { useParams } from "next/navigation"
 import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { workloadKindLabel, type ImageUsage, type StatusType } from "@/lib/cluster/reports"
+import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { podMetricQueries } from "@/lib/cluster/prometheus/pod-metrics"
 import ResourceHeader from "@/app/components/resource-header"
@@ -57,8 +56,7 @@ export default function PodDetailPage() {
   const [, workloadUsages] = workloadMatch
   const workloadRoot = workloadUsages[0]?.workloadRootInfo
   const workloadName = workloadRoot?.name ?? "—"
-  const workloadKind = workloadRoot?.kind ?? "—"
-  const workloadApiGroup = workloadRoot ? findWorkloadRoot(clusterResources, workloadRoot)?.apiGroup : undefined
+  const workloadKind = workloadRoot?.qualifiedKind ?? workloadRoot?.kind ?? "—"
 
   const ownUsages = data.report.imageUsages.filter(
     u => u.podName === pod.name && u.namespace === pod.namespace,
@@ -109,7 +107,7 @@ export default function PodDetailPage() {
           breadcrumbs={[
             { label: "Workloads", href: linkTo("/topmost-owners") },
             { label: `Namespace ${pod.namespace}` },
-            { label: `${workloadKindLabel(workloadKind, workloadApiGroup)} ${workloadName}`, href: backHref },
+            { label: `${workloadKind} ${workloadName}`, href: backHref },
             { label: `Pod ${pod.name}` },
           ]}
           chips={[

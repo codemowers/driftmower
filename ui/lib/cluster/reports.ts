@@ -40,16 +40,6 @@ export type WorkloadScore = {
   }
 }
 
-const BUILTIN_WORKLOAD_GROUPS = new Set(["", "core", "apps", "batch"])
-
-export function workloadKindLabel(kind: string, apiVersion?: string): string {
-  if (!apiVersion) return kind
-  const slash = apiVersion.indexOf("/")
-  const group = slash === -1 ? "" : apiVersion.slice(0, slash)
-  if (group && !BUILTIN_WORKLOAD_GROUPS.has(group)) return `${kind}.${group}`
-  return kind
-}
-
 export type ScrapeStatus = {
   timestamp: number
   success: boolean
@@ -98,6 +88,8 @@ export type ImageUsage = {
   }
   workloadRootInfo: {
     kind: string
+    apiGroup?: string
+    qualifiedKind?: string
     name: string
     namespace: string
     uid: string

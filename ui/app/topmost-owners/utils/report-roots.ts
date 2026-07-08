@@ -15,11 +15,16 @@ export function reportWorkloadRoots(data: Report | null): ReportWorkloadRoot[] {
   const roots: ReportWorkloadRoot[] = []
   for (const [groupKey, usages] of Object.entries(data.report.workloadGroupMap)) {
     if (groupKey === "unknown") continue
-    const parts = groupKey.split("/")
-    if (parts.length < 3) continue
-    const uid = usages[0]?.workloadRootInfo?.uid
-    if (!uid) continue
-    roots.push({ groupKey, kind: parts[0], namespace: parts[1], name: parts[2], uid, usages })
+    const root = usages[0]?.workloadRootInfo
+    if (!root?.uid) continue
+    roots.push({
+      groupKey,
+      kind: root.kind,
+      namespace: root.namespace,
+      name: root.name,
+      uid: root.uid,
+      usages,
+    })
   }
   return roots
 }

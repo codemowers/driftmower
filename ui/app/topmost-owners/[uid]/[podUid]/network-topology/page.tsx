@@ -31,7 +31,7 @@ export default function PodNetworkTopologyPage() {
   const [, workloadUsages] = workloadMatch
   const workloadRoot = workloadUsages[0]?.workloadRootInfo
   const workloadName = workloadRoot?.name ?? "—"
-  const workloadKind = workloadRoot?.kind ?? "—"
+  const workloadKind = workloadRoot?.qualifiedKind ?? workloadRoot?.kind ?? "—"
 
   return (
     <div className="flex min-h-full flex-col">

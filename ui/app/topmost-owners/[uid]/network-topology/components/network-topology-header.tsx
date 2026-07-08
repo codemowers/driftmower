@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { ExternalLink } from "lucide-react"
-import { workloadKindLabel } from "@/lib/cluster/reports"
 import { type NetstatdStatus, fetchNetstatdUrl } from "@/lib/cluster/netstatd"
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -12,9 +11,9 @@ import LiveAge from "./live-age"
 type Props = {
   uid: string
   kind: string
+  kindLabel: string
   namespace: string
   name: string
-  apiGroup?: string
   status: NetstatdStatus
   lastFlushedAt: number | null
   hiddenCount: number
@@ -44,9 +43,9 @@ const STATUS_LABEL: Record<NetstatdStatus, string> = {
 export default function NetworkTopologyHeader({
   uid,
   kind,
+  kindLabel,
   namespace,
   name,
-  apiGroup,
   status,
   lastFlushedAt,
   hiddenCount,
@@ -66,7 +65,7 @@ export default function NetworkTopologyHeader({
         items={[
           { label: "Workloads", href: ownersHref },
           { label: `Namespace ${namespace}` },
-          { label: `${workloadKindLabel(kind, apiGroup)} ${name}`, href: ownerHref },
+          { label: `${kindLabel} ${name}`, href: ownerHref },
           { label: "Network topology" },
         ]}
       />

@@ -39,11 +39,11 @@ type RawObject = {
 type KubeList = { items: RawObject[] }
 
 const SOURCES = [
-  { path: "/api/v1/pods", kind: "Pod", apiGroup: "v1" },
-  { path: "/apis/apps/v1/deployments", kind: "Deployment", apiGroup: "apps/v1" },
-  { path: "/apis/apps/v1/replicasets", kind: "ReplicaSet", apiGroup: "apps/v1" },
-  { path: "/apis/apps/v1/statefulsets", kind: "StatefulSet", apiGroup: "apps/v1" },
-  { path: "/apis/apps/v1/daemonsets", kind: "DaemonSet", apiGroup: "apps/v1" },
+  { path: "/api/v1/pods", kind: "Pod" },
+  { path: "/apis/apps/v1/deployments", kind: "Deployment" },
+  { path: "/apis/apps/v1/replicasets", kind: "ReplicaSet" },
+  { path: "/apis/apps/v1/statefulsets", kind: "StatefulSet" },
+  { path: "/apis/apps/v1/daemonsets", kind: "DaemonSet" },
 ] as const
 
 export async function getClusterResources(): Promise<ClusterResource[]> {
@@ -62,7 +62,7 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
   )
 
   const raws = lists.flatMap(({ source, items }) =>
-    items.map(obj => ({ obj, kind: source.kind, apiGroup: source.apiGroup })),
+    items.map(obj => ({ obj, kind: source.kind })),
   )
 
   const ownerOf = new Map<string, string | undefined>()
@@ -80,8 +80,8 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
     return resolveManager(ownerOf.get(uid), seen)
   }
 
-  const resources = raws.map(({ obj, kind, apiGroup }) =>
-    toClusterResource(obj, kind, apiGroup, resolveManager(obj.metadata.uid)),
+  const resources = raws.map(({ obj, kind }) =>
+    toClusterResource(obj, kind, resolveManager(obj.metadata.uid)),
   )
 
   addCrdStubs(resources, raws)
@@ -91,14 +91,12 @@ export async function getClusterResources(): Promise<ClusterResource[]> {
 function toClusterResource(
   obj: RawObject,
   kind: string,
-  apiGroup: string,
   manager: ManagerInfo | undefined,
 ): ClusterResource {
   const meta = obj.metadata
   const resource: ClusterResource = {
     uid: meta.uid,
     kind,
-    apiGroup,
     name: meta.name,
     namespace: meta.namespace ?? "",
   }
@@ -148,7 +146,6 @@ function addCrdStubs(resources: ClusterResource[], raws: { obj: RawObject }[]): 
     stubs.set(ref.uid, {
       uid: ref.uid,
       kind: ref.kind,
-      apiGroup: ref.apiVersion,
       name: ref.name,
       namespace: obj.metadata.namespace ?? "",
     })

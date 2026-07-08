@@ -16,7 +16,7 @@ const RESTARTABLE_KINDS = new Set(["Deployment", "StatefulSet", "DaemonSet"])
 
 function resourceToken(kind: string, apiGroup?: string): string {
   if (RESTARTABLE_KINDS.has(kind)) return kind.toLowerCase()
-  const group = apiGroup?.includes("/") ? apiGroup.split("/")[0] : ""
+  const group = apiGroup && apiGroup !== "v1" && apiGroup !== "core" ? apiGroup.split("/")[0] : ""
   const plural = `${kind.toLowerCase()}s`
   return group ? `${plural}.${group}` : plural
 }

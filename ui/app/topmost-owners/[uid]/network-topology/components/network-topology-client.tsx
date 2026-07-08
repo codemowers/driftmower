@@ -2,7 +2,6 @@
 
 import { useMemo } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import {
   useNetstatd,
   findDescendantPodUids,
@@ -24,11 +23,12 @@ import NetworkTopologyHeader from "./network-topology-header"
 type Props = {
   uid: string
   kind: string
+  kindLabel: string
   namespace: string
   name: string
 }
 
-export default function NetworkTopologyClient({ uid, kind, namespace, name }: Props) {
+export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace, name }: Props) {
   const clusterResources = useClusterState(s => s.clusterResources)
   const status = useNetstatd(s => s.status)
   const error = useNetstatd(s => s.error)
@@ -60,8 +60,6 @@ export default function NetworkTopologyClient({ uid, kind, namespace, name }: Pr
     [aggregated.inClusterOut, aggregated.unknownOut, aggregated.external],
   )
 
-  const apiGroup = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })?.apiGroup
-
   const portTotal = listeningGroups.length
   const inboundCount = aggregated.inbound.length
   const peerTotal = aggregated.inClusterOut.length
@@ -82,9 +80,9 @@ export default function NetworkTopologyClient({ uid, kind, namespace, name }: Pr
         <NetworkTopologyHeader
           uid={uid}
           kind={kind}
+          kindLabel={kindLabel}
           namespace={namespace}
           name={name}
-          apiGroup={apiGroup}
           status={status}
           lastFlushedAt={lastFlushedAt}
           hiddenCount={hiddenCount}
