@@ -27,5 +27,6 @@ export type ClusterNodesResponse = {
   nodes: NodeDrift[]
   reference: K8sReference | null
   provider: string
+  eolProduct: string
   error?: string
 }

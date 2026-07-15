@@ -47,7 +47,12 @@ function nodeLoadError(e: unknown): string {
 
 export async function getClusterNodes(): Promise<ClusterNodesResponse> {
   if (!isInCluster()) {
-    return { nodes: [], reference: await resolveReference(envDistro() ?? "vanilla"), provider: "Kubernetes" }
+    return {
+      nodes: [],
+      reference: await resolveReference(envDistro() ?? "vanilla"),
+      provider: "Kubernetes",
+      eolProduct: "kubernetes",
+    }
   }
 
   let items: RawNode[] | null = null
@@ -64,7 +69,7 @@ export async function getClusterNodes(): Promise<ClusterNodesResponse> {
   const reference = await resolveReference(envDistro() ?? detectDistro(firstVersion))
   const provider = detectProvider(firstVersion)
 
-  if (!items) return { nodes: [], reference, provider: provider.name, error }
+  if (!items) return { nodes: [], reference, provider: provider.name, eolProduct: provider.eolProduct, error }
 
   const releases = await fetchEolReleases(provider.eolProduct)
 
@@ -81,5 +86,5 @@ export async function getClusterNodes(): Promise<ClusterNodesResponse> {
     }
   })
 
-  return { nodes, reference, provider: provider.name }
+  return { nodes, reference, provider: provider.name, eolProduct: provider.eolProduct }
 }

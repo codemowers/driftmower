@@ -63,7 +63,12 @@ export default function ClusterPage() {
           </p>
         ) : (
           <>
-            <ClusterHeader reference={nodeDrift.reference} provider={nodeDrift.provider} nodeCount={nodes.length} />
+            <ClusterHeader
+              reference={nodeDrift.reference}
+              provider={nodeDrift.provider}
+              eolProduct={nodeDrift.eolProduct}
+              nodeCount={nodes.length}
+            />
 
             <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
               <PrometheusAlerts onCollapsedHeight={setAlertsHeight} />
