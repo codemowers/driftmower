@@ -76,11 +76,7 @@ export function loadAppConfig(
 ): AppConfig {
   const cli = parseCliArguments(arguments_)
   const maximumLimit = readInteger(source.get<number>('search.maximumLimit'), 'maximumLimit')
-  const defaultLimit = readInteger(
-    source.get<number>('search.defaultLimit'),
-    'defaultLimit',
-    maximumLimit
-  )
+  const defaultLimit = readInteger(source.get<number>('search.defaultLimit'), 'defaultLimit', maximumLimit)
 
   return {
     databasePath: readString(cli.db ?? source.get<string>('database.path'), 'databasePath'),

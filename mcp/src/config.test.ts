@@ -57,9 +57,7 @@ describe('loadAppConfig', () => {
     )
     expect(() =>
       loadAppConfig([], sourceWith({ 'search.maximumLimit': 10, 'search.defaultLimit': 11 }))
-    ).toThrow(
-      'defaultLimit must be an integer between 1 and 10'
-    )
+    ).toThrow('defaultLimit must be an integer between 1 and 10')
   })
 
   it('rejects an empty database path', () => {

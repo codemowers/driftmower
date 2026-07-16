@@ -29,6 +29,7 @@ describe('read-only SQLite database', () => {
 
   it('opens an existing database read-only and rejects writes', async () => {
     const writableDatabase = new BetterSqlite3(databasePath)
+
     writableDatabase.exec('CREATE TABLE reports (id TEXT PRIMARY KEY)')
     writableDatabase.close()
     const database = await openReadOnlyDatabase(databasePath)

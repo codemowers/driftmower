@@ -2,28 +2,108 @@
 
 import { loadAppConfig } from './config.js'
 import { checkDatabaseSchema } from './db/schema-check.js'
-import { openReadOnlyDatabase } from './db/sqlite.js'
+import { openReadOnlyDatabase, type Database } from './db/sqlite.js'
+import { SqliteWorkloadRepository } from './db/workload-repository.js'
+import { startHealthServer } from './http/health.js'
 import { createLogger } from './logger.js'
+import { createMcpServer } from './mcp/create-server.js'
+import { startHttpTransport } from './mcp/transports/http.js'
+import { startStdioTransport } from './mcp/transports/stdio.js'
+import { WorkloadSearchService } from './services/workload-search-service.js'
 
 async function main(): Promise<void> {
   const appConfig = loadAppConfig()
   const logger = createLogger(appConfig.logLevel)
-  const database = await openReadOnlyDatabase(appConfig.databasePath)
+  const healthServer =
+    appConfig.transport === 'http'
+      ? await startHealthServer({
+          host: appConfig.host,
+          port: appConfig.healthPort,
+          databasePath: appConfig.databasePath
+        })
+      : undefined
+  let database: Database | undefined
 
   try {
+    database = await openReadOnlyDatabase(appConfig.databasePath)
     await checkDatabaseSchema(database)
-    logger.info('Driftmower database opened read-only and schema is compatible')
-    logger.error('Server startup is not implemented until the remaining plan phases are complete')
-  } finally {
-    await database.destroy()
-  }
+    const repository = new SqliteWorkloadRepository(database)
+    const workloadSearchService = new WorkloadSearchService(
+      repository,
+      appConfig.defaultLimit,
+      appConfig.maximumLimit
+    )
+    const mcpServer = createMcpServer({ workloadSearchService })
 
-  process.exitCode = 1
+    if (appConfig.transport === 'stdio') {
+      await startStdioTransport(mcpServer)
+      logger.info('Driftmower MCP server started', { transport: 'stdio' })
+
+      return
+    }
+
+    const httpServer = await startHttpTransport(mcpServer, {
+      host: appConfig.host,
+      port: appConfig.port
+    })
+
+    logger.info('Driftmower MCP server started', {
+      transport: 'http',
+      host: appConfig.host,
+      port: appConfig.port,
+      healthPort: appConfig.healthPort
+    })
+
+    registerShutdown(async () => {
+      await Promise.all([
+        closeServer(httpServer),
+        healthServer ? closeServer(healthServer) : Promise.resolve(),
+        mcpServer.close(),
+        database?.destroy()
+      ])
+    })
+  } catch (error) {
+    await database?.destroy()
+
+    if (!healthServer) {
+      throw error
+    }
+
+    logger.error(errorMessage(error))
+    logger.warn('Health server remains available while MCP startup is not ready', {
+      healthPort: appConfig.healthPort
+    })
+    registerShutdown(() => closeServer(healthServer))
+  }
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-
-  createLogger().error(message)
+  createLogger().error(errorMessage(error))
   process.exitCode = 1
 })
+
+function closeServer(server: import('node:http').Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close(error => (error ? reject(error) : resolve()))
+  })
+}
+
+function registerShutdown(close: () => Promise<void>): void {
+  let closing = false
+
+  const handleSignal = (): void => {
+    if (closing) {
+      return
+    }
+
+    closing = true
+    void close().catch((error: unknown) => createLogger().error(errorMessage(error)))
+  }
+
+  process.once('SIGINT', handleSignal)
+  process.once('SIGTERM', handleSignal)
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
