@@ -22,6 +22,7 @@ export async function openReadOnlyDatabase(databasePath: string): Promise<Knex> 
   })
 
   try {
+    // Prevent writes at the SQLite connection level in addition to the driver's read-only mode.
     await database.raw('PRAGMA query_only = ON')
 
     return database

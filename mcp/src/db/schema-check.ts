@@ -21,6 +21,7 @@ export class SchemaCompatibilityError extends Error {
 
 export async function checkDatabaseSchema(database: Knex): Promise<SchemaCheckResult> {
   const expectedTables = [...REQUIRED_TABLES, ...OPTIONAL_TABLES]
+  // Read SQLite's schema catalog once to validate required tables and discover optional ones.
   const rows = await database<TableNameRow>('sqlite_master')
     .select('name')
     .where('type', 'table')
