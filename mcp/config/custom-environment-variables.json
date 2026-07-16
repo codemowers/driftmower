@@ -1,0 +1,28 @@
+{
+  "mcp": {
+    "transport": "DRIFTMOWER_MCP_TRANSPORT",
+    "host": "DRIFTMOWER_MCP_HOST",
+    "port": {
+      "__name": "DRIFTMOWER_MCP_PORT",
+      "__format": "number"
+    },
+    "healthPort": {
+      "__name": "DRIFTMOWER_MCP_HEALTH_PORT",
+      "__format": "number"
+    },
+    "logLevel": "DRIFTMOWER_MCP_LOG_LEVEL"
+  },
+  "database": {
+    "path": "DRIFTMOWER_MCP_DB_PATH"
+  },
+  "search": {
+    "defaultLimit": {
+      "__name": "DRIFTMOWER_MCP_DEFAULT_LIMIT",
+      "__format": "number"
+    },
+    "maximumLimit": {
+      "__name": "DRIFTMOWER_MCP_MAX_LIMIT",
+      "__format": "number"
+    }
+  }
+}
