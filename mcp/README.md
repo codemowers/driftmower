@@ -62,6 +62,59 @@ HTTP mode exposes:
 - Readiness: `http://127.0.0.1:3001/readyz`
 - Startup: `http://127.0.0.1:3001/startupz`
 
+## Local Codex MCP Registration
+
+For local Codex usage, register this server as a `stdio` MCP server. Pass
+`NODE_CONFIG_DIR` explicitly so the server can load this project's
+`config/default.json` even when Codex starts it from another working directory.
+
+Build first:
+
+```bash
+npm run build
+```
+
+Register the server:
+
+```bash
+DRIFTMOWER_MCP_DIR=/path/to/driftmower-mcp
+DRIFTMOWER_DB=/path/to/driftmower-be.sqlite
+
+codex mcp add driftmower \
+  --env NODE_CONFIG_DIR="$DRIFTMOWER_MCP_DIR/config" \
+  -- \
+  node "$DRIFTMOWER_MCP_DIR/dist/index.js" \
+  --db "$DRIFTMOWER_DB"
+```
+
+Check the registration:
+
+```bash
+codex mcp list
+codex mcp get driftmower
+```
+
+Then start Codex in the repository you want to inspect or update:
+
+```bash
+codex -C /path/to/your/repository
+```
+
+Example prompt:
+
+```text
+Ask Driftmower for workloads matching memelord. Based on the snapshot data, inspect this repo and propose the config changes needed to update outdated images.
+```
+
+You can also register a running HTTP server instead of `stdio`:
+
+```bash
+codex mcp add driftmower-http --url http://127.0.0.1:3000/mcp
+```
+
+For local machine usage, `stdio` is the recommended mode. It does not require a
+separate long-running server process and keeps the SQLite database path explicit.
+
 ## Tool
 
 `search_workloads` accepts:
