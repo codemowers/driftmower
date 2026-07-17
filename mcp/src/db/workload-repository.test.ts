@@ -32,7 +32,15 @@ describe('SqliteWorkloadRepository', () => {
   it('searches only the latest full-cluster report per cluster and ignores status', async () => {
     insertReport(seedDatabase, 'old-full', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertReport(seedDatabase, 'latest-full', 'prod', '2026-01-02', 'cluster', ALL_NAMESPACES, 'pending')
-    insertReport(seedDatabase, 'newer-selected', 'prod', '2026-01-03', 'cluster', SELECTED_NAMESPACES, 'ready')
+    insertReport(
+      seedDatabase,
+      'newer-selected',
+      'prod',
+      '2026-01-03',
+      'cluster',
+      SELECTED_NAMESPACES,
+      'ready'
+    )
     insertReport(seedDatabase, 'newest-yaml', 'prod', '2026-01-04', 'yaml', ALL_NAMESPACES, 'ready')
     insertReport(seedDatabase, 'stage-full', 'stage', '2026-01-02', 'cluster', ALL_NAMESPACES, 'pending')
     insertUsage(seedDatabase, 'old-full', 'old', 'memelord-old')

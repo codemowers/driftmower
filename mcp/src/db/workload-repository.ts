@@ -90,11 +90,7 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
     // Fetch full-cluster snapshot candidates newest-first within each cluster.
     // TypeScript selects the first row per cluster to avoid a database-specific window query.
     const rows = (await this.database<ReportRow>('reports')
-      .select([
-        'id',
-        'cluster_context as clusterContext',
-        'created_at as createdAt'
-      ])
+      .select(['id', 'cluster_context as clusterContext', 'created_at as createdAt'])
       .where('source_type', CLUSTER_SOURCE_TYPE)
       .andWhere('namespace_scope', ALL_NAMESPACE_SCOPE)
       .orderBy([
