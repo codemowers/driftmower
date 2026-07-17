@@ -8,10 +8,11 @@ import { startHttpTransport } from './http.js'
 
 describe('HTTP MCP transport', () => {
   let httpServer: Server | undefined
-  let client: Client | undefined
+  let clients: Client[] = []
 
   afterEach(async () => {
-    await client?.close()
+    await Promise.all(clients.map(client => client.close()))
+    clients = []
 
     if (httpServer) {
       await new Promise<void>((resolve, reject) => {
@@ -22,17 +23,21 @@ describe('HTTP MCP transport', () => {
 
   it('serves search_workloads on /mcp', async () => {
     const searchWorkloads = vi.fn().mockResolvedValue({ query: 'api', matches: [] })
-    const mcpServer = createMcpServer({ workloadSearchService: { searchWorkloads } })
     const serverErrors: unknown[] = []
 
-    httpServer = await startHttpTransport(mcpServer, {
-      host: '127.0.0.1',
-      port: 0,
-      onError: error => serverErrors.push(error)
-    })
+    httpServer = await startHttpTransport(
+      () => createMcpServer({ workloadSearchService: { searchWorkloads } }),
+      {
+        host: '127.0.0.1',
+        port: 0,
+        onError: error => serverErrors.push(error)
+      }
+    )
     const address = httpServer.address() as AddressInfo
 
-    client = new Client({ name: 'http-test-client', version: '1.0.0' })
+    const client = new Client({ name: 'http-test-client', version: '1.0.0' })
+
+    clients.push(client)
     const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${address.port}/mcp`))
 
     await client.connect(transport).catch((error: unknown) => {
@@ -57,5 +62,33 @@ describe('HTTP MCP transport', () => {
 
     expect(result.structuredContent).toEqual({ query: 'api', matches: [] })
     expect(searchWorkloads).toHaveBeenCalledWith({ query: 'api', limit: undefined })
+  })
+
+  it('accepts a second client initialization as a separate HTTP session', async () => {
+    const searchWorkloads = vi.fn().mockResolvedValue({ query: 'llm', matches: [] })
+
+    httpServer = await startHttpTransport(
+      () => createMcpServer({ workloadSearchService: { searchWorkloads } }),
+      {
+        host: '127.0.0.1',
+        port: 0
+      }
+    )
+    const address = httpServer.address() as AddressInfo
+    const endpoint = new URL(`http://127.0.0.1:${address.port}/mcp`)
+    const firstClient = new Client({ name: 'first-http-test-client', version: '1.0.0' })
+    const secondClient = new Client({ name: 'second-http-test-client', version: '1.0.0' })
+
+    clients.push(firstClient, secondClient)
+
+    await firstClient.connect(new StreamableHTTPClientTransport(endpoint))
+    await secondClient.connect(new StreamableHTTPClientTransport(endpoint))
+
+    const result = await secondClient.callTool({
+      name: 'search_workloads',
+      arguments: { query: 'llm' }
+    })
+
+    expect(result.structuredContent).toEqual({ query: 'llm', matches: [] })
   })
 })

@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+  labels:
+    app: driftmower-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: driftmower-mcp
+  template:
+    metadata:
+      labels:
+        app: driftmower-mcp
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: driftmower-be
+              topologyKey: kubernetes.io/hostname
+      imagePullSecrets:
+        - name: sergii-gitea-registry-secret
+      containers:
+        - name: driftmower-mcp
+          image: git.codemowers.io/uq69adc8851/driftmower-mcp:latest
+          ports:
+            - containerPort: 3000
+              name: mcp
+            - containerPort: 3001
+              name: health
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: NODE_CONFIG_ENV
+              value: 'default'
+            - name: DRIFTMOWER_MCP_TRANSPORT
+              value: 'http'
+            - name: DRIFTMOWER_MCP_DB_PATH
+              value: '/data/driftmower-be.sqlite'
+            - name: DRIFTMOWER_MCP_HOST
+              value: '::'
+            - name: DRIFTMOWER_MCP_PORT
+              value: '3000'
+            - name: DRIFTMOWER_MCP_HEALTH_PORT
+              value: '3001'
+            - name: DRIFTMOWER_MCP_DEFAULT_LIMIT
+              value: '20'
+            - name: DRIFTMOWER_MCP_MAX_LIMIT
+              value: '100'
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: health
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '50m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: driftmower-be-data-v2

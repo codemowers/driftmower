@@ -115,6 +115,83 @@ codex mcp add driftmower-http --url http://127.0.0.1:3000/mcp
 For local machine usage, `stdio` is the recommended mode. It does not require a
 separate long-running server process and keeps the SQLite database path explicit.
 
+## Docker Usage
+
+Build a local image:
+
+```bash
+docker build -t driftmower-mcp:local .
+```
+
+Run HTTP mode with a read-only database mount:
+
+```bash
+docker run --rm \
+  -e DRIFTMOWER_MCP_TRANSPORT=http \
+  -e DRIFTMOWER_MCP_DB_PATH=/data/driftmower-be.sqlite \
+  -e DRIFTMOWER_MCP_HOST=0.0.0.0 \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -v /path/to/driftmower-data:/data:ro \
+  driftmower-mcp:local
+```
+
+Check readiness:
+
+```bash
+curl http://127.0.0.1:3001/readyz
+```
+
+## Kubernetes Deployment
+
+Kubernetes manifests live in `manifests/`. They deploy the MCP server in HTTP
+mode as an internal `ClusterIP` service in the `driftmowers` namespace.
+
+The deployment mounts the existing Driftmower backend PVC
+`driftmower-be-data-v2` at `/data` read-only and uses pod affinity to co-locate
+with `app: driftmower-be`, matching the ReadWriteOnce SQLite volume constraint.
+The in-cluster HTTP server binds to `::` so Kubernetes can probe it in IPv6 or
+dual-stack clusters.
+
+Apply manually:
+
+```bash
+kubectl apply -f manifests/namespace.yaml
+kubectl apply -f manifests/deployment-app.yaml
+kubectl apply -f manifests/service.yaml
+```
+
+Forward the in-cluster MCP and health endpoints to your local machine:
+
+```bash
+kubectl -n driftmowers port-forward deploy/driftmower-mcp 3000:3000 3001:3001
+```
+
+After forwarding, Codex can use `http://127.0.0.1:3000/mcp` and readiness is
+available at `http://127.0.0.1:3001/readyz`.
+
+HTTP mode is intended for internal cluster access only in the MVP. Do not expose
+it through Ingress or the public internet without adding authentication and
+authorization.
+
+## Skaffold Quickstart
+
+Build and deploy with Skaffold:
+
+```bash
+skaffold run --tail --port-forward=user
+```
+
+For iterative development:
+
+```bash
+skaffold dev --port-forward
+```
+
+The Skaffold config builds `git.codemowers.io/uq69adc8851/driftmower-mcp`,
+deploys the raw manifests, and port-forwards the MCP endpoint to
+`localhost:3000` and health endpoints to `localhost:3001`.
+
 ## Tool
 
 `search_workloads` accepts:

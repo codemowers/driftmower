@@ -33,16 +33,18 @@ async function main(): Promise<void> {
       appConfig.defaultLimit,
       appConfig.maximumLimit
     )
-    const mcpServer = createMcpServer({ workloadSearchService })
+    const createServer = (): ReturnType<typeof createMcpServer> => createMcpServer({ workloadSearchService })
 
     if (appConfig.transport === 'stdio') {
+      const mcpServer = createServer()
+
       await startStdioTransport(mcpServer)
       logger.info('Driftmower MCP server started', { transport: 'stdio' })
 
       return
     }
 
-    const httpServer = await startHttpTransport(mcpServer, {
+    const httpServer = await startHttpTransport(createServer, {
       host: appConfig.host,
       port: appConfig.port
     })
@@ -58,7 +60,6 @@ async function main(): Promise<void> {
       await Promise.all([
         closeServer(httpServer),
         healthServer ? closeServer(healthServer) : Promise.resolve(),
-        mcpServer.close(),
         database?.destroy()
       ])
     })

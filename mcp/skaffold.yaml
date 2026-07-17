@@ -1,0 +1,38 @@
+apiVersion: skaffold/v3
+kind: Config
+metadata:
+  name: driftmower-mcp
+
+build:
+  local:
+    useBuildkit: true
+  artifacts:
+    - image: git.codemowers.io/uq69adc8851/driftmower-mcp
+      platforms:
+        - linux/amd64
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "src/**/*.ts"
+            dest: /app
+
+deploy:
+  kubectl:
+    defaultNamespace: driftmowers
+
+manifests:
+  rawYaml:
+    - manifests/namespace.yaml
+    - manifests/deployment-app.yaml
+    - manifests/service.yaml
+
+portForward:
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3000
+    localPort: 3000
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3001
+    localPort: 3001
