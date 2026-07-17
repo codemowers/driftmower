@@ -160,6 +160,7 @@ function createGroup(overrides: Partial<MatchingWorkloadGroupRow> = {}): Matchin
     workloadNamespace: 'apps',
     workloadName: 'api',
     searchRepository: null,
+    releaseInfo: null,
     matchRank: 0,
     ...overrides
   }

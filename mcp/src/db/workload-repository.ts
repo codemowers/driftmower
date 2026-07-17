@@ -4,6 +4,14 @@ const CLUSTER_SOURCE_TYPE = 'cluster'
 // TODO ineffective querying, remove after MVP scope, make it better
 const ALL_NAMESPACE_SCOPE = JSON.stringify({ mode: 'all' })
 
+interface ReleaseInfoJson {
+  name?: unknown
+  namespace?: unknown
+  chartName?: unknown
+  chartVersion?: unknown
+  latestChartTag?: unknown
+}
+
 interface ReportRow {
   id: string
   clusterContext: string | null
@@ -17,6 +25,7 @@ interface WorkloadGroupCandidateRow {
   workloadNamespace: string | null
   workloadName: string | null
   searchRepository: string | null
+  releaseInfo: string | null
 }
 
 interface WorkloadDetailDatabaseRow extends WorkloadGroupCandidateRow {
@@ -113,8 +122,13 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
         'iu.workload_kind as workloadKind',
         'iu.workload_namespace as workloadNamespace',
         'iu.workload_name as workloadName',
-        'iu.repository as searchRepository'
+        'iu.repository as searchRepository',
+        'rs.release_info as releaseInfo'
       ])
+      .leftJoin('release_scores as rs', join => {
+        join.on('rs.report_id', '=', 'iu.report_id')
+        join.andOn('rs.group_key', '=', 'iu.release_group_key')
+      })
       .whereIn('iu.report_id', reportIds)
       .orderBy([
         { column: 'iu.report_id', order: 'asc' },
@@ -222,11 +236,18 @@ export function rankWorkloadName(workloadName: string | null, normalizedQuery: s
 }
 
 function rankWorkloadCandidate(candidate: WorkloadGroupCandidateRow, normalizedQuery: string): number | null {
+  const releaseInfo = parseReleaseInfo(candidate.releaseInfo)
+
   return minNullableRank([
     rankSearchText(candidate.workloadName, normalizedQuery, 0),
     rankSearchText(candidate.workloadNamespace, normalizedQuery, 3),
     rankSearchText(candidate.workloadKind, normalizedQuery, 6),
-    rankSearchText(candidate.searchRepository, normalizedQuery, 9)
+    rankSearchText(candidate.searchRepository, normalizedQuery, 9),
+    rankSearchText(optionalString(releaseInfo?.name), normalizedQuery, 12),
+    rankSearchText(optionalString(releaseInfo?.namespace), normalizedQuery, 12),
+    rankSearchText(optionalString(releaseInfo?.chartName), normalizedQuery, 12),
+    rankSearchText(optionalString(releaseInfo?.chartVersion), normalizedQuery, 15),
+    rankSearchText(optionalString(releaseInfo?.latestChartTag), normalizedQuery, 15)
   ])
 }
 
@@ -244,6 +265,24 @@ function minNullableRank(ranks: Array<number | null>): number | null {
   }
 
   return Math.min(...matchedRanks)
+}
+
+function parseReleaseInfo(value: string | null): ReleaseInfoJson | null {
+  if (!value) {
+    return null
+  }
+
+  try {
+    const parsedValue: unknown = JSON.parse(value)
+
+    return typeof parsedValue === 'object' && parsedValue !== null ? (parsedValue as ReleaseInfoJson) : null
+  } catch {
+    return null
+  }
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
 }
 
 function compareMatchingGroups(left: MatchingWorkloadGroupRow, right: MatchingWorkloadGroupRow): number {

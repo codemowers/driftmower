@@ -101,6 +101,39 @@ describe('SqliteWorkloadRepository', () => {
     })
   })
 
+  it('searches persisted Helm release and chart metadata', async () => {
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertUsage(seedDatabase, 'report', 'helm', 'controller', 'example/controller', 'main', 'release-1')
+    seedDatabase
+      .prepare('INSERT INTO release_scores (report_id, group_key, release_info) VALUES (?, ?, ?)')
+      .run(
+        'report',
+        'release-1',
+        JSON.stringify({
+          name: 'cert-manager',
+          namespace: 'cert-manager',
+          chartName: 'cert-manager-chart'
+        })
+      )
+
+    const repository = await createRepository(databasePath)
+    const chartMatches = await repository.searchMatchingGroups('cert-manager-chart', 20)
+    const releaseMatches = await repository.searchMatchingGroups('cert-manager', 20)
+
+    expect(chartMatches).toHaveLength(1)
+    expect(chartMatches[0]).toMatchObject({
+      workloadName: 'controller',
+      releaseInfo: expect.stringContaining('cert-manager-chart'),
+      matchRank: 12
+    })
+    expect(releaseMatches).toHaveLength(1)
+    expect(releaseMatches[0]).toMatchObject({
+      workloadName: 'controller',
+      releaseInfo: expect.stringContaining('cert-manager'),
+      matchRank: 12
+    })
+  })
+
   it('limits workload groups rather than image rows', async () => {
     insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
     insertUsage(seedDatabase, 'report', 'alpha', 'api-alpha', 'api/alpha', 'main')
