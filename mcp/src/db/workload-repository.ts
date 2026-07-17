@@ -16,6 +16,7 @@ interface WorkloadGroupCandidateRow {
   workloadKind: string | null
   workloadNamespace: string | null
   workloadName: string | null
+  searchRepository: string | null
 }
 
 interface WorkloadDetailDatabaseRow extends WorkloadGroupCandidateRow {
@@ -103,22 +104,23 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
   }
 
   private async loadGroupCandidates(reportIds: string[]): Promise<WorkloadGroupCandidateRow[]> {
-    // Find distinct workload identities only in the selected latest reports.
-    // Name matching and ranking happen in TypeScript so user input never becomes SQL text.
+    // Find distinct workload search candidates only in the selected latest reports.
+    // Matching and ranking happen in TypeScript so user input never becomes SQL text.
     return (await this.database<WorkloadGroupCandidateRow>('image_usages as iu')
       .distinct([
         'iu.report_id as reportId',
         'iu.workload_group_key as workloadGroupKey',
         'iu.workload_kind as workloadKind',
         'iu.workload_namespace as workloadNamespace',
-        'iu.workload_name as workloadName'
+        'iu.workload_name as workloadName',
+        'iu.repository as searchRepository'
       ])
       .whereIn('iu.report_id', reportIds)
-      .whereNotNull('iu.workload_name')
       .orderBy([
         { column: 'iu.report_id', order: 'asc' },
         { column: 'iu.workload_group_key', order: 'asc' },
-        { column: 'iu.workload_name', order: 'asc' }
+        { column: 'iu.workload_name', order: 'asc' },
+        { column: 'iu.repository', order: 'asc' }
       ])) as WorkloadGroupCandidateRow[]
   }
 
@@ -188,7 +190,7 @@ function enrichMatchingGroup(
   normalizedQuery: string
 ): MatchingWorkloadGroupRow | null {
   const report = reportsById.get(candidate.reportId)
-  const matchRank = rankWorkloadName(candidate.workloadName, normalizedQuery)
+  const matchRank = rankWorkloadCandidate(candidate, normalizedQuery)
 
   if (!report?.clusterContext || matchRank === null) {
     return null
@@ -217,6 +219,31 @@ export function rankWorkloadName(workloadName: string | null, normalizedQuery: s
   }
 
   return normalizedName.startsWith(normalizedQuery) ? 1 : 2
+}
+
+function rankWorkloadCandidate(candidate: WorkloadGroupCandidateRow, normalizedQuery: string): number | null {
+  return minNullableRank([
+    rankSearchText(candidate.workloadName, normalizedQuery, 0),
+    rankSearchText(candidate.workloadNamespace, normalizedQuery, 3),
+    rankSearchText(candidate.workloadKind, normalizedQuery, 6),
+    rankSearchText(candidate.searchRepository, normalizedQuery, 9)
+  ])
+}
+
+function rankSearchText(value: string | null, normalizedQuery: string, offset: number): number | null {
+  const rank = rankWorkloadName(value, normalizedQuery)
+
+  return rank === null ? null : rank + offset
+}
+
+function minNullableRank(ranks: Array<number | null>): number | null {
+  const matchedRanks = ranks.filter((rank): rank is number => rank !== null)
+
+  if (matchedRanks.length === 0) {
+    return null
+  }
+
+  return Math.min(...matchedRanks)
 }
 
 function compareMatchingGroups(left: MatchingWorkloadGroupRow, right: MatchingWorkloadGroupRow): number {

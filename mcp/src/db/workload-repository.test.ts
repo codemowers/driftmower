@@ -78,6 +78,29 @@ describe('SqliteWorkloadRepository', () => {
     ])
   })
 
+  it('searches namespace and image repository when workload name does not match', async () => {
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertUsage(seedDatabase, 'report', 'namespace', 'llama-gemma', 'ggml-org/llama.cpp', 'main', null, 'llm')
+    insertUsage(seedDatabase, 'report', 'repository', 'webui', 'open-webui/open-webui')
+
+    const repository = await createRepository(databasePath)
+    const namespaceMatches = await repository.searchMatchingGroups('llm', 20)
+    const repositoryMatches = await repository.searchMatchingGroups('open-webui', 20)
+
+    expect(namespaceMatches).toHaveLength(1)
+    expect(namespaceMatches[0]).toMatchObject({
+      workloadName: 'llama-gemma',
+      workloadNamespace: 'llm',
+      matchRank: 3
+    })
+    expect(repositoryMatches).toHaveLength(1)
+    expect(repositoryMatches[0]).toMatchObject({
+      workloadName: 'webui',
+      workloadNamespace: 'apps',
+      matchRank: 10
+    })
+  })
+
   it('limits workload groups rather than image rows', async () => {
     insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
     insertUsage(seedDatabase, 'report', 'alpha', 'api-alpha', 'api/alpha', 'main')
@@ -182,16 +205,17 @@ function insertUsage(
   workloadName: string,
   repository = 'example/workload',
   containerName = 'main',
-  releaseGroupKey: string | null = null
+  releaseGroupKey: string | null = null,
+  workloadNamespace = 'apps'
 ): void {
   database
     .prepare(
       `INSERT INTO image_usages
-        (report_id, workload_group_key, workload_kind, workload_namespace, workload_name,
+       (report_id, workload_group_key, workload_kind, workload_namespace, workload_name,
          release_group_key, registry, repository, deployed_tag, latest_tag, status,
          version_status, container_name)
-       VALUES (?, ?, 'Deployment', 'apps', ?, ?, 'registry.example', ?, '1.0.0', '2.0.0',
+       VALUES (?, ?, 'Deployment', ?, ?, ?, 'registry.example', ?, '1.0.0', '2.0.0',
                'analyzed', 'outdated', ?)`
     )
-    .run(reportId, groupKey, workloadName, releaseGroupKey, repository, containerName)
+    .run(reportId, groupKey, workloadNamespace, workloadName, releaseGroupKey, repository, containerName)
 }
