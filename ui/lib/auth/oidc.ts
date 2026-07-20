@@ -32,7 +32,9 @@ export function getOidcRuntimeConfig(): OidcRuntimeConfig {
     appBaseUrl,
     redirectUri: `${appBaseUrl}/api/auth/callback`,
     postLogoutRedirectUri: `${appBaseUrl}/`,
-    scope: process.env.OIDC_SCOPE || "openid profile groups offline_access",
+    // applications gates passmower's per-user /api/apps launcher list,
+    // which backs the OIDC Applications page.
+    scope: process.env.OIDC_SCOPE || "openid profile groups applications offline_access",
     resource: requireEnv("OIDC_AUDIENCE"),
   }
 }

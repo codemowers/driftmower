@@ -27,6 +27,9 @@ spec:
     - openid
     - profile
     - groups
+    # Grants access to passmower's per-user /api/apps launcher list, which
+    # backs the OIDC Applications page.
+    - applications
     - offline_access
   tokenEndpointAuthMethod: client_secret_basic
   pkce: true
