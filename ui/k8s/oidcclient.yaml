@@ -30,6 +30,9 @@ spec:
     # Grants access to passmower's per-user /api/apps launcher list, which
     # backs the OIDC Applications page.
     - applications
+    # Carries the codemowers.io/namespaces claim (accessible-namespace set)
+    # into tokens; consumed by driftmower-be tenancy scoping.
+    - namespaces
     - offline_access
   tokenEndpointAuthMethod: client_secret_basic
   pkce: true

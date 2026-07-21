@@ -34,7 +34,9 @@ export function getOidcRuntimeConfig(): OidcRuntimeConfig {
     postLogoutRedirectUri: `${appBaseUrl}/`,
     // applications gates passmower's per-user /api/apps launcher list,
     // which backs the OIDC Applications page.
-    scope: process.env.OIDC_SCOPE || "openid profile groups applications offline_access",
+    // `namespaces` carries the codemowers.io/namespaces claim (the accessible
+    // namespace set) into tokens for tenancy scoping in driftmower-be.
+    scope: process.env.OIDC_SCOPE || "openid profile groups applications namespaces offline_access",
     resource: requireEnv("OIDC_AUDIENCE"),
   }
 }
