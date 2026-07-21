@@ -80,8 +80,10 @@ export async function getValidAccessToken(session: IronSession<SessionData>): Pr
 }
 
 // RFC 8707 resource indicator for platform-manager; must equal the audience
-// platform-manager validates JWTs against.
-function platformManagerAudience(): string {
+// platform-manager validates JWTs against. Exported so the login route can
+// include it as a second resource at authorization time — the IdP only mints
+// tokens for resources present in the original grant.
+export function platformManagerAudience(): string {
   return process.env.PLATFORM_MANAGER_AUDIENCE || "https://platform-manager-api"
 }
 
