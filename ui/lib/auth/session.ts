@@ -14,9 +14,7 @@ export interface SessionData {
   expiresAt?: number
   // Second RFC 8707 resource-scoped access token, minted on demand for the
   // platform-manager (tenancy control plane) API.
-  pmAccessToken?: string
   // Epoch seconds.
-  pmExpiresAt?: number
   claims?: SessionClaims
   codeVerifier?: string
   state?: string
