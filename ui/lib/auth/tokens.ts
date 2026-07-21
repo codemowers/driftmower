@@ -78,3 +78,58 @@ export async function getValidAccessToken(session: IronSession<SessionData>): Pr
     return null
   }
 }
+
+// RFC 8707 resource indicator for platform-manager; must equal the audience
+// platform-manager validates JWTs against.
+function platformManagerAudience(): string {
+  return process.env.PLATFORM_MANAGER_AUDIENCE || "https://platform-manager-api"
+}
+
+function isPmAccessTokenExpired(session: SessionData): boolean {
+  if (!session.pmExpiresAt) {
+    return true
+  }
+
+  return nowSeconds() >= session.pmExpiresAt - EXPIRY_SKEW_SECONDS
+}
+
+// Second resource-scoped access token for the platform-manager API, minted
+// from the same refresh token but with its own resource indicator. Kept
+// separate from the driftmower-api token fields on purpose: the two tokens
+// carry different audiences and expire independently.
+//
+// Unlike getValidAccessToken, a refresh failure here does not destroy the
+// session — the driftmower-api token may still be perfectly valid, so the
+// caller just answers 401 for the platform-manager routes.
+export async function getPlatformManagerToken(session: IronSession<SessionData>): Promise<string | null> {
+  if (session.pmAccessToken && !isPmAccessTokenExpired(session)) {
+    return session.pmAccessToken
+  }
+
+  if (!session.refreshToken) {
+    return null
+  }
+
+  try {
+    const config = await getOidcConfig()
+    const tokens = await oidc.refreshTokenGrant(config, session.refreshToken, {
+      resource: platformManagerAudience(),
+    })
+
+    session.pmAccessToken = tokens.access_token
+    const expiresIn = typeof tokens.expires_in === "number" ? tokens.expires_in : 3600
+    session.pmExpiresAt = nowSeconds() + expiresIn
+
+    // Defensive: if the IdP rotates the refresh token on this grant, losing
+    // the new one would break the next driftmower-api refresh too.
+    if (tokens.refresh_token) {
+      session.refreshToken = tokens.refresh_token
+    }
+
+    await session.save()
+
+    return session.pmAccessToken ?? null
+  } catch {
+    return null
+  }
+}

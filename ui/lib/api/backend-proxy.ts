@@ -35,19 +35,20 @@ function filterHeaders(headers: Headers): Headers {
   return out
 }
 
-export async function proxyRequest(req: Request, upstreamUrl: string): Promise<Response> {
+// Forwards a request to an upstream with the given bearer token. Shared by
+// proxyRequest (driftmower-be) and the platform-manager proxy, which differ
+// only in target and in how the token is obtained.
+export async function forwardRequest(
+  req: Request,
+  upstreamUrl: string,
+  accessToken: string,
+  logPrefix = "be-proxy",
+): Promise<Response> {
   const incoming = new URL(req.url)
   const target = new URL(upstreamUrl)
   incoming.searchParams.forEach((value, key) => {
     target.searchParams.append(key, value)
   })
-
-  const session = await getSession()
-  const accessToken = await getValidAccessToken(session)
-
-  if (!accessToken) {
-    return Response.json({ error: "not authenticated" }, { status: 401 })
-  }
 
   const headers = filterHeaders(req.headers)
   headers.set("authorization", `Bearer ${accessToken}`)
@@ -68,7 +69,7 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
     upstream = await fetch(target.toString(), init)
   } catch (e) {
     const cause = e instanceof Error && e.cause ? String(e.cause) : String(e)
-    console.error(`[be-proxy] ${req.method} ${target} -> unreachable: ${cause}`)
+    console.error(`[${logPrefix}] ${req.method} ${target} -> unreachable: ${cause}`)
     return Response.json(
       { error: "upstream unreachable", cause },
       { status: 502 },
@@ -76,7 +77,7 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
   }
 
   if (upstream.status >= 500) {
-    console.error(`[be-proxy] ${req.method} ${target} -> ${upstream.status} ${upstream.statusText}`)
+    console.error(`[${logPrefix}] ${req.method} ${target} -> ${upstream.status} ${upstream.statusText}`)
   }
 
   return new Response(upstream.body, {
@@ -84,6 +85,17 @@ export async function proxyRequest(req: Request, upstreamUrl: string): Promise<R
     statusText: upstream.statusText,
     headers: filterHeaders(upstream.headers),
   })
+}
+
+export async function proxyRequest(req: Request, upstreamUrl: string): Promise<Response> {
+  const session = await getSession()
+  const accessToken = await getValidAccessToken(session)
+
+  if (!accessToken) {
+    return Response.json({ error: "not authenticated" }, { status: 401 })
+  }
+
+  return forwardRequest(req, upstreamUrl, accessToken)
 }
 
 export function backendUrl(): string {
