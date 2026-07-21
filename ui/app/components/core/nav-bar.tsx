@@ -9,6 +9,7 @@ import {
   Boxes,
   BarChart3,
   Cpu,
+  FolderKey,
   PanelLeft,
   Server,
   ServerOff,
@@ -31,6 +32,9 @@ type NavItem = {
 const navItems: NavItem[] = [
   { name: "Executive Summary", href: "/executive-summary", icon: BarChart3 },
   { name: "OIDC Applications", href: "/oidc-applications", icon: ShieldCheck },
+  // Always shown: the page renders a "not configured" state when the BFF
+  // reports platform-manager is not deployed.
+  { name: "Tenants", href: "/tenants", icon: FolderKey },
   { name: "Topmost Owners", href: "/topmost-owners", icon: Boxes },
   { name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
   { name: "Cluster", href: "/cluster", icon: Cpu },
