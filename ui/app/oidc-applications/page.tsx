@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { ExternalLink } from "lucide-react"
 import PageHeader from "../components/page-header"
+import ClusterScopeBanner from "../components/cluster-scope-banner"
 
 type OidcApp = {
   name: string
@@ -91,6 +92,7 @@ export default function OidcApplicationsPage() {
           title="OIDC Applications"
           subtitle="Applications available to you"
         />
+        <ClusterScopeBanner />
 
         {state.status === "loading" && (
           <p className="text-sm text-muted-foreground">Loading applications…</p>

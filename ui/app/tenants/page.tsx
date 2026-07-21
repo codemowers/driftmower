@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { FileTerminal } from "lucide-react"
+import { Check, FileTerminal, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PageHeader from "../components/page-header"
 import KubeconfigPanel from "./kubeconfig-panel"
+import { selectTenant, useTenantContext } from "@/lib/tenancy/tenant-context"
 
 type Tenant = {
   tenant: string
@@ -24,6 +25,7 @@ type FetchState =
 
 function TenantCard({ tenant }: { tenant: Tenant }) {
   const [showKubeconfig, setShowKubeconfig] = useState(false)
+  const isContext = useTenantContext(s => s.selectedTenant) === tenant.tenant
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
@@ -76,7 +78,7 @@ function TenantCard({ tenant }: { tenant: Tenant }) {
         <p className="text-xs text-muted-foreground">Created by {tenant.creator}</p>
       )}
 
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
@@ -86,6 +88,16 @@ function TenantCard({ tenant }: { tenant: Tenant }) {
         >
           <FileTerminal aria-hidden />
           Kubeconfig
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={isContext}
+          onClick={() => selectTenant(tenant.tenant)}
+        >
+          {isContext ? <Check aria-hidden /> : <Layers aria-hidden />}
+          {isContext ? "Current context" : "Set as context"}
         </Button>
       </div>
 

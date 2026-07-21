@@ -6,13 +6,15 @@ import { reportWorkloadRoots } from "./report-roots"
 export function countTopmostOwners(
   data: Report | null,
   clusterResources: ClusterResource[] | null,
+  namespaces?: Set<string> | null,
 ): { tracked: number; total: number } {
-  const roots = reportWorkloadRoots(data)
-  const liveCount = liveWorkloadEntries(
+  const allRoots = reportWorkloadRoots(data)
+  const roots = namespaces ? allRoots.filter(r => namespaces.has(r.namespace)) : allRoots
+  const liveEntries = liveWorkloadEntries(
     clusterResources,
     new Map(),
-    new Set(roots.map(r => r.uid)),
-    new Set(roots.map(r => r.groupKey)),
-  ).length
-  return { tracked: roots.length, total: roots.length + liveCount }
+    new Set(allRoots.map(r => r.uid)),
+    new Set(allRoots.map(r => r.groupKey)),
+  ).filter(e => !namespaces || namespaces.has(e.namespace))
+  return { tracked: roots.length, total: roots.length + liveEntries.length }
 }

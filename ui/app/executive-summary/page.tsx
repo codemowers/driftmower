@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
+import { useTenantScope } from "@/lib/tenancy/tenant-context";
 import StatCard, { type StatValueTone } from "./components/stat-card";
 import SectionLinkCard from "./components/section-link-card";
 import DriftBreakdown from "./components/drift-breakdown";
@@ -9,6 +10,8 @@ import TechnicalDebtEstimate from "./components/technical-debt-estimate";
 import MostOutdatedWorkloads, { worstStatus, type OutdatedWorkloadEntry } from "./components/most-outdated-workloads";
 import ScraperIssues from "./components/scraper-issues";
 import PageHeader from "../components/page-header";
+import ClusterWideTag from "../components/cluster-wide-tag";
+import TenantEmptyState from "../components/tenant-empty-state";
 import { cn } from "@/lib/utils/cn";
 import { Boxes, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
@@ -46,14 +49,17 @@ const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 
 
 export default function ExecutiveSummaryPage() {
   const { data, reportId, clusterResources } = useClusterState();
+  const { tenant, namespaces } = useTenantScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = rottennessValueTone(rottennessScore)
 
-  const usages = data?.report.imageUsages ?? []
+  const scopeSet = namespaces ? new Set(namespaces) : null
+  const usages = (data?.report.imageUsages ?? [])
+    .filter(u => !scopeSet || scopeSet.has(u.namespace))
 
   const workloadMap = groupByWorkload(usages)
-  const owners = countTopmostOwners(data, clusterResources)
+  const owners = countTopmostOwners(data, clusterResources, scopeSet)
   const helmReleaseCount = new Set(
     usages.flatMap(u => u.releaseInfo?.managementKind === "helm" ? [u.releaseInfo.groupKey] : [])
   ).size
@@ -85,6 +91,9 @@ export default function ExecutiveSummaryPage() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
 
+  // The selected tenant's namespaces match nothing in the current report.
+  const tenantEmpty = tenant !== null && data !== null && usages.length === 0
+
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-10 px-7 py-12">
@@ -92,69 +101,77 @@ export default function ExecutiveSummaryPage() {
         {/* Header */}
         <PageHeader title="Executive Summary" subtitle="Monitor container drift across your cluster" />
 
+        {tenant && tenantEmpty ? (
+          <TenantEmptyState tenant={tenant} entity="tracked containers" />
+        ) : (
+          <>
+            <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
+              {/* Rottenness score: pre-computed in the report, cannot be re-scoped client-side */}
+              <div className="flex flex-col justify-center gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6 py-7">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Rottenness Score
+                  </p>
+                  {tenant && <ClusterWideTag />}
+                </div>
+                <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
+                  {rottennessScore.toFixed(2)}
+                </p>
+                <p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>
+              </div>
 
-        <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
-          {/* Rottenness score */}
-          <div className="flex flex-col justify-center gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6 py-7">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Rottenness Score
-            </p>
-            <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
-              {rottennessScore.toFixed(2)}
-            </p>
-            <p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>
-          </div>
+              {/* Divider */}
+              <div className="bg-gray-300" />
 
-          {/* Divider */}
-          <div className="bg-gray-300" />
-
-          {/* Status counts */}
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-              Container drift · <span className="tabular-nums">{usages.length}</span> tracked
-              {unknownCount > 0 && (
-                <> · <span className="tabular-nums">{unknownCount}</span> unknown</>
-              )}
-            </p>
-          <div className="grid grid-cols-4 gap-4">
-            <StatCard value={okCount}    accent="ok"    valueTone="ok"    label="OK"    hint="up to date" />
-            <StatCard value={patchCount} accent="patch" valueTone="patch" label="PATCH" hint="patch behind" />
-            <StatCard value={minorCount} accent="minor" valueTone="minor" label="MINOR" hint="minor behind" />
-            <StatCard value={majorCount} accent="major" valueTone="major" label="MAJOR" hint="major behind" />
-          </div>
-          </div>
-        </div>
+              {/* Status counts */}
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Container drift · <span className="tabular-nums">{usages.length}</span> tracked
+                  {unknownCount > 0 && (
+                    <> · <span className="tabular-nums">{unknownCount}</span> unknown</>
+                  )}
+                </p>
+              <div className="grid grid-cols-4 gap-4">
+                <StatCard value={okCount}    accent="ok"    valueTone="ok"    label="OK"    hint="up to date" />
+                <StatCard value={patchCount} accent="patch" valueTone="patch" label="PATCH" hint="patch behind" />
+                <StatCard value={minorCount} accent="minor" valueTone="minor" label="MINOR" hint="minor behind" />
+                <StatCard value={majorCount} accent="major" valueTone="major" label="MAJOR" hint="major behind" />
+              </div>
+              </div>
+            </div>
 
 
-        {/* Section links */}
-        <div className="flex w-full flex-wrap gap-5">
-          <SectionLinkCard
-            href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
-            title="Topmost Owners"
-            count={owners.tracked}
-            total={owners.total}
-            countEntity="owners"
-            hint="Controllers at the root of each workload subtree"
-            icon={Boxes}
-          />
-          <SectionLinkCard
-            href={reportId ? `/helm-releases?report=${reportId}` : "/helm-releases"}
-            title="Helm Releases"
-            count={helmReleaseCount}
-            countEntity="releases"
-            hint="Installed charts and revision history"
-            icon={ShipWheel}
-          />
-        </div>
+            {/* Section links */}
+            <div className="flex w-full flex-wrap gap-5">
+              <SectionLinkCard
+                href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
+                title="Topmost Owners"
+                count={owners.tracked}
+                total={owners.total}
+                countEntity="owners"
+                hint="Controllers at the root of each workload subtree"
+                icon={Boxes}
+              />
+              <SectionLinkCard
+                href={reportId ? `/helm-releases?report=${reportId}` : "/helm-releases"}
+                title="Helm Releases"
+                count={helmReleaseCount}
+                countEntity="releases"
+                hint="Installed charts and revision history"
+                icon={ShipWheel}
+              />
+            </div>
 
-        <DriftBreakdown ok={okCount} patch={patchCount} minor={minorCount} major={majorCount} />
+            <DriftBreakdown ok={okCount} patch={patchCount} minor={minorCount} major={majorCount} />
 
-        <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
+            <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
 
-        <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
-          <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />
-          <ScraperIssues issues={data?.issues ?? []} onCollapsedHeight={setIssuesHeight} />
-        </div>
+            <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
+              <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />
+              <ScraperIssues issues={data?.issues ?? []} clusterWide={tenant !== null} onCollapsedHeight={setIssuesHeight} />
+            </div>
+          </>
+        )}
 
       </main>
     </div>

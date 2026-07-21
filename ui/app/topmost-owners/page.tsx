@@ -11,7 +11,9 @@ import type { FocusKey, WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "./utils/pod-summary"
 import { liveWorkloadEntries } from "./utils/live-entries"
 import { reportWorkloadRoots } from "./utils/report-roots"
+import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useTenantScope } from "@/lib/tenancy/tenant-context"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
 import type { StatusType } from "@/lib/cluster/reports"
@@ -43,6 +45,7 @@ function TopmostOwnersContent() {
   const isFetchingReport = useClusterState(s => s.isFetchingReport)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { tenant, namespaces } = useTenantScope()
 
   const [storedFocus, setStoredFocus] = useState<string | null>(null)
   useEffect(() => {
@@ -153,7 +156,9 @@ function TopmostOwnersContent() {
     ? liveWorkloadEntries(clusterResources, podSummaries, excludeUids, excludeGroupKeys)
     : []
 
+  const scopeSet = namespaces ? new Set(namespaces) : null
   const workloads = [...reportEntries, ...liveEntries]
+    .filter(w => !scopeSet || scopeSet.has(w.namespace))
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -166,7 +171,11 @@ function TopmostOwnersContent() {
           pills={focus.pills(workloads)}
           leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
-        <WorkloadList entries={workloads} focus={focus} />
+        {tenant && workloads.length === 0 ? (
+          <TenantEmptyState tenant={tenant} entity="workloads" />
+        ) : (
+          <WorkloadList entries={workloads} focus={focus} />
+        )}
       </main>
     </div>
   )
