@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { Issue } from "@/lib/cluster/reports"
+import ClusterWideTag from "@/app/components/cluster-wide-tag"
 
 const TYPE_STYLE: Record<string, { bg: string; text: string }> = {
   scraper_failed:  { bg: "bg-status-major-bg", text: "text-status-major-label" },
@@ -27,9 +28,9 @@ function splitImage(image: string): { registry: string | null; repo: string } {
 
 const INITIAL_COUNT = 8
 
-type Props = { issues: Issue[]; onCollapsedHeight?: (height: number) => void }
+type Props = { issues: Issue[]; clusterWide?: boolean; onCollapsedHeight?: (height: number) => void }
 
-export default function ScraperIssues({ issues, onCollapsedHeight }: Props) {
+export default function ScraperIssues({ issues, clusterWide, onCollapsedHeight }: Props) {
   const [expanded, setExpanded] = useState(false)
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
@@ -62,9 +63,12 @@ export default function ScraperIssues({ issues, onCollapsedHeight }: Props) {
 
   return (
     <div ref={cardRef} className="flex flex-col rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Scraper Issues
-      </p>
+      <div className="mb-4 flex items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Scraper Issues
+        </p>
+        {clusterWide && <ClusterWideTag />}
+      </div>
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">No issues detected.</p>
       ) : (

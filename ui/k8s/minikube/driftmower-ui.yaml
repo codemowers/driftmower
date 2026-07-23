@@ -1,0 +1,102 @@
+# Minikube adaptation of k8s/deployment.yaml + service.yaml + ingress.yaml.
+# Differences from the codemowers/production manifests:
+#   - image -> locally-built localhost/driftmower-ui:local, imagePullPolicy: Never
+#   - no imagePullSecrets (image built into the node)
+#   - APP_BASE_URL -> https://driftmower.veebkolm.eu
+#   - ingressClassName traefik -> cloudflare-tunnel, no TLS block (Cloudflare
+#     terminates TLS at the edge; no cert-manager in this cluster)
+#   - OIDC_* still sourced from the passmower-generated secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driftmower-ui
+  namespace: driftmowers
+spec:
+  selector:
+    matchLabels:
+      app: driftmower-ui
+  template:
+    metadata:
+      labels:
+        app: driftmower-ui
+    spec:
+      serviceAccountName: driftmower-ui
+      containers:
+        - name: app
+          image: localhost/driftmower-ui:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          env:
+            - name: BACKEND_URL
+              value: "http://driftmower-be:3030"
+            - name: LLM_BASE_URL
+              value: "https://llama-api.ee-lte-1.codemowers.io/v1"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llama-api-token
+                  key: token
+            # Tenancy control plane behind the Tenants page; unset disables it.
+            - name: PLATFORM_MANAGER_URL
+              value: "http://platform-manager-dev.default.svc"
+            # Resource indicator requested for platform-manager tokens; must
+            # equal platform-manager's OIDC audience.
+            - name: PLATFORM_MANAGER_AUDIENCE
+              value: "https://platform-manager-api"
+            - name: APP_BASE_URL
+              value: "https://driftmower.veebkolm.eu"
+            - name: OIDC_AUDIENCE
+              value: "https://driftmower-api"
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-ui-owner-secrets
+                  key: OIDC_CLIENT_ID
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-ui-owner-secrets
+                  key: OIDC_CLIENT_SECRET
+            - name: OIDC_IDP_URI
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-ui-owner-secrets
+                  key: OIDC_IDP_URI
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: driftmower-ui-session
+                  key: SESSION_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: driftmower-ui
+  namespace: driftmowers
+spec:
+  selector:
+    app: driftmower-ui
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: driftmower-ui
+  namespace: driftmowers
+spec:
+  ingressClassName: cloudflare-tunnel
+  rules:
+    - host: driftmower.veebkolm.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: driftmower-ui
+                port:
+                  number: 80

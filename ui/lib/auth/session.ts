@@ -12,6 +12,9 @@ export interface SessionData {
   refreshToken?: string
   // Epoch seconds.
   expiresAt?: number
+  // Second RFC 8707 resource-scoped access token, minted on demand for the
+  // platform-manager (tenancy control plane) API.
+  // Epoch seconds.
   claims?: SessionClaims
   codeVerifier?: string
   state?: string

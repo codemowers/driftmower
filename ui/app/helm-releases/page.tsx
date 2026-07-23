@@ -4,7 +4,9 @@ import { Suspense } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import ReleaseList, { type ReleaseEntry } from "./components/release-list"
+import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useTenantScope } from "@/lib/tenancy/tenant-context"
 import { driftSummaryPills } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
@@ -30,9 +32,13 @@ const DISPLAY_ORDER: Record<StatusType, number> = {
 
 export default function HelmReleasesPage() {
   const { data } = useClusterState()
+  const { tenant, namespaces } = useTenantScope()
+  const scopeSet = namespaces ? new Set(namespaces) : null
 
   const entries: ReleaseEntry[] = data
-    ? Object.values(data.rotenness.releaseScores).map(score => {
+    ? Object.values(data.rotenness.releaseScores)
+      .filter(score => !scopeSet || scopeSet.has(score.releaseInfo.namespace))
+      .map(score => {
         const usages = data.report.releaseGroupMap[score.groupKey] ?? []
 
         const worstStatus = usages.reduce<StatusType>((worst, u) => {
@@ -76,9 +82,13 @@ export default function HelmReleasesPage() {
           secondary={{ label: "containers", count: totalContainers }}
           pills={driftSummaryPills(statusCounts, noDataCount)}
         />
-        <Suspense>
-          <ReleaseList entries={entries} />
-        </Suspense>
+        {tenant && entries.length === 0 ? (
+          <TenantEmptyState tenant={tenant} entity="Helm releases" />
+        ) : (
+          <Suspense>
+            <ReleaseList entries={entries} />
+          </Suspense>
+        )}
       </main>
     </div>
   )

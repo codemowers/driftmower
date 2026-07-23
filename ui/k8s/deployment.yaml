@@ -34,6 +34,13 @@ spec:
                 secretKeyRef:
                   name: llama-api-token
                   key: token
+            # Tenancy control plane behind the Tenants page; unset disables it.
+            - name: PLATFORM_MANAGER_URL
+              value: "http://platform-manager.platform-manager.svc"
+            # Resource indicator requested for platform-manager tokens; must
+            # equal platform-manager's OIDC audience.
+            - name: PLATFORM_MANAGER_AUDIENCE
+              value: "https://platform-manager-api"
             # Public base URL of this app (used to build the OIDC redirect URI).
             - name: APP_BASE_URL
               value: "https://driftmower-ui.ee-lte-1.codemowers.io"

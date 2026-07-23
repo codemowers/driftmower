@@ -9,6 +9,7 @@ import {
   Boxes,
   BarChart3,
   Cpu,
+  FolderKey,
   PanelLeft,
   Server,
   ServerOff,
@@ -19,8 +20,10 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/session"
+import { useTenantContext } from "@/lib/tenancy/tenant-context"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
+import TenantPicker from "./tenant-picker"
 
 type NavItem = {
   name: string
@@ -31,6 +34,9 @@ type NavItem = {
 const navItems: NavItem[] = [
   { name: "Executive Summary", href: "/executive-summary", icon: BarChart3 },
   { name: "OIDC Applications", href: "/oidc-applications", icon: ShieldCheck },
+  // Always shown: the page renders a "not configured" state when the BFF
+  // reports platform-manager is not deployed.
+  { name: "Tenants", href: "/tenants", icon: FolderKey },
   { name: "Topmost Owners", href: "/topmost-owners", icon: Boxes },
   { name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
   { name: "Cluster", href: "/cluster", icon: Cpu },
@@ -46,7 +52,13 @@ function isNavActive(pathname: string, href: string): boolean {
 export default function NavBar({ claims }: { claims: SessionClaims }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const { isConnected, clusterName, reportId } = useClusterState()
+  const selectedTenant = useTenantContext(s => s.selectedTenant)
   const pathname = usePathname()
+
+  const carriedParams = new URLSearchParams()
+  if (reportId) carriedParams.set("report", reportId)
+  if (selectedTenant) carriedParams.set("tenant", selectedTenant)
+  const carriedQuery = carriedParams.toString()
 
   useEffect(() => {
     if (localStorage.getItem("nav-expanded") === "false") {
@@ -89,6 +101,8 @@ export default function NavBar({ claims }: { claims: SessionClaims }) {
 
       {/* Nav items */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <TenantPicker isExpanded={isExpanded} />
+
         {isExpanded && (
           <h2 className="mt-5 w-full px-5 font-mono text-sm font-medium tracking-wide text-gray-400">
             Navigate
@@ -104,7 +118,7 @@ export default function NavBar({ claims }: { claims: SessionClaims }) {
               const Icon = item.icon
               const active = isNavActive(pathname, item.href)
 
-              const href = reportId ? `${item.href}?report=${reportId}` : item.href
+              const href = carriedQuery ? `${item.href}?${carriedQuery}` : item.href
               const link = (
                 <Link
                   href={href}
