@@ -4,6 +4,8 @@ import type { ImageUsage } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { supportsYamlView } from "@/lib/cluster/yaml-supported-kinds"
+import YamlLink from "@/app/components/yaml-link"
 
 type Props = {
   usages: ImageUsage[]
@@ -42,16 +44,21 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
 
         return (
           <div key={w.uid} className="overflow-hidden rounded-xl border border-gray-200">
-            <Link
-              href={workloadHref}
-              className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5 transition-colors hover:bg-brand-bg/30"
-            >
-              <span className="rounded bg-brand-bg px-1.5 py-0.5 text-xs font-semibold text-brand-label">
-                {w.kind}
-              </span>
-              <span className="text-sm font-semibold text-foreground">{w.name}</span>
-              <span className="font-mono text-xs text-muted-foreground">{w.namespace}</span>
-            </Link>
+            <div className="flex items-center border-b border-gray-200 bg-gray-50 transition-colors hover:bg-brand-bg/30">
+              <Link
+                href={workloadHref}
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5"
+              >
+                <span className="rounded bg-brand-bg px-1.5 py-0.5 text-xs font-semibold text-brand-label">
+                  {w.kind}
+                </span>
+                <span className="text-sm font-semibold text-foreground">{w.name}</span>
+                <span className="font-mono text-xs text-muted-foreground">{w.namespace}</span>
+              </Link>
+              {liveRoot && supportsYamlView(liveRoot.kind) && (
+                <YamlLink uid={liveRoot.uid} className="px-4 py-2.5" />
+              )}
+            </div>
 
             <div>
               {pods.map((pod, idx) => {
@@ -59,19 +66,24 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
                   ? `/topmost-owners/${w.uid}/${pod.uid}?report=${reportId}`
                   : `/topmost-owners/${w.uid}/${pod.uid}`
                 return (
-                  <Link
+                  <div
                     key={pod.uid}
-                    href={podHref}
                     className={cn(
-                      "grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 transition-colors hover:bg-brand-bg/30",
+                      "flex items-center transition-colors hover:bg-brand-bg/30",
                       idx > 0 && "border-t border-gray-100",
                     )}
                   >
-                    <span className={cn("w-2 h-2 rounded-full shrink-0", POD_SEVERITY_STYLE[classifyPod(pod)].solid)} />
-                    <span className="truncate font-mono text-sm text-foreground">{pod.name}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{pod.nodeName ?? "—"}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{pod.ips?.[0] ?? "—"}</span>
-                  </Link>
+                    <Link
+                      href={podHref}
+                      className="grid min-w-0 flex-1 grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3"
+                    >
+                      <span className={cn("w-2 h-2 rounded-full shrink-0", POD_SEVERITY_STYLE[classifyPod(pod)].solid)} />
+                      <span className="truncate font-mono text-sm text-foreground">{pod.name}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{pod.nodeName ?? "—"}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{pod.ips?.[0] ?? "—"}</span>
+                    </Link>
+                    <YamlLink uid={pod.uid} className="px-4 py-3" />
+                  </div>
                 )
               })}
             </div>
