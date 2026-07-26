@@ -136,6 +136,7 @@ function TopmostOwnersContent() {
             worstStatus,
             issueCount,
             inReport: true,
+            repos: [...repoStatus.keys()],
             drift: {
               containerCount: usages.length,
               staleRepoCount,

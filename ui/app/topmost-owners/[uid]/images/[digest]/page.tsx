@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { Bookmark } from "lucide-react"
+import { Layers } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -72,7 +72,7 @@ export default function ImageTagDetailPage() {
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
         <ResourceHeader
-          icon={Bookmark}
+          icon={Layers}
           iconAriaLabel="OCI image tag"
           title={repoLabel}
           copyValue={fullRef}

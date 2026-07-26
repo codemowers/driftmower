@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertTriangle, ExternalLink } from "lucide-react"
+import { AlertTriangle, ExternalLink, Layers } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -20,16 +20,30 @@ function isFinished(e: WorkloadEntry): boolean {
   return e.pods.worst.severity === "succeeded"
 }
 
+function matchesIdentity(e: WorkloadEntry, q: string): boolean {
+  return (
+    e.name.toLowerCase().includes(q) ||
+    e.namespace.toLowerCase().includes(q) ||
+    (e.manager.kind !== "standalone" && e.manager.name.toLowerCase().includes(q))
+  )
+}
+
+function matchingRepos(e: WorkloadEntry, q: string): string[] {
+  return e.repos.filter(r => r.toLowerCase().includes(q)).sort()
+}
+
 function WorkloadRow({
   entry,
   focus,
   reportId,
   linkTo,
+  repoHint,
 }: {
   entry: WorkloadEntry
   focus: FocusDefinition
   reportId: string | null
   linkTo: LinkTo
+  repoHint: string[]
 }) {
   const router = useRouter()
   const { uid, kind, name, namespace, manager, issueCount } = entry
@@ -69,6 +83,15 @@ function WorkloadRow({
           )}
         </div>
         <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
+        {repoHint.length > 0 && (
+          <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <Layers className="size-3 shrink-0" />
+            <span className="truncate font-mono">{repoHint[0]}</span>
+            {repoHint.length > 1 && (
+              <span className="shrink-0 tabular-nums">+{repoHint.length - 1}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Manager */}
@@ -198,12 +221,11 @@ export default function WorkloadList({ entries, focus }: { entries: WorkloadEntr
     .filter(e => showFinished || !isFinished(e))
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
-    .filter(e =>
-      q === "" ||
-      e.name.toLowerCase().includes(q) ||
-      e.namespace.toLowerCase().includes(q) ||
-      (e.manager.kind !== "standalone" && e.manager.name.toLowerCase().includes(q))
-    )
+    .filter(e => q === "" || matchesIdentity(e, q) || matchingRepos(e, q).length > 0)
+
+  if (q !== "") {
+    filteredEntries.sort((a, b) => Number(matchesIdentity(b, q)) - Number(matchesIdentity(a, q)))
+  }
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white">
@@ -238,7 +260,14 @@ export default function WorkloadList({ entries, focus }: { entries: WorkloadEntr
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <WorkloadRow key={entry.groupKey} entry={entry} focus={focus} reportId={reportId} linkTo={linkTo} />
+            <WorkloadRow
+              key={entry.groupKey}
+              entry={entry}
+              focus={focus}
+              reportId={reportId}
+              linkTo={linkTo}
+              repoHint={q !== "" && !matchesIdentity(entry, q) ? matchingRepos(entry, q) : []}
+            />
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No workloads match your filters</p>

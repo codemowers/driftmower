@@ -79,7 +79,7 @@ export default function WorkloadFilters({
       <FilterSearchInput
         value={searchQuery}
         onChange={onSearchChange}
-        placeholder="Search workloads, namespaces, managers..."
+        placeholder="Search workloads, namespaces, managers, images..."
       />
 
       <div className="flex items-center gap-2">

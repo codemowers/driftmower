@@ -16,6 +16,7 @@ export type WorkloadEntry = {
   worstStatus: StatusType
   issueCount: number
   inReport: boolean
+  repos: string[]
   drift?: {
     containerCount: number
     staleRepoCount: number

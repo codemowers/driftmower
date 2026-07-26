@@ -26,6 +26,7 @@ export function liveWorkloadEntries(
       worstStatus: "no_data",
       issueCount: 0,
       inReport: false,
+      repos: [],
       pods: podSummaries.get(resource.uid) ?? EMPTY_POD_SUMMARY,
     })
   }
