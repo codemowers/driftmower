@@ -8,30 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
-import type { VulnerabilityReport, VulnerabilitySeverity, Vulnerability } from "@/lib/cluster/vulnerability"
-
-const CVE_SEVERITY_STYLE: Record<VulnerabilitySeverity, { bg: string; text: string; label: string }> = {
-  CRITICAL: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Critical" },
-  HIGH:     { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "High" },
-  MEDIUM:   { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Medium" },
-  LOW:      { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "Low" },
-  UNKNOWN:  { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "Unknown" },
-  NONE:     { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "None" },
-}
-
-const CVE_SEVERITY_RANK: Record<VulnerabilitySeverity, number> = {
-  CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, UNKNOWN: 4, NONE: 5,
-}
-
-function worstVulnerability(report: VulnerabilityReport): Vulnerability | null {
-  const vulns = report.report.vulnerabilities
-  if (vulns.length === 0) return null
-  return [...vulns].sort((a, b) => {
-    const rankDiff = (CVE_SEVERITY_RANK[a.severity] ?? 5) - (CVE_SEVERITY_RANK[b.severity] ?? 5)
-    if (rankDiff !== 0) return rankDiff
-    return b.score - a.score
-  })[0]
-}
+import { CVE_SEVERITY_STYLE, worstVulnerability, type VulnerabilityReport } from "@/lib/cluster/vulnerability"
+import { digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
 function WorstCveCell({ report }: { report: VulnerabilityReport | null | undefined }) {
   if (report === undefined) {
@@ -97,7 +75,7 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
 
   const deduped = new Map<string, { usage: ImageUsage; count: number }>()
   for (const u of usages) {
-    const key = `${u.containerName}::${u.imageInfo.registry}/${u.imageInfo.repository}`
+    const key = `${u.containerName}::${u.imageInfo.registry}/${u.imageInfo.repository}::${u.imageInfo.digest}`
     const existing = deduped.get(key)
     if (existing) existing.count++
     else deduped.set(key, { usage: u, count: 1 })
@@ -120,7 +98,7 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
 
           return (
             <div
-              key={`${u.containerName}::${u.image}`}
+              key={`${u.containerName}::${u.image}::${u.imageInfo.digest}`}
               className={cn(idx > 0 && "border-t border-gray-100")}
             >
               <div className={cn("grid items-center gap-4 px-4 py-3", GRID)}>
@@ -136,13 +114,16 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
                 </div>
                 <Link
                   href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
-                  className="group inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
+                  className="group flex min-w-0 flex-col font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
                 >
-                  <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
-                  <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
+                    <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                  </span>
+                  <span className="truncate">{digestCrumb(u.imageInfo.digest)}</span>
                 </Link>
-                <TagCell tag={vs.deployedTag} builtAt={vs.deployedBuiltAt} />
-                <TagCell tag={vs.latestTag}   builtAt={vs.latestBuiltAt} />
+                <TagCell tag={resolvedVersion(u) ?? vs.deployedTag} builtAt={vs.deployedBuiltAt} />
+                <TagCell tag={vs.latestTag} builtAt={vs.latestBuiltAt} />
                 <div>
                   {statusStyle ? (
                     <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", statusStyle.bg, statusStyle.text)}>

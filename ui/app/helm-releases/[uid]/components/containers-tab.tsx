@@ -5,6 +5,7 @@ import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
 function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
   return (
@@ -34,6 +35,7 @@ const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Running", "Available", "Version drift"]
 
 export default function ContainersTab({ usages, issues, reportId }: Props) {
+  const reportQuery = reportId ? `?report=${reportId}` : ""
 
   const workloadMap = usages.reduce<Map<string, ImageUsage[]>>((map, u) => {
     if (!u.workloadRootInfo) return map
@@ -59,7 +61,7 @@ export default function ContainersTab({ usages, issues, reportId }: Props) {
 
         const deduped = new Map<string, { usage: ImageUsage; count: number }>()
         for (const u of containers) {
-          const key = `${u.containerName}::${u.imageInfo.registry}/${u.imageInfo.repository}`
+          const key = `${u.containerName}::${u.imageInfo.registry}/${u.imageInfo.repository}::${u.imageInfo.digest}`
           const existing = deduped.get(key)
           if (existing) existing.count++
           else deduped.set(key, { usage: u, count: 1 })
@@ -94,7 +96,7 @@ export default function ContainersTab({ usages, issues, reportId }: Props) {
 
                 return (
                   <div
-                    key={`${u.containerName}::${u.image}`}
+                    key={`${u.containerName}::${u.image}::${u.imageInfo.digest}`}
                     className={cn(
                       idx > 0 && "border-t border-gray-100"
                     )}
@@ -111,14 +113,17 @@ export default function ContainersTab({ usages, issues, reportId }: Props) {
                         )}
                       </div>
                       <Link
-                        href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${reportId ? `?report=${reportId}` : ""}`}
-                        className="group inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
+                        href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${reportQuery}`}
+                        className="group flex min-w-0 flex-col font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
                       >
-                        <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
-                        <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
+                          <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                        </span>
+                        <span className="truncate">{digestCrumb(u.imageInfo.digest)}</span>
                       </Link>
-                      <TagCell tag={vs.deployedTag} builtAt={vs.deployedBuiltAt} />
-                      <TagCell tag={vs.latestTag}   builtAt={vs.latestBuiltAt} />
+                      <TagCell tag={resolvedVersion(u) ?? vs.deployedTag} builtAt={vs.deployedBuiltAt} />
+                      <TagCell tag={vs.latestTag} builtAt={vs.latestBuiltAt} />
                       <div>
                         {statusStyle ? (
                           <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", statusStyle.bg, statusStyle.text)}>
