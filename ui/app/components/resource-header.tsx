@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
 
-type Chip = { label: string; tone?: "brand" | "muted" }
+type Chip = { label: string; tone?: "brand" | "muted"; className?: string }
 
 type Props = {
   icon: LucideIcon
@@ -69,7 +69,7 @@ export default function ResourceHeader({
                   key={i}
                   className={cn(
                     "rounded-md px-2 py-0.5 text-xs font-semibold",
-                    CHIP_TONE[chip.tone ?? "brand"],
+                    chip.className ?? CHIP_TONE[chip.tone ?? "brand"],
                   )}
                 >
                   {chip.label}

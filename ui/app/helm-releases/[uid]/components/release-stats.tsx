@@ -1,5 +1,6 @@
 import type { StatusType } from "@/lib/cluster/reports"
 import { staleText } from "@/lib/cluster/status-style"
+import { shortDate } from "@/lib/utils/format-time"
 import {
   StatGrid,
   StatCell,
@@ -13,22 +14,27 @@ type Props = {
   normalizedScore: number
   staleRepoCount: number
   distinctRepoCount: number
-  totalContainers: number
-  totalWorkloadCount: number
   namespace: string
   worstStatus: StatusType
+  installedAt?: string
+  upgradedAt?: string
+  revision?: number
 }
 
 export default function ReleaseStats({
   normalizedScore,
   staleRepoCount,
   distinctRepoCount,
-  totalContainers,
-  totalWorkloadCount,
   namespace,
   worstStatus,
+  installedAt,
+  upgradedAt,
+  revision,
 }: Props) {
-  const workloadLabel = totalWorkloadCount === 1 ? "1 workload" : `${totalWorkloadCount} workloads`
+  const upgradeCaptionParts = [
+    installedAt ? `installed ${shortDate(installedAt)}` : null,
+    revision !== undefined ? `revision ${revision}` : null,
+  ].filter(Boolean)
 
   return (
     <StatGrid>
@@ -41,9 +47,9 @@ export default function ReleaseStats({
         <StatCaption>image repositories</StatCaption>
       </StatCell>
 
-      <StatCell label="Containers">
-        <StatValue>{totalContainers}</StatValue>
-        <StatCaption>across {workloadLabel}</StatCaption>
+      <StatCell label="Last Upgraded">
+        <StatValue className="font-sans">{upgradedAt ? shortDate(upgradedAt) : "—"}</StatValue>
+        {upgradeCaptionParts.length > 0 && <StatCaption>{upgradeCaptionParts.join(" · ")}</StatCaption>}
       </StatCell>
 
       <NamespaceCell namespace={namespace} worstStatus={worstStatus} />

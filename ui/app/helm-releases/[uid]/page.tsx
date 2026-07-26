@@ -4,6 +4,7 @@ import { useParams } from "next/navigation"
 import { ShipWheel } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
+import { normalizeDeployDate } from "@/app/helm-releases/utils/chart-versions"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import ReleaseStats from "./components/release-stats"
@@ -70,7 +71,17 @@ export default function HelmReleaseDetailPage() {
             { label: "Helm Releases", href: backHref },
             { label: `${score.releaseInfo.managementKind} ${score.releaseInfo.name}` },
           ]}
-          chips={[{ label: score.releaseInfo.managementKind, tone: "brand" }]}
+          chips={[
+            { label: score.releaseInfo.managementKind, tone: "brand" },
+            ...(score.releaseInfo.helmStatus
+              ? [{
+                  label: score.releaseInfo.helmStatus,
+                  className: score.releaseInfo.helmStatus === "deployed"
+                    ? "bg-status-ok-bg text-status-ok-label"
+                    : "bg-status-minor-bg text-status-minor-label",
+                }]
+              : []),
+          ]}
           scoreChip={{ status: worstStatus, score: normalizedScore }}
           issueCount={issueCount}
           subtitle={`${score.releaseInfo.namespace} · ${containerLabel} · ${workloadLabel}`}
@@ -80,10 +91,11 @@ export default function HelmReleaseDetailPage() {
           normalizedScore={normalizedScore}
           staleRepoCount={score.staleRepoCount}
           distinctRepoCount={score.distinctRepoCount}
-          totalContainers={score.totalContainers}
-          totalWorkloadCount={score.totalWorkloadCount}
           namespace={score.releaseInfo.namespace}
           worstStatus={worstStatus}
+          installedAt={normalizeDeployDate(score.releaseInfo.firstDeployedAt)}
+          upgradedAt={normalizeDeployDate(score.releaseInfo.lastDeployedAt)}
+          revision={score.releaseInfo.revision}
         />
 
         <ChartCard
