@@ -52,7 +52,7 @@ function Row({ label, date, tone }: { label: string; date?: string; tone: (iso: 
 
 export default function SupportLifecycle({ usage }: { usage: ImageUsage }) {
   const { endOfLifeDate, endOfActiveSupportDate } = usage.imageInfo
-  const tracked = Boolean(endOfLifeDate || endOfActiveSupportDate)
+  if (!endOfLifeDate && !endOfActiveSupportDate) return null
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
@@ -60,16 +60,10 @@ export default function SupportLifecycle({ usage }: { usage: ImageUsage }) {
         Support lifecycle
       </p>
 
-      {tracked ? (
-        <div className="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
-          <Row label="Support ends" date={endOfActiveSupportDate} tone={activeSupportTone} />
-          <Row label="End of life" date={endOfLifeDate} tone={eolTone} />
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Not tracked · no EOL or active-support dates published
-        </p>
-      )}
+      <div className="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+        <Row label="Support ends" date={endOfActiveSupportDate} tone={activeSupportTone} />
+        <Row label="End of life" date={endOfLifeDate} tone={eolTone} />
+      </div>
     </div>
   )
 }

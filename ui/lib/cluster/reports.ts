@@ -130,14 +130,14 @@ export type Report = {
     imageUsages: ImageUsage[]
     releaseGroupMap: Record<string, ImageUsage[]>
     workloadGroupMap: Record<string, ImageUsage[]>
-    registryRepoMap: Record<string, unknown>
     excludedContainerCount: number
-    availableTagsMap: Record<string, string[]>
-    consideredTagsMap: Record<string, string[]>
-    filteredTagsMap: Record<string, string[]>
-    irrelevantTagsMap: Record<string, string[]>
-    latestSemverMap: Record<string, string>
-    scrapeStatusMap: Record<string, ScrapeStatus>
+    registryRepoMap?: Record<string, unknown>
+    availableTagsMap?: Record<string, string[]>
+    consideredTagsMap?: Record<string, string[]>
+    filteredTagsMap?: Record<string, string[]>
+    irrelevantTagsMap?: Record<string, string[]>
+    latestSemverMap?: Record<string, string>
+    scrapeStatusMap?: Record<string, ScrapeStatus>
   }
   rotenness: {
     normalizedScore: number

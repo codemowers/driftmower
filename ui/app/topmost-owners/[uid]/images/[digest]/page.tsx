@@ -7,12 +7,13 @@ import type { StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import CopyButton from "@/app/components/copy-button"
-import ImageTagStats from "./components/image-tag-stats"
-import TagIdentity from "./components/tag-identity"
-import SupportLifecycle from "./components/support-lifecycle"
-import SourceCard from "./components/source-card"
-import ImageIssues from "./components/image-issues"
-import ImageVulnerabilities from "./components/image-vulnerabilities"
+import ImageTagStats from "@/app/components/image/image-tag-stats"
+import TagIdentity from "@/app/components/image/tag-identity"
+import SupportLifecycle from "@/app/components/image/support-lifecycle"
+import SourceCard from "@/app/components/image/source-card"
+import ImageIssues from "@/app/components/image/image-issues"
+import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
+import { artifactTitle, digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
 const STATUS_LABEL: Record<StatusType, string> = {
   major_behind: "Major",
@@ -61,6 +62,7 @@ export default function ImageTagDetailPage() {
   const { registry, repository, tag } = usage.imageInfo
   const repoLabel = `${registry}/${repository}`
   const fullRef = `${repoLabel}:${tag}@${digest}`
+  const version = resolvedVersion(usage)
 
   const imageIssues = data.issues.filter(i => usage.image.includes(i.image))
   const status = usage.versionStatus.statusType
@@ -74,22 +76,20 @@ export default function ImageTagDetailPage() {
         <ResourceHeader
           icon={Layers}
           iconAriaLabel="OCI image tag"
-          title={repoLabel}
-          copyValue={fullRef}
+          title={artifactTitle(repository, version)}
           breadcrumbs={[
             { label: "Workloads", href: rootHref },
             { label: `Namespace ${workloadNamespace}` },
             { label: `${workloadKindLabel} ${workloadName}`, href: workloadHref },
-            { label: `Image ${repoLabel}` },
+            { label: `Image ${repository}@${digestCrumb(digest)}` },
           ]}
           chips={[{ label: "Image Tag", tone: "brand" }]}
           scoreChip={{ status, score: 0, label: statusLabel(status) }}
           issueCount={imageIssues.length}
           subtitle={
             <span className="flex items-center gap-1.5">
-              <span>digest:</span>
-              <span className="break-all font-mono">{digest}</span>
-              <CopyButton value={digest} />
+              <span className="break-all font-mono">{fullRef}</span>
+              <CopyButton value={fullRef} />
             </span>
           }
         />

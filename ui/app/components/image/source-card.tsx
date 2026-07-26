@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { ExternalLink, GitGraph } from "lucide-react"
-import { OCI_DOCUMENTATION, OCI_REVISION, sourceRepoUrl } from "../utils/oci-labels"
+import { OCI_DOCUMENTATION, OCI_REVISION, sourceRepoUrl } from "@/lib/utils/oci-labels"
 import type { ImageUsage } from "@/lib/cluster/reports"
 
 const SHORT_SHA_LENGTH = 8
@@ -34,12 +34,18 @@ function FooterLink({ label, href, children }: { label: string; href: string; ch
   )
 }
 
-export default function SourceCard({ usage }: { usage: ImageUsage }) {
+export default function SourceCard({
+  usage,
+  showRevision = true,
+}: {
+  usage: ImageUsage
+  showRevision?: boolean
+}) {
   const { labels } = usage.imageInfo
   const repoUrl = sourceRepoUrl(labels)
   if (!repoUrl) return null
 
-  const revision = labels?.[OCI_REVISION]
+  const revision = showRevision ? labels?.[OCI_REVISION] : undefined
   const docs = labels?.[OCI_DOCUMENTATION]
   const docsUrl = docs?.startsWith("http") ? docs : undefined
 

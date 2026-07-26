@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"
-import { OCI_BASE_NAME, sortedLabelEntries, stripOciPrefix } from "../utils/oci-labels"
+import { OCI_BASE_NAME, sortedLabelEntries, stripOciPrefix } from "@/lib/utils/oci-labels"
 import type { ImageUsage } from "@/lib/cluster/reports"
 
 const COLLAPSED_LABEL_COUNT = 8
