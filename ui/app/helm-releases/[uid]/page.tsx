@@ -86,7 +86,10 @@ export default function HelmReleaseDetailPage() {
           worstStatus={worstStatus}
         />
 
-        <ChartCard releaseInfo={score.releaseInfo} />
+        <ChartCard
+          releaseInfo={score.releaseInfo}
+          href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab"] })}
+        />
 
         <ReleaseTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportId={reportId} />
       </main>

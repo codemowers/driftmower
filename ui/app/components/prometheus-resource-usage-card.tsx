@@ -1,6 +1,7 @@
 "use client"
 
-import { Fragment, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
+import { softWrapText } from "@/lib/utils/soft-wrap-text"
 import { ChevronRight, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes, formatCores } from "@/lib/utils/format-bytes"
@@ -369,7 +370,7 @@ function VolumeRow({ volume }: { volume: PodVolume }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-56 shrink-0 break-words font-mono text-xs text-foreground" title={volume.name}>
-        {withBreaks(volume.name)}
+        {softWrapText(volume.name)}
       </span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
         <div className={cn("h-full rounded-full", usageBarColor(pct))} style={{ width: `${Math.min(pct * 100, 100)}%` }} />
@@ -379,14 +380,4 @@ function VolumeRow({ volume }: { volume: PodVolume }) {
       </span>
     </div>
   )
-}
-
-function withBreaks(text: string) {
-  const segments = text.split(/(?<=[-.])/)
-  return segments.map((segment, i) => (
-    <Fragment key={i}>
-      {segment}
-      {i < segments.length - 1 && <wbr />}
-    </Fragment>
-  ))
 }

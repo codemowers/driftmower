@@ -1,7 +1,7 @@
 "use client"
 
-import { Fragment } from "react"
 import { cn } from "@/lib/utils/cn"
+import { softWrapText } from "@/lib/utils/soft-wrap-text"
 import { kubectlAge } from "@/lib/utils/format-time"
 import { formatBytes } from "@/lib/utils/format-bytes"
 import { usageBarColor } from "@/lib/utils/usage-color"
@@ -105,20 +105,10 @@ function Node({ node }: { node: NodeDrift }) {
   )
 }
 
-function withBreaks(text: string) {
-  const segments = text.split(/(?<=[-.])/)
-  return segments.map((segment, i) => (
-    <Fragment key={i}>
-      {segment}
-      {i < segments.length - 1 && <wbr />}
-    </Fragment>
-  ))
-}
-
 function NodeName({ name }: { name: string }) {
   return (
     <span className="break-words font-mono text-sm font-semibold text-foreground">
-      {withBreaks(name)}
+      {softWrapText(name)}
     </span>
   )
 }

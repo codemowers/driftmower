@@ -13,6 +13,18 @@ export type ReleaseInfo = {
   chartName: string
   chartVersion: string
   chartAppVersion: string
+  revision?: number
+  helmStatus?: string
+  firstDeployedAt?: string
+  lastDeployedAt?: string
+  chartSource?: string
+  chartSourceKind?: string
+  chartRegistry?: string
+  chartRepository?: string
+  chartRepoUrl?: string
+  chartSourceVersion?: string
+  chartTags?: string[]
+  latestChartTag?: string
 }
 
 export type ReleaseScore = {

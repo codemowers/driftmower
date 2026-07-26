@@ -61,6 +61,14 @@ export function compactRelativeTimeFromNow(iso: string): string {
   return future ? "soon" : "just now"
 }
 
+// "Jul 2" — month + day, for compact deploy-date captions.
+export function shortDate(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en", { month: "short", day: "numeric" })
+}
+
 // kubectl-style age: day-centric
 export function kubectlAge(iso: string): string {
   const ms = Date.now() - Date.parse(iso)
