@@ -1,0 +1,63 @@
+"use client"
+
+import { Suspense } from "react"
+import PageHeader from "../components/page-header"
+import StatusSummaryBar from "../components/status-summary-bar"
+import TenantEmptyState from "../components/tenant-empty-state"
+import ImageList from "./components/image-list"
+import { imageEntries } from "./utils/image-entries"
+import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import type { StatusType } from "@/lib/cluster/reports"
+
+const DISPLAY_ORDER: Record<StatusType, number> = {
+  major_behind: 0,
+  minor_behind: 1,
+  patch_behind: 2,
+  up_to_date:   3,
+  ahead:        4,
+  no_data:      5,
+  no_version:   5,
+}
+
+const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
+
+export default function ContainerImagesPage() {
+  const { data } = useClusterState()
+  const { tenant, namespaces } = useTenantScope()
+
+  const entries = imageEntries(data, namespaces ? new Set(namespaces) : null)
+    .sort((a, b) =>
+      DISPLAY_ORDER[a.worstStatus] - DISPLAY_ORDER[b.worstStatus] ||
+      b.containerCount - a.containerCount ||
+      a.repository.localeCompare(b.repository),
+    )
+
+  const totalContainers = entries.reduce((sum, e) => sum + e.containerCount, 0)
+  const statusCounts = Object.fromEntries(
+    PILL_STATUSES.map(status => [status, entries.filter(e => e.worstStatus === status).length]),
+  ) as Partial<Record<StatusType, number>>
+  const noDataCount = entries.filter(e => isNoData(e.worstStatus)).length
+
+  return (
+    <div className="min-h-full flex flex-col items-center">
+      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
+        <PageHeader title="Container Images" subtitle="Every unique image running in the cluster" />
+        <StatusSummaryBar
+          totalLabel="images"
+          totalCount={entries.length}
+          secondary={{ label: "containers", count: totalContainers }}
+          pills={driftSummaryPills(statusCounts, noDataCount)}
+        />
+        {tenant && entries.length === 0 ? (
+          <TenantEmptyState tenant={tenant} entity="images" />
+        ) : (
+          <Suspense>
+            <ImageList entries={entries} />
+          </Suspense>
+        )}
+      </main>
+    </div>
+  )
+}
