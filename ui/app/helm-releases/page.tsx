@@ -67,7 +67,7 @@ export default function HelmReleasesPage() {
 
   const totalContainers = entries.reduce((s, e) => s + e.totalContainers, 0)
   const statusCounts = Object.fromEntries(
-    (["up_to_date", "patch_behind", "minor_behind", "major_behind"] as StatusType[])
+    (["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"] as StatusType[])
       .map(s => [s, entries.filter(e => e.worstStatus === s).length])
   ) as Partial<Record<StatusType, number>>
   const noDataCount = entries.filter(e => e.worstStatus === "no_data" || e.worstStatus === "no_version").length

@@ -17,6 +17,7 @@ const DRIFT_CHIPS: { token: string; label: string }[] = [
   { token: "patch",  label: "Patch" },
   { token: "minor",  label: "Minor" },
   { token: "major",  label: "Major" },
+  { token: "ahead",  label: "Ahead" },
   { token: "nodata", label: "No data" },
 ]
 

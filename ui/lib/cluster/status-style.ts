@@ -7,6 +7,7 @@ export const SEVERITY_STYLE: Partial<Record<StatusType, StatusStyle>> = {
   minor_behind: { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "Minor" },
   patch_behind: { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Patch" },
   up_to_date:   { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
+  ahead:        { bg: "bg-status-ahead-bg", text: "text-status-ahead-label", label: "Ahead" },
 }
 
 export function isNoData(status: StatusType): boolean {
@@ -15,7 +16,7 @@ export function isNoData(status: StatusType): boolean {
 
 export type SummaryPill = { label: string; count: number; bg: string; text: string }
 
-const DRIFT_PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind"]
+const DRIFT_PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 
 export function driftSummaryPills(
   statusCounts: Partial<Record<StatusType, number>>,

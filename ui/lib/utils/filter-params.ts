@@ -5,6 +5,7 @@ const STATUS_TOKEN: [string, StatusType][] = [
   ["patch", "patch_behind"],
   ["minor", "minor_behind"],
   ["major", "major_behind"],
+  ["ahead", "ahead"],
   ["nodata", "no_data"],
 ]
 

@@ -36,6 +36,11 @@
   --color-status-major-label: #b01e21;
   --color-status-major-text: #761416;
 
+  --color-status-ahead: #8b6fc0;
+  --color-status-ahead-bg: #eae2f6;
+  --color-status-ahead-label: #6a35a3;
+  --color-status-ahead-text: #47206e;
+
   --color-status-neutral: #6b7280;
   --color-status-neutral-bg: #eceef1;
   --color-status-neutral-label: #565d68;

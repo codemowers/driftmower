@@ -13,7 +13,7 @@ const DISPLAY_ORDER: Record<StatusType, number> = {
   no_version:   5,
 }
 
-const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind"]
+const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 
 function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
   if (staleRepoCount === 0) return "text-muted-foreground"
@@ -68,6 +68,7 @@ export const DRIFT_FOCUS: FocusDefinition = {
     { token: "patch",  label: "Patch",   match: e => e.worstStatus === "patch_behind" },
     { token: "minor",  label: "Minor",   match: e => e.worstStatus === "minor_behind" },
     { token: "major",  label: "Major",   match: e => e.worstStatus === "major_behind" },
+    { token: "ahead",  label: "Ahead",   match: e => e.worstStatus === "ahead" },
     { token: "nodata", label: "No data", match: e => e.worstStatus === "no_data" || e.worstStatus === "no_version" },
   ],
   secondary: entries => ({
