@@ -27,7 +27,9 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next internals, static assets, and the socket.io
-  // path (handled by server.js before Next).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|socket.io|.*\\.).*)"],
+  // Static assets match by file extension, not by "contains a dot": image
+  // routes carry a registry hostname and would skip the session check.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|socket\\.io|.*\\.(?:ico|png|jpg|jpeg|gif|webp|avif|svg|css|js|mjs|map|txt|xml|woff|woff2|ttf|otf)$).*)",
+  ],
 }
