@@ -20,6 +20,16 @@ async function readCa(): Promise<Buffer> {
   return cachedCa
 }
 
+export class KubeApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "KubeApiError"
+    this.status = status
+  }
+}
+
 export function isInCluster(): boolean {
   return typeof process.env.KUBERNETES_SERVICE_HOST === "string" && process.env.KUBERNETES_SERVICE_HOST !== ""
 }
@@ -47,7 +57,10 @@ async function kubeRequestText(path: string, accept: string): Promise<string> {
             resolve(body)
           } else {
             console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${body.slice(0, 200)}`)
-            reject(new Error(`Kubernetes API ${path} returned ${res.statusCode}: ${body.slice(0, 200)}`))
+            reject(new KubeApiError(
+              `Kubernetes API ${path} returned ${res.statusCode}: ${body.slice(0, 200)}`,
+              res.statusCode ?? 0,
+            ))
           }
         })
       },

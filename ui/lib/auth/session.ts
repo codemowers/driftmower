@@ -51,3 +51,13 @@ export async function getSession(): Promise<IronSession<SessionData>> {
 
   return getIronSession<SessionData>(await cookies(), getSessionOptions())
 }
+
+// Catches the SESSION_SECRET throw so callers get a 401 rather than a 500.
+export async function hasSession(): Promise<boolean> {
+  try {
+    const session = await getSession()
+    return Boolean(session.claims?.sub)
+  } catch {
+    return false
+  }
+}

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef } from "react"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { useScrollTabIntoView } from "@/lib/hooks/use-scroll-tab-into-view"
 import { useTabParam } from "@/lib/hooks/use-tab-param"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
@@ -13,18 +13,6 @@ import MetadataTab from "./metadata-tab"
 
 const TABS = ["Images", "Ports", "Logs", "Metadata"] as const
 
-function getScrollParent(el: HTMLElement | null): HTMLElement | null {
-  let node = el?.parentElement ?? null
-  while (node) {
-    const overflowY = getComputedStyle(node).overflowY
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
-      return node
-    }
-    node = node.parentElement
-  }
-  return null
-}
-
 type Props = {
   pod: ClusterResource
   usages: ImageUsage[]
@@ -35,36 +23,14 @@ type Props = {
 export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
   const [active, setActive] = useTabParam("ptab", TABS)
   const { suffix: contextQuery } = useContextHref()
-  const rootRef = useRef<HTMLDivElement>(null)
-  const scrollOnLogsRef = useRef(false)
-
-  useEffect(() => {
-    if (active !== "Logs" || !scrollOnLogsRef.current) return
-    scrollOnLogsRef.current = false
-
-    const scroller = getScrollParent(rootRef.current)
-    const content = scroller?.firstElementChild
-    if (!scroller || !content) return
-
-    const pinToBottom = () => scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" })
-    pinToBottom()
-
-    const observer = new ResizeObserver(pinToBottom)
-    observer.observe(content)
-    const stop = setTimeout(() => observer.disconnect(), 600)
-
-    return () => {
-      observer.disconnect()
-      clearTimeout(stop)
-    }
-  }, [active])
+  const { rootRef, requestScroll } = useScrollTabIntoView(active)
 
   return (
     <TabBar
       tabs={TABS}
       active={active}
       onSelect={tab => {
-        scrollOnLogsRef.current = tab === "Logs"
+        if (tab === "Logs") requestScroll()
         setActive(tab)
       }}
       rootRef={rootRef}

@@ -94,7 +94,14 @@ export default function HelmReleaseDetailPage() {
           href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab"] })}
         />
 
-        <ReleaseTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportId={reportId} />
+        <ReleaseTabs
+          uid={uid}
+          releaseInfo={score.releaseInfo}
+          usages={usages}
+          issues={data.issues}
+          clusterResources={clusterResources}
+          reportId={reportId}
+        />
       </main>
     </div>
   )
