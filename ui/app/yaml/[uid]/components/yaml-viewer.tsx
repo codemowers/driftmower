@@ -126,20 +126,22 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
         onScroll={e => setScopeIndex(Math.max(0, Math.floor(e.currentTarget.scrollTop / LINE_HEIGHT_PX)))}
         onMouseLeave={() => setHoveredIndex(null)}
       >
-        {lines.map((line, i) => (
-          <div
-            key={i}
-            style={{ height: LINE_HEIGHT_PX }}
-            className={cn(
-              "flex items-center whitespace-pre px-4",
-              hoveredIndex === i && "bg-brand-bg",
-            )}
-            onMouseEnter={() => setHoveredIndex(i)}
-            onClick={() => navigator.clipboard.writeText(line.path)}
-          >
-            <LineText text={line.text} />
-          </div>
-        ))}
+        <div className="w-max min-w-full">
+          {lines.map((line, i) => (
+            <div
+              key={i}
+              style={{ height: LINE_HEIGHT_PX }}
+              className={cn(
+                "flex items-center whitespace-pre px-4",
+                hoveredIndex === i && "bg-brand-bg",
+              )}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onClick={() => navigator.clipboard.writeText(line.path)}
+            >
+              <LineText text={line.text} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
