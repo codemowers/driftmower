@@ -8,9 +8,10 @@ import TabBar from "@/app/components/tab-bar"
 import ContainersTab from "./containers-tab"
 import ResourcesTab from "./resources-tab"
 import ValuesTab from "./values-tab"
+import ManifestTab from "./manifest-tab"
 
 const TABS = ["Containers", "Resources", "Values", "Manifest"] as const
-const SCROLL_INTO_VIEW_TABS = new Set<string>(["Values"])
+const SCROLL_INTO_VIEW_TABS = new Set<string>(["Values", "Manifest"])
 
 type Props = {
   uid: string
@@ -42,9 +43,7 @@ export default function ReleaseTabs({ uid, releaseInfo, usages, issues, clusterR
         <ResourcesTab usages={usages} clusterResources={clusterResources} reportId={reportId} />
       )}
       {active === "Values" && <ValuesTab uid={uid} releaseInfo={releaseInfo} />}
-      {active === "Manifest" && (
-        <p className="text-sm text-muted-foreground">Manifest not available coming soon</p>
-      )}
+      {active === "Manifest" && <ManifestTab uid={uid} releaseInfo={releaseInfo} />}
     </TabBar>
   )
 }
