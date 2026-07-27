@@ -1,15 +1,6 @@
 import type { ImageUsage, Issue, Report, ScrapeStatus, StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_ORDER } from "@/lib/cluster/status-style"
 import { resolvedVersion } from "@/lib/utils/image-artifacts"
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
 
 export type ImageWorkload = {
   uid: string

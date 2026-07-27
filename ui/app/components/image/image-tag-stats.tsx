@@ -10,13 +10,14 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 
 const SEVERITY_STYLE: Record<StatusType, { bg: string; text: string; label: string }> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Major" },
-  minor_behind: { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "Minor" },
-  patch_behind: { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "Patch" },
-  up_to_date:   { bg: "bg-status-ok-bg",    text: "text-status-ok-label",    label: "OK" },
-  ahead:        { bg: "bg-status-ahead-bg", text: "text-status-ahead-label", label: "Ahead" },
-  no_data:      { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "No data" },
-  no_version:   { bg: "bg-gray-100",        text: "text-muted-foreground",   label: "No version" },
+  major_behind: { bg: "bg-status-major-bg",   text: "text-status-major-label",   label: "Major" },
+  minor_behind: { bg: "bg-status-minor-bg",   text: "text-status-minor-label",   label: "Minor" },
+  patch_behind: { bg: "bg-status-patch-bg",   text: "text-status-patch-label",   label: "Patch" },
+  up_to_date:   { bg: "bg-status-ok-bg",      text: "text-status-ok-label",      label: "OK" },
+  ahead:        { bg: "bg-status-ahead-bg",   text: "text-status-ahead-label",   label: "Ahead" },
+  behind:       { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "Behind" },
+  no_data:      { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "No data" },
+  no_version:   { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "No version" },
 }
 
 function severityStyle(statusType: string): { bg: string; text: string; label: string } {

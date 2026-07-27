@@ -8,18 +8,8 @@ import ImageList from "./components/image-list"
 import { imageEntries } from "./utils/image-entries"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
-import { driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
-
-const DISPLAY_ORDER: Record<StatusType, number> = {
-  major_behind: 0,
-  minor_behind: 1,
-  patch_behind: 2,
-  up_to_date:   3,
-  ahead:        4,
-  no_data:      5,
-  no_version:   5,
-}
 
 const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 

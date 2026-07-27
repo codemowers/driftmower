@@ -4,22 +4,13 @@ import { useParams } from "next/navigation"
 import { ShipWheel } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_ORDER } from "@/lib/cluster/status-style"
 import { normalizeDeployDate } from "@/app/helm-releases/utils/chart-versions"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
 import ReleaseTabs from "./components/release-tabs"
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
 
 export default function HelmReleaseDetailPage() {
   const { uid } = useParams<{ uid: string }>()

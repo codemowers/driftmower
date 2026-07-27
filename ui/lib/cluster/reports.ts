@@ -2,7 +2,7 @@ import { useClusterState } from "./cluster-state"
 import { REPORTS_URL } from "./constants"
 import { fetchJson } from "@/lib/utils/fetch-json"
 
-export type StatusType = "up_to_date" | "patch_behind" | "minor_behind" | "major_behind" | "ahead" | "no_data" | "no_version"
+export type StatusType = "up_to_date" | "patch_behind" | "minor_behind" | "major_behind" | "ahead" | "behind" | "no_data" | "no_version"
 
 export type ReleaseInfo = {
   managementKind: string

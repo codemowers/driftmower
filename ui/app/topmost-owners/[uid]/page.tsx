@@ -6,6 +6,7 @@ import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/status-style"
 import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { workloadMetricQueries } from "@/lib/cluster/prometheus/workload-metrics"
@@ -18,18 +19,6 @@ import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
-
-const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 
 export default function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()

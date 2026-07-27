@@ -1,18 +1,8 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
-
-type StatusType = ImageUsage["versionStatus"]["statusType"]
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
+import type { StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_ORDER } from "@/lib/cluster/status-style"
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
   major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "major" },

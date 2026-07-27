@@ -6,7 +6,7 @@ import CopyButton from "@/app/components/copy-button"
 import Breadcrumbs, { type BreadcrumbItem } from "@/app/components/breadcrumbs"
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
 
 type Chip = { label: string; tone?: "brand" | "muted"; className?: string }
 
@@ -40,9 +40,7 @@ export default function ResourceHeader({
 }: Props) {
   const scoreStyle = scoreChip ? SEVERITY_STYLE[scoreChip.status] : undefined
   const scoreLabel = scoreChip
-    ? scoreChip.label ?? (scoreChip.status === "no_data" || scoreChip.status === "no_version"
-        ? "—"
-        : scoreChip.score.toFixed(2))
+    ? scoreChip.label ?? (isNoData(scoreChip.status) ? "—" : scoreChip.score.toFixed(2))
     : ""
 
   return (

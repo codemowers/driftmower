@@ -16,19 +16,8 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
+import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
-
-const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 
 export default function TopmostOwnersPage() {
   return (

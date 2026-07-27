@@ -1,17 +1,7 @@
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE, driftSummaryPills } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, SEVERITY_STYLE, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
 import type { FocusDefinition, WorkloadEntry } from "./types"
-
-const DISPLAY_ORDER: Record<StatusType, number> = {
-  major_behind: 0,
-  minor_behind: 1,
-  patch_behind: 2,
-  up_to_date:   3,
-  ahead:        4,
-  no_data:      5,
-  no_version:   5,
-}
 
 const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 
@@ -69,7 +59,7 @@ export const DRIFT_FOCUS: FocusDefinition = {
     { token: "minor",  label: "Minor",   match: e => e.worstStatus === "minor_behind" },
     { token: "major",  label: "Major",   match: e => e.worstStatus === "major_behind" },
     { token: "ahead",  label: "Ahead",   match: e => e.worstStatus === "ahead" },
-    { token: "nodata", label: "No data", match: e => e.worstStatus === "no_data" || e.worstStatus === "no_version" },
+    { token: "nodata", label: "No data", match: e => isNoData(e.worstStatus) },
   ],
   secondary: entries => ({
     label: "containers",
@@ -79,7 +69,7 @@ export const DRIFT_FOCUS: FocusDefinition = {
     Object.fromEntries(
       PILL_STATUSES.map(s => [s, entries.filter(e => e.worstStatus === s).length]),
     ) as Partial<Record<StatusType, number>>,
-    entries.filter(e => e.worstStatus === "no_data" || e.worstStatus === "no_version").length,
+    entries.filter(e => isNoData(e.worstStatus)).length,
   ),
   headers: ["Contents", "Stale repos", "Drift"],
   gridCols: "grid-cols-[95px_minmax(0,3fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)]",

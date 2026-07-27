@@ -4,6 +4,7 @@ import { useParams } from "next/navigation"
 import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
+import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { podMetricQueries } from "@/lib/cluster/prometheus/pod-metrics"
 import ResourceHeader from "@/app/components/resource-header"
@@ -15,18 +16,6 @@ import PodLlmSummary from "./components/pod-llm-summary"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
 import { usePodMetrics } from "./hooks/use-pod-metrics"
-
-const SEVERITY_ORDER: Record<StatusType, number> = {
-  major_behind: 4,
-  minor_behind:  3,
-  patch_behind:  2,
-  up_to_date:    1,
-  ahead:         0,
-  no_data:      -1,
-  no_version:   -1,
-}
-
-const STALE_STATUSES: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 
 export default function PodDetailPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()

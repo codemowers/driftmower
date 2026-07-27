@@ -7,7 +7,7 @@ import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import ReleaseFilters from "./release-filters"
 
@@ -141,7 +141,7 @@ export default function ReleaseList({ entries }: { entries: ReleaseEntry[] }) {
   const filteredEntries = entries
     .filter(e => {
       if (activeStatuses.size === 0) return true
-      if (activeStatuses.has("no_data") && (e.worstStatus === "no_data" || e.worstStatus === "no_version")) return true
+      if (activeStatuses.has("no_data") && isNoData(e.worstStatus)) return true
       return activeStatuses.has(e.worstStatus)
     })
     .filter(e => !showIssuesOnly || e.issueCount > 0)

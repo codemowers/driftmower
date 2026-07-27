@@ -21,6 +21,7 @@ const STATUS_LABEL: Record<StatusType, string> = {
   patch_behind: "Patch",
   up_to_date:   "OK",
   ahead:        "Ahead",
+  behind:       "Behind",
   no_data:      "No data",
   no_version:   "No version",
 }
