@@ -1,4 +1,4 @@
-import { streamQuery } from "@/lib/llm"
+import { isLlmConfigured, streamQuery } from "@/lib/llm"
 import {
   SYSTEM_PROMPT_LIVE,
   SYSTEM_PROMPT_STATIC,
@@ -27,6 +27,10 @@ function isLiveFacts(facts: object): facts is LiveFacts {
 }
 
 export async function POST(req: Request) {
+  if (!isLlmConfigured()) {
+    return Response.json({ error: "LLM_BASE_URL is not set" }, { status: 503 })
+  }
+
   let body: { kind?: string; facts?: unknown }
   try {
     body = await req.json()
