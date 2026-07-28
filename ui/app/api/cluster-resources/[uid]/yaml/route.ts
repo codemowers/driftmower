@@ -32,7 +32,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
     return Response.json({ error: "Resource not found or its uid changed" }, { status: 404 })
   }
 
-  if (resource.metadata) delete resource.metadata.managedFields
-
   return Response.json(resource)
 }

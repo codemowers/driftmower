@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useParams } from "next/navigation"
 import { FileCode } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -58,15 +59,17 @@ export default function YamlPage() {
             { label: resource.kind, tone: "brand" },
             { label: resource.namespace, tone: "muted" },
           ]}
-          subtitle="live from the cluster · managedFields omitted"
+          subtitle="live from the cluster"
         />
 
-        <YamlViewer
-          uid={resource.uid}
-          kind={resource.kind}
-          namespace={resource.namespace}
-          name={resource.name}
-        />
+        <Suspense>
+          <YamlViewer
+            uid={resource.uid}
+            kind={resource.kind}
+            namespace={resource.namespace}
+            name={resource.name}
+          />
+        </Suspense>
       </main>
     </div>
   )

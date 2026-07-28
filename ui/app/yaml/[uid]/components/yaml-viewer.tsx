@@ -1,8 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Switch } from "@/components/ui/switch"
 import DocumentViewer from "@/app/components/document-viewer"
-import { emitYamlLines, type YamlLine } from "@/lib/utils/yaml-lines"
+import { generatedAnnotator, stripGenerated } from "@/lib/cluster/managed-fields"
+import { useSearchParam } from "@/lib/hooks/use-search-param"
+import { emitYamlLines } from "@/lib/utils/yaml-lines"
 
 type Props = {
   uid: string
@@ -14,10 +17,14 @@ type Props = {
 type FetchState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; lines: YamlLine[] }
+  | { status: "ready"; resource: Record<string, unknown> }
 
 export default function YamlViewer({ uid, kind, namespace, name }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" })
+  const [managedParam, setManagedParam] = useSearchParam("managed")
+
+  const showManaged = managedParam === "1"
+  const resource = state.status === "ready" ? state.resource : null
 
   useEffect(() => {
     let cancelled = false
@@ -31,7 +38,7 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
           setState({ status: "error", message: json.error ?? `Request failed with status ${res.status}` })
           return
         }
-        setState({ status: "ready", lines: emitYamlLines(json) })
+        setState({ status: "ready", resource: json })
       })
       .catch(e => {
         if (!cancelled) setState({ status: "error", message: String(e) })
@@ -42,6 +49,14 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
     }
   }, [uid, kind, namespace, name])
 
+  const views = useMemo(() => {
+    if (!resource) return null
+    return {
+      managed: emitYamlLines(resource, { annotate: generatedAnnotator }),
+      clean: emitYamlLines(stripGenerated(resource)),
+    }
+  }, [resource])
+
   if (state.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading YAML…</p>
   }
@@ -50,5 +65,35 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
     return <p className="text-sm text-status-major-label">Failed to load YAML: {state.message}</p>
   }
 
-  return <DocumentViewer lines={state.lines} filename={`${name}.yaml`} />
+  if (!views) return null
+
+  const lines = showManaged ? views.managed : views.clean
+  const hiddenCount = views.managed.length - views.clean.length
+  const command = `kubectl get ${kind.toLowerCase()} ${name} -n ${namespace} -o yaml`
+
+  return (
+    <DocumentViewer
+      lines={lines}
+      filename={`${name}.yaml`}
+      toolbar={
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
+          Show managed fields
+          <Switch checked={showManaged} onCheckedChange={next => setManagedParam(next ? "1" : null)} />
+        </label>
+      }
+      footer={
+        <>
+          <span>{lines.length} lines</span>
+          {!showManaged && hiddenCount > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span>{hiddenCount} lines hidden</span>
+            </>
+          )}
+          <span aria-hidden>·</span>
+          <span className="font-mono">{command}</span>
+        </>
+      }
+    />
+  )
 }

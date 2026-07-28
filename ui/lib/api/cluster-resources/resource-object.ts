@@ -9,7 +9,7 @@ const RESOURCE_PATHS: Record<string, (namespace: string, name: string) => string
 }
 
 export type ResourceObject = {
-  metadata?: { uid?: string; managedFields?: unknown }
+  metadata?: { uid?: string }
 } & Record<string, unknown>
 
 export async function getResourceObject(
