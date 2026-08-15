@@ -1,5 +1,6 @@
 import type { StatusType } from "@/lib/cluster/reports"
 import { HISTORY_SEVERITY } from "@/lib/cluster/status-style"
+import { IMAGE_USAGE_CHANGES_URL, REPORTS_URL } from "@/lib/cluster/constants"
 import { fetchJson } from "@/lib/utils/fetch-json"
 import type { Observation, SeriesSource } from "./build-series"
 import { seriesKey } from "./build-series"
@@ -65,13 +66,13 @@ function loadReports(context: string): Promise<ReportRow[]> {
   for (const field of ["id", "createdAt", "summaryNormalizedScore", "summaryTotalContainers"]) {
     params.append("$select[]", field)
   }
-  return fetchAll<ReportRow>("/api/reports", params)
+  return fetchAll<ReportRow>(REPORTS_URL, params)
 }
 
 function loadChanges(): Promise<ChangeRow[]> {
   const params = new URLSearchParams()
   params.append("$sort[createdAt]", "1")
-  return fetchAll<ChangeRow>("/api/image-usage-changes", params)
+  return fetchAll<ChangeRow>(IMAGE_USAGE_CHANGES_URL, params)
 }
 
 // Group keys are "Kind/namespace/name"; a name may contain slashes.

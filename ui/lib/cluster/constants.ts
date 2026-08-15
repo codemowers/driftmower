@@ -1,6 +1,7 @@
 export const ANALYZE_CLUSTER_URL = "/api/analyze-cluster"
 export const KUBERNETES_CONTEXTS_URL = "/api/kubernetes-contexts"
 export const REPORTS_URL = "/api/reports"
+export const IMAGE_USAGE_CHANGES_URL = "/api/image-usage-changes"
 export const VULNERABILITY_REPORT_URL = "/api/vulnerability-report"
 export const WORKLOADS_URL = "/api/workloads"
 export const CLUSTER_RESOURCES_URL = "/api/cluster-resources"
