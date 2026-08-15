@@ -1,10 +1,12 @@
 import type { FocusDefinition, FocusKey } from "./types"
 import { DRIFT_FOCUS } from "./drift-focus"
 import { PODS_FOCUS } from "./pods-focus"
+import { HISTORY_FOCUS } from "./history-focus"
 
 export const FOCUSES: Record<FocusKey, FocusDefinition> = {
   drift: DRIFT_FOCUS,
   pods: PODS_FOCUS,
+  history: HISTORY_FOCUS,
 }
 
 export const DEFAULT_FOCUS: FocusKey = "drift"

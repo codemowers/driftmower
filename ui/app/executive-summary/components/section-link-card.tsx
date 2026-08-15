@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils/cn"
 export type SectionLinkCardProps = {
   href: string
   title: string
-  count: number
+  count: number | null
   total?: number
   countEntity: string
   hint: string
@@ -36,7 +36,7 @@ export default function SectionLinkCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-brand-text">{title}</p>
           <p className="font-mono text-sm tabular-nums text-foreground">
-            {total !== undefined && total > count ? `${count} of ${total}` : count} {countEntity} tracked
+            {count === null ? "–" : total !== undefined && total > count ? `${count} of ${total}` : count} {countEntity} tracked
           </p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>

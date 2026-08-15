@@ -107,9 +107,7 @@ export default function VersionsTable({
               </span>
 
               <div>
-                {style
-                  ? <span className={cn(CHIP, style.bg, style.text)}>{style.label}</span>
-                  : <span className={cn(CHIP, "bg-gray-100 text-muted-foreground")}>No data</span>}
+                <span className={cn(CHIP, style.bg, style.text)}>{style.label}</span>
               </div>
 
               <div>

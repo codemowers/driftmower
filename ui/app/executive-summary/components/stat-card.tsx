@@ -1,16 +1,18 @@
+import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
-export type StatAccent = "ok" | "patch" | "minor" | "major" | "brand"
+export type StatAccent = "ok" | "patch" | "minor" | "major" | "ahead" | "brand"
 
 export type StatValueTone =
     | "ok"
     | "patch"
     | "minor"
     | "major"
+    | "ahead"
     | "brand"
     | "muted"
 
 export type StatCardProps = {
-    value: string | number
+    value: ReactNode
     accent: StatAccent
     valueTone: StatValueTone
     textTone?: StatValueTone
@@ -31,6 +33,7 @@ export default function StatCard({
         patch: "bg-status-patch-bg border-status-patch",
         minor: "bg-status-minor-bg border-status-minor",
         major: "bg-status-major-bg border-status-major",
+        ahead: "bg-status-ahead-bg border-status-ahead",
         brand: "bg-brand-bg border-brand",
     }
 
@@ -39,13 +42,14 @@ export default function StatCard({
         patch: "text-status-patch-label",
         minor: "text-status-minor-label",
         major: "text-status-major-label",
+        ahead: "text-status-ahead-label",
         brand: "text-brand-label",
         muted: "text-muted-foreground",
     }
 
     return (
         <div className={cn(
-            "flex min-w-0 flex-col gap-1 rounded-3xl border-t-4 px-6 py-6.5",
+            "flex min-w-0 flex-col justify-center gap-1 rounded-3xl border-t-4 px-6 py-6.5",
             bg[accent],
         )}>
             {label && (

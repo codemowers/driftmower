@@ -7,6 +7,7 @@ import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
+import type { Span } from "@/lib/cluster/drift-history/types"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
 import { imagePath } from "@/lib/utils/image-artifacts"
@@ -18,11 +19,13 @@ import {
   type Vulnerability,
   type VulnerabilityReport,
 } from "@/lib/cluster/vulnerability"
+import DriftSparkline from "@/app/components/drift-history/drift-sparkline"
+import { useImageHistory } from "@/lib/hooks/use-bulk-drift-history"
 import ImageFilters from "./image-filters"
 import type { ImageEntry } from "../utils/image-entries"
 
-const GRID = "grid-cols-[3.5fr_2fr_2fr_1.2fr_1.2fr]"
-const HEADERS = ["Image", "Running", "Used by", "Drift", "Worst CVE"]
+const GRID = "grid-cols-[3.5fr_2fr_2fr_1.9fr_0.9fr_1.2fr]"
+const HEADERS = ["Image", "Running", "Used by", "Historic drift", "Drift", "Worst CVE"]
 
 function WorstCveCell({
   digests,
@@ -90,10 +93,12 @@ function UsedByCell({ entry }: { entry: ImageEntry }) {
 function ImageRow({
   entry,
   reports,
+  spans,
   linkTo,
 }: {
   entry: ImageEntry
   reports: Record<string, VulnerabilityReport> | null
+  spans: Span[] | undefined
   linkTo: LinkTo
 }) {
   const { registry, repository, latestTag, worstStatus, issueCount, digests } = entry
@@ -129,6 +134,10 @@ function ImageRow({
 
       <UsedByCell entry={entry} />
 
+      <div className="flex items-center pr-10">
+        {spans ? <DriftSparkline spans={spans} className="w-full" /> : <span className="text-xs text-muted-foreground">—</span>}
+      </div>
+
       {/* Drift */}
       <div className="flex items-center">
         {style ? (
@@ -152,6 +161,7 @@ function ImageRow({
 
 export default function ImageList({ entries }: { entries: ImageEntry[] }) {
   const reports = useClusterState(s => s.vulnerabilityReports)
+  const history = useImageHistory()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { linkTo } = useContextHref()
@@ -233,7 +243,7 @@ export default function ImageList({ entries }: { entries: ImageEntry[] }) {
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <ImageRow key={entry.key} entry={entry} reports={reports} linkTo={linkTo} />
+            <ImageRow key={entry.key} entry={entry} reports={reports} spans={history[entry.key]?.spans} linkTo={linkTo} />
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No images match your filters</p>

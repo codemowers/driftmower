@@ -7,23 +7,13 @@ import { OCI_CREATED } from "@/lib/utils/oci-labels"
 import { integrityInfo } from "@/lib/utils/image-artifacts"
 import VulnerabilityBar from "./vulnerability-bar"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { SEVERITY_STYLE, type StatusStyle } from "@/lib/cluster/status-style"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 
-const SEVERITY_STYLE: Record<StatusType, { bg: string; text: string; label: string }> = {
-  major_behind: { bg: "bg-status-major-bg",   text: "text-status-major-label",   label: "Major" },
-  minor_behind: { bg: "bg-status-minor-bg",   text: "text-status-minor-label",   label: "Minor" },
-  patch_behind: { bg: "bg-status-patch-bg",   text: "text-status-patch-label",   label: "Patch" },
-  up_to_date:   { bg: "bg-status-ok-bg",      text: "text-status-ok-label",      label: "OK" },
-  ahead:        { bg: "bg-status-ahead-bg",   text: "text-status-ahead-label",   label: "Ahead" },
-  behind:       { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "Behind" },
-  no_data:      { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "No data" },
-  no_version:   { bg: "bg-gray-100",          text: "text-muted-foreground",     label: "No version" },
-}
-
-function severityStyle(statusType: string): { bg: string; text: string; label: string } {
+function severityStyle(statusType: string): StatusStyle {
   return SEVERITY_STYLE[statusType as StatusType] ?? {
-    bg: "bg-gray-100",
-    text: "text-muted-foreground",
+    bg: "bg-status-neutral-bg",
+    text: "text-status-neutral-label",
     label: statusType.replace(/_/g, " "),
   }
 }

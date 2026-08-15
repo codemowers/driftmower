@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, startTransition, useEffect, useMemo, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import WorkloadList from "./components/workload-list"
@@ -10,6 +10,7 @@ import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./fo
 import type { FocusKey, WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "./utils/pod-summary"
 import { liveWorkloadEntries } from "./utils/live-entries"
+import { useWorkloadHistory } from "@/lib/hooks/use-bulk-drift-history"
 import { reportWorkloadRoots } from "./utils/report-roots"
 import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -32,7 +33,6 @@ function TopmostOwnersContent() {
   const clusterResources = useClusterState(s => s.clusterResources)
   const isLoading = useClusterState(s => s.isLoading)
   const isFetchingReport = useClusterState(s => s.isFetchingReport)
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { tenant, namespaces } = useTenantScope()
 
@@ -44,6 +44,7 @@ function TopmostOwnersContent() {
 
   const focusKey = resolveFocusKey(searchParams.get("focus"), storedFocus)
   const focus = FOCUSES[focusKey]
+  const history = useWorkloadHistory(focusKey === "history")
 
   function handleFocusChange(key: FocusKey) {
     if (key === focusKey) return
@@ -60,7 +61,7 @@ function TopmostOwnersContent() {
     else params.delete("filters")
 
     const next = params.toString()
-    router.replace(next ? `?${next}` : window.location.pathname)
+    window.history.replaceState(null, "", next ? `?${next}` : window.location.pathname)
   }
 
   const podSummaries = useMemo(() => summarizePodsByRoot(clusterResources), [clusterResources])
@@ -147,8 +148,11 @@ function TopmostOwnersContent() {
     : []
 
   const scopeSet = namespaces ? new Set(namespaces) : null
-  const workloads = [...reportEntries, ...liveEntries]
+  const scoped = [...reportEntries, ...liveEntries]
     .filter(w => !scopeSet || scopeSet.has(w.namespace))
+  const workloads = focus.key === "history"
+    ? scoped.map(w => ({ ...w, history: history[w.groupKey] }))
+    : scoped
 
   return (
     <div className="min-h-full flex flex-col items-center">

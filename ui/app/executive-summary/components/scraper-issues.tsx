@@ -70,7 +70,7 @@ export default function ScraperIssues({ issues, clusterWide, onCollapsedHeight }
         {clusterWide && <ClusterWideTag />}
       </div>
       {shown.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No issues detected.</p>
+        <p className="text-sm text-muted-foreground">{data ? "No issues detected." : "–"}</p>
       ) : (
         <div className={cn("flex flex-col divide-y divide-gray-100", expanded && "max-h-160 overflow-y-auto")}>
           {shown.map((issue, i) => {

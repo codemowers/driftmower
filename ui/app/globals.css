@@ -41,6 +41,11 @@
   --color-status-ahead-label: #6a35a3;
   --color-status-ahead-text: #47206e;
 
+  --color-status-behind: #a8845f;
+  --color-status-behind-bg: #eee0d2;
+  --color-status-behind-label: #6f5436;
+  --color-status-behind-text: #4f3c26;
+
   --color-status-neutral: #6b7280;
   --color-status-neutral-bg: #eceef1;
   --color-status-neutral-label: #565d68;

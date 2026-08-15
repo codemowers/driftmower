@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
 import { useTenantScope } from "@/lib/tenancy/tenant-context";
-import StatCard, { type StatValueTone } from "./components/stat-card";
+import { type StatValueTone } from "./components/stat-card";
 import SectionLinkCard from "./components/section-link-card";
 import DriftBreakdown from "./components/drift-breakdown";
 import TechnicalDebtEstimate from "./components/technical-debt-estimate";
+import DriftOverTime from "./components/drift-over-time";
+import DriftRottennessSparkline from "./components/drift-rottenness-sparkline";
 import MostOutdatedWorkloads, { worstStatus, type OutdatedWorkloadEntry } from "./components/most-outdated-workloads";
 import ScraperIssues from "./components/scraper-issues";
 import PageHeader from "../components/page-header";
@@ -29,6 +31,7 @@ const valueToneText: Record<StatValueTone, string> = {
   patch: "text-status-patch-label",
   minor: "text-status-minor-label",
   major: "text-status-major-label",
+  ahead: "text-status-ahead-label",
   brand: "text-brand-label",
   muted: "text-muted-foreground",
 }
@@ -51,8 +54,9 @@ export default function ExecutiveSummaryPage() {
   const { data, reportId, clusterResources } = useClusterState();
   const { tenant, namespaces } = useTenantScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
+  const ready = data !== null
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
-  const rottennessTone = rottennessValueTone(rottennessScore)
+  const rottennessTone = ready ? rottennessValueTone(rottennessScore) : "muted"
 
   const scopeSet = namespaces ? new Set(namespaces) : null
   const usages = (data?.report.imageUsages ?? [])
@@ -68,7 +72,7 @@ export default function ExecutiveSummaryPage() {
   const patchCount = usages.filter(u => u.versionStatus.statusType === "patch_behind").length
   const minorCount = usages.filter(u => u.versionStatus.statusType === "minor_behind").length
   const majorCount = usages.filter(u => u.versionStatus.statusType === "major_behind").length
-  const unknownCount = usages.length - (okCount + patchCount + minorCount + majorCount)
+  const aheadCount = usages.filter(u => u.versionStatus.statusType === "ahead").length
 
   const topOutdatedWorkloads: OutdatedWorkloadEntry[] = Array.from(workloadMap.entries())
     .map(([key, workloadUsages]) => {
@@ -107,7 +111,7 @@ export default function ExecutiveSummaryPage() {
           <>
             <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
               {/* Rottenness score: pre-computed in the report, cannot be re-scoped client-side */}
-              <div className="flex flex-col justify-center gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6 py-7">
+              <div className="flex flex-col gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6 py-5">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Rottenness Score
@@ -115,38 +119,31 @@ export default function ExecutiveSummaryPage() {
                   {tenant && <ClusterWideTag />}
                 </div>
                 <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
-                  {rottennessScore.toFixed(2)}
+                  {ready ? rottennessScore.toFixed(2) : <span className="text-2xl font-normal">–</span>}
                 </p>
-                <p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>
+                <DriftRottennessSparkline fallback={<p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>} />
               </div>
 
               {/* Divider */}
               <div className="bg-gray-300" />
 
-              {/* Status counts */}
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                  Container drift · <span className="tabular-nums">{usages.length}</span> tracked
-                  {unknownCount > 0 && (
-                    <> · <span className="tabular-nums">{unknownCount}</span> unknown</>
-                  )}
-                </p>
-              <div className="grid grid-cols-4 gap-4">
-                <StatCard value={okCount}    accent="ok"    valueTone="ok"    label="OK"    hint="up to date" />
-                <StatCard value={patchCount} accent="patch" valueTone="patch" label="PATCH" hint="patch behind" />
-                <StatCard value={minorCount} accent="minor" valueTone="minor" label="MINOR" hint="minor behind" />
-                <StatCard value={majorCount} accent="major" valueTone="major" label="MAJOR" hint="major behind" />
-              </div>
-              </div>
+              <DriftBreakdown
+                ready={ready}
+                total={usages.length}
+                ahead={aheadCount}
+                ok={okCount}
+                patch={patchCount}
+                minor={minorCount}
+                major={majorCount}
+              />
             </div>
-
 
             {/* Section links */}
             <div className="flex w-full flex-wrap gap-5">
               <SectionLinkCard
                 href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
                 title="Topmost Owners"
-                count={owners.tracked}
+                count={ready ? owners.tracked : null}
                 total={owners.total}
                 countEntity="owners"
                 hint="Controllers at the root of each workload subtree"
@@ -155,16 +152,16 @@ export default function ExecutiveSummaryPage() {
               <SectionLinkCard
                 href={reportId ? `/helm-releases?report=${reportId}` : "/helm-releases"}
                 title="Helm Releases"
-                count={helmReleaseCount}
+                count={ready ? helmReleaseCount : null}
                 countEntity="releases"
                 hint="Installed charts and revision history"
                 icon={ShipWheel}
               />
             </div>
 
-            <DriftBreakdown ok={okCount} patch={patchCount} minor={minorCount} major={majorCount} />
+            <DriftOverTime />
 
-            <TechnicalDebtEstimate outdatedWorkloadCount={patchCount + minorCount + majorCount}/>
+            <TechnicalDebtEstimate outdatedWorkloadCount={ready ? patchCount + minorCount + majorCount : null}/>
 
             <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
               <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />

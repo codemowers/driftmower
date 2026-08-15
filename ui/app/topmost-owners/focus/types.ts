@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { SummaryPill } from "@/lib/cluster/status-style"
 import type { PodSummary } from "../utils/pod-summary"
+import type { SeriesStats, Span } from "@/lib/cluster/drift-history/types"
 
 export type WorkloadEntry = {
   groupKey: string
@@ -23,9 +24,10 @@ export type WorkloadEntry = {
     distinctRepoCount: number
   }
   pods?: PodSummary
+  history?: { spans: Span[]; stats: SeriesStats }
 }
 
-export type FocusKey = "drift" | "pods"
+export type FocusKey = "drift" | "pods" | "history"
 
 export type ScaleLevel = {
   token: string

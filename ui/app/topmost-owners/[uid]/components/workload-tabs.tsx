@@ -9,8 +9,9 @@ import ImagesTab from "./images-tab"
 import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
+import HistoryTab from "./history-tab"
 
-const TABS = ["Images", "Pods", "Descendants", "Metadata"] as const
+const TABS = ["Images", "Pods", "Descendants", "Metadata", "History"] as const
 
 type Props = {
   usages: ImageUsage[]
@@ -23,6 +24,7 @@ type Props = {
 export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid }: Props) {
   const [active, setActive] = useTabParam("wtab", TABS)
   const { linkTo, suffix: contextQuery } = useContextHref()
+  const workloadGroupKey = usages.find(u => u.workloadRootInfo?.groupKey)?.workloadRootInfo?.groupKey
 
   return (
     <TabBar tabs={TABS} active={active} onSelect={setActive}>
@@ -38,6 +40,7 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
       {active === "Metadata" && (
         <MetadataTab clusterResources={clusterResources} liveWorkloadUid={liveWorkloadUid} />
       )}
+      {active === "History" && workloadGroupKey && <HistoryTab workloadGroupKey={workloadGroupKey} />}
     </TabBar>
   )
 }

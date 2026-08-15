@@ -13,11 +13,11 @@ import {
 } from "@/app/components/filter-bar"
 
 const DRIFT_CHIPS: { token: string; label: string }[] = [
+  { token: "ahead",  label: "Ahead" },
   { token: "ok",     label: "OK" },
   { token: "patch",  label: "Patch" },
   { token: "minor",  label: "Minor" },
   { token: "major",  label: "Major" },
-  { token: "ahead",  label: "Ahead" },
   { token: "nodata", label: "No data" },
 ]
 

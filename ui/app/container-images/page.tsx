@@ -8,10 +8,8 @@ import ImageList from "./components/image-list"
 import { imageEntries } from "./utils/image-entries"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
-import { DISPLAY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
-
-const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 
 export default function ContainerImagesPage() {
   const { data } = useClusterState()
@@ -26,7 +24,7 @@ export default function ContainerImagesPage() {
 
   const totalContainers = entries.reduce((sum, e) => sum + e.containerCount, 0)
   const statusCounts = Object.fromEntries(
-    PILL_STATUSES.map(status => [status, entries.filter(e => e.worstStatus === status).length]),
+    DRIFT_PILL_STATUSES.map(status => [status, entries.filter(e => e.worstStatus === status).length]),
   ) as Partial<Record<StatusType, number>>
   const noDataCount = entries.filter(e => isNoData(e.worstStatus)).length
 

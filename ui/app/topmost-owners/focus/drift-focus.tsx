@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
-import { DISPLAY_ORDER, SEVERITY_STYLE, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_STYLE, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
 import type { FocusDefinition, WorkloadEntry } from "./types"
-
-const PILL_STATUSES: StatusType[] = ["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"]
 
 function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
   if (staleRepoCount === 0) return "text-muted-foreground"
@@ -36,15 +34,9 @@ function DriftCells({ entry }: { entry: WorkloadEntry }) {
       </div>
 
       <div className="flex items-center">
-        {style ? (
-          <span className={cn("text-center rounded-md px-3 py-1.5 text-xs font-semibold", style.bg, style.text)}>
-            {style.label}
-          </span>
-        ) : (
-          <span className="text-center rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-            No data
-          </span>
-        )}
+        <span className={cn("text-center rounded-md px-3 py-1.5 text-xs font-semibold", style.bg, style.text)}>
+          {style.label}
+        </span>
       </div>
     </>
   )
@@ -54,11 +46,11 @@ export const DRIFT_FOCUS: FocusDefinition = {
   key: "drift",
   label: "Drift",
   scale: [
+    { token: "ahead",  label: "Ahead",   match: e => e.worstStatus === "ahead" },
     { token: "ok",     label: "OK",      match: e => e.worstStatus === "up_to_date" },
     { token: "patch",  label: "Patch",   match: e => e.worstStatus === "patch_behind" },
     { token: "minor",  label: "Minor",   match: e => e.worstStatus === "minor_behind" },
     { token: "major",  label: "Major",   match: e => e.worstStatus === "major_behind" },
-    { token: "ahead",  label: "Ahead",   match: e => e.worstStatus === "ahead" },
     { token: "nodata", label: "No data", match: e => isNoData(e.worstStatus) },
   ],
   secondary: entries => ({
@@ -67,7 +59,7 @@ export const DRIFT_FOCUS: FocusDefinition = {
   }),
   pills: entries => driftSummaryPills(
     Object.fromEntries(
-      PILL_STATUSES.map(s => [s, entries.filter(e => e.worstStatus === s).length]),
+      DRIFT_PILL_STATUSES.map(s => [s, entries.filter(e => e.worstStatus === s).length]),
     ) as Partial<Record<StatusType, number>>,
     entries.filter(e => isNoData(e.worstStatus)).length,
   ),

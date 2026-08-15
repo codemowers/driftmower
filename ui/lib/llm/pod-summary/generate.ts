@@ -100,23 +100,23 @@ export async function* streamLiveSummary(facts: LiveFacts): AsyncIterable<string
   yield* streamFromRoute("live", facts)
 }
 
+// One at a time: these streams would otherwise hold the connections navigation needs.
 export async function prewarmStaticSummaries(
   podUsagesList: ImageUsage[][],
   vulnReports: Record<string, VulnerabilityReport> | null,
 ): Promise<void> {
   const seen = new Set<string>()
-  await Promise.all(
-    podUsagesList.map(async usages => {
-      if (usages.length === 0) return
-      const key = staticKey(staticFacts(usages, vulnReports))
-      if (seen.has(key) || readStore()[key] !== undefined) return
-      seen.add(key)
-      try {
-        for await (const chunk of streamStaticSummary(usages, vulnReports)) void chunk
-      } catch {
-        // ignore
-      }
-    }),
-  )
+
+  for (const usages of podUsagesList) {
+    if (usages.length === 0) continue
+    const key = staticKey(staticFacts(usages, vulnReports))
+    if (seen.has(key) || readStore()[key] !== undefined) continue
+    seen.add(key)
+    try {
+      for await (const chunk of streamStaticSummary(usages, vulnReports)) void chunk
+    } catch {
+      // ignore
+    }
+  }
 }
 

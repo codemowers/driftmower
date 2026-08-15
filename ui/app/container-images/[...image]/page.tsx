@@ -21,6 +21,7 @@ import DeployedByCard from "./components/deployed-by-card"
 import ManagedByCard from "./components/managed-by-card"
 import TagHistoryCard from "./components/tag-history-card"
 import VersionsTable from "./components/versions-table"
+import HistoryCard from "./components/history-card"
 import { imageDetail, tagResolution, type ImageDetail, type ImageVersion } from "../utils/image-entries"
 
 const PAIR_GRID = "grid gap-6 items-start xl:grid-cols-[1fr_340px]"
@@ -191,6 +192,7 @@ function ContainerImageDetailContent() {
               linkTo={linkTo}
             />
             <VersionsTable versions={detail.versions} containerCount={detail.containerCount} />
+            <HistoryCard imageKey={detail.key} />
           </div>
           <div className="flex flex-col gap-6">
             <ManagedByCard releases={detail.releases} linkTo={linkTo} />

@@ -8,11 +8,11 @@ function debtTone(hours: number): string {
 }
 
 type Props = {
-  outdatedWorkloadCount: number
+  outdatedWorkloadCount: number | null
 }
 
 export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) {
-  const hours = outdatedWorkloadCount * AVG_UPGRADE_TIME
+  const hours = outdatedWorkloadCount === null ? null : outdatedWorkloadCount * AVG_UPGRADE_TIME
 
   return (
     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-6">
@@ -20,12 +20,14 @@ export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) 
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Technical Debt Estimate
         </p>
-        <p className="text-sm text-gray-400">
-          {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
-        </p>
+        {hours !== null && (
+          <p className="text-sm text-gray-400">
+            {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
+          </p>
+        )}
       </div>
-      <p className={`text-4xl font-semibold tabular-nums ${debtTone(hours)}`}>
-        ~{hours}h
+      <p className={`text-4xl font-semibold tabular-nums ${hours === null ? "text-muted-foreground" : debtTone(hours)}`}>
+        {hours === null ? <span className="text-2xl font-normal">–</span> : `~${hours}h`}
       </p>
     </div>
   )

@@ -41,7 +41,9 @@ export default function WorkloadDetailPage() {
       if (list) list.push(u)
       else byPod.set(key, [u])
     }
-    void prewarmStaticSummaries([...byPod.values()], vulnerabilityReports)
+    // Summaries are a background nicety, so they wait for an idle moment.
+    const id = requestIdleCallback(() => void prewarmStaticSummaries([...byPod.values()], vulnerabilityReports))
+    return () => cancelIdleCallback(id)
   }, [uid, data, vulnerabilityReports])
 
   const match = data

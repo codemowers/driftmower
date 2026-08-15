@@ -7,7 +7,7 @@ import ReleaseList, { type ReleaseEntry } from "./components/release-list"
 import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
-import { DISPLAY_ORDER, SEVERITY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function HelmReleasesPage() {
@@ -47,8 +47,7 @@ export default function HelmReleasesPage() {
 
   const totalContainers = entries.reduce((s, e) => s + e.totalContainers, 0)
   const statusCounts = Object.fromEntries(
-    (["up_to_date", "patch_behind", "minor_behind", "major_behind", "ahead"] as StatusType[])
-      .map(s => [s, entries.filter(e => e.worstStatus === s).length])
+    DRIFT_PILL_STATUSES.map(s => [s, entries.filter(e => e.worstStatus === s).length])
   ) as Partial<Record<StatusType, number>>
   const noDataCount = entries.filter(e => isNoData(e.worstStatus)).length
 

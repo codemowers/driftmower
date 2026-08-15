@@ -11,7 +11,6 @@ import { StatGrid, StatCell, StatValue, StatCaption } from "@/app/components/sta
 import type { ImageDetail, ImageVersion } from "../../utils/image-entries"
 
 const PILL = "rounded-md px-2 py-0.5 text-xs font-semibold"
-const NO_DATA_PILL = <span className={cn(PILL, "bg-gray-100 text-muted-foreground")}>No data</span>
 
 function DriftPills({ versions }: { versions: ImageVersion[] }) {
   const distinct = [...new Set(versions.map(v => v.statusType))]
@@ -19,9 +18,7 @@ function DriftPills({ versions }: { versions: ImageVersion[] }) {
     <div className="flex flex-wrap items-center gap-1.5">
       {distinct.map(status => {
         const style = SEVERITY_STYLE[status]
-        return style
-          ? <span key={status} className={cn(PILL, style.bg, style.text)}>{style.label}</span>
-          : <span key={status} className={cn(PILL, "bg-gray-100 text-muted-foreground")}>No data</span>
+        return <span key={status} className={cn(PILL, style.bg, style.text)}>{style.label}</span>
       })}
     </div>
   )
@@ -41,7 +38,7 @@ function DriftCell({ detail }: { detail: ImageDetail }) {
 
   const version = versions[0]
   const deployed = version?.tag ?? "—"
-  const style = version ? SEVERITY_STYLE[version.statusType] : undefined
+  const style = SEVERITY_STYLE[version?.statusType ?? "no_data"]
 
   return (
     <StatCell label="Drift">
@@ -49,9 +46,7 @@ function DriftCell({ detail }: { detail: ImageDetail }) {
         {latestTag && latestTag !== deployed ? `${deployed} → ${latestTag}` : deployed}
       </StatValue>
       <div className="flex items-center gap-1.5">
-        {style
-          ? <span className={cn(PILL, style.bg, style.text)}>{style.label}</span>
-          : NO_DATA_PILL}
+        <span className={cn(PILL, style.bg, style.text)}>{style.label}</span>
       </div>
     </StatCell>
   )
