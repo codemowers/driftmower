@@ -141,16 +141,7 @@ export default function AiInsightsCard({ workloadKey, reportId }: Props) {
 
   if (!reportId) return null
 
-  if (state.phase === "loading") {
-    return (
-      <Frame>
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-6 py-5">
-          <div className="h-4 w-28 animate-pulse rounded bg-gray-100" />
-          <div className="h-5 w-1/2 animate-pulse rounded bg-gray-100" />
-        </div>
-      </Frame>
-    )
-  }
+  if (state.phase === "loading") return null
 
   if (state.phase === "error") {
     return (
@@ -162,15 +153,7 @@ export default function AiInsightsCard({ workloadKey, reportId }: Props) {
     )
   }
 
-  if (state.insights === null) {
-    return (
-      <Frame>
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-5 text-sm text-muted-foreground">
-          No AI analysis for this workload yet.
-        </div>
-      </Frame>
-    )
-  }
+  if (state.insights === null) return null
 
   const { role, importance, confidence } = state.insights
   const details = buildInsightDetails(state.insights)
