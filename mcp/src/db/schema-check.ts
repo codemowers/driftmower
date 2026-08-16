@@ -22,10 +22,6 @@ export const REQUIRED_COLUMNS = {
   release_scores: ['report_id', 'group_key', 'release_info']
 } as const
 
-type RequiredTable = (typeof REQUIRED_TABLES)[number]
-
-export type RequiredColumnResult = Record<RequiredTable, string[]>
-
 interface TableNameRow {
   name: string
 }
@@ -33,7 +29,6 @@ interface TableNameRow {
 export interface SchemaCheckResult {
   requiredTables: string[]
   optionalTables: string[]
-  requiredColumns: RequiredColumnResult
 }
 
 export class SchemaCompatibilityError extends Error {
@@ -68,8 +63,7 @@ export async function checkDatabaseSchema(database: Knex): Promise<SchemaCheckRe
 
   return {
     requiredTables: REQUIRED_TABLES.filter(table => foundTables.has(table)),
-    optionalTables: OPTIONAL_TABLES.filter(table => foundTables.has(table)),
-    requiredColumns: copyRequiredColumns()
+    optionalTables: OPTIONAL_TABLES.filter(table => foundTables.has(table))
   }
 }
 
@@ -88,14 +82,6 @@ async function findMissingColumns(database: Knex): Promise<string[]> {
   }
 
   return missingColumns
-}
-
-function copyRequiredColumns(): RequiredColumnResult {
-  return {
-    reports: [...REQUIRED_COLUMNS.reports],
-    image_usages: [...REQUIRED_COLUMNS.image_usages],
-    release_scores: [...REQUIRED_COLUMNS.release_scores]
-  }
 }
 
 function schemaCompatibilityMessage(missingTables: string[], missingColumns: string[]): string {

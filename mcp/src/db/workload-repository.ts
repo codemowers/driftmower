@@ -1,13 +1,6 @@
 import type { Knex } from 'knex'
+import { parseReleaseInfo } from '../domain/release-info.js'
 import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
-
-interface ReleaseInfoJson {
-  name?: unknown
-  namespace?: unknown
-  chartName?: unknown
-  chartVersion?: unknown
-  latestChartTag?: unknown
-}
 
 interface WorkloadGroupCandidateRow {
   reportId: string
@@ -207,11 +200,11 @@ function rankWorkloadCandidate(candidate: WorkloadGroupCandidateRow, normalizedQ
     rankSearchText(candidate.workloadNamespace, normalizedQuery, 3),
     rankSearchText(candidate.workloadKind, normalizedQuery, 6),
     rankSearchText(candidate.searchRepository, normalizedQuery, 9),
-    rankSearchText(optionalString(releaseInfo?.name), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.namespace), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.chartName), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.chartVersion), normalizedQuery, 15),
-    rankSearchText(optionalString(releaseInfo?.latestChartTag), normalizedQuery, 15)
+    rankSearchText(releaseInfo?.name ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.namespace ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.chartName ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.chartVersion ?? null, normalizedQuery, 15),
+    rankSearchText(releaseInfo?.latestChartTag ?? null, normalizedQuery, 15)
   ])
 }
 
@@ -229,24 +222,6 @@ function minNullableRank(ranks: Array<number | null>): number | null {
   }
 
   return Math.min(...matchedRanks)
-}
-
-function parseReleaseInfo(value: string | null): ReleaseInfoJson | null {
-  if (!value) {
-    return null
-  }
-
-  try {
-    const parsedValue: unknown = JSON.parse(value)
-
-    return typeof parsedValue === 'object' && parsedValue !== null ? (parsedValue as ReleaseInfoJson) : null
-  } catch {
-    return null
-  }
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null
 }
 
 function compareMatchingGroups(left: MatchingWorkloadGroupRow, right: MatchingWorkloadGroupRow): number {

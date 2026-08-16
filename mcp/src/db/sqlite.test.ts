@@ -18,6 +18,11 @@ interface MissingColumn {
   column: string
 }
 
+interface SeedTableOptions {
+  includeWorkloads?: boolean
+  missingColumn?: MissingColumn
+}
+
 describe('read-only SQLite database', () => {
   let directoryPath: string
   let databasePath: string
@@ -49,17 +54,12 @@ describe('read-only SQLite database', () => {
   })
 
   it('accepts a compatible schema and reports optional tables', async () => {
-    seedTables([...REQUIRED_TABLES, 'workloads'])
+    seedTables(REQUIRED_TABLES, { includeWorkloads: true })
     const database = await openReadOnlyDatabase(databasePath)
 
     await expect(checkDatabaseSchema(database)).resolves.toMatchObject({
       requiredTables: REQUIRED_TABLES,
-      optionalTables: ['workloads'],
-      requiredColumns: {
-        reports: REQUIRED_COLUMNS.reports,
-        image_usages: REQUIRED_COLUMNS.image_usages,
-        release_scores: REQUIRED_COLUMNS.release_scores
-      }
+      optionalTables: ['workloads']
     })
     await database.destroy()
   })
@@ -81,7 +81,7 @@ describe('read-only SQLite database', () => {
   it('rejects each missing required column', async () => {
     for (const table of REQUIRED_TABLES) {
       for (const column of REQUIRED_COLUMNS[table]) {
-        seedTables(REQUIRED_TABLES, { table, column })
+        seedTables(REQUIRED_TABLES, { missingColumn: { table, column } })
         const database = await openReadOnlyDatabase(databasePath)
 
         await expect(checkDatabaseSchema(database)).rejects.toMatchObject({
@@ -95,29 +95,23 @@ describe('read-only SQLite database', () => {
     }
   })
 
-  function seedTables(tableNames: readonly string[], missingColumn?: MissingColumn): void {
+  function seedTables(tableNames: readonly RequiredTable[], options: SeedTableOptions = {}): void {
     const writableDatabase = new BetterSqlite3(databasePath)
 
     for (const tableName of tableNames) {
-      const columns = columnsForTable(tableName, missingColumn)
+      const columns = REQUIRED_COLUMNS[tableName]
+        .filter(
+          column => tableName !== options.missingColumn?.table || column !== options.missingColumn.column
+        )
+        .map(column => `${column} TEXT`)
 
       writableDatabase.exec(`CREATE TABLE ${tableName} (${columns.join(', ')})`)
     }
 
-    writableDatabase.close()
-  }
-
-  function columnsForTable(tableName: string, missingColumn?: MissingColumn): string[] {
-    if (!isRequiredTable(tableName)) {
-      return ['id TEXT PRIMARY KEY']
+    if (options.includeWorkloads) {
+      writableDatabase.exec('CREATE TABLE workloads (id TEXT PRIMARY KEY)')
     }
 
-    return REQUIRED_COLUMNS[tableName]
-      .filter(column => tableName !== missingColumn?.table || column !== missingColumn.column)
-      .map(column => `${column} TEXT`)
-  }
-
-  function isRequiredTable(tableName: string): tableName is RequiredTable {
-    return tableName in REQUIRED_COLUMNS
+    writableDatabase.close()
   }
 })
