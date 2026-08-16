@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { REQUIRED_COLUMNS } from '../db/schema-check.js'
 import { startHealthServer } from './health.js'
 
 describe('health server', () => {
@@ -58,8 +59,10 @@ describe('health server', () => {
   it('reports ready for a compatible read-only database', async () => {
     const database = new BetterSqlite3(databasePath)
 
-    for (const table of ['reports', 'image_usages', 'release_scores']) {
-      database.exec(`CREATE TABLE ${table} (id TEXT PRIMARY KEY)`)
+    for (const [table, requiredColumns] of Object.entries(REQUIRED_COLUMNS)) {
+      const columns = requiredColumns.map(column => `${column} TEXT`)
+
+      database.exec(`CREATE TABLE ${table} (${columns.join(', ')})`)
     }
 
     database.close()

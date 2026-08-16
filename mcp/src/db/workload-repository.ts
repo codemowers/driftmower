@@ -1,8 +1,5 @@
 import type { Knex } from 'knex'
-
-const CLUSTER_SOURCE_TYPE = 'cluster'
-// TODO ineffective querying, remove after MVP scope, make it better
-const ALL_NAMESPACE_SCOPE = JSON.stringify({ mode: 'all' })
+import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
 
 interface ReleaseInfoJson {
   name?: unknown
@@ -10,12 +7,6 @@ interface ReleaseInfoJson {
   chartName?: unknown
   chartVersion?: unknown
   latestChartTag?: unknown
-}
-
-interface ReportRow {
-  id: string
-  clusterContext: string | null
-  createdAt: string
 }
 
 interface WorkloadGroupCandidateRow {
@@ -62,17 +53,20 @@ export interface WorkloadRepository {
 }
 
 export class SqliteWorkloadRepository implements WorkloadRepository {
-  constructor(private readonly database: Knex) {}
+  constructor(
+    private readonly database: Knex,
+    private readonly reportSnapshotRepository: ReportSnapshotRepository
+  ) {}
 
   async searchMatchingGroups(query: string, limit: number): Promise<MatchingWorkloadGroupRow[]> {
-    const latestReports = await this.loadLatestFullClusterReports()
+    const latestReports = await this.reportSnapshotRepository.findLatestReadyFullClusterReports()
 
     if (latestReports.length === 0) {
       return []
     }
 
-    const candidates = await this.loadGroupCandidates(latestReports.map(report => report.id))
-    const reportsById = new Map(latestReports.map(report => [report.id, report]))
+    const candidates = await this.loadGroupCandidates(latestReports.map(report => report.reportId))
+    const reportsById = new Map(latestReports.map(report => [report.reportId, report]))
     const normalizedQuery = query.toLocaleLowerCase()
 
     return uniqueGroupCandidates(candidates)
@@ -94,22 +88,6 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
       ...row,
       ...groupsById.get(workloadGroupId(row))!
     }))
-  }
-
-  private async loadLatestFullClusterReports(): Promise<ReportRow[]> {
-    // Fetch full-cluster snapshot candidates newest-first within each cluster.
-    // TypeScript selects the first row per cluster to avoid a database-specific window query.
-    const rows = (await this.database<ReportRow>('reports')
-      .select(['id', 'cluster_context as clusterContext', 'created_at as createdAt'])
-      .where('source_type', CLUSTER_SOURCE_TYPE)
-      .andWhere('namespace_scope', ALL_NAMESPACE_SCOPE)
-      .orderBy([
-        { column: 'cluster_context', order: 'asc' },
-        { column: 'created_at', order: 'desc' },
-        { column: 'id', order: 'desc' }
-      ])) as unknown as ReportRow[]
-
-    return latestReportPerCluster(rows)
   }
 
   private async loadGroupCandidates(reportIds: string[]): Promise<WorkloadGroupCandidateRow[]> {
@@ -170,20 +148,6 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
   }
 }
 
-function latestReportPerCluster(rows: ReportRow[]): ReportRow[] {
-  const reportsByCluster = new Map<string, ReportRow>()
-
-  for (const row of rows) {
-    if (!row.clusterContext || reportsByCluster.has(row.clusterContext)) {
-      continue
-    }
-
-    reportsByCluster.set(row.clusterContext, row)
-  }
-
-  return [...reportsByCluster.values()]
-}
-
 function uniqueGroupCandidates(rows: WorkloadGroupCandidateRow[]): WorkloadGroupCandidateRow[] {
   const groups = new Map<string, WorkloadGroupCandidateRow>()
 
@@ -200,7 +164,7 @@ function uniqueGroupCandidates(rows: WorkloadGroupCandidateRow[]): WorkloadGroup
 
 function enrichMatchingGroup(
   candidate: WorkloadGroupCandidateRow,
-  reportsById: Map<string, ReportRow>,
+  reportsById: Map<string, ReportSnapshot>,
   normalizedQuery: string
 ): MatchingWorkloadGroupRow | null {
   const report = reportsById.get(candidate.reportId)
