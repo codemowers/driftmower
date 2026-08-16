@@ -52,7 +52,7 @@ const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 
 
 export default function ExecutiveSummaryPage() {
   const { data, reportId, clusterResources } = useClusterState();
-  const { tenant, namespaces } = useTenantScope();
+  const { tenants: scopedTenants, namespaces } = useTenantScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const ready = data !== null
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
@@ -96,7 +96,7 @@ export default function ExecutiveSummaryPage() {
     .slice(0, 5)
 
   // The selected tenant's namespaces match nothing in the current report.
-  const tenantEmpty = tenant !== null && data !== null && usages.length === 0
+  const tenantEmpty = scopedTenants.length > 0 && data !== null && usages.length === 0
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -105,8 +105,8 @@ export default function ExecutiveSummaryPage() {
         {/* Header */}
         <PageHeader title="Executive Summary" subtitle="Monitor container drift across your cluster" />
 
-        {tenant && tenantEmpty ? (
-          <TenantEmptyState tenant={tenant} entity="tracked containers" />
+        {tenantEmpty ? (
+          <TenantEmptyState tenants={scopedTenants} entity="tracked containers" />
         ) : (
           <>
             <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
@@ -116,7 +116,7 @@ export default function ExecutiveSummaryPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Rottenness Score
                   </p>
-                  {tenant && <ClusterWideTag />}
+                  {scopedTenants.length > 0 && <ClusterWideTag />}
                 </div>
                 <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
                   {ready ? rottennessScore.toFixed(2) : <span className="text-2xl font-normal">–</span>}
@@ -165,7 +165,7 @@ export default function ExecutiveSummaryPage() {
 
             <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
               <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />
-              <ScraperIssues issues={data?.issues ?? []} clusterWide={tenant !== null} onCollapsedHeight={setIssuesHeight} />
+              <ScraperIssues issues={data?.issues ?? []} clusterWide={scopedTenants.length > 0} onCollapsedHeight={setIssuesHeight} />
             </div>
           </>
         )}

@@ -26,10 +26,15 @@ export default function TenantContextInit() {
   useEffect(() => {
     const state = useTenantContext.getState()
 
+    const fromUrl = tenantParam ? tenantParam.split(",").filter(Boolean) : []
+
     // The URL is the source of truth whenever it names a tenant.
-    if (tenantParam) {
-      if (state.selectedTenant !== tenantParam || !state.initialized) {
-        useTenantContext.setState({ selectedTenant: tenantParam, initialized: true })
+    if (fromUrl.length > 0) {
+      const unchanged =
+        state.selectedTenants.length === fromUrl.length &&
+        state.selectedTenants.every((t, i) => t === fromUrl[i])
+      if (!unchanged || !state.initialized) {
+        useTenantContext.setState({ selectedTenants: fromUrl, initialized: true })
       }
       return
     }
@@ -37,15 +42,15 @@ export default function TenantContextInit() {
     // No ?tenant= in the URL: keep the store selection across navigation and
     // put it back into the URL for reloads/sharing.
     if (state.initialized) {
-      if (state.selectedTenant) syncTenantParam(state.selectedTenant)
+      if (state.selectedTenants.length > 0) syncTenantParam(state.selectedTenants)
       return
     }
 
     // First load without a deep link: pick the default once tenants are known.
     if (!hydrated) return
     const fallback = defaultTenantSelection(state)
-    useTenantContext.setState({ selectedTenant: fallback, initialized: true })
-    if (fallback) syncTenantParam(fallback)
+    useTenantContext.setState({ selectedTenants: fallback, initialized: true })
+    if (fallback.length > 0) syncTenantParam(fallback)
   }, [tenantParam, hydrated])
 
   return null

@@ -72,7 +72,7 @@ export async function forwardRequest(
     console.error(`[${logPrefix}] ${req.method} ${target} -> unreachable: ${cause}`)
     return Response.json(
       { error: "upstream unreachable", cause },
-      { status: 502 },
+      { status: 502, headers: { "x-proxy-unreachable": "1" } },
     )
   }
 

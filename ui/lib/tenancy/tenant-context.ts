@@ -10,94 +10,123 @@ export type TenantInfo = {
   stackChannel: string
 }
 
+export type TenantUnavailableReason =
+  | "not-configured"
+  | "stale-session"
+  | "unreachable"
+  | "error"
+
 export type TenantContextState = {
-  // /api/tenants answered (successfully or not) for this session.
   hydrated: boolean
-  // platform-manager is deployed and the tenant list loaded.
   available: boolean
+  unavailableReason: TenantUnavailableReason | null
   admin: boolean
   tenants: TenantInfo[]
-  // The chosen tenant context; null = whole cluster.
-  selectedTenant: string | null
-  // A selection has been made (from the URL, the default, or the picker).
+  selectedTenants: string[]
   initialized: boolean
 }
 
 export const useTenantContext = create<TenantContextState>(() => ({
   hydrated: false,
   available: false,
+  unavailableReason: null,
   admin: false,
   tenants: [],
-  selectedTenant: null,
+  selectedTenants: [],
   initialized: false,
 }))
 
-let hydrationStarted = false
+function unavailableReasonFor(status: number): TenantUnavailableReason {
+  if (status === 404) return "not-configured"
+  if (status === 401) return "stale-session"
+  if (status === 503) return "unreachable"
+  return "error"
+}
 
-// Fetch the tenant list once per session; safe to call repeatedly.
 export function hydrateTenantContext(): void {
-  if (hydrationStarted) return
-  hydrationStarted = true
+  if (useTenantContext.getState().hydrated) return
   fetch("/api/tenants")
     .then(async res => {
       if (!res.ok) {
-        // 404 = platform-manager not deployed, 401 = stale session; either
-        // way there is no tenant context to offer.
-        useTenantContext.setState({ hydrated: true, available: false })
+        useTenantContext.setState({
+          hydrated: true,
+          available: false,
+          unavailableReason: unavailableReasonFor(res.status),
+        })
         return
       }
       const body: { admin: boolean; tenants: TenantInfo[] } = await res.json()
       useTenantContext.setState({
         hydrated: true,
         available: true,
+        unavailableReason: null,
         admin: body.admin,
         tenants: body.tenants,
       })
     })
-    .catch(() => useTenantContext.setState({ hydrated: true, available: false }))
+    .catch(() =>
+      useTenantContext.setState({
+        hydrated: true,
+        available: false,
+        unavailableReason: "unreachable",
+      }),
+    )
 }
 
-// Non-admins with tenants land on their first tenant; admins and tenantless
-// users land on the whole cluster.
-export function defaultTenantSelection(state: TenantContextState): string | null {
-  return !state.admin && state.tenants.length > 0 ? state.tenants[0].tenant : null
+export function defaultTenantSelection(state: TenantContextState): string[] {
+  return !state.admin && state.tenants.length > 0 ? [state.tenants[0].tenant] : []
 }
 
-// Mirror the selection into ?tenant= (shallow, no re-navigation) so the
-// context survives reloads and produces shareable deep links.
-export function syncTenantParam(tenant: string | null): void {
+export function syncTenantParam(tenants: string[]): void {
   if (typeof window === "undefined") return
+  const value = tenants.join(",")
   const url = new URL(window.location.href)
-  if (url.searchParams.get("tenant") === tenant) return
-  if (tenant) url.searchParams.set("tenant", tenant)
+  if ((url.searchParams.get("tenant") ?? "") === value) return
+  if (value) url.searchParams.set("tenant", value)
   else url.searchParams.delete("tenant")
   window.history.replaceState(null, "", url)
 }
 
-// Select a tenant context (null = whole cluster).
-export function selectTenant(tenant: string | null): void {
-  useTenantContext.setState({ selectedTenant: tenant, initialized: true })
-  syncTenantParam(tenant)
+export function selectTenants(tenants: string[]): void {
+  useTenantContext.setState({ selectedTenants: tenants, initialized: true })
+  syncTenantParam(tenants)
+}
+
+export function toggleTenant(tenant: string): void {
+  const { selectedTenants } = useTenantContext.getState()
+  selectTenants(
+    selectedTenants.includes(tenant)
+      ? selectedTenants.filter(t => t !== tenant)
+      : [...selectedTenants, tenant],
+  )
 }
 
 export type TenantScope = {
-  tenant: string | null
-  // Namespaces the selection covers; null = whole cluster (no filtering).
+  tenants: string[]
+  label: string | null
   namespaces: string[] | null
 }
 
 export function useTenantScope(): TenantScope {
-  const selectedTenant = useTenantContext(s => s.selectedTenant)
+  const selectedTenants = useTenantContext(s => s.selectedTenants)
   const tenants = useTenantContext(s => s.tenants)
 
   return useMemo(() => {
-    if (!selectedTenant) return { tenant: null, namespaces: null }
-    const tenant = tenants.find(t => t.tenant === selectedTenant)
-    // An unknown tenant (stale deep link) scopes to nothing rather than
-    // silently showing cluster-wide data.
+    if (selectedTenants.length === 0) return { tenants: [], label: null, namespaces: null }
+
+    // A stale deep link naming an unknown tenant must scope to nothing, not widen back to the cluster.
+    const namespaces = selectedTenants.flatMap(name => {
+      const tenant = tenants.find(t => t.tenant === name)
+      return tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : []
+    })
+
     return {
-      tenant: selectedTenant,
-      namespaces: tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : [],
+      tenants: selectedTenants,
+      label:
+        selectedTenants.length === 1
+          ? selectedTenants[0]
+          : `${selectedTenants.length} tenants`,
+      namespaces: [...new Set(namespaces)],
     }
-  }, [selectedTenant, tenants])
+  }, [selectedTenants, tenants])
 }

@@ -13,7 +13,7 @@ import type { StatusType } from "@/lib/cluster/reports"
 
 export default function ContainerImagesPage() {
   const { data } = useClusterState()
-  const { tenant, namespaces } = useTenantScope()
+  const { tenants: scopedTenants, namespaces } = useTenantScope()
 
   const entries = imageEntries(data, namespaces ? new Set(namespaces) : null)
     .sort((a, b) =>
@@ -38,8 +38,8 @@ export default function ContainerImagesPage() {
           secondary={{ label: "containers", count: totalContainers }}
           pills={driftSummaryPills(statusCounts, noDataCount)}
         />
-        {tenant && entries.length === 0 ? (
-          <TenantEmptyState tenant={tenant} entity="images" />
+        {scopedTenants.length > 0 && entries.length === 0 ? (
+          <TenantEmptyState tenants={scopedTenants} entity="images" />
         ) : (
           <Suspense>
             <ImageList entries={entries} />

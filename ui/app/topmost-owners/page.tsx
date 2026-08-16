@@ -34,7 +34,7 @@ function TopmostOwnersContent() {
   const isLoading = useClusterState(s => s.isLoading)
   const isFetchingReport = useClusterState(s => s.isFetchingReport)
   const searchParams = useSearchParams()
-  const { tenant, namespaces } = useTenantScope()
+  const { tenants: scopedTenants, namespaces } = useTenantScope()
 
   const [storedFocus, setStoredFocus] = useState<string | null>(null)
   useEffect(() => {
@@ -165,8 +165,8 @@ function TopmostOwnersContent() {
           pills={focus.pills(workloads)}
           leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
-        {tenant && workloads.length === 0 ? (
-          <TenantEmptyState tenant={tenant} entity="workloads" />
+        {scopedTenants.length > 0 && workloads.length === 0 ? (
+          <TenantEmptyState tenants={scopedTenants} entity="workloads" />
         ) : (
           <WorkloadList entries={workloads} focus={focus} />
         )}

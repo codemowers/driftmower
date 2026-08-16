@@ -1,7 +1,7 @@
 "use client"
 
 import PageHeader from "../components/page-header"
-import ClusterScopeBanner from "../components/cluster-scope-banner"
+import ClusterScopePill from "../components/cluster-scope-pill"
 import OidcApplicationTile from "./components/oidc-application-tile"
 import { useOidcApplications } from "./hooks/use-oidc-applications"
 
@@ -14,8 +14,8 @@ export default function OidcApplicationsPage() {
         <PageHeader
           title="OIDC Applications"
           subtitle="Applications available to you"
+          accessory={<ClusterScopePill />}
         />
-        <ClusterScopeBanner />
 
         {state.status === "loading" && (
           <p className="text-sm text-muted-foreground">Loading applications…</p>

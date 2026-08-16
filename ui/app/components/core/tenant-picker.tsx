@@ -1,49 +1,54 @@
 "use client"
 
-import { ChevronsUpDown, Layers } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Building2, ChevronsUpDown } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { FilterToggle } from "@/app/components/filter-bar"
 import { cn } from "@/lib/utils/cn"
-import { selectTenant, useTenantContext } from "@/lib/tenancy/tenant-context"
-
-// Radix radio items need a non-empty value; this sentinel stands in for the
-// null ("Whole cluster") selection.
-const WHOLE_CLUSTER = "__whole_cluster__"
+import { selectTenants, toggleTenant, useTenantContext } from "@/lib/tenancy/tenant-context"
 
 export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
   const hydrated = useTenantContext(s => s.hydrated)
   const available = useTenantContext(s => s.available)
   const admin = useTenantContext(s => s.admin)
   const tenants = useTenantContext(s => s.tenants)
-  const selectedTenant = useTenantContext(s => s.selectedTenant)
+  const selectedTenants = useTenantContext(s => s.selectedTenants)
 
   if (!hydrated || !available) return null
 
-  const label = selectedTenant ?? "Whole cluster"
+  const label =
+    selectedTenants.length === 0
+      ? "Whole cluster"
+      : selectedTenants.length === 1
+        ? selectedTenants[0]
+        : `${selectedTenants.length} tenants`
+
   const showWholeCluster = admin || tenants.length === 0
-  // A ?tenant= deep link can name a tenant the user cannot see; still list it
+  // A ?tenant= deep link can name tenants the user cannot see; still list them
   // so the current selection is visible and re-selectable.
-  const unknownSelection =
-    selectedTenant !== null && !tenants.some(t => t.tenant === selectedTenant)
-      ? selectedTenant
-      : null
+  const unknownSelection = selectedTenants.filter(t => !tenants.some(k => k.tenant === t))
+  const isSingleTenantUser = !showWholeCluster && tenants.length === 1 && unknownSelection.length === 0
+  const namespacesInScope = new Set(
+    selectedTenants.flatMap(name => {
+      const tenant = tenants.find(t => t.tenant === name)
+      return tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : []
+    }),
+  )
 
   const trigger = (
-    <DropdownMenuTrigger
+    <PopoverTrigger
       aria-label={`Tenant context: ${label}`}
       className={cn(
-        "flex cursor-pointer items-center rounded-md text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
-        isExpanded ? "w-full gap-3 px-3 py-2.5" : "justify-center px-2 py-3 mx-0.5",
+        "flex cursor-pointer items-center rounded-md text-sm text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-muted aria-expanded:text-foreground",
+        isExpanded ? "w-full gap-3 px-3 py-3" : "justify-center px-2 py-3 mx-0.5",
       )}
     >
-      <Layers className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="relative inline-flex shrink-0">
+        <Building2 className="size-5 text-muted-foreground" aria-hidden />
+        {!isExpanded && selectedTenants.length > 0 && (
+          <span className="absolute -right-1 -top-1 size-1.5 rounded-full bg-brand" aria-hidden />
+        )}
+      </span>
       {isExpanded && (
         <>
           <span className="min-w-0 flex-1 truncate text-left font-mono text-sm font-medium tracking-tighter">
@@ -52,7 +57,7 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
           <ChevronsUpDown className="size-4 shrink-0 text-gray-400" aria-hidden />
         </>
       )}
-    </DropdownMenuTrigger>
+    </PopoverTrigger>
   )
 
   return (
@@ -62,8 +67,8 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
           Tenant
         </h2>
       )}
-      <div className={cn("mt-2 flex w-full flex-col", isExpanded ? "px-3" : "items-center px-0")}>
-        <DropdownMenu>
+      <div className={cn("mt-2 flex w-full flex-col", isExpanded ? "px-3" : "px-0")}>
+        <Popover>
           {isExpanded ? (
             trigger
           ) : (
@@ -75,33 +80,72 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
             </Tooltip>
           )}
 
-          <DropdownMenuContent
+          <PopoverContent
             side={isExpanded ? "bottom" : "right"}
             align="start"
-            className="w-64"
+            className="w-72 gap-0.5 p-2"
           >
-            <DropdownMenuLabel>Tenant context</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={selectedTenant ?? WHOLE_CLUSTER}
-              onValueChange={value => selectTenant(value === WHOLE_CLUSTER ? null : value)}
-            >
-              {showWholeCluster && (
-                <DropdownMenuRadioItem value={WHOLE_CLUSTER}>Whole cluster</DropdownMenuRadioItem>
+            <div className="flex items-center justify-between px-3 pb-1 pt-1">
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Tenant context
+              </span>
+              {!isSingleTenantUser && selectedTenants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => selectTenants([])}
+                  className="text-xs text-muted-foreground hover:text-brand-label hover:underline"
+                >
+                  Clear
+                </button>
               )}
+            </div>
+
+            {showWholeCluster && (
+              <>
+                <FilterToggle
+                  checked={selectedTenants.length === 0}
+                  onToggle={() => selectTenants([])}
+                  label="Whole cluster"
+                />
+                <div className="my-1 h-px bg-gray-200" />
+              </>
+            )}
+
+            <div className="max-h-64 overflow-y-auto">
               {tenants.map(t => (
-                <DropdownMenuRadioItem key={t.tenant} value={t.tenant}>
-                  <span className="min-w-0 truncate font-mono">{t.tenant}</span>
-                </DropdownMenuRadioItem>
+                <FilterToggle
+                  key={t.tenant}
+                  checked={selectedTenants.includes(t.tenant)}
+                  onToggle={() => toggleTenant(t.tenant)}
+                  label={<span className="font-mono">{t.tenant}</span>}
+                  count={1 + t.appNamespaces.length}
+                />
               ))}
-              {unknownSelection && (
-                <DropdownMenuRadioItem value={unknownSelection}>
-                  <span className="min-w-0 truncate font-mono">{unknownSelection}</span>
-                </DropdownMenuRadioItem>
-              )}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {unknownSelection.map(t => (
+                <FilterToggle
+                  key={t}
+                  checked
+                  onToggle={() => toggleTenant(t)}
+                  label={<span className="font-mono">{t}</span>}
+                />
+              ))}
+            </div>
+
+            {selectedTenants.length > 0 && (
+              <>
+                <div className="my-1 h-px bg-gray-200" />
+                <p className="px-3 pb-1 text-xs text-muted-foreground">
+                  {selectedTenants.length === 1
+                    ? "1 tenant selected"
+                    : `${selectedTenants.length} tenants selected`}
+                  , {namespacesInScope.size} namespaces in scope
+                </p>
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
+      {!isExpanded && <div className="mx-auto mt-2 h-px w-8 bg-gray-200" aria-hidden />}
     </div>
   )
 }

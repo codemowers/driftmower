@@ -2,9 +2,6 @@ import { forwardRequest } from "@/lib/api/backend-proxy"
 import { getSession } from "@/lib/auth/session"
 import { getPlatformManagerToken } from "@/lib/auth/tokens"
 
-// platform-manager (the tenancy control plane) is an optional deployment:
-// without PLATFORM_MANAGER_URL the BFF routes answer 404 and the tenants
-// page renders its "not configured" empty state.
 export function platformManagerUrl(): string | null {
   const url = process.env.PLATFORM_MANAGER_URL
   return url ? url.replace(/\/+$/, "") : null
@@ -24,5 +21,11 @@ export async function proxyPlatformManagerRequest(req: Request, upstreamPath: st
     return Response.json({ error: "not authenticated" }, { status: 401 })
   }
 
-  return forwardRequest(req, `${baseUrl}${upstreamPath}`, accessToken, "pm-proxy")
+  const response = await forwardRequest(req, `${baseUrl}${upstreamPath}`, accessToken, "pm-proxy")
+
+  if (response.status === 502 && response.headers.get("x-proxy-unreachable") === "1") {
+    return Response.json({ error: "platform-manager unreachable" }, { status: 503 })
+  }
+
+  return response
 }

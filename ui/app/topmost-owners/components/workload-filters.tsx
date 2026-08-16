@@ -2,12 +2,12 @@
 
 import { SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   FilterSearchInput,
   FilterChips,
   FilterFooter,
+  FilterToggle,
   FILTER_ACTIVE,
   FILTER_INACTIVE,
 } from "@/app/components/filter-bar"
@@ -31,35 +31,6 @@ type Props = {
   onToggleArgoManaged: () => void
   counts: { finished: number; helm: number; argo: number; issues: number }
   onReset: () => void
-}
-
-function FilterToggle({
-  checked, onToggle, label, count,
-}: {
-  checked: boolean
-  onToggle: () => void
-  label: string
-  count: number
-}) {
-  return (
-    <div
-      role="checkbox"
-      aria-checked={checked}
-      tabIndex={0}
-      onClick={onToggle}
-      onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onToggle() } }}
-      className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 hover:bg-brand-bg/50 focus:outline-none focus-visible:bg-brand-bg/50"
-    >
-      <Checkbox
-        checked={checked}
-        aria-hidden
-        tabIndex={-1}
-        className="pointer-events-none data-checked:border-brand data-checked:bg-brand data-checked:text-white"
-      />
-      <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
-      <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
-    </div>
-  )
 }
 
 export default function WorkloadFilters({

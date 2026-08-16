@@ -6,10 +6,10 @@ import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import {
+  BookUser,
   Boxes,
   BarChart3,
   Cpu,
-  FolderKey,
   Layers,
   PanelLeft,
   Server,
@@ -40,26 +40,23 @@ const navItems: NavItem[] = [
   { name: "Cluster", href: "/cluster", icon: Cpu },
   // Always shown: the page renders a "not configured" state when the BFF
   // reports platform-manager is not deployed.
-  { name: "Tenants", href: "/tenants", icon: FolderKey },
+  { name: "Tenants", href: "/tenants", icon: BookUser },
   { name: "OIDC Applications", href: "/oidc-applications", icon: ShieldCheck },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return pathname === "/" || pathname === "/executive-summary"
-  }
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 export default function NavBar({ claims }: { claims: SessionClaims }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const { isConnected, clusterName, reportId } = useClusterState()
-  const selectedTenant = useTenantContext(s => s.selectedTenant)
+  const selectedTenants = useTenantContext(s => s.selectedTenants)
   const pathname = usePathname()
 
   const carriedParams = new URLSearchParams()
   if (reportId) carriedParams.set("report", reportId)
-  if (selectedTenant) carriedParams.set("tenant", selectedTenant)
+  if (selectedTenants.length > 0) carriedParams.set("tenant", selectedTenants.join(","))
   const carriedQuery = carriedParams.toString()
 
   useEffect(() => {

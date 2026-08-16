@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react"
 import PageHeader from "../components/page-header"
-import ClusterScopeBanner from "../components/cluster-scope-banner"
+import ClusterScopePill from "../components/cluster-scope-pill"
 import ClusterHeader from "./components/cluster-header"
 import NodeRoleCard from "./components/node-role-card"
 import PrometheusAlerts from "./components/prometheus-alerts"
@@ -56,8 +56,11 @@ export default function ClusterPage() {
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Cluster" subtitle="Nodes and Kubernetes support lifecycle" />
-        <ClusterScopeBanner />
+        <PageHeader
+          title="Cluster"
+          subtitle="Nodes and Kubernetes support lifecycle"
+          accessory={<ClusterScopePill />}
+        />
 
         {nodeDrift === null ? (
           <p className="text-sm text-muted-foreground">

@@ -12,7 +12,7 @@ import type { StatusType } from "@/lib/cluster/reports"
 
 export default function HelmReleasesPage() {
   const { data } = useClusterState()
-  const { tenant, namespaces } = useTenantScope()
+  const { tenants: scopedTenants, namespaces } = useTenantScope()
   const scopeSet = namespaces ? new Set(namespaces) : null
 
   const entries: ReleaseEntry[] = data
@@ -61,8 +61,8 @@ export default function HelmReleasesPage() {
           secondary={{ label: "containers", count: totalContainers }}
           pills={driftSummaryPills(statusCounts, noDataCount)}
         />
-        {tenant && entries.length === 0 ? (
-          <TenantEmptyState tenant={tenant} entity="Helm releases" />
+        {scopedTenants.length > 0 && entries.length === 0 ? (
+          <TenantEmptyState tenants={scopedTenants} entity="Helm releases" />
         ) : (
           <Suspense>
             <ReleaseList entries={entries} />
