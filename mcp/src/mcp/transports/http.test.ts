@@ -23,10 +23,15 @@ describe('HTTP MCP transport', () => {
 
   it('serves search_workloads on /mcp', async () => {
     const searchWorkloads = vi.fn().mockResolvedValue({ query: 'api', matches: [] })
+    const planImageUpdates = vi.fn()
     const serverErrors: unknown[] = []
 
     httpServer = await startHttpTransport(
-      () => createMcpServer({ workloadSearchService: { searchWorkloads } }),
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads },
+          imageUpdatePlanningService: { planImageUpdates }
+        }),
       {
         host: '127.0.0.1',
         port: 0,
@@ -66,9 +71,14 @@ describe('HTTP MCP transport', () => {
 
   it('accepts a second client initialization as a separate HTTP session', async () => {
     const searchWorkloads = vi.fn().mockResolvedValue({ query: 'llm', matches: [] })
+    const planImageUpdates = vi.fn()
 
     httpServer = await startHttpTransport(
-      () => createMcpServer({ workloadSearchService: { searchWorkloads } }),
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads },
+          imageUpdatePlanningService: { planImageUpdates }
+        }),
       {
         host: '127.0.0.1',
         port: 0

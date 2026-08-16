@@ -3,6 +3,7 @@ import type { Knex } from 'knex'
 export const CLUSTER_REPORT_SOURCE_TYPE = 'cluster'
 export const READY_REPORT_STATUS = 'ready'
 export const ALL_NAMESPACE_SCOPE = JSON.stringify({ mode: 'all' })
+export const IN_CLUSTER_CONTEXT = 'in-cluster'
 
 interface ReportSnapshotDatabaseRow {
   reportId: string
@@ -18,6 +19,8 @@ export interface ReportSnapshot {
 
 export interface ReportSnapshotRepository {
   findLatestReadyFullClusterReports(cluster?: string): Promise<ReportSnapshot[]>
+  findLatestReadyInClusterReport(): Promise<ReportSnapshot | null>
+  findReadyInClusterReportById(reportId: string): Promise<ReportSnapshot | null>
 }
 
 export class SqliteReportSnapshotRepository implements ReportSnapshotRepository {
@@ -41,6 +44,33 @@ export class SqliteReportSnapshotRepository implements ReportSnapshotRepository 
     ])) as unknown as ReportSnapshotDatabaseRow[]
 
     return latestReportPerCluster(rows)
+  }
+
+  async findLatestReadyInClusterReport(): Promise<ReportSnapshot | null> {
+    const reports = await this.findLatestReadyFullClusterReports(IN_CLUSTER_CONTEXT)
+
+    return reports[0] ?? null
+  }
+
+  async findReadyInClusterReportById(reportId: string): Promise<ReportSnapshot | null> {
+    const row = (await this.database<ReportSnapshotDatabaseRow>('reports')
+      .select(['id as reportId', 'cluster_context as clusterContext', 'created_at as createdAt'])
+      .where('id', reportId)
+      .andWhere('cluster_context', IN_CLUSTER_CONTEXT)
+      .andWhere('source_type', CLUSTER_REPORT_SOURCE_TYPE)
+      .andWhere('namespace_scope', ALL_NAMESPACE_SCOPE)
+      .andWhere('status', READY_REPORT_STATUS)
+      .first()) as unknown as ReportSnapshotDatabaseRow | undefined
+
+    if (!row?.clusterContext) {
+      return null
+    }
+
+    return {
+      reportId: row.reportId,
+      clusterContext: row.clusterContext,
+      createdAt: row.createdAt
+    }
   }
 }
 

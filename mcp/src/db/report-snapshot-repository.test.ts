@@ -4,7 +4,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ALL_NAMESPACE_SCOPE, SqliteReportSnapshotRepository } from './report-snapshot-repository.js'
+import {
+  ALL_NAMESPACE_SCOPE,
+  IN_CLUSTER_CONTEXT,
+  SqliteReportSnapshotRepository
+} from './report-snapshot-repository.js'
 import { openReadOnlyDatabase } from './sqlite.js'
 
 const SELECTED_NAMESPACE_SCOPE = JSON.stringify({ mode: 'selected', namespaces: ['apps'] })
@@ -86,6 +90,89 @@ describe('SqliteReportSnapshotRepository', () => {
     const snapshots = await repository.findLatestReadyFullClusterReports('prod')
 
     expect(snapshots).toEqual([])
+  })
+
+  it('selects only the latest eligible in-cluster report', async () => {
+    insertReport(
+      seedDatabase,
+      'older-ready',
+      IN_CLUSTER_CONTEXT,
+      '2026-01-01',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'ready'
+    )
+    insertReport(
+      seedDatabase,
+      'external-ready',
+      'prod',
+      '2026-01-03',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'ready'
+    )
+    insertReport(
+      seedDatabase,
+      'newer-failed',
+      IN_CLUSTER_CONTEXT,
+      '2026-01-04',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'failed'
+    )
+
+    const repository = await createRepository(databasePath)
+    const snapshot = await repository.findLatestReadyInClusterReport()
+
+    expect(snapshot).toMatchObject({
+      reportId: 'older-ready',
+      clusterContext: IN_CLUSTER_CONTEXT,
+      createdAt: '2026-01-01'
+    })
+  })
+
+  it('loads an older cursor-pinned report only while it remains eligible', async () => {
+    insertReport(
+      seedDatabase,
+      'older-ready',
+      IN_CLUSTER_CONTEXT,
+      '2026-01-01',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'ready'
+    )
+    insertReport(
+      seedDatabase,
+      'newer-ready',
+      IN_CLUSTER_CONTEXT,
+      '2026-01-02',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'ready'
+    )
+    insertReport(seedDatabase, 'external', 'prod', '2026-01-03', 'cluster', ALL_NAMESPACE_SCOPE, 'ready')
+    insertReport(
+      seedDatabase,
+      'failed',
+      IN_CLUSTER_CONTEXT,
+      '2026-01-04',
+      'cluster',
+      ALL_NAMESPACE_SCOPE,
+      'failed'
+    )
+
+    const repository = await createRepository(databasePath)
+    const pinned = await repository.findReadyInClusterReportById('older-ready')
+    const external = await repository.findReadyInClusterReportById('external')
+    const failed = await repository.findReadyInClusterReportById('failed')
+
+    expect(pinned).toMatchObject({
+      reportId: 'older-ready',
+      clusterContext: IN_CLUSTER_CONTEXT,
+      createdAt: '2026-01-01'
+    })
+    expect(external).toBeNull()
+    expect(failed).toBeNull()
   })
 })
 

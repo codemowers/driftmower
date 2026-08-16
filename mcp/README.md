@@ -2,10 +2,9 @@
 
 MCP server for exposing persisted Driftmower analysis snapshots to coding agents.
 
-The server opens a Driftmower SQLite database in read-only mode and provides the
-`search_workloads` MCP tool. Searches are case-insensitive substring matches over
-workload names from the latest completed full-cluster report snapshot for each
-cluster.
+The server opens a Driftmower SQLite database in read-only mode and provides tools
+for finding workloads and planning image updates from persisted analysis snapshots.
+It never modifies the database or a target repository.
 
 ## Requirements
 
@@ -192,7 +191,9 @@ The Skaffold config builds `git.codemowers.io/uq69adc8851/driftmower-mcp`,
 deploys the raw manifests, and port-forwards the MCP endpoint to
 `localhost:3000` and health endpoints to `localhost:3001`.
 
-## Tool
+## Tools
+
+### `search_workloads`
 
 `search_workloads` accepts:
 
@@ -207,6 +208,70 @@ Results include workload identity, cluster, namespace, kind, observed image or
 Helm version details, latest known versions when available, and snapshot
 metadata. The response represents analyzed snapshot data, not guaranteed live
 cluster state.
+
+### `plan_image_updates`
+
+`plan_image_updates` returns an advisory, paginated update plan from the latest
+ready in-cluster, all-namespace report. Cluster selection is implicit because an
+MCP deployment is paired with one Driftmower backend. Later pages remain pinned
+to the first page's snapshot.
+
+```json
+{
+  "namespace": "cert-manager",
+  "versionStatuses": ["major_behind", "minor_behind", "patch_behind"],
+  "limit": 20
+}
+```
+
+All input fields are optional. `namespace` and `versionStatuses` filter actions,
+`limit` bounds a page, and `cursor` continues a previous page. The tool does not
+accept a cluster selector and ignores reports produced from external kubeconfig
+contexts.
+The supported version statuses are `major_behind`, `minor_behind`,
+`patch_behind`, and `behind`. Use the returned `nextCursor` unchanged to request
+the next page with the same filters.
+
+An abbreviated result looks like:
+
+```json
+{
+  "status": "ok",
+  "snapshot": {
+    "reportId": "0b249694-625d-41c8-a788-5b207c9c4d6b",
+    "createdAt": "2026-07-13 20:14:51"
+  },
+  "summary": {
+    "uniqueImageCandidates": 3,
+    "totalActions": 1,
+    "imageTagUpdates": 0,
+    "helmChartUpdates": 1,
+    "manualReviews": 0
+  },
+  "actions": [
+    {
+      "type": "helm_chart_update",
+      "releaseName": "cert-manager",
+      "observedChartVersion": "v1.20.0",
+      "latestKnownChartVersion": "1.21.0"
+    }
+  ],
+  "nextCursor": null,
+  "warnings": ["This plan is based on a Driftmower analysis snapshot, not live cluster state."]
+}
+```
+
+Actions are one of:
+
+- `image_tag_update` for a non-Helm workload and container.
+- `helm_chart_update` for a Helm release with a distinct chart candidate.
+- `manual_review` when a Helm release has no usable distinct chart candidate.
+
+Helm actions include at most ten deduplicated image evidence records. Raw report
+payloads and chart-tag candidate arrays are not exposed. The tool is read-only,
+and its results do not establish compatibility, maintenance approval, or
+deployment safety. Repository discovery, edits, validation, and approval remain
+the caller's responsibility.
 
 ## Development
 
