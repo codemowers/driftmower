@@ -1,4 +1,4 @@
-import { BAND_STYLE, LEGEND_ORDER } from "@/lib/cluster/drift-history/band-style"
+import { BAND_STYLE, LEGEND_ORDER, MARK_ORDER, MARK_STYLE } from "@/lib/cluster/drift-history/band-style"
 import { cn } from "@/lib/utils/cn"
 
 export default function HistoryLegend({ showMarks = true }: { showMarks?: boolean }) {
@@ -16,18 +16,25 @@ export default function HistoryLegend({ showMarks = true }: { showMarks?: boolea
           </span>
         )
       })}
-      {showMarks && (
-        <>
-          <span className="inline-flex items-center gap-1.5 border-l border-gray-200 pl-4 whitespace-nowrap">
-            <i className="inline-block h-3.5 w-0.5 rounded-full bg-foreground/45" />
-            Deployed
-          </span>
-          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-            <i className="inline-block h-3.5 border-l-2 border-dashed border-foreground/35" />
-            Upstream release
-          </span>
-        </>
-      )}
+      {showMarks &&
+        MARK_ORDER.map((kind, i) => {
+          const style = MARK_STYLE[kind]
+          return (
+            <span
+              key={kind}
+              className={cn(
+                "inline-flex items-center gap-1.5 whitespace-nowrap",
+                i === 0 && "border-l border-gray-200 pl-4",
+              )}
+            >
+              <i
+                className={cn("inline-block h-3.5 w-0.5", style.color, !style.dash && "bg-current")}
+                style={{ backgroundImage: style.dash }}
+              />
+              {style.label}
+            </span>
+          )
+        })}
     </div>
   )
 }

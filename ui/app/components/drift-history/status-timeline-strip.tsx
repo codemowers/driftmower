@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent, type ReactNode } from "react"
 import { layOutBands, layOutMarks, withMinWidth, type LaidOutBand, type LaidOutMark } from "@/lib/cluster/drift-history/bands"
-import { BAND_STYLE } from "@/lib/cluster/drift-history/band-style"
+import { BAND_STYLE, MARK_STYLE } from "@/lib/cluster/drift-history/band-style"
 import { axisDate } from "@/lib/cluster/drift-history/format"
 import type { Span, VersionMark } from "@/lib/cluster/drift-history/types"
 import { cn } from "@/lib/utils/cn"
@@ -83,18 +83,20 @@ export default function StatusTimelineStrip({ spans, marks, windowStart, windowE
         })}
       </div>
 
-      {positioned.map((mark, i) => (
-        <div
-          key={`${mark.kind}-${mark.t}-${i}`}
-          className={cn(
-            "pointer-events-none absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2",
-            mark.kind === "deploy"
-              ? "rounded-full bg-foreground/45"
-              : "border-l-2 border-dashed border-foreground/35",
+      {positioned.map((mark, i) => {
+        const style = MARK_STYLE[mark.kind]
+        return (
+          <div
+            key={`${mark.kind}-${mark.t}-${i}`}
+            className={cn(
+              "pointer-events-none absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2",
+              style.color,
+              !style.dash && "rounded-full bg-current",
             )}
-          style={{ left: `${mark.left}%` }}
-        />
-      ))}
+            style={{ left: `${mark.left}%`, backgroundImage: style.dash }}
+          />
+        )
+      })}
 
       {readout && (
         <div

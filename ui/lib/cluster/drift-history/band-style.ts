@@ -1,10 +1,30 @@
-import type { BandStatus } from "./types"
+import type { BandStatus, MarkKind } from "./types"
 
 export type BandStyle = {
   bg: string
   fill: string
   baseline: string
   label: string
+}
+
+export type MarkStyle = {
+  color: string
+  dash?: string
+  label: string
+}
+
+const MARK_DASH = "repeating-linear-gradient(to bottom, currentColor 0 3px, transparent 3px 6px)"
+
+export const MARK_STYLE: Record<MarkKind, MarkStyle> = {
+  deploy: {
+    color: "text-foreground/45",
+    label: "Deployed",
+  },
+  upstream: {
+    color: "text-foreground/35",
+    dash: MARK_DASH,
+    label: "Upstream release",
+  },
 }
 
 export const BAND_STYLE: Record<BandStatus, BandStyle> = {
@@ -63,6 +83,8 @@ export const BAND_STYLE: Record<BandStatus, BandStyle> = {
     label: "Not deployed",
   },
 }
+
+export const MARK_ORDER: MarkKind[] = ["deploy", "upstream"]
 
 export const LEGEND_ORDER: BandStatus[] = [
   "ahead",

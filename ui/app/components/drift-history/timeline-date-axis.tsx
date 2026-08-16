@@ -69,7 +69,7 @@ export default function TimelineDateAxis({ series, windowStart, windowEnd }: Pro
         {ticks.map(tick => (
           <div
             key={`line-${tick.t}`}
-            className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-muted-foreground/50"
+            className="absolute top-0 h-1.5 w-0.5 -translate-x-1/2 bg-muted-foreground/45"
             style={{ left: `${tick.left}%` }}
           />
         ))}
