@@ -33,7 +33,7 @@ function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: LinkTo })
   const { releaseInfo, staleRepoCount, distinctRepoCount, totalContainers, totalWorkloadCount, worstStatus, issueCount } = entry
   const style = SEVERITY_STYLE[worstStatus]
   const showAppVersion = releaseInfo.chartAppVersion && releaseInfo.chartAppVersion !== releaseInfo.chartVersion
-  const href = linkTo(`/helm-releases/${releaseInfo.uid}`, { drop: ["htab"] })
+  const href = linkTo(`/helm-releases/${releaseInfo.uid}`, { drop: ["htab", "focus"] })
 
   return (
     <Link

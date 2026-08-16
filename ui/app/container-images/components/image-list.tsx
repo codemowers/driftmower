@@ -107,7 +107,7 @@ function ImageRow({
 
   return (
     <Link
-      href={linkTo(`/container-images/${path}`)}
+      href={linkTo(`/container-images/${path}`, { drop: ["focus"] })}
       className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}
     >
       {/* Image */}

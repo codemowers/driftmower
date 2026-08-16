@@ -1,6 +1,6 @@
 import { useSearchParams } from "next/navigation"
 
-const CARRY = ["report", "tenant", "filters", "q", "wtab", "ptab", "htab"] as const
+const CARRY = ["report", "tenant", "filters", "q", "focus", "wtab", "ptab", "htab"] as const
 
 export type LinkTo = (path: string, opts?: { drop?: string[] }) => string
 

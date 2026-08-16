@@ -37,14 +37,25 @@ function TopmostOwnersContent() {
   const { tenants: scopedTenants, namespaces } = useTenantScope()
 
   const [storedFocus, setStoredFocus] = useState<string | null>(null)
+  const [focusResolved, setFocusResolved] = useState(false)
   useEffect(() => {
     const stored = localStorage.getItem(FOCUS_STORAGE_KEY)
-    if (stored) startTransition(() => setStoredFocus(stored))
+    startTransition(() => {
+      if (stored) setStoredFocus(stored)
+      setFocusResolved(true)
+    })
   }, [])
 
   const focusKey = resolveFocusKey(searchParams.get("focus"), storedFocus)
   const focus = FOCUSES[focusKey]
   const history = useWorkloadHistory(focusKey === "history")
+
+  useEffect(() => {
+    if (!focusResolved || focusKey === DEFAULT_FOCUS || searchParams.get("focus")) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("focus", focusKey)
+    window.history.replaceState(null, "", `?${params.toString()}`)
+  }, [focusResolved, focusKey, searchParams])
 
   function handleFocusChange(key: FocusKey) {
     if (key === focusKey) return
@@ -168,7 +179,7 @@ function TopmostOwnersContent() {
         {scopedTenants.length > 0 && workloads.length === 0 ? (
           <TenantEmptyState tenants={scopedTenants} entity="workloads" />
         ) : (
-          <WorkloadList entries={workloads} focus={focus} />
+          <WorkloadList key={focus.key} entries={workloads} focus={focus} syncUrl={focusResolved} />
         )}
       </main>
     </div>

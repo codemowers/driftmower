@@ -27,7 +27,7 @@ export default function ManagedByCard({
           {releases.map(release => (
             <Link
               key={release.uid}
-              href={linkTo(`/helm-releases/${release.uid}`, { drop: ["htab"] })}
+              href={linkTo(`/helm-releases/${release.uid}`, { drop: ["htab", "focus"] })}
               className="flex flex-col gap-0.5 px-5 py-3 transition-colors hover:bg-brand-bg/40"
             >
               <span className="flex min-w-0 items-center gap-2">

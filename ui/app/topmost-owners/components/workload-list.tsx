@@ -142,7 +142,15 @@ function WorkloadRow({
   )
 }
 
-export default function WorkloadList({ entries, focus }: { entries: WorkloadEntry[]; focus: FocusDefinition }) {
+export default function WorkloadList({
+  entries,
+  focus,
+  syncUrl,
+}: {
+  entries: WorkloadEntry[]
+  focus: FocusDefinition
+  syncUrl: boolean
+}) {
   const reportId = useClusterState(s => s.reportId)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -157,14 +165,8 @@ export default function WorkloadList({ entries, focus }: { entries: WorkloadEntr
   const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
 
-  const [prevFocusKey, setPrevFocusKey] = useState(focus.key)
-  if (prevFocusKey !== focus.key) {
-    setPrevFocusKey(focus.key)
-    const valid = new Set(focus.scale.map(l => l.token))
-    setActiveTokens(prev => new Set([...prev].filter(t => valid.has(t))))
-  }
-
   useEffect(() => {
+    if (!syncUrl) return
     const filters = [
       ...focus.scale.filter(l => activeTokens.has(l.token)).map(l => l.token),
       ...(showIssuesOnly ? ["issues"] : []),
@@ -181,7 +183,7 @@ export default function WorkloadList({ entries, focus }: { entries: WorkloadEntr
     if (next !== searchParams.toString()) {
       router.replace(next ? `?${next}` : window.location.pathname)
     }
-  }, [activeTokens, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
+  }, [syncUrl, activeTokens, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
 
   function handleTokenToggle(token: string) {
     setActiveTokens(prev => {

@@ -37,7 +37,7 @@ export default function TenantDetailPage() {
       : tenant.appNamespaces
   }, [tenant, normalized])
 
-  const breadcrumbs = [{ label: "Tenants", href: linkTo("/tenants") }, { label: name }]
+  const breadcrumbs = [{ label: "Tenants", href: linkTo("/tenants", { drop: ["focus"] }) }, { label: name }]
 
   if (!hydrated) {
     return (

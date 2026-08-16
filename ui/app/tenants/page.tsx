@@ -157,7 +157,7 @@ export default function TenantsPage() {
                 return (
                   <Link
                     key={tenant.tenant}
-                    href={linkTo(`/tenants/${encodeURIComponent(tenant.tenant)}`)}
+                    href={linkTo(`/tenants/${encodeURIComponent(tenant.tenant)}`, { drop: ["focus"] })}
                     className={cn(
                       ROW_GRID,
                       "border-b border-gray-200 px-5 py-4 transition-colors last:border-b-0 hover:bg-brand-bg/40",

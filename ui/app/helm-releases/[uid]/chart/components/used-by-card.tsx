@@ -24,7 +24,7 @@ export default function UsedByCard({ releases, linkTo }: Props) {
         {releases.map((score, i) => (
           <Link
             key={score.groupKey}
-            href={linkTo(`/helm-releases/${score.releaseInfo.uid}`, { drop: ["htab"] })}
+            href={linkTo(`/helm-releases/${score.releaseInfo.uid}`, { drop: ["htab", "focus"] })}
             className={cn(
               "flex items-center gap-2 px-4 py-3 transition-colors hover:bg-brand-bg/30",
               i > 0 && "border-t border-gray-100",

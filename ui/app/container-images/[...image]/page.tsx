@@ -57,8 +57,8 @@ function ArtifactView({
         iconAriaLabel="Container image artifact"
         title={artifactTitle(detail.repository, version.resolvedTag)}
         breadcrumbs={[
-          { label: "Container Images", href: linkTo("/container-images") },
-          { label: `Image ${detail.key}`, href: linkTo(`/container-images/${imagePath(detail.key)}`) },
+          { label: "Container Images", href: linkTo("/container-images", { drop: ["focus"] }) },
+          { label: `Image ${detail.key}`, href: linkTo(`/container-images/${imagePath(detail.key)}`, { drop: ["focus"] }) },
           { label: crumb },
         ]}
         chips={[
@@ -148,7 +148,7 @@ function ContainerImageDetailContent() {
           title={detail.repository}
           copyValue={detail.key}
           breadcrumbs={[
-            { label: "Container Images", href: linkTo("/container-images") },
+            { label: "Container Images", href: linkTo("/container-images", { drop: ["focus"] }) },
             { label: `Image ${detail.key}` },
           ]}
           chips={[{ label: "Image", tone: "brand" }]}

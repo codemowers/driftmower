@@ -46,7 +46,7 @@ export default function HelmReleaseDetailPage() {
     usages.some(u => u.image.includes(i.image))
   ).length
 
-  const backHref = linkTo("/helm-releases")
+  const backHref = linkTo("/helm-releases", { drop: ["focus"] })
   const containerLabel = score.totalContainers === 1 ? "1 container" : `${score.totalContainers} containers`
   const workloadLabel = score.totalWorkloadCount === 1 ? "1 workload" : `${score.totalWorkloadCount} workloads`
 
@@ -91,7 +91,7 @@ export default function HelmReleaseDetailPage() {
 
         <ChartCard
           releaseInfo={score.releaseInfo}
-          href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab"] })}
+          href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab", "focus"] })}
         />
 
         <ReleaseTabs

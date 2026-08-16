@@ -73,10 +73,10 @@ export default function ChartDetailPage() {
           title={chartName}
           copyValue={chartName}
           breadcrumbs={[
-            { label: "Helm Releases", href: linkTo("/helm-releases") },
+            { label: "Helm Releases", href: linkTo("/helm-releases", { drop: ["focus"] }) },
             {
               label: `${info.managementKind} ${info.name}`,
-              href: linkTo(`/helm-releases/${uid}`, { drop: ["htab"] }),
+              href: linkTo(`/helm-releases/${uid}`, { drop: ["htab", "focus"] }),
             },
             { label: `chart ${chartName}` },
           ]}
