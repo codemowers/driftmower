@@ -2,6 +2,25 @@ import type { Knex } from 'knex'
 
 export const REQUIRED_TABLES = ['reports', 'image_usages', 'release_scores'] as const
 export const OPTIONAL_TABLES = ['workloads', 'workload_scores'] as const
+export const REQUIRED_COLUMNS = {
+  reports: ['id', 'source_type', 'cluster_context', 'created_at', 'namespace_scope', 'status'],
+  image_usages: [
+    'report_id',
+    'workload_group_key',
+    'workload_kind',
+    'workload_namespace',
+    'workload_name',
+    'release_group_key',
+    'container_name',
+    'registry',
+    'repository',
+    'deployed_tag',
+    'latest_tag',
+    'status',
+    'version_status'
+  ],
+  release_scores: ['report_id', 'group_key', 'release_info']
+} as const
 
 interface TableNameRow {
   name: string
@@ -13,8 +32,11 @@ export interface SchemaCheckResult {
 }
 
 export class SchemaCompatibilityError extends Error {
-  constructor(public readonly missingTables: string[]) {
-    super(`Incompatible Driftmower database: missing required tables: ${missingTables.join(', ')}`)
+  constructor(
+    public readonly missingTables: string[],
+    public readonly missingColumns: string[] = []
+  ) {
+    super(schemaCompatibilityMessage(missingTables, missingColumns))
     this.name = 'SchemaCompatibilityError'
   }
 }
@@ -33,8 +55,45 @@ export async function checkDatabaseSchema(database: Knex): Promise<SchemaCheckRe
     throw new SchemaCompatibilityError([...missingTables])
   }
 
+  const missingColumns = await findMissingColumns(database)
+
+  if (missingColumns.length > 0) {
+    throw new SchemaCompatibilityError([], missingColumns)
+  }
+
   return {
     requiredTables: REQUIRED_TABLES.filter(table => foundTables.has(table)),
     optionalTables: OPTIONAL_TABLES.filter(table => foundTables.has(table))
   }
+}
+
+async function findMissingColumns(database: Knex): Promise<string[]> {
+  const missingColumns: string[] = []
+
+  for (const table of REQUIRED_TABLES) {
+    const columnInfo = await database(table).columnInfo()
+    const foundColumns = new Set(Object.keys(columnInfo))
+
+    for (const column of REQUIRED_COLUMNS[table]) {
+      if (!foundColumns.has(column)) {
+        missingColumns.push(`${table}.${column}`)
+      }
+    }
+  }
+
+  return missingColumns
+}
+
+function schemaCompatibilityMessage(missingTables: string[], missingColumns: string[]): string {
+  const problems: string[] = []
+
+  if (missingTables.length > 0) {
+    problems.push(`missing required tables: ${missingTables.join(', ')}`)
+  }
+
+  if (missingColumns.length > 0) {
+    problems.push(`missing required columns: ${missingColumns.join(', ')}`)
+  }
+
+  return `Incompatible Driftmower database: ${problems.join('; ')}`
 }

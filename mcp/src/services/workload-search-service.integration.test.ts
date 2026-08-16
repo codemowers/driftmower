@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { SqliteReportSnapshotRepository } from '../db/report-snapshot-repository.js'
 import { checkDatabaseSchema } from '../db/schema-check.js'
 import { openReadOnlyDatabase, type Database } from '../db/sqlite.js'
 import { SqliteWorkloadRepository } from '../db/workload-repository.js'
@@ -14,7 +15,10 @@ describe('WorkloadSearchService backend database fixture', () => {
   beforeAll(async () => {
     database = await openReadOnlyDatabase(FIXTURE_PATH)
     await checkDatabaseSchema(database)
-    service = new WorkloadSearchService(new SqliteWorkloadRepository(database), 20, 100)
+    const reportSnapshotRepository = new SqliteReportSnapshotRepository(database)
+    const workloadRepository = new SqliteWorkloadRepository(database, reportSnapshotRepository)
+
+    service = new WorkloadSearchService(workloadRepository, 20, 100)
   })
 
   afterAll(async () => {

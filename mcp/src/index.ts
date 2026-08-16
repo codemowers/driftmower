@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { loadAppConfig } from './config.js'
+import { SqliteReportSnapshotRepository } from './db/report-snapshot-repository.js'
 import { checkDatabaseSchema } from './db/schema-check.js'
 import { openReadOnlyDatabase, type Database } from './db/sqlite.js'
 import { SqliteWorkloadRepository } from './db/workload-repository.js'
@@ -27,7 +28,8 @@ async function main(): Promise<void> {
   try {
     database = await openReadOnlyDatabase(appConfig.databasePath)
     await checkDatabaseSchema(database)
-    const repository = new SqliteWorkloadRepository(database)
+    const reportSnapshotRepository = new SqliteReportSnapshotRepository(database)
+    const repository = new SqliteWorkloadRepository(database, reportSnapshotRepository)
     const workloadSearchService = new WorkloadSearchService(
       repository,
       appConfig.defaultLimit,

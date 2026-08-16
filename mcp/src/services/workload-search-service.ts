@@ -9,22 +9,13 @@ import type {
   WorkloadDetailRow,
   WorkloadRepository
 } from '../db/workload-repository.js'
+import { parseReleaseInfo } from '../domain/release-info.js'
 
 const CURRENT_VERSION_STATUSES = new Set(['up_to_date', 'current'])
 
 export interface SearchWorkloadsInput {
   query: string
   limit?: number
-}
-
-interface ReleaseInfoJson {
-  managementKind?: unknown
-  name?: unknown
-  namespace?: unknown
-  chartName?: unknown
-  chartVersion?: unknown
-  chartAppVersion?: unknown
-  latestChartTag?: unknown
 }
 
 export class WorkloadSearchService {
@@ -152,31 +143,17 @@ function selectHelmAnalysis(rows: WorkloadDetailRow[]): HelmAnalysis | null {
 
     if (releaseInfo) {
       return {
-        releaseName: optionalString(releaseInfo.name),
-        releaseNamespace: optionalString(releaseInfo.namespace),
-        chartName: optionalString(releaseInfo.chartName),
-        observedChartVersion: optionalString(releaseInfo.chartVersion),
-        latestKnownChartVersion: optionalString(releaseInfo.latestChartTag),
-        appVersion: optionalString(releaseInfo.chartAppVersion)
+        releaseName: releaseInfo.name ?? null,
+        releaseNamespace: releaseInfo.namespace ?? null,
+        chartName: releaseInfo.chartName ?? null,
+        observedChartVersion: releaseInfo.chartVersion ?? null,
+        latestKnownChartVersion: releaseInfo.latestChartTag ?? null,
+        appVersion: releaseInfo.chartAppVersion ?? null
       }
     }
   }
 
   return null
-}
-
-function parseReleaseInfo(value: string): ReleaseInfoJson | null {
-  try {
-    const parsedValue: unknown = JSON.parse(value)
-
-    return typeof parsedValue === 'object' && parsedValue !== null ? (parsedValue as ReleaseInfoJson) : null
-  } catch {
-    return null
-  }
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null
 }
 
 function compareNullableStrings(left: string | null, right: string | null): number {

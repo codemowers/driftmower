@@ -1,22 +1,6 @@
 import type { Knex } from 'knex'
-
-const CLUSTER_SOURCE_TYPE = 'cluster'
-// TODO ineffective querying, remove after MVP scope, make it better
-const ALL_NAMESPACE_SCOPE = JSON.stringify({ mode: 'all' })
-
-interface ReleaseInfoJson {
-  name?: unknown
-  namespace?: unknown
-  chartName?: unknown
-  chartVersion?: unknown
-  latestChartTag?: unknown
-}
-
-interface ReportRow {
-  id: string
-  clusterContext: string | null
-  createdAt: string
-}
+import { parseReleaseInfo } from '../domain/release-info.js'
+import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
 
 interface WorkloadGroupCandidateRow {
   reportId: string
@@ -62,17 +46,20 @@ export interface WorkloadRepository {
 }
 
 export class SqliteWorkloadRepository implements WorkloadRepository {
-  constructor(private readonly database: Knex) {}
+  constructor(
+    private readonly database: Knex,
+    private readonly reportSnapshotRepository: ReportSnapshotRepository
+  ) {}
 
   async searchMatchingGroups(query: string, limit: number): Promise<MatchingWorkloadGroupRow[]> {
-    const latestReports = await this.loadLatestFullClusterReports()
+    const latestReports = await this.reportSnapshotRepository.findLatestReadyFullClusterReports()
 
     if (latestReports.length === 0) {
       return []
     }
 
-    const candidates = await this.loadGroupCandidates(latestReports.map(report => report.id))
-    const reportsById = new Map(latestReports.map(report => [report.id, report]))
+    const candidates = await this.loadGroupCandidates(latestReports.map(report => report.reportId))
+    const reportsById = new Map(latestReports.map(report => [report.reportId, report]))
     const normalizedQuery = query.toLocaleLowerCase()
 
     return uniqueGroupCandidates(candidates)
@@ -94,22 +81,6 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
       ...row,
       ...groupsById.get(workloadGroupId(row))!
     }))
-  }
-
-  private async loadLatestFullClusterReports(): Promise<ReportRow[]> {
-    // Fetch full-cluster snapshot candidates newest-first within each cluster.
-    // TypeScript selects the first row per cluster to avoid a database-specific window query.
-    const rows = (await this.database<ReportRow>('reports')
-      .select(['id', 'cluster_context as clusterContext', 'created_at as createdAt'])
-      .where('source_type', CLUSTER_SOURCE_TYPE)
-      .andWhere('namespace_scope', ALL_NAMESPACE_SCOPE)
-      .orderBy([
-        { column: 'cluster_context', order: 'asc' },
-        { column: 'created_at', order: 'desc' },
-        { column: 'id', order: 'desc' }
-      ])) as unknown as ReportRow[]
-
-    return latestReportPerCluster(rows)
   }
 
   private async loadGroupCandidates(reportIds: string[]): Promise<WorkloadGroupCandidateRow[]> {
@@ -170,20 +141,6 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
   }
 }
 
-function latestReportPerCluster(rows: ReportRow[]): ReportRow[] {
-  const reportsByCluster = new Map<string, ReportRow>()
-
-  for (const row of rows) {
-    if (!row.clusterContext || reportsByCluster.has(row.clusterContext)) {
-      continue
-    }
-
-    reportsByCluster.set(row.clusterContext, row)
-  }
-
-  return [...reportsByCluster.values()]
-}
-
 function uniqueGroupCandidates(rows: WorkloadGroupCandidateRow[]): WorkloadGroupCandidateRow[] {
   const groups = new Map<string, WorkloadGroupCandidateRow>()
 
@@ -200,7 +157,7 @@ function uniqueGroupCandidates(rows: WorkloadGroupCandidateRow[]): WorkloadGroup
 
 function enrichMatchingGroup(
   candidate: WorkloadGroupCandidateRow,
-  reportsById: Map<string, ReportRow>,
+  reportsById: Map<string, ReportSnapshot>,
   normalizedQuery: string
 ): MatchingWorkloadGroupRow | null {
   const report = reportsById.get(candidate.reportId)
@@ -243,11 +200,11 @@ function rankWorkloadCandidate(candidate: WorkloadGroupCandidateRow, normalizedQ
     rankSearchText(candidate.workloadNamespace, normalizedQuery, 3),
     rankSearchText(candidate.workloadKind, normalizedQuery, 6),
     rankSearchText(candidate.searchRepository, normalizedQuery, 9),
-    rankSearchText(optionalString(releaseInfo?.name), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.namespace), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.chartName), normalizedQuery, 12),
-    rankSearchText(optionalString(releaseInfo?.chartVersion), normalizedQuery, 15),
-    rankSearchText(optionalString(releaseInfo?.latestChartTag), normalizedQuery, 15)
+    rankSearchText(releaseInfo?.name ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.namespace ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.chartName ?? null, normalizedQuery, 12),
+    rankSearchText(releaseInfo?.chartVersion ?? null, normalizedQuery, 15),
+    rankSearchText(releaseInfo?.latestChartTag ?? null, normalizedQuery, 15)
   ])
 }
 
@@ -265,24 +222,6 @@ function minNullableRank(ranks: Array<number | null>): number | null {
   }
 
   return Math.min(...matchedRanks)
-}
-
-function parseReleaseInfo(value: string | null): ReleaseInfoJson | null {
-  if (!value) {
-    return null
-  }
-
-  try {
-    const parsedValue: unknown = JSON.parse(value)
-
-    return typeof parsedValue === 'object' && parsedValue !== null ? (parsedValue as ReleaseInfoJson) : null
-  } catch {
-    return null
-  }
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null
 }
 
 function compareMatchingGroups(left: MatchingWorkloadGroupRow, right: MatchingWorkloadGroupRow): number {

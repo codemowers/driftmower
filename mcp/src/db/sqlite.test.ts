@@ -3,10 +3,25 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { checkDatabaseSchema, SchemaCompatibilityError } from './schema-check.js'
+import {
+  checkDatabaseSchema,
+  REQUIRED_COLUMNS,
+  REQUIRED_TABLES,
+  SchemaCompatibilityError
+} from './schema-check.js'
 import { openReadOnlyDatabase } from './sqlite.js'
 
-const REQUIRED_TABLES = ['reports', 'image_usages', 'release_scores']
+type RequiredTable = keyof typeof REQUIRED_COLUMNS
+
+interface MissingColumn {
+  table: RequiredTable
+  column: string
+}
+
+interface SeedTableOptions {
+  includeWorkloads?: boolean
+  missingColumn?: MissingColumn
+}
 
 describe('read-only SQLite database', () => {
   let directoryPath: string
@@ -39,7 +54,7 @@ describe('read-only SQLite database', () => {
   })
 
   it('accepts a compatible schema and reports optional tables', async () => {
-    seedTables([...REQUIRED_TABLES, 'workloads'])
+    seedTables(REQUIRED_TABLES, { includeWorkloads: true })
     const database = await openReadOnlyDatabase(databasePath)
 
     await expect(checkDatabaseSchema(database)).resolves.toMatchObject({
@@ -63,11 +78,38 @@ describe('read-only SQLite database', () => {
     }
   })
 
-  function seedTables(tableNames: string[]): void {
+  it('rejects each missing required column', async () => {
+    for (const table of REQUIRED_TABLES) {
+      for (const column of REQUIRED_COLUMNS[table]) {
+        seedTables(REQUIRED_TABLES, { missingColumn: { table, column } })
+        const database = await openReadOnlyDatabase(databasePath)
+
+        await expect(checkDatabaseSchema(database)).rejects.toMatchObject({
+          name: 'SchemaCompatibilityError',
+          missingTables: [],
+          missingColumns: [`${table}.${column}`]
+        } satisfies Partial<SchemaCompatibilityError>)
+        await database.destroy()
+        await rm(databasePath, { force: true })
+      }
+    }
+  })
+
+  function seedTables(tableNames: readonly RequiredTable[], options: SeedTableOptions = {}): void {
     const writableDatabase = new BetterSqlite3(databasePath)
 
     for (const tableName of tableNames) {
-      writableDatabase.exec(`CREATE TABLE ${tableName} (id TEXT PRIMARY KEY)`)
+      const columns = REQUIRED_COLUMNS[tableName]
+        .filter(
+          column => tableName !== options.missingColumn?.table || column !== options.missingColumn.column
+        )
+        .map(column => `${column} TEXT`)
+
+      writableDatabase.exec(`CREATE TABLE ${tableName} (${columns.join(', ')})`)
+    }
+
+    if (options.includeWorkloads) {
+      writableDatabase.exec('CREATE TABLE workloads (id TEXT PRIMARY KEY)')
     }
 
     writableDatabase.close()

@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { SqliteReportSnapshotRepository } from './report-snapshot-repository.js'
 import { openReadOnlyDatabase } from './sqlite.js'
 import { SqliteWorkloadRepository } from './workload-repository.js'
 
@@ -25,11 +26,12 @@ describe('SqliteWorkloadRepository', () => {
 
   afterEach(async () => {
     await readDatabase?.destroy()
+    readDatabase = undefined
     seedDatabase.close()
     await rm(directoryPath, { recursive: true, force: true })
   })
 
-  it('searches only the latest full-cluster report per cluster and ignores status', async () => {
+  it('searches only the latest ready full-cluster report per cluster', async () => {
     insertReport(seedDatabase, 'old-full', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertReport(seedDatabase, 'latest-full', 'prod', '2026-01-02', 'cluster', ALL_NAMESPACES, 'pending')
     insertReport(
@@ -42,7 +44,7 @@ describe('SqliteWorkloadRepository', () => {
       'ready'
     )
     insertReport(seedDatabase, 'newest-yaml', 'prod', '2026-01-04', 'yaml', ALL_NAMESPACES, 'ready')
-    insertReport(seedDatabase, 'stage-full', 'stage', '2026-01-02', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'stage-full', 'stage', '2026-01-02', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'old-full', 'old', 'memelord-old')
     insertUsage(seedDatabase, 'latest-full', 'prod', 'Memelord')
     insertUsage(seedDatabase, 'newer-selected', 'selected', 'memelord-selected')
@@ -53,17 +55,17 @@ describe('SqliteWorkloadRepository', () => {
     const groups = await repository.searchMatchingGroups('MEMELORD', 20)
 
     expect(groups).toHaveLength(2)
-    expect(groups.map(group => group.reportId)).toEqual(['latest-full', 'stage-full'])
+    expect(groups.map(group => group.reportId)).toEqual(['old-full', 'stage-full'])
     expect(groups[0]).toMatchObject({
       clusterContext: 'prod',
-      reportCreatedAt: '2026-01-02',
-      workloadName: 'Memelord',
-      matchRank: 0
+      reportCreatedAt: '2026-01-01',
+      workloadName: 'memelord-old',
+      matchRank: 1
     })
   })
 
   it('ranks exact, prefix, and substring matches deterministically', async () => {
-    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'report', 'substring', 'our-api-worker')
     insertUsage(seedDatabase, 'report', 'prefix', 'api-worker')
     insertUsage(seedDatabase, 'report', 'exact', 'API')
@@ -79,7 +81,7 @@ describe('SqliteWorkloadRepository', () => {
   })
 
   it('searches namespace and image repository when workload name does not match', async () => {
-    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'report', 'namespace', 'llama-gemma', 'ggml-org/llama.cpp', 'main', null, 'llm')
     insertUsage(seedDatabase, 'report', 'repository', 'webui', 'open-webui/open-webui')
 
@@ -102,7 +104,7 @@ describe('SqliteWorkloadRepository', () => {
   })
 
   it('searches persisted Helm release and chart metadata', async () => {
-    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'report', 'helm', 'controller', 'example/controller', 'main', 'release-1')
     seedDatabase
       .prepare('INSERT INTO release_scores (report_id, group_key, release_info) VALUES (?, ?, ?)')
@@ -135,7 +137,7 @@ describe('SqliteWorkloadRepository', () => {
   })
 
   it('limits workload groups rather than image rows', async () => {
-    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'report', 'alpha', 'api-alpha', 'api/alpha', 'main')
     insertUsage(seedDatabase, 'report', 'alpha', 'api-alpha', 'api/sidecar', 'sidecar')
     insertUsage(seedDatabase, 'report', 'beta', 'api-beta', 'api/beta', 'main')
@@ -150,7 +152,7 @@ describe('SqliteWorkloadRepository', () => {
   })
 
   it('joins release analysis while retaining non-Helm image rows', async () => {
-    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'pending')
+    insertReport(seedDatabase, 'report', 'prod', '2026-01-01', 'cluster', ALL_NAMESPACES, 'ready')
     insertUsage(seedDatabase, 'report', 'helm', 'helm-api', 'api/helm', 'main', 'release-1')
     insertUsage(seedDatabase, 'report', 'plain', 'plain-api', 'api/plain', 'main')
     seedDatabase
@@ -175,8 +177,9 @@ describe('SqliteWorkloadRepository', () => {
 
 async function createRepository(databasePath: string): Promise<SqliteWorkloadRepository> {
   readDatabase = await openReadOnlyDatabase(databasePath)
+  const reportSnapshotRepository = new SqliteReportSnapshotRepository(readDatabase)
 
-  return new SqliteWorkloadRepository(readDatabase)
+  return new SqliteWorkloadRepository(readDatabase, reportSnapshotRepository)
 }
 
 function createSchema(database: Database): void {
