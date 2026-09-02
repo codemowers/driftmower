@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { loadAppConfig } from './config.js'
+import { SqliteImageUpdateRepository } from './db/image-update-repository.js'
 import { SqliteReportSnapshotRepository } from './db/report-snapshot-repository.js'
 import { checkDatabaseSchema } from './db/schema-check.js'
 import { openReadOnlyDatabase, type Database } from './db/sqlite.js'
@@ -10,6 +11,7 @@ import { createLogger } from './logger.js'
 import { createMcpServer } from './mcp/create-server.js'
 import { startHttpTransport } from './mcp/transports/http.js'
 import { startStdioTransport } from './mcp/transports/stdio.js'
+import { ImageUpdatePlanningService } from './services/image-update-planning-service.js'
 import { WorkloadSearchService } from './services/workload-search-service.js'
 
 async function main(): Promise<void> {
@@ -35,7 +37,15 @@ async function main(): Promise<void> {
       appConfig.defaultLimit,
       appConfig.maximumLimit
     )
-    const createServer = (): ReturnType<typeof createMcpServer> => createMcpServer({ workloadSearchService })
+    const imageUpdateRepository = new SqliteImageUpdateRepository(database)
+    const imageUpdatePlanningService = new ImageUpdatePlanningService(
+      imageUpdateRepository,
+      reportSnapshotRepository,
+      appConfig.defaultLimit,
+      appConfig.maximumLimit
+    )
+    const createServer = (): ReturnType<typeof createMcpServer> =>
+      createMcpServer({ workloadSearchService, imageUpdatePlanningService })
 
     if (appConfig.transport === 'stdio') {
       const mcpServer = createServer()
