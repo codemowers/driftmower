@@ -2,11 +2,11 @@ import { hasSession } from "@/lib/auth/session"
 import { isLlmConfigured } from "@/lib/llm"
 import type { ActionFacts } from "@/lib/features/actions/types"
 import { sync } from "@/lib/features/actions/queue"
+import { MAX_ACTIONS_PER_REQUEST } from "@/lib/features/actions/client"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-const MAX_ACTIONS_PER_REQUEST = 500
 const KINDS = new Set(["update-image", "upgrade-chart", "pin-digest"])
 const MANAGERS = new Set(["helm", "argo", "standalone", "operator"])
 

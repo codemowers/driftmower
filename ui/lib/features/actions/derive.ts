@@ -1,25 +1,33 @@
-import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
+import type { ImageUsage, ReleaseInfo, Report, StatusType } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { resolvedVersion } from "@/lib/utils/image-artifacts"
 import { sourceRepoUrl } from "@/lib/utils/oci-labels"
 import { compareChartVersions } from "@/lib/features/helm-releases/chart-versions"
+import { compareSemver, parseSemver, severeFixableCount } from "./verdict"
 import {
   assessKey,
+  managerScope,
   type ActionFacts,
   type ActionRow,
   type AssessResult,
+  type AssessState,
+  type ClusterActionRow,
   type CveFact,
+  type DisplayRow,
   type DriftClass,
   type HowCommand,
   type ManagerFacts,
+  type Relation,
 } from "./types"
 
 const BEHIND: StatusType[] = ["patch_behind", "minor_behind", "major_behind"]
 const BUILTIN_API_GROUPS = new Set(["", "apps", "batch", "v1", "core"])
 const CVE_CAP = 40
 const KIND_ORDER: Record<ActionFacts["kind"], number> = { "update-image": 0, "upgrade-chart": 1, "pin-digest": 2 }
+const DRIFT_RANK: Record<DriftClass, number> = { major: 0, minor: 1, patch: 2, unknown: 3 }
 
 export function managerFacts(usages: ImageUsage[], root: ClusterResource | undefined, container: string): ManagerFacts {
   const first = usages[0]
@@ -87,63 +95,157 @@ function worstUsagePerRepo(usages: ImageUsage[]): Map<string, ImageUsage> {
   return byRepo
 }
 
+function imageRows(repository: string, usage: ImageUsage, manager: ManagerFacts, vulnReports: Record<string, VulnerabilityReport> | null): ActionRow[] {
+  const rows: ActionRow[] = []
+  const from = resolvedVersion(usage)
+  const to = usage.versionStatus.latestTag
+  if (BEHIND.includes(usage.versionStatus.statusType) && from && to && from !== to) {
+    const facts: ActionFacts = {
+      kind: "update-image",
+      repository,
+      from,
+      to,
+      drift: driftClass(usage),
+      sourceRepoUrl: sourceRepoUrl(usage.imageInfo.labels),
+      cves: cveFacts(usage, vulnReports),
+      manager,
+    }
+    rows.push({ key: assessKey(facts), facts, verb: "Update image", name: shortName(repository), statusType: usage.versionStatus.statusType })
+  }
+  if (usage.tagStatus === "mismatch" && from) {
+    const facts: ActionFacts = {
+      kind: "pin-digest",
+      repository,
+      from: usage.imageInfo.tag,
+      to: from,
+      drift: "unknown",
+      sourceRepoUrl: null,
+      cves: [],
+      manager,
+      digest: usage.imageInfo.digest,
+    }
+    rows.push({ key: assessKey(facts), facts, verb: "Pin the digest", name: shortName(repository), statusType: usage.versionStatus.statusType })
+  }
+  return rows
+}
+
+function chartRow(release: ReleaseInfo | null, manager: ManagerFacts): ActionRow | null {
+  if (release?.managementKind !== "helm" || !release.latestChartTag) return null
+  if (compareChartVersions(release.latestChartTag, release.chartVersion) <= 0) return null
+  const facts: ActionFacts = {
+    kind: "upgrade-chart",
+    repository: `${release.chartRepoUrl ?? release.chartSource ?? "chart"}/${release.chartName}`,
+    from: release.chartVersion,
+    to: release.latestChartTag,
+    drift: chartDrift(release.chartVersion, release.latestChartTag),
+    sourceRepoUrl: null,
+    cves: [],
+    manager,
+    chart: { name: release.chartName, repoUrl: release.chartRepoUrl, source: release.chartSource },
+  }
+  return { key: assessKey(facts), facts, verb: "Upgrade chart", name: release.chartName, statusType: "no_data" }
+}
+
+function ownerLabel(manager: ManagerFacts): string {
+  switch (manager.kind) {
+    case "helm":
+      return `release ${manager.release}`
+    case "argo":
+      return `app ${manager.app}`
+    default:
+      return `${manager.workloadKind} ${manager.namespace}/${manager.name}`
+  }
+}
+
+function repositoryKey(usage: ImageUsage): string {
+  return `${usage.imageInfo.registry}/${usage.imageInfo.repository}`
+}
+
 export function deriveActions(
   usages: ImageUsage[],
   root: ClusterResource | undefined,
   vulnReports: Record<string, VulnerabilityReport> | null,
 ): ActionRow[] {
   const rows: ActionRow[] = []
-
   for (const [repository, usage] of worstUsagePerRepo(usages)) {
-    const manager = managerFacts(usages, root, usage.containerName)
-    const from = resolvedVersion(usage)
-    const to = usage.versionStatus.latestTag
-    if (BEHIND.includes(usage.versionStatus.statusType) && from && to && from !== to) {
-      const facts: ActionFacts = {
-        kind: "update-image",
-        repository,
-        from,
-        to,
-        drift: driftClass(usage),
-        sourceRepoUrl: sourceRepoUrl(usage.imageInfo.labels),
-        cves: cveFacts(usage, vulnReports),
-        manager,
-      }
-      rows.push({ key: assessKey(facts), facts, verb: "Update image", name: shortName(repository), statusType: usage.versionStatus.statusType })
-    }
-    if (usage.tagStatus === "mismatch" && from) {
-      const facts: ActionFacts = {
-        kind: "pin-digest",
-        repository,
-        from: usage.imageInfo.tag,
-        to: from,
-        drift: "unknown",
-        sourceRepoUrl: null,
-        cves: [],
-        manager,
-        digest: usage.imageInfo.digest,
-      }
-      rows.push({ key: assessKey(facts), facts, verb: "Pin the digest", name: shortName(repository), statusType: usage.versionStatus.statusType })
-    }
+    rows.push(...imageRows(repository, usage, managerFacts(usages, root, usage.containerName), vulnReports))
   }
-
-  const release = usages[0]?.releaseInfo
-  if (release?.managementKind === "helm" && release.latestChartTag && compareChartVersions(release.latestChartTag, release.chartVersion) > 0) {
-    const facts: ActionFacts = {
-      kind: "upgrade-chart",
-      repository: `${release.chartRepoUrl ?? release.chartSource ?? "chart"}/${release.chartName}`,
-      from: release.chartVersion,
-      to: release.latestChartTag,
-      drift: chartDrift(release.chartVersion, release.latestChartTag),
-      sourceRepoUrl: null,
-      cves: [],
-      manager: managerFacts(usages, root, usages[0].containerName),
-      chart: { name: release.chartName, repoUrl: release.chartRepoUrl, source: release.chartSource },
-    }
-    rows.push({ key: assessKey(facts), facts, verb: "Upgrade chart", name: release.chartName, statusType: "no_data" })
-  }
-
+  const first = usages[0]
+  const chart = first ? chartRow(first.releaseInfo, managerFacts(usages, root, first.containerName)) : null
+  if (chart) rows.push(chart)
   return rows.sort(compareActionRows)
+}
+
+export function deriveImageActions(
+  usages: ImageUsage[],
+  clusterResources: ClusterResource[] | null,
+  vulnReports: Record<string, VulnerabilityReport> | null,
+): ActionRow[] {
+  const roots = new Map<string, ClusterResource | undefined>()
+  const rootFor = (usage: ImageUsage): ClusterResource | undefined => {
+    const info = usage.workloadRootInfo
+    if (!info) return undefined
+    if (!roots.has(info.groupKey)) roots.set(info.groupKey, findWorkloadRoot(clusterResources, info))
+    return roots.get(info.groupKey)
+  }
+
+  const byKey = new Map<string, ActionRow>()
+  const chartScopes = new Set<string>()
+  for (const usage of usages) {
+    const manager = managerFacts([usage], rootFor(usage), usage.containerName)
+    const name = ownerLabel(manager)
+    for (const row of imageRows(repositoryKey(usage), usage, manager, vulnReports)) {
+      if (!byKey.has(row.key)) byKey.set(row.key, { ...row, name })
+    }
+    if (manager.kind !== "helm" || chartScopes.has(managerScope(manager))) continue
+    chartScopes.add(managerScope(manager))
+    const chart = chartRow(usage.releaseInfo, manager)
+    if (chart) byKey.set(chart.key, { ...chart, name })
+  }
+  return [...byKey.values()].sort(compareActionRows)
+}
+
+export function deriveClusterActions(
+  data: Report,
+  clusterResources: ClusterResource[] | null,
+  vulnReports: Record<string, VulnerabilityReport> | null,
+  scopeNamespaces: ReadonlySet<string> | null,
+): ClusterActionRow[] {
+  const byKey = new Map<string, ClusterActionRow>()
+  for (const usages of Object.values(data.report.workloadGroupMap)) {
+    const first = usages[0]
+    const info = first?.workloadRootInfo
+    if (!info?.uid) continue
+    if (scopeNamespaces && !scopeNamespaces.has(first.namespace)) continue
+    const root = findWorkloadRoot(clusterResources, info)
+    const releaseGroup = first.releaseInfo?.managementKind === "helm" ? first.releaseInfo.groupKey : null
+    const releaseUid = releaseGroup ? data.rotenness.releaseScores[releaseGroup]?.releaseInfo.uid ?? null : null
+    const owner = { uid: info.uid, kind: info.kind, name: info.name, namespace: info.namespace }
+    for (const row of deriveActions(usages, root, vulnReports)) {
+      if (!byKey.has(row.key)) byKey.set(row.key, { ...row, owner, releaseUid })
+    }
+  }
+  return [...byKey.values()].sort(compareActionFacts)
+}
+
+export function compareActionFacts(a: ActionRow, b: ActionRow): number {
+  return (
+    severeFixableCount(b.facts) - severeFixableCount(a.facts) ||
+    DRIFT_RANK[a.facts.drift] - DRIFT_RANK[b.facts.drift] ||
+    KIND_ORDER[a.facts.kind] - KIND_ORDER[b.facts.kind] ||
+    a.name.localeCompare(b.name)
+  )
+}
+
+export function currentChartScopes(usages: ImageUsage[]): Set<string> {
+  const scopes = new Set<string>()
+  for (const usage of usages) {
+    const release = usage.releaseInfo
+    if (release?.managementKind !== "helm" || !release.latestChartTag) continue
+    if (compareChartVersions(release.latestChartTag, release.chartVersion) > 0) continue
+    scopes.add(managerScope({ kind: "helm", namespace: release.namespace, release: release.name, chartVersion: release.chartVersion }))
+  }
+  return scopes
 }
 
 function chartDrift(from: string, to: string): DriftClass {
@@ -152,6 +254,59 @@ function chartDrift(from: string, to: string): DriftClass {
   if (a[0] !== b[0]) return "major"
   if (a[1] !== b[1]) return "minor"
   return "patch"
+}
+
+function semverEqual(a: string, b: string): boolean {
+  const x = parseSemver(a)
+  const y = parseSemver(b)
+  return x !== null && y !== null && compareSemver(x, y) === 0
+}
+
+function semverAtLeast(a: string, b: string): boolean {
+  const x = parseSemver(a)
+  const y = parseSemver(b)
+  return x !== null && y !== null && compareSemver(x, y) >= 0
+}
+
+export function relateRows<T extends ActionRow>(rows: T[], results: Record<string, AssessState>, currentCharts: ReadonlySet<string>): DisplayRow<T>[] {
+  const plain = (row: T, relation: Relation = "none", waitingOnChart = false): DisplayRow<T> =>
+    ({ ...row, displayFrom: row.facts.from, relation, absorbed: [], waitingOnChart })
+  const chartRows = new Map<string, DisplayRow<T>>()
+  for (const row of rows) {
+    if (row.facts.kind === "upgrade-chart" && row.facts.manager.kind === "helm") chartRows.set(managerScope(row.facts.manager), plain(row))
+  }
+  const out: DisplayRow<T>[] = []
+  for (const row of rows) {
+    if (row.facts.kind !== "update-image" || row.facts.manager.kind !== "helm") {
+      out.push(chartRows.get(row.facts.kind === "upgrade-chart" ? managerScope(row.facts.manager) : "") ?? plain(row))
+      continue
+    }
+    const chart = chartRows.get(managerScope(row.facts.manager))
+    if (!chart) {
+      out.push(plain(row, currentCharts.has(managerScope(row.facts.manager)) ? "override" : "helm-unknown"))
+      continue
+    }
+    const chartState = results[chart.key]
+    const app = chartState?.state === "pending" ? chartState.chartAppVersions : chartState?.result.chartAppVersions
+    if (app === undefined) {
+      out.push(plain(row, "helm-unknown", true))
+      continue
+    }
+    if (!app?.from || !app.to) {
+      out.push(plain(row, "helm-unknown"))
+      continue
+    }
+    if (!semverEqual(row.facts.from, app.from)) {
+      out.push(plain(row))
+      continue
+    }
+    if (semverAtLeast(app.to, row.facts.to)) {
+      chart.absorbed.push(row)
+      continue
+    }
+    out.push({ ...plain(row, "after-chart"), displayFrom: app.to })
+  }
+  return out
 }
 
 export function compareActionRows(a: ActionRow, b: ActionRow): number {
@@ -169,7 +324,13 @@ function chartRef(manager: Extract<ManagerFacts, { kind: "helm" }>): string | nu
   return absolute ? manager.chartSource : `${manager.chartSource} --repo ${manager.chartRepoUrl}`
 }
 
-export function commandsFor(row: ActionRow, result: AssessResult | null): HowCommand[] {
+const RELATION_HINT: Partial<Record<Relation, string>> = {
+  "after-chart": "Applies on top of the chart upgrade and pins the image against the chart. Kept by --reuse-values, dropped by a values file that omits it.",
+  override: "This is an override the chart does not know about. Kept by --reuse-values, dropped by a values file that omits it.",
+  "helm-unknown": "If the new chart ships this version, prefer the chart upgrade; this override pins the image against the chart.",
+}
+
+export function commandsFor(row: ActionRow, result: AssessResult | null, relation: Relation = "none"): HowCommand[] {
   const { facts } = row
   const manager = facts.manager
   const argoLink = manager.kind === "argo" && manager.url ? { label: "Open in Argo CD", url: manager.url } : undefined
@@ -200,7 +361,7 @@ export function commandsFor(row: ActionRow, result: AssessResult | null): HowCom
           ? `The image is not set through the release values. Add ${facts.repository}:${facts.to} to values.yaml and run helm upgrade.`
           : interim
             ? `Interim ${interim} avoids the breaking change; target ${facts.to} needs the affected values changed first.`
-            : undefined,
+            : RELATION_HINT[relation],
       }]
     }
     case "argo": {

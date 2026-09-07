@@ -37,7 +37,12 @@ export type ActionRow = {
   statusType: StatusType
 }
 
-export type ChangeEntry = { text: string; version: string; url: string | null }
+export type ClusterActionRow = ActionRow & {
+  owner: { uid: string; kind: string; name: string; namespace: string }
+  releaseUid: string | null
+}
+
+export type ChangeEntry ={ text: string; version: string; url: string | null }
 export type ConfigKey = { path: string; type: string }
 export type Affect = { entry: number; config: number; effect: "breaks" | "changes" }
 
@@ -57,6 +62,8 @@ export type Coverage = {
   configKeysSent: number
 }
 
+export type ChartAppVersions = { from: string | null; to: string | null }
+
 export type AssessResult = {
   risk: Risk
   value: Value
@@ -69,10 +76,20 @@ export type AssessResult = {
   sources: { label: string; url: string }[]
   valuesKey: { path: string; mode: "tag" | "image" } | null
   interim: string | null
+  chartAppVersions: ChartAppVersions | null
+}
+
+export type Relation = "none" | "after-chart" | "override" | "helm-unknown"
+
+export type DisplayRow<T extends ActionRow = ActionRow> = T & {
+  displayFrom: string
+  relation: Relation
+  absorbed: T[]
+  waitingOnChart: boolean
 }
 
 export type AssessState =
-  | { state: "pending" }
+  | { state: "pending"; chartAppVersions?: ChartAppVersions | null }
   | { state: "ready"; result: AssessResult; computedAt: number }
   | { state: "failed"; result: AssessResult; computedAt: number }
 

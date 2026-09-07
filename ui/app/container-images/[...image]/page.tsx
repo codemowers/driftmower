@@ -1,13 +1,16 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useMemo } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { Layers } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
+import { currentChartScopes, deriveImageActions } from "@/lib/features/actions/derive"
+import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import ResourceHeader from "@/app/components/resource-header"
+import ActionsCard from "@/app/components/actions-card"
 import CopyButton from "@/app/components/copy-button"
 import TagIdentity from "@/app/components/image/tag-identity"
 import SourceCard from "@/app/components/image/source-card"
@@ -22,7 +25,7 @@ import ManagedByCard from "./components/managed-by-card"
 import TagHistoryCard from "./components/tag-history-card"
 import VersionsTable from "./components/versions-table"
 import HistoryCard from "./components/history-card"
-import { imageDetail, tagResolution, type ImageDetail, type ImageVersion } from "../utils/image-entries"
+import { imageDetail, imageUsagesForKey, tagResolution, type ImageDetail, type ImageVersion } from "../utils/image-entries"
 
 const PAIR_GRID = "grid gap-6 items-start xl:grid-cols-[1fr_340px]"
 
@@ -100,10 +103,18 @@ function ContainerImageDetailContent() {
   const key = (params.image ?? []).map(decodeURIComponent).join("/")
   const searchParams = useSearchParams()
   const data = useClusterState(s => s.data)
+  const clusterResources = useClusterState(s => s.clusterResources)
+  const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { namespaces } = useTenantScope()
   const { linkTo } = useContextHref()
 
-  const detail = imageDetail(data, key, namespaces ? new Set(namespaces) : null)
+  const scope = useMemo(() => (namespaces ? new Set(namespaces) : null), [namespaces])
+  const usages = useMemo(() => imageUsagesForKey(data, key, scope), [data, key, scope])
+  const actionRows = useMemo(() => deriveImageActions(usages, clusterResources, vulnerabilityReports), [usages, clusterResources, vulnerabilityReports])
+  const currentCharts = useMemo(() => currentChartScopes(usages), [usages])
+  const assessments = useActionAssessments(actionRows, currentCharts)
+
+  const detail = imageDetail(data, key, scope)
 
   if (!data || !detail) {
     return (
@@ -179,6 +190,8 @@ function ContainerImageDetailContent() {
         />
 
         <ImageStats detail={detail} />
+
+        <ActionsCard {...assessments} />
 
         {detail.issues.length > 0 && <ImageIssues issues={detail.issues} />}
 

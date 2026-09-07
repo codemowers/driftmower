@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
 import { useTenantScope } from "@/lib/tenancy/tenant-context";
+import { currentChartScopes, deriveClusterActions } from "@/lib/features/actions/derive";
+import TopActions from "./components/top-actions";
 import { type StatValueTone } from "./components/stat-card";
 import SectionLinkCard from "./components/section-link-card";
 import DriftBreakdown from "./components/drift-breakdown";
@@ -51,9 +53,13 @@ function groupByWorkload(usages: ImageUsage[]): Map<string, ImageUsage[]> {
 const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 2, patch_behind: 1 }
 
 export default function ExecutiveSummaryPage() {
-  const { data, reportId, clusterResources } = useClusterState();
+  const { data, reportId, clusterResources, vulnerabilityReports } = useClusterState();
   const { tenants: scopedTenants, namespaces } = useTenantScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
+  const topActions = useMemo(
+    () => (data ? deriveClusterActions(data, clusterResources, vulnerabilityReports, namespaces ? new Set(namespaces) : null) : []),
+    [data, clusterResources, vulnerabilityReports, namespaces],
+  )
   const ready = data !== null
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = ready ? rottennessValueTone(rottennessScore) : "muted"
@@ -62,6 +68,7 @@ export default function ExecutiveSummaryPage() {
   const usages = (data?.report.imageUsages ?? [])
     .filter(u => !scopeSet || scopeSet.has(u.namespace))
 
+  const currentCharts = currentChartScopes(usages)
   const workloadMap = groupByWorkload(usages)
   const owners = countTopmostOwners(data, clusterResources, scopeSet)
   const helmReleaseCount = new Set(
@@ -162,6 +169,8 @@ export default function ExecutiveSummaryPage() {
             <DriftOverTime />
 
             <TechnicalDebtEstimate outdatedWorkloadCount={ready ? patchCount + minorCount + majorCount : null}/>
+
+            <TopActions rows={topActions} currentCharts={currentCharts} reportId={reportId} />
 
             <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
               <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />

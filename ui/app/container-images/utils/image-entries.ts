@@ -225,14 +225,19 @@ export function tagResolution(data: Report | null, key: string): TagResolution |
   }
 }
 
+export function imageUsagesForKey(data: Report | null, key: string, scopeNamespaces: Set<string> | null): ImageUsage[] {
+  if (!data) return []
+  return groupUsagesByRepo(data, scopeNamespaces).get(key) ?? []
+}
+
 export function imageDetail(
   data: Report | null,
   key: string,
   scopeNamespaces: Set<string> | null,
 ): ImageDetail | null {
   if (!data) return null
-  const usages = groupUsagesByRepo(data, scopeNamespaces).get(key)
-  if (!usages?.length) return null
+  const usages = imageUsagesForKey(data, key, scopeNamespaces)
+  if (usages.length === 0) return null
 
   return {
     ...toEntry(key, usages, data.issues),

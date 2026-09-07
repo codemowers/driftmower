@@ -1,9 +1,11 @@
 import type {
   ActionFacts,
+  ActionRow,
   AssessResult,
   ChangeEntry,
   Classification,
   Coverage,
+  Relation,
   Risk,
   Value,
 } from "./types"
@@ -41,12 +43,20 @@ function minorsSkipped(facts: ActionFacts): number {
   return to[1] - from[1]
 }
 
+export function severeFixableCount(facts: ActionFacts): number {
+  return facts.cves.filter(c => c.fixedVersion && (c.severity === "CRITICAL" || c.severity === "HIGH")).length
+}
+
 function hasFixableSevereCve(facts: ActionFacts): boolean {
-  return facts.cves.some(c => c.fixedVersion && (c.severity === "CRITICAL" || c.severity === "HIGH"))
+  return severeFixableCount(facts) > 0
+}
+
+function followsFloatingTag(facts: ActionFacts): boolean {
+  return parseSemver(facts.from) === null
 }
 
 export function deriveRisk(facts: ActionFacts, c: Classification, coverage: Coverage): Risk {
-  if (facts.kind === "pin-digest") return "safe"
+  if (facts.kind === "pin-digest") return followsFloatingTag(facts) ? "review" : "safe"
   if (c.breaking.length > 0 || c.affects.some(a => a.effect === "breaks")) return "risky"
   if (facts.drift === "major") return "review"
   if (c.affects.some(a => a.effect === "changes")) return "review"
@@ -55,7 +65,7 @@ export function deriveRisk(facts: ActionFacts, c: Classification, coverage: Cove
 }
 
 export function deriveValue(facts: ActionFacts, c: Classification): Value {
-  if (facts.kind === "pin-digest") return "high"
+  if (facts.kind === "pin-digest") return followsFloatingTag(facts) ? "low" : "high"
   if (hasFixableSevereCve(facts) || c.security.length > 0) return "high"
   if (facts.cves.length === 0 && c.security.length === 0 && c.affects.length === 0) return "low"
   return "medium"
@@ -86,7 +96,9 @@ function plural(n: number, word: string, words = `${word}s`): string {
 
 export function verdictText(risk: Risk, facts: ActionFacts, c: Classification, coverage: Coverage, interim: string | null): string {
   if (facts.kind === "pin-digest") {
-    return "Pinning changes nothing that runs today; it stops a restart from silently changing the build."
+    return followsFloatingTag(facts)
+      ? `This workload follows ${facts.from} by design. Pin ${facts.to} if you want it to stay on this build, or leave it and let the next restart take the new one.`
+      : "The tag was rebuilt with the same version, usually for a base image fix. Restart to pick it up, then pin the new digest so it stays put."
   }
   const parts: string[] = []
   const span = facts.kind === "upgrade-chart" ? "chart" : facts.drift === "unknown" ? "version" : facts.drift
@@ -115,8 +127,48 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-export function reasonLine(facts: ActionFacts, result: AssessResult | null): string {
-  if (facts.kind === "pin-digest") return "tag moved in the registry; a restart would change the build"
+export type ReasonContext = { relation: Relation; absorbed: ActionRow[]; displayFrom: string }
+
+function driftBetween(from: string, to: string): string | null {
+  const a = parseSemver(from)
+  const b = parseSemver(to)
+  if (!a || !b) return null
+  if (b[0] !== a[0]) return plural(b[0] - a[0], "major")
+  if (b[1] !== a[1]) return plural(b[1] - a[1], "minor")
+  if (b[2] !== a[2]) return plural(b[2] - a[2], "patch", "patches")
+  return null
+}
+
+function driftFallback(facts: ActionFacts): string {
+  if (facts.kind === "upgrade-chart") return `${facts.drift} chart bump`
+  const skipped = minorsSkipped(facts)
+  return skipped > 1 ? `${skipped} minor releases skipped` : `${facts.drift} release behind`
+}
+
+export function reasonLine(facts: ActionFacts, result: AssessResult | null, ctx?: ReasonContext): string {
+  if (!ctx) return baseReason(facts, result)
+  if (ctx.absorbed.length > 0) {
+    const first = ctx.absorbed[0].facts
+    const more = ctx.absorbed.length > 1 ? ` +${ctx.absorbed.length - 1} more` : ""
+    const merged = { ...facts, cves: [...facts.cves, ...ctx.absorbed.flatMap(a => a.facts.cves)] }
+    return `ships ${first.repository.split("/").pop()} ${first.from} → ${first.to}${more} · ${baseReason(merged, result)}`
+  }
+  const base = baseReason(facts, result)
+  if (ctx.relation === "after-chart") {
+    const still = driftBetween(ctx.displayFrom, facts.to)
+    const lead = still ? `after the chart upgrade, still ${still} behind` : "after the chart upgrade, still behind"
+    return base === driftFallback(facts) ? lead : `${lead} · ${base}`
+  }
+  if (ctx.relation === "override") return `${base} · the latest chart still pins ${facts.from}`
+  return base
+}
+
+function baseReason(facts: ActionFacts, result: AssessResult | null): string {
+  if (facts.kind === "pin-digest") {
+    return followsFloatingTag(facts)
+      ? `manifest follows ${facts.from}; a restart would move to the new build`
+      : `${facts.from} was rebuilt; running pods are on the old build`
+  }
   const severe = facts.cves.filter(c => c.fixedVersion && (c.severity === "CRITICAL" || c.severity === "HIGH"))
   const critical = severe.filter(c => c.severity === "CRITICAL").length
   const high = severe.length - critical
@@ -132,9 +184,7 @@ export function reasonLine(facts: ActionFacts, result: AssessResult | null): str
     if (result.coverage.changelog === "none") return "no release notes found"
     if (result.value === "low") return "fixes and housekeeping only"
   }
-  if (facts.kind === "upgrade-chart") return `${facts.drift} chart bump`
-  const skipped = minorsSkipped(facts)
-  return skipped > 1 ? `${skipped} minor releases skipped` : `${facts.drift} release behind`
+  return driftFallback(facts)
 }
 
 export function deterministicResult(facts: ActionFacts): AssessResult {
@@ -151,5 +201,6 @@ export function deterministicResult(facts: ActionFacts): AssessResult {
     sources: [],
     valuesKey: null,
     interim: null,
+    chartAppVersions: null,
   }
 }

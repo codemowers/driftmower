@@ -1,15 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/status-style"
-import { prewarmStaticSummaries } from "@/lib/llm/pod-summary"
+import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
-import { workloadMetricQueries } from "@/lib/cluster/prometheus/workload-metrics"
+import { workloadMetricQueries } from "@/lib/features/prometheus/workload-metrics"
 import ResourceHeader from "@/app/components/resource-header"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import WorkloadStats from "./components/workload-stats"
@@ -18,9 +16,12 @@ import NetworkCard from "@/app/components/network-card"
 import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
-import ActionsCard from "./components/actions-card"
+import ActionsCard from "@/app/components/actions-card"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
-import { useActionAssessments } from "./hooks/use-action-assessments"
+import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
+import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
+
+const NO_USAGES: ImageUsage[] = []
 
 export default function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()
@@ -29,24 +30,6 @@ export default function WorkloadDetailPage() {
   const clusterResources = useClusterState(s => s.clusterResources)
   const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
-
-  useEffect(() => {
-    if (!data) return
-    const entry = Object.entries(data.report.workloadGroupMap).find(
-      ([, u]) => u[0]?.workloadRootInfo?.uid === uid,
-    )
-    if (!entry) return
-    const byPod = new Map<string, ImageUsage[]>()
-    for (const u of entry[1]) {
-      const key = `${u.namespace}/${u.podName}`
-      const list = byPod.get(key)
-      if (list) list.push(u)
-      else byPod.set(key, [u])
-    }
-    // Summaries are a background nicety, so they wait for an idle moment.
-    const id = requestIdleCallback(() => void prewarmStaticSummaries([...byPod.values()], vulnerabilityReports))
-    return () => cancelIdleCallback(id)
-  }, [uid, data, vulnerabilityReports])
 
   const match = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -64,7 +47,10 @@ export default function WorkloadDetailPage() {
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
   const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
   const workloadMetrics = useWorkloadMetrics(namespace, podNames)
-  const assessments = useActionAssessments(match?.[1] ?? [], root, vulnerabilityReports)
+  const actionUsages = match?.[1] ?? NO_USAGES
+  const actionRows = deriveActions(actionUsages, root, vulnerabilityReports)
+  const currentCharts = currentChartScopes(actionUsages)
+  const assessments = useActionAssessments(actionRows, currentCharts)
 
   if (!data || !match) {
     return (

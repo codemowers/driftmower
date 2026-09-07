@@ -1,27 +1,39 @@
 "use client"
 
+import { useMemo } from "react"
 import { useParams } from "next/navigation"
 import { ShipWheel } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
+import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 import { normalizeDeployDate } from "@/lib/features/helm-releases/chart-versions"
+import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
+import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
+import ActionsCard from "@/app/components/actions-card"
 import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
 import ReleaseTabs from "./components/release-tabs"
+
+const NO_USAGES: ImageUsage[] = []
 
 export default function HelmReleaseDetailPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
 
   const score = data
     ? Object.values(data.rotenness.releaseScores).find(s => s.releaseInfo.uid === uid)
     : null
+
+  const usages = (data && score ? data.report.releaseGroupMap[score.groupKey] : undefined) ?? NO_USAGES
+  const actionRows = useMemo(() => deriveActions(usages, undefined, vulnerabilityReports), [usages, vulnerabilityReports])
+  const currentCharts = useMemo(() => currentChartScopes(usages), [usages])
+  const assessments = useActionAssessments(actionRows, currentCharts)
 
   if (!data || !score) {
     return (
@@ -32,8 +44,6 @@ export default function HelmReleaseDetailPage() {
       </div>
     )
   }
-
-  const usages = data.report.releaseGroupMap[score.groupKey] ?? []
 
   const normalizedScore = score.distinctRepoCount > 0 ? score.staleRepoCount / score.distinctRepoCount : 0
 
@@ -93,6 +103,8 @@ export default function HelmReleaseDetailPage() {
           releaseInfo={score.releaseInfo}
           href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab", "focus"] })}
         />
+
+        <ActionsCard {...assessments} />
 
         <ReleaseTabs
           uid={uid}
