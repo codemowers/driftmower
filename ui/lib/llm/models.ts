@@ -26,6 +26,16 @@ export const MODELS = {
     presencePenalty: 0.5,
     extraBody: { chat_template_kwargs: { enable_thinking: false } },
   },
+  "qwen3.6-classify": {
+    id: "Qwen3.6-35B-A3B-UD-Q4_K_M",
+    label: "Qwen3.6 35B",
+    temperature: 0,
+    maxOutputTokens: 300,
+    extraBody: {
+      chat_template_kwargs: { enable_thinking: false },
+      response_format: { type: "json_object" },
+    },
+  },
   "qwen3.6-think": {
     id: "Qwen3.6-35B-A3B-UD-Q4_K_M",
     label: "Qwen3.6 35B",

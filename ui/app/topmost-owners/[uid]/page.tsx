@@ -18,7 +18,9 @@ import NetworkCard from "@/app/components/network-card"
 import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
+import ActionsCard from "./components/actions-card"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
+import { useActionAssessments } from "./hooks/use-action-assessments"
 
 export default function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()
@@ -62,6 +64,7 @@ export default function WorkloadDetailPage() {
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
   const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
   const workloadMetrics = useWorkloadMetrics(namespace, podNames)
+  const assessments = useActionAssessments(match?.[1] ?? [], root, vulnerabilityReports)
 
   if (!data || !match) {
     return (
@@ -149,6 +152,8 @@ export default function WorkloadDetailPage() {
         ) : isArgo && argoApp ? (
           <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
         ) : null}
+
+        <ActionsCard {...assessments} />
 
         <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
 

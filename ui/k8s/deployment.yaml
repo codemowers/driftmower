@@ -34,6 +34,13 @@ spec:
                 secretKeyRef:
                   name: llama-api-token
                   key: token
+            # Optional: raises the GitHub Releases rate limit for the Actions card's changelog lookups.
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token
+                  key: token
+                  optional: true
             # Tenancy control plane behind the Tenants page; unset disables it.
             - name: PLATFORM_MANAGER_URL
               value: "http://platform-manager.platform-manager.svc"

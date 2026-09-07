@@ -7,6 +7,7 @@ import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
 import { startLiveDataFetching } from "@/lib/cluster/live-data"
 import { getAnalysisSocket, waitForSocketConnect } from "@/lib/cluster/analysis-socket"
 import { useClusterState } from "@/lib/cluster/cluster-state"
+import { prewarmActions } from "@/lib/features/actions/client"
 
 const SOCKET_SLOT_WAIT_MS = 3000
 
@@ -14,8 +15,19 @@ export default function ClusterInit() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const reportId = useClusterState(state => state.reportId)
+  const data = useClusterState(state => state.data)
+  const clusterResources = useClusterState(state => state.clusterResources)
+  const vulnerabilityReports = useClusterState(state => state.vulnerabilityReports)
+  const vulnerabilityReportsError = useClusterState(state => state.vulnerabilityReportsError)
   const reportParam = searchParams.get("report")
   const searchQuery = searchParams.toString()
+
+  // Seed the server-side assessment queue once per report, after every input it needs has loaded.
+  useEffect(() => {
+    if (!reportId || !data || !clusterResources) return
+    if (!vulnerabilityReports && !vulnerabilityReportsError) return
+    prewarmActions(reportId, data, clusterResources, vulnerabilityReports)
+  }, [reportId, data, clusterResources, vulnerabilityReports, vulnerabilityReportsError])
 
   // Start the polled live-data loop once for the app's lifetime.
   useEffect(() => startLiveDataFetching(), [])
