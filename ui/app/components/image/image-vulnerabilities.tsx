@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn"
 import { compactRelativeTimeFromNow } from "@/lib/utils/format-time"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage } from "@/lib/cluster/reports"
-import type { VulnerabilitySeverity, Vulnerability } from "@/lib/cluster/vulnerability"
+import type { VulnerabilitySeverity, Vulnerability } from "@/lib/features/vulnerability"
 
 const SEVERITY_STYLE: Record<VulnerabilitySeverity, { bg: string; text: string; label: string }> = {
   CRITICAL: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Critical" },

@@ -1,11 +1,11 @@
 import { create } from "zustand"
 import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
-import type { VulnerabilityReport } from "./vulnerability/types"
-import type { ClusterNodesResponse } from "@/lib/api/cluster-resources/types"
-import type { AlertsResult } from "./prometheus/alerts"
-import type { ClusterMetrics } from "./prometheus/metrics"
-import type { NodeStorageMap } from "./prometheus/node-storage"
+import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
+import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
+import type { AlertsResult } from "@/lib/features/prometheus/alerts"
+import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
+import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
 
 export type ClusterResource = {
   uid: string

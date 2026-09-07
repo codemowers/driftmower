@@ -3,8 +3,8 @@
 import HistoryLegend from "@/app/components/drift-history/history-legend"
 import DriftTimelineRow from "@/app/components/drift-history/drift-timeline-row"
 import TimelineDateAxis from "@/app/components/drift-history/timeline-date-axis"
-import { percentLabel, windowSummary } from "@/lib/cluster/drift-history/format"
-import { useWorkloadSeries } from "@/lib/hooks/use-drift-history"
+import { percentLabel, windowSummary } from "@/lib/features/drift-history/format"
+import { useWorkloadSeries } from "@/lib/features/drift-history/use-drift-history"
 import { cn } from "@/lib/utils/cn"
 
 export default function HistoryTab({ workloadGroupKey }: { workloadGroupKey: string }) {

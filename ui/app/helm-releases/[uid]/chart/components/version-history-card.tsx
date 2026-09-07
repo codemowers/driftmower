@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils/cn"
-import { compareChartVersions, normalizeChartVersion, sortChartVersionsDesc } from "@/app/helm-releases/utils/chart-versions"
+import { compareChartVersions, normalizeChartVersion, sortChartVersionsDesc } from "@/lib/features/helm-releases/chart-versions"
 import { canBuildChartCommands, isAbsoluteChartRef } from "./chart-commands-card"
 
 const COLLAPSED_CELL_COUNT = 21

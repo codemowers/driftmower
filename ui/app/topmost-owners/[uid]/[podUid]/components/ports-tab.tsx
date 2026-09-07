@@ -1,6 +1,6 @@
 "use client"
 
-import { useNetstatd, filterListening } from "@/lib/cluster/netstatd"
+import { useNetstatd, filterListening } from "@/lib/features/netstatd"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {

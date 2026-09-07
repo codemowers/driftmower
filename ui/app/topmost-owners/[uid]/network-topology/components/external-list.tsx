@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { cn } from "@/lib/utils/cn"
-import { useRdns, lookupRdns, type AggRow, type RdnsEntry } from "@/lib/cluster/netstatd"
+import { useRdns, lookupRdns, type AggRow, type RdnsEntry } from "@/lib/features/netstatd"
 
 type Props = {
   rows: AggRow[]

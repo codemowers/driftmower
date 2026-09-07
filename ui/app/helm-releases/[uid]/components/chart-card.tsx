@@ -2,8 +2,8 @@ import Link from "next/link"
 import { Map, ArrowRight } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
-import { chartDrift } from "@/app/helm-releases/utils/chart-versions"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
+import { chartDrift } from "@/lib/features/helm-releases/chart-versions"
+import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 
 const CARD_BASE =
   "flex items-center gap-5 rounded-xl border border-gray-200 bg-white px-5 py-4"

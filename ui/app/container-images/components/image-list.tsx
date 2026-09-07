@@ -7,8 +7,8 @@ import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
-import type { Span } from "@/lib/cluster/drift-history/types"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
+import type { Span } from "@/lib/features/drift-history/types"
+import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
 import { imagePath } from "@/lib/utils/image-artifacts"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
@@ -18,9 +18,9 @@ import {
   worstVulnerability,
   type Vulnerability,
   type VulnerabilityReport,
-} from "@/lib/cluster/vulnerability"
+} from "@/lib/features/vulnerability"
 import DriftSparkline from "@/app/components/drift-history/drift-sparkline"
-import { useImageHistory } from "@/lib/hooks/use-bulk-drift-history"
+import { useImageHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
 import ImageFilters from "./image-filters"
 import type { ImageEntry } from "../utils/image-entries"
 

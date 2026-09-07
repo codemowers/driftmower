@@ -10,14 +10,14 @@ import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./fo
 import type { FocusKey, WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "./utils/pod-summary"
 import { liveWorkloadEntries } from "./utils/live-entries"
-import { useWorkloadHistory } from "@/lib/hooks/use-bulk-drift-history"
+import { useWorkloadHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
 import { reportWorkloadRoots } from "./utils/report-roots"
 import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
-import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/status-style"
+import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function TopmostOwnersPage() {

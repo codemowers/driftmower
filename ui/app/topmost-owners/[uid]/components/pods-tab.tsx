@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
+import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
 import { collectOwnedPods } from "@/lib/cluster/workload-root"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
 

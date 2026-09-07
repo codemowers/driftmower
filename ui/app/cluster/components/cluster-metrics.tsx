@@ -4,8 +4,8 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes } from "@/lib/utils/format-bytes"
 import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
-import { classifyPod } from "@/lib/cluster/pod-status-style"
-import type { ClusterMetrics } from "@/lib/cluster/prometheus/metrics"
+import { classifyPod } from "@/lib/cluster/styles/pod-status-style"
+import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 
 type Memory = NonNullable<ClusterMetrics["memory"]>
 

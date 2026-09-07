@@ -1,6 +1,6 @@
-import { getPodLogs } from "@/lib/cluster/logs/pod"
-import { TAIL_LINES } from "@/lib/cluster/logs/constants"
-import type { LogSource } from "@/lib/cluster/logs/types"
+import { getPodLogs } from "@/lib/features/logs/pod"
+import { TAIL_LINES } from "@/lib/features/logs/constants"
+import type { LogSource } from "@/lib/features/logs/types"
 
 export const dynamic = "force-dynamic"
 

@@ -9,7 +9,7 @@ import {
   filterListening,
   groupListening,
   buildMatrix,
-} from "@/lib/cluster/netstatd"
+} from "@/lib/features/netstatd"
 import Section from "./section"
 import SummaryStrip from "./summary-strip"
 import ListeningList from "./listening-list"

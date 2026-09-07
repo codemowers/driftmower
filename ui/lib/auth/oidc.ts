@@ -1,3 +1,5 @@
+import "server-only"
+
 import * as oidc from "openid-client"
 
 export interface OidcRuntimeConfig {

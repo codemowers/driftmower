@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils/cn"
-import type { NetstatdStatus } from "@/lib/cluster/netstatd"
+import type { NetstatdStatus } from "@/lib/features/netstatd"
 import LiveAge from "./live-age"
 
 type Props = {

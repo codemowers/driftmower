@@ -1,4 +1,4 @@
-import { getClusterNodes } from "@/lib/api/cluster-resources/nodes"
+import { getClusterNodes } from "@/lib/cluster-resources/nodes"
 
 export const dynamic = "force-dynamic"
 

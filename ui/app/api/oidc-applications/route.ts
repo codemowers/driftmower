@@ -1,4 +1,4 @@
-import { proxyRequest } from "@/lib/api/backend-proxy"
+import { proxyRequest } from "@/lib/server/backend-proxy"
 import { getOidcRuntimeConfig } from "@/lib/auth/oidc"
 
 export const dynamic = "force-dynamic"

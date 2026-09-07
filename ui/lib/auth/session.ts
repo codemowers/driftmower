@@ -1,3 +1,5 @@
+import "server-only"
+
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session"
 
 export interface SessionClaims {

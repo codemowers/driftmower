@@ -4,7 +4,7 @@ import { Suspense } from "react"
 import { useParams } from "next/navigation"
 import { FileCode } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { supportsYamlView } from "@/lib/cluster/yaml-supported-kinds"
+import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import ResourceHeader from "@/app/components/resource-header"
 import YamlViewer from "./components/yaml-viewer"
 

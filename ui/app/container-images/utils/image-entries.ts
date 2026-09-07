@@ -1,5 +1,5 @@
 import type { ImageUsage, Issue, Report, ScrapeStatus, StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER } from "@/lib/cluster/status-style"
+import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 import { resolvedVersion } from "@/lib/utils/image-artifacts"
 
 export type ImageWorkload = {

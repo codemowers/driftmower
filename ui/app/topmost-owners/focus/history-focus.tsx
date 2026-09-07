@@ -1,6 +1,6 @@
 import DriftSparkline from "@/app/components/drift-history/drift-sparkline"
-import { dayLabel, percentLabel } from "@/lib/cluster/drift-history/format"
-import { isGreen, trendBetween } from "@/lib/cluster/drift-history/stats"
+import { dayLabel, percentLabel } from "@/lib/features/drift-history/format"
+import { isGreen, trendBetween } from "@/lib/features/drift-history/stats"
 import { cn } from "@/lib/utils/cn"
 import type { FocusDefinition, WorkloadEntry } from "./types"
 

@@ -7,8 +7,8 @@ import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
-import { CVE_SEVERITY_STYLE, worstVulnerability, type VulnerabilityReport } from "@/lib/cluster/vulnerability"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
+import { CVE_SEVERITY_STYLE, worstVulnerability, type VulnerabilityReport } from "@/lib/features/vulnerability"
 import { digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
 function WorstCveCell({ report }: { report: VulnerabilityReport | null | undefined }) {

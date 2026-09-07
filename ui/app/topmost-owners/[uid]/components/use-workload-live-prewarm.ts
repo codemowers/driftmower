@@ -2,11 +2,11 @@
 
 import { useEffect, useRef } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useNetstatd, useNetstatdStable } from "@/lib/cluster/netstatd"
+import { useNetstatd, useNetstatdStable } from "@/lib/features/netstatd"
 import type { ImageUsage } from "@/lib/cluster/reports"
-import { ensureLive, podLiveFacts, staticFacts } from "@/lib/llm/pod-summary"
+import { ensureLive, podLiveFacts, staticFacts } from "@/lib/features/pod-summary"
 
-export function useWorkloadLivePrewarm(workloadUid: string): void {
+export function useWorkloadLivePrewarm(workloadUid: string, enabled = true): void {
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
@@ -18,7 +18,7 @@ export function useWorkloadLivePrewarm(workloadUid: string): void {
   }, [workloadUid])
 
   useEffect(() => {
-    if (prewarmed.current || !stable || !data) return
+    if (!enabled || prewarmed.current || !stable || !data) return
     const entry = Object.entries(data.report.workloadGroupMap).find(
       ([, u]) => u[0]?.workloadRootInfo?.uid === workloadUid,
     )
@@ -44,5 +44,5 @@ export function useWorkloadLivePrewarm(workloadUid: string): void {
       const staticRisk = { riskDriver: facts.riskDriver, worstSeverity: facts.worstSeverity }
       ensureLive(podRes.uid, podLiveFacts(podRes, net, clusterResources, staticRisk))
     }
-  }, [stable, data, clusterResources, vulnReports, workloadUid])
+  }, [enabled, stable, data, clusterResources, vulnReports, workloadUid])
 }

@@ -10,7 +10,7 @@ import {
   fetchNetstatdUrl,
   filterListening,
   groupListening,
-} from "@/lib/cluster/netstatd"
+} from "@/lib/features/netstatd"
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import Breadcrumbs from "@/app/components/breadcrumbs"

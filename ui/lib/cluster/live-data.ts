@@ -1,9 +1,9 @@
 import { checkConnection } from "./check-connection"
 import { useClusterState } from "./cluster-state"
 import { CLUSTER_RESOURCES_URL, CLUSTER_NODES_URL } from "./constants"
-import { fetchClusterAlerts } from "./prometheus/alerts"
-import { fetchClusterMetrics } from "./prometheus/metrics"
-import { fetchNodeStorage } from "./prometheus/node-storage"
+import { fetchClusterAlerts } from "@/lib/features/prometheus/alerts"
+import { fetchClusterMetrics } from "@/lib/features/prometheus/metrics"
+import { fetchNodeStorage } from "@/lib/features/prometheus/node-storage"
 
 const CONNECTED_FETCH_INTERVAL = 30000
 const DISCONNECTED_FETCH_INTERVAL = 5000

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils/cn"
-import type { AggRow } from "@/lib/cluster/netstatd"
+import type { AggRow } from "@/lib/features/netstatd"
 
 type Props = {
   rows: AggRow[]

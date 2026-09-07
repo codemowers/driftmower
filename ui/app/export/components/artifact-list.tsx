@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils/cn"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import { formatSize, ARTIFACT_CLASSES, type ArtifactClass, type ClassifiedArtifact } from "../data"
 
 const GRID = "grid-cols-[1.5rem_minmax(0,1fr)_5rem_6rem]"

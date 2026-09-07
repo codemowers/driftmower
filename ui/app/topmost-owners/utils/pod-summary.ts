@@ -1,5 +1,5 @@
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import { classifyPod, podStateLabel, POD_SQUARE_ORDER, type PodSeverity } from "@/lib/cluster/pod-status-style"
+import { classifyPod, podStateLabel, POD_SQUARE_ORDER, type PodSeverity } from "@/lib/cluster/styles/pod-status-style"
 
 export type PodSummary = {
   total: number

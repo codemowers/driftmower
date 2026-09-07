@@ -5,7 +5,7 @@ import { softWrapText } from "@/lib/utils/soft-wrap-text"
 import { kubectlAge } from "@/lib/utils/format-time"
 import { formatBytes } from "@/lib/utils/format-bytes"
 import { usageBarColor } from "@/lib/utils/usage-color"
-import type { NodeDrift, Readiness, SupportSeverity } from "@/lib/api/cluster-resources/types"
+import type { NodeDrift, Readiness, SupportSeverity } from "@/lib/cluster-resources/types"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 
 const GRID = "grid-cols-[1.8fr_1.6fr_2.3fr_1.6fr_1.3fr_0.3fr]"

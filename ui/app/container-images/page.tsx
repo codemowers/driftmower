@@ -8,7 +8,7 @@ import ImageList from "./components/image-list"
 import { imageEntries } from "./utils/image-entries"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
-import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, driftSummaryPills, isNoData } from "@/lib/cluster/styles/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function ContainerImagesPage() {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useNetstatd, aggregate, buildPodGraph } from "@/lib/cluster/netstatd"
+import { useNetstatd, aggregate, buildPodGraph } from "@/lib/features/netstatd"
 import { buildLayout, edgeEndpoints, elbowPath } from "./graph-layout"
 import { usePanZoom } from "./use-pan-zoom"
 import TopologyNode from "./topology-node"

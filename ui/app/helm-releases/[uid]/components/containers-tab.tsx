@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils/cn"
 import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import { digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
 function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {

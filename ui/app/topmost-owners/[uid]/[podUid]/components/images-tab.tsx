@@ -7,8 +7,8 @@ import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
-import type { VulnerabilityReport, VulnerabilitySeverity, Vulnerability } from "@/lib/cluster/vulnerability"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
+import type { VulnerabilityReport, VulnerabilitySeverity, Vulnerability } from "@/lib/features/vulnerability"
 
 const CVE_SEVERITY_STYLE: Record<VulnerabilitySeverity, { bg: string; text: string; label: string }> = {
   CRITICAL: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Critical" },

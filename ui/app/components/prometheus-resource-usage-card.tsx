@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils/cn"
 import { formatBytes, formatCores } from "@/lib/utils/format-bytes"
 import { usageBarColor } from "@/lib/utils/usage-color"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { PodVolume, ResourceTriplet } from "@/lib/cluster/prometheus/query"
-import type { PerPodMetrics } from "@/lib/cluster/prometheus/workload-metrics"
+import type { PodVolume, ResourceTriplet } from "@/lib/features/prometheus/query"
+import type { PerPodMetrics } from "@/lib/features/prometheus/workload-metrics"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const MAX_VISIBLE = 5

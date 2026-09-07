@@ -3,10 +3,10 @@
 import type { ComponentProps } from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { DRIFT_CHART_CONFIG } from "@/lib/cluster/drift-history/chart-config"
-import type { StackPoint, StackStatus } from "@/lib/cluster/drift-history/types"
-import { axisDate, tooltipDate } from "@/lib/cluster/drift-history/format"
-import { BAND_STYLE } from "@/lib/cluster/drift-history/band-style"
+import { DRIFT_CHART_CONFIG } from "@/lib/features/drift-history/chart-config"
+import type { StackPoint, StackStatus } from "@/lib/features/drift-history/types"
+import { axisDate, tooltipDate } from "@/lib/features/drift-history/format"
+import { BAND_STYLE } from "@/lib/features/drift-history/band-style"
 import HistoryLegend from "./history-legend"
 
 const LAYERS: StackStatus[] = ["no_data", "behind", "major_behind", "minor_behind", "patch_behind", "up_to_date", "ahead"]

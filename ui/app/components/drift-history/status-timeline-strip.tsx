@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, type MouseEvent, type ReactNode } from "react"
-import { layOutBands, layOutMarks, withMinWidth, type LaidOutBand, type LaidOutMark } from "@/lib/cluster/drift-history/bands"
-import { BAND_STYLE, MARK_STYLE } from "@/lib/cluster/drift-history/band-style"
-import { axisDate } from "@/lib/cluster/drift-history/format"
-import type { Span, VersionMark } from "@/lib/cluster/drift-history/types"
+import { layOutBands, layOutMarks, withMinWidth, type LaidOutBand, type LaidOutMark } from "@/lib/features/drift-history/bands"
+import { BAND_STYLE, MARK_STYLE } from "@/lib/features/drift-history/band-style"
+import { axisDate } from "@/lib/features/drift-history/format"
+import type { Span, VersionMark } from "@/lib/features/drift-history/types"
 import { cn } from "@/lib/utils/cn"
 
 type Props = {

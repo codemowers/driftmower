@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchPodMetrics, type PodMetrics } from "@/lib/cluster/prometheus/pod-metrics"
+import { fetchPodMetrics, type PodMetrics } from "@/lib/features/prometheus/pod-metrics"
 
 const POLL_INTERVAL = 30000
 

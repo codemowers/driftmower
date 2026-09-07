@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils/cn"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { POD_SEVERITY_STYLE, POD_SQUARE_ORDER, type PodSeverity } from "@/lib/cluster/pod-status-style"
+import { POD_SEVERITY_STYLE, POD_SQUARE_ORDER, type PodSeverity } from "@/lib/cluster/styles/pod-status-style"
 
 const MAX_ROWS = 3
 const SQUARES_PER_ROW = 7

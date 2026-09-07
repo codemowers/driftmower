@@ -1,7 +1,7 @@
 "use client"
 
 import { Plus, Minus } from "lucide-react"
-import type { GraphNode } from "@/lib/cluster/netstatd"
+import type { GraphNode } from "@/lib/features/netstatd"
 import { cn } from "@/lib/utils/cn"
 import { subtitleText, type Side } from "./graph-layout"
 

@@ -5,7 +5,7 @@ import { Check, Copy, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import CopyButton from "@/app/components/copy-button"
 import { cn } from "@/lib/utils/cn"
-import { yamlText, type YamlLine } from "@/lib/utils/yaml-lines"
+import { yamlText, type YamlLine } from "@/lib/features/yaml/yaml-lines"
 
 const LINE_HEIGHT_PX = 20
 const MAX_PATH_CHARS = 110

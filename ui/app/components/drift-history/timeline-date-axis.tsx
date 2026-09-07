@@ -1,8 +1,8 @@
 "use client"
 
-import { layOutBands } from "@/lib/cluster/drift-history/bands"
-import { axisDate } from "@/lib/cluster/drift-history/format"
-import type { Span, VersionMark } from "@/lib/cluster/drift-history/types"
+import { layOutBands } from "@/lib/features/drift-history/bands"
+import { axisDate } from "@/lib/features/drift-history/format"
+import type { Span, VersionMark } from "@/lib/features/drift-history/types"
 import { cn } from "@/lib/utils/cn"
 import { TIMELINE_ROW_GRID } from "./drift-timeline-row"
 

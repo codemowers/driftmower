@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch"
 import DocumentViewer from "@/app/components/document-viewer"
 import TabMessage from "./tab-message"
 import { HELM_RELEASES_URL } from "@/lib/cluster/constants"
-import { countLeaves, mergeValues, valueLines, type ReleaseValues, type ValuesView } from "@/lib/cluster/helm-values"
+import { countLeaves, mergeValues, valueLines, type ReleaseValues, type ValuesView } from "@/lib/features/helm-releases/values"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 
 type Props = {

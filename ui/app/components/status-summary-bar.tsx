@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
-import type { SummaryPill } from "@/lib/cluster/status-style"
+import type { SummaryPill } from "@/lib/cluster/styles/status-style"
 
 type Props = {
   totalLabel: string

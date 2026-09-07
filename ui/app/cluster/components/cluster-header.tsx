@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react"
-import type { K8sReference } from "@/lib/api/cluster-resources/types"
+import type { K8sReference } from "@/lib/cluster-resources/types"
 
 export default function ClusterHeader({
   reference,

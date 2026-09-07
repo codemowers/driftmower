@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import RottennessSparkline from "@/app/components/drift-history/rottenness-sparkline"
-import { useDriftHistory } from "@/lib/hooks/use-drift-history"
+import { useDriftHistory } from "@/lib/features/drift-history/use-drift-history"
 import { cn } from "@/lib/utils/cn"
 
 export default function DriftRottennessSparkline({ fallback }: { fallback: ReactNode }) {

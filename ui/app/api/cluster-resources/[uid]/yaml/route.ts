@@ -1,6 +1,6 @@
-import { isInCluster } from "@/lib/api/k8s"
-import { getResourceObject } from "@/lib/api/cluster-resources/resource-object"
-import { supportsYamlView } from "@/lib/cluster/yaml-supported-kinds"
+import { isInCluster } from "@/lib/server/k8s"
+import { getResourceObject } from "@/lib/cluster-resources/resource-object"
+import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 
 export const dynamic = "force-dynamic"
 

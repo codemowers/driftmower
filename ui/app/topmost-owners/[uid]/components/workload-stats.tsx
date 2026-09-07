@@ -1,5 +1,5 @@
 import type { StatusType } from "@/lib/cluster/reports"
-import { staleText } from "@/lib/cluster/status-style"
+import { staleText } from "@/lib/cluster/styles/status-style"
 import {
   StatGrid,
   StatCell,

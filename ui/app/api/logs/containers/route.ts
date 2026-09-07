@@ -1,4 +1,4 @@
-import { listContainers } from "@/lib/cluster/logs/pod"
+import { listContainers } from "@/lib/features/logs/pod"
 
 export const dynamic = "force-dynamic"
 

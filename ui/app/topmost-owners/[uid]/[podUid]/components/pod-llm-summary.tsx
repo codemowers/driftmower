@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
-import { useNetstatd, useNetstatdStable } from "@/lib/cluster/netstatd"
-import { ensureLive, getLiveText, podLiveFacts, staticFacts, streamStaticSummary } from "@/lib/llm/pod-summary"
+import { useNetstatd, useNetstatdStable } from "@/lib/features/netstatd"
+import { ensureLive, getLiveText, podLiveFacts, staticFacts, streamStaticSummary } from "@/lib/features/pod-summary"
 
 type Props = { pod: ClusterResource }
 

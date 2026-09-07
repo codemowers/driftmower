@@ -2,9 +2,9 @@
 
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import { compactRelativeTimeFromNow } from "@/lib/utils/format-time"
-import { aggregateVulnerabilities } from "@/lib/cluster/vulnerability"
+import { aggregateVulnerabilities } from "@/lib/features/vulnerability"
 import VulnerabilityBar from "@/app/components/image/vulnerability-bar"
 import { integrityInfo } from "@/lib/utils/image-artifacts"
 import { StatGrid, StatCell, StatValue, StatCaption } from "@/app/components/stats-card"

@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { Switch } from "@/components/ui/switch"
 import DocumentViewer from "@/app/components/document-viewer"
-import { generatedAnnotator, stripGenerated } from "@/lib/cluster/managed-fields"
+import { generatedAnnotator, stripGenerated } from "@/lib/features/yaml/managed-fields"
 import { useSearchParam } from "@/lib/hooks/use-search-param"
-import { emitYamlLines } from "@/lib/utils/yaml-lines"
+import { emitYamlLines } from "@/lib/features/yaml/yaml-lines"
 
 type Props = {
   uid: string

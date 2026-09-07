@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import { classifyPod, podStateLabel, POD_SEVERITY_STYLE } from "@/lib/cluster/pod-status-style"
+import { classifyPod, podStateLabel, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
 import {
   StatGrid,
   StatCell,

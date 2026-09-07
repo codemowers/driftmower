@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { ExternalLink } from "lucide-react"
-import { type NetstatdStatus, fetchNetstatdUrl } from "@/lib/cluster/netstatd"
+import { type NetstatdStatus, fetchNetstatdUrl } from "@/lib/features/netstatd"
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import Breadcrumbs from "@/app/components/breadcrumbs"

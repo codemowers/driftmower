@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils/cn"
-import type { Matrix } from "@/lib/cluster/netstatd"
+import type { Matrix } from "@/lib/features/netstatd"
 
 type Props = {
   matrix: Matrix

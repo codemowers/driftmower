@@ -1,4 +1,4 @@
-import { isInCluster, kubeApiGet } from "@/lib/api/k8s"
+import { isInCluster, kubeApiGet } from "@/lib/server/k8s"
 import { createTtlCache } from "@/lib/utils/ttl-cache"
 
 export const dynamic = "force-dynamic"

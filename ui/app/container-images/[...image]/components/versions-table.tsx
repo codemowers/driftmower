@@ -4,12 +4,12 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import {
   CVE_SEVERITY_STYLE,
   worstVulnerability,
   type VulnerabilityReport,
-} from "@/lib/cluster/vulnerability"
+} from "@/lib/features/vulnerability"
 import CopyButton from "@/app/components/copy-button"
 import { integrityStyle } from "@/lib/utils/image-artifacts"
 import type { ImageVersion } from "../../utils/image-entries"

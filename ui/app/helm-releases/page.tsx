@@ -7,7 +7,7 @@ import ReleaseList, { type ReleaseEntry } from "./components/release-list"
 import TenantEmptyState from "../components/tenant-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useTenantScope } from "@/lib/tenancy/tenant-context"
-import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/styles/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function HelmReleasesPage() {

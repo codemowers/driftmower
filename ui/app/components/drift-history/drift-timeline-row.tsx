@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import StatusTimelineStrip from "./status-timeline-strip"
-import { percentLabel } from "@/lib/cluster/drift-history/format"
-import type { DriftSeries } from "@/lib/cluster/drift-history/types"
+import { percentLabel } from "@/lib/features/drift-history/format"
+import type { DriftSeries } from "@/lib/features/drift-history/types"
 import { digestCrumb } from "@/lib/utils/image-artifacts"
 import { cn } from "@/lib/utils/cn"
 

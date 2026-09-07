@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 
 type ContainerEntry = {
   containerName: string

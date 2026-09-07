@@ -8,7 +8,7 @@ import TabMessage from "./tab-message"
 import { HELM_RELEASES_URL } from "@/lib/cluster/constants"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 import { cn } from "@/lib/utils/cn"
-import { textLines } from "@/lib/utils/yaml-lines"
+import { textLines } from "@/lib/features/yaml/yaml-lines"
 
 type ManifestDocumentSummary = {
   index: number

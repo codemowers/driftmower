@@ -1,4 +1,4 @@
-import { proxyPlatformManagerRequest } from "@/lib/api/platform-manager-proxy"
+import { proxyPlatformManagerRequest } from "@/lib/server/platform-manager-proxy"
 
 export const dynamic = "force-dynamic"
 

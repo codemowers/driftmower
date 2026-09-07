@@ -1,4 +1,4 @@
-import { proxyPrometheusJson } from "@/lib/api/prometheus"
+import { proxyPrometheusJson } from "@/lib/features/prometheus/proxy"
 
 export const dynamic = "force-dynamic"
 

@@ -1,5 +1,5 @@
-import { getReleaseManifest, getReleaseManifestDocument, getReleaseManifestText } from "@/lib/api/helm-releases"
-import { isInCluster, KubeApiError } from "@/lib/api/k8s"
+import { getReleaseManifest, getReleaseManifestDocument, getReleaseManifestText } from "@/lib/features/helm-releases/releases"
+import { isInCluster, KubeApiError } from "@/lib/server/k8s"
 import { hasSession } from "@/lib/auth/session"
 
 export const dynamic = "force-dynamic"

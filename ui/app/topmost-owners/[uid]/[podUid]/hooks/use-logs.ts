@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { fetchLogs } from "@/lib/cluster/logs/fetch"
-import { BUFFER_CAP, POLL_INTERVAL_MS, TAIL_LINES } from "@/lib/cluster/logs/constants"
-import { compareNs } from "@/lib/cluster/logs/line"
-import type { LogLine, LogSource } from "@/lib/cluster/logs/types"
+import { fetchLogs } from "@/lib/features/logs/fetch"
+import { BUFFER_CAP, POLL_INTERVAL_MS, TAIL_LINES } from "@/lib/features/logs/constants"
+import { compareNs } from "@/lib/features/logs/line"
+import type { LogLine, LogSource } from "@/lib/features/logs/types"
 
 export type LogsState = {
   lines: LogLine[]

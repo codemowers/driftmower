@@ -1,8 +1,8 @@
 "use client"
 
-import { layOutBands, withMinWidth } from "@/lib/cluster/drift-history/bands"
-import { BAND_STYLE } from "@/lib/cluster/drift-history/band-style"
-import type { Span } from "@/lib/cluster/drift-history/types"
+import { layOutBands, withMinWidth } from "@/lib/features/drift-history/bands"
+import { BAND_STYLE } from "@/lib/features/drift-history/band-style"
+import type { Span } from "@/lib/features/drift-history/types"
 import { cn } from "@/lib/utils/cn"
 
 type Props = {

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
-import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_STYLE, driftSummaryPills, isNoData } from "@/lib/cluster/status-style"
+import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_STYLE, driftSummaryPills, isNoData } from "@/lib/cluster/styles/status-style"
 import type { FocusDefinition, WorkloadEntry } from "./types"
 
 function staleColor(staleRepoCount: number, distinctRepoCount: number): string {

@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react"
 import { ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { AlertGroup, AlertSeverity } from "@/lib/cluster/prometheus/types"
+import type { AlertGroup, AlertSeverity } from "@/lib/features/prometheus/types"
 
 const MAX_VISIBLE = 5
 

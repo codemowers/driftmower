@@ -1,5 +1,5 @@
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import { supportsYamlView } from "@/lib/cluster/yaml-supported-kinds"
+import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import YamlLink from "@/app/components/yaml-link"
 
 type Props = {

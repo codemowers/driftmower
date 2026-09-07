@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
 import type { StatusType } from "@/lib/cluster/reports"
-import type { SummaryPill } from "@/lib/cluster/status-style"
+import type { SummaryPill } from "@/lib/cluster/styles/status-style"
 import type { PodSummary } from "../utils/pod-summary"
-import type { SeriesStats, Span } from "@/lib/cluster/drift-history/types"
+import type { SeriesStats, Span } from "@/lib/features/drift-history/types"
 
 export type WorkloadEntry = {
   groupKey: string

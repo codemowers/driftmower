@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils/cn"
-import { POD_SEVERITY_STYLE, POD_SORT_ORDER, type PodSeverity } from "@/lib/cluster/pod-status-style"
+import { POD_SEVERITY_STYLE, POD_SORT_ORDER, type PodSeverity } from "@/lib/cluster/styles/pod-status-style"
 import PodStatusSquares from "../components/pod-status-squares"
 import type { FocusDefinition, WorkloadEntry } from "./types"
 

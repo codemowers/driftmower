@@ -8,7 +8,7 @@ import NodeRoleCard from "./components/node-role-card"
 import PrometheusAlerts from "./components/prometheus-alerts"
 import ClusterMetrics from "./components/cluster-metrics"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { NodeDrift, SupportSeverity } from "@/lib/api/cluster-resources/types"
+import type { NodeDrift, SupportSeverity } from "@/lib/cluster-resources/types"
 
 const DISPLAY_ORDER: Record<SupportSeverity, number> = {
   eol:      0,

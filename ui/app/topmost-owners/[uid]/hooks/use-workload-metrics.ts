@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchWorkloadMetrics, type WorkloadMetrics } from "@/lib/cluster/prometheus/workload-metrics"
+import { fetchWorkloadMetrics, type WorkloadMetrics } from "@/lib/features/prometheus/workload-metrics"
 
 const POLL_INTERVAL = 30000
 

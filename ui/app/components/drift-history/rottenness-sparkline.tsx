@@ -2,9 +2,9 @@
 
 import { Area, AreaChart, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { DRIFT_CHART_CONFIG } from "@/lib/cluster/drift-history/chart-config"
-import { dayLabel, tooltipDate } from "@/lib/cluster/drift-history/format"
-import type { RottennessPoint } from "@/lib/cluster/drift-history/types"
+import { DRIFT_CHART_CONFIG } from "@/lib/features/drift-history/chart-config"
+import { dayLabel, tooltipDate } from "@/lib/features/drift-history/format"
+import type { RottennessPoint } from "@/lib/features/drift-history/types"
 
 const MIN_DOMAIN = 0.6
 const HEADROOM = 1.3

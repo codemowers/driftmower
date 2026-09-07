@@ -2,7 +2,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
 import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER } from "@/lib/cluster/status-style"
+import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
   major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "major" },

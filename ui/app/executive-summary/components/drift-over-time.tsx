@@ -3,10 +3,10 @@
 import { useMemo } from "react"
 import DriftAreaChart from "@/app/components/drift-history/drift-area-chart"
 import { StatCaption, StatCell, StatGrid, StatValue } from "@/app/components/stats-card"
-import { clusterStack, clusterStats, groupBy, sparklines } from "@/lib/cluster/drift-history/aggregate"
-import { dayCount, percentLabel, windowSummary } from "@/lib/cluster/drift-history/format"
-import { BULK_RESOLUTION } from "@/lib/cluster/drift-history/build-series"
-import { useDriftHistory } from "@/lib/hooks/use-drift-history"
+import { clusterStack, clusterStats, groupBy, sparklines } from "@/lib/features/drift-history/aggregate"
+import { dayCount, percentLabel, windowSummary } from "@/lib/features/drift-history/format"
+import { BULK_RESOLUTION } from "@/lib/features/drift-history/build-series"
+import { useDriftHistory } from "@/lib/features/drift-history/use-drift-history"
 import { cn } from "@/lib/utils/cn"
 
 export default function DriftOverTime() {

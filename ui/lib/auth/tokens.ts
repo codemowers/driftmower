@@ -1,3 +1,5 @@
+import "server-only"
+
 import * as oidc from "openid-client"
 import type { IronSession } from "iron-session"
 

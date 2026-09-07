@@ -1,4 +1,4 @@
-import { BAND_STYLE, LEGEND_ORDER, MARK_ORDER, MARK_STYLE } from "@/lib/cluster/drift-history/band-style"
+import { BAND_STYLE, LEGEND_ORDER, MARK_ORDER, MARK_STYLE } from "@/lib/features/drift-history/band-style"
 import { cn } from "@/lib/utils/cn"
 
 export default function HistoryLegend({ showMarks = true }: { showMarks?: boolean }) {

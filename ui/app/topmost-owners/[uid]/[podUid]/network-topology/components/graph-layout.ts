@@ -1,4 +1,4 @@
-import { POD_NODE_ID, type GraphNode, type PodGraph } from "@/lib/cluster/netstatd"
+import { POD_NODE_ID, type GraphNode, type PodGraph } from "@/lib/features/netstatd"
 
 export type Side = "in" | "out"
 export type Point = { x: number; y: number }

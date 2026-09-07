@@ -1,5 +1,5 @@
 import { Agent } from "undici"
-import { backendUrl, type FetchInit } from "@/lib/api/backend-proxy"
+import { backendUrl, type FetchInit } from "@/lib/server/backend-proxy"
 import { getSession } from "@/lib/auth/session"
 import { getValidAccessToken } from "@/lib/auth/tokens"
 

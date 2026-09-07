@@ -7,7 +7,7 @@ import { OCI_CREATED } from "@/lib/utils/oci-labels"
 import { integrityInfo } from "@/lib/utils/image-artifacts"
 import VulnerabilityBar from "./vulnerability-bar"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { SEVERITY_STYLE, type StatusStyle } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE, type StatusStyle } from "@/lib/cluster/styles/status-style"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 
 function severityStyle(statusType: string): StatusStyle {

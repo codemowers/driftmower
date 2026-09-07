@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/status-style"
+import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 import CopyButton from "@/app/components/copy-button"
 
 const CELL_LABEL = "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
