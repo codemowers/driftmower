@@ -14,7 +14,7 @@ import {
   PanelLeft,
   Server,
   ServerOff,
-  ShieldCheck,
+  LayoutGrid,
   ShipWheel,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -41,7 +41,7 @@ const navItems: NavItem[] = [
   // Always shown: the page renders a "not configured" state when the BFF
   // reports platform-manager is not deployed.
   { name: "Tenants", href: "/tenants", icon: BookUser },
-  { name: "OIDC Applications", href: "/oidc-applications", icon: ShieldCheck },
+  { name: "Applications", href: "/applications", icon: LayoutGrid },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {

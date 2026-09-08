@@ -10,6 +10,9 @@ export type SectionLinkCardProps = {
   countEntity: string
   hint: string
   icon: LucideIcon
+  // Replaces the "N of M <entity> tracked" line for cards whose count is not a
+  // tracking ratio.
+  countText?: string
 }
 
 export default function SectionLinkCard({
@@ -20,6 +23,7 @@ export default function SectionLinkCard({
   countEntity,
   hint,
   icon: Icon,
+  countText,
 }: SectionLinkCardProps) {
   return (
     <Link
@@ -36,7 +40,10 @@ export default function SectionLinkCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-brand-text">{title}</p>
           <p className="font-mono text-sm tabular-nums text-foreground">
-            {count === null ? "–" : total !== undefined && total > count ? `${count} of ${total}` : count} {countEntity} tracked
+            {count === null
+              ? "–"
+              : countText ??
+                `${total !== undefined && total > count ? `${count} of ${total}` : count} ${countEntity} tracked`}
           </p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>

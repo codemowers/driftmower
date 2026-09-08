@@ -9,6 +9,57 @@ export function platformManagerUrl(): string | null {
   return url ? url.replace(/\/+$/, "") : null
 }
 
+export type TenantScope =
+  | { state: "ok"; admin: boolean; namespaces: string[] }
+  | { state: "not-configured" | "unauthenticated" | "unreachable" }
+
+type TenantsResponse = {
+  admin: boolean
+  tenants: { tenantNamespace: string; appNamespaces: string[] }[]
+}
+
+// Server-to-server read: callers scope their own response, so they need the values not a body.
+export async function fetchTenantScope(): Promise<TenantScope> {
+  const baseUrl = platformManagerUrl()
+
+  if (!baseUrl) {
+    return { state: "not-configured" }
+  }
+
+  const session = await getSession()
+  const accessToken = await getPlatformManagerToken(session)
+
+  if (!accessToken) {
+    return { state: "unauthenticated" }
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${baseUrl}/api/tenants`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    })
+  } catch (e) {
+    const cause = e instanceof Error && e.cause ? String(e.cause) : String(e)
+    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> unreachable: ${cause}`)
+    return { state: "unreachable" }
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { state: "unauthenticated" }
+  }
+
+  if (!response.ok) {
+    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> ${response.status} ${response.statusText}`)
+    return { state: "unreachable" }
+  }
+
+  const body = (await response.json()) as TenantsResponse
+  const namespaces = body.tenants.flatMap(t => [t.tenantNamespace, ...t.appNamespaces])
+
+  return { state: "ok", admin: body.admin, namespaces: [...new Set(namespaces)] }
+}
+
 export async function proxyPlatformManagerRequest(req: Request, upstreamPath: string): Promise<Response> {
   const baseUrl = platformManagerUrl()
 

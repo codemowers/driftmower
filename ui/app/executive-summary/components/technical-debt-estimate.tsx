@@ -1,3 +1,5 @@
+import type { ReportReadiness } from "@/lib/cluster/report-readiness"
+
 const AVG_UPGRADE_TIME = 1
 
 function debtTone(hours: number): string {
@@ -9,9 +11,16 @@ function debtTone(hours: number): string {
 
 type Props = {
   outdatedWorkloadCount: number | null
+  readiness: ReportReadiness
 }
 
-export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) {
+const UNAVAILABLE: Partial<Record<ReportReadiness, { value: string; caption: string }>> = {
+  "no-reports": { value: "Not yet estimated", caption: "Needs one analysis to size the work" },
+  unresolved: { value: "Cannot be estimated", caption: "Needs at least one comparable version" },
+}
+
+export default function TechnicalDebtEstimate({ outdatedWorkloadCount, readiness }: Props) {
+  const unavailable = UNAVAILABLE[readiness]
   const hours = outdatedWorkloadCount === null ? null : outdatedWorkloadCount * AVG_UPGRADE_TIME
 
   return (
@@ -20,15 +29,23 @@ export default function TechnicalDebtEstimate({ outdatedWorkloadCount }: Props) 
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Technical Debt Estimate
         </p>
-        {hours !== null && (
-          <p className="text-sm text-gray-400">
-            {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
-          </p>
+        {unavailable ? (
+          <p className="text-sm text-gray-400">{unavailable.caption}</p>
+        ) : (
+          hours !== null && (
+            <p className="text-sm text-gray-400">
+              {outdatedWorkloadCount} outdated workloads × avg {AVG_UPGRADE_TIME}h upgrade time
+            </p>
+          )
         )}
       </div>
-      <p className={`text-4xl font-semibold tabular-nums ${hours === null ? "text-muted-foreground" : debtTone(hours)}`}>
-        {hours === null ? <span className="text-2xl font-normal">–</span> : `~${hours}h`}
-      </p>
+      {unavailable ? (
+        <p className="text-xl font-medium text-muted-foreground">{unavailable.value}</p>
+      ) : (
+        <p className={`text-4xl font-semibold tabular-nums ${hours === null ? "text-muted-foreground" : debtTone(hours)}`}>
+          {hours === null ? <span className="text-2xl font-normal">–</span> : `~${hours}h`}
+        </p>
+      )}
     </div>
   )
 }

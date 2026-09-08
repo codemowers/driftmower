@@ -17,9 +17,11 @@ import PageHeader from "../components/page-header";
 import ClusterWideTag from "../components/cluster-wide-tag";
 import TenantEmptyState from "../components/tenant-empty-state";
 import { cn } from "@/lib/utils/cn";
-import { Boxes, ShipWheel } from "lucide-react";
+import { Boxes, LayoutGrid, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
 import { countTopmostOwners } from "@/app/topmost-owners/utils/owner-counts";
+import { reportReadiness, type ReportReadiness } from "@/lib/cluster/report-readiness";
+import { scopedHosts, useApplications } from "@/lib/features/applications/use-applications";
 
 function rottennessValueTone(score: number): StatValueTone {
   if (score < 0.15) return "ok"
@@ -52,8 +54,15 @@ function groupByWorkload(usages: ImageUsage[]): Map<string, ImageUsage[]> {
 
 const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 2, patch_behind: 1 }
 
+// A score of 0.00 under "0 = healthy" reads as flawless, so it waits for something scorable.
+const UNSCORABLE: Partial<Record<ReportReadiness, { value: string; caption: string }>> = {
+  "no-reports": { value: "No analysis yet", caption: "The first report is still being collected" },
+  unresolved: { value: "Cannot be scored", caption: "No container has a version to compare" },
+}
+
 export default function ExecutiveSummaryPage() {
-  const { data, reportId, clusterResources, vulnerabilityReports } = useClusterState();
+  const { data, reportId, clusterResources, vulnerabilityReports, isFetchingReport } = useClusterState();
+  const { launcher, inventory } = useApplications();
   const { tenants: scopedTenants, namespaces } = useTenantScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const topActions = useMemo(
@@ -80,6 +89,21 @@ export default function ExecutiveSummaryPage() {
   const minorCount = usages.filter(u => u.versionStatus.statusType === "minor_behind").length
   const majorCount = usages.filter(u => u.versionStatus.statusType === "major_behind").length
   const aheadCount = usages.filter(u => u.versionStatus.statusType === "ahead").length
+
+  const readiness = reportReadiness({
+    hasReport: ready,
+    isFetchingReport,
+    knownVersions: aheadCount + okCount + patchCount + minorCount + majorCount,
+    containers: usages.length,
+  })
+
+  const unscorable = UNSCORABLE[readiness]
+
+  const availableApps = launcher.status === "ready" ? launcher.entries.length : null
+  const otherHosts =
+    inventory.status === "ready" && inventory.tenancy === "ok"
+      ? scopedHosts(inventory.entries, namespaces).length
+      : 0
 
   const topOutdatedWorkloads: OutdatedWorkloadEntry[] = Array.from(workloadMap.entries())
     .map(([key, workloadUsages]) => {
@@ -118,24 +142,38 @@ export default function ExecutiveSummaryPage() {
           <>
             <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
               {/* Rottenness score: pre-computed in the report, cannot be re-scoped client-side */}
-              <div className="flex flex-col gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6 py-5">
+              <div
+                className={cn(
+                  "flex flex-col justify-center gap-1 rounded-3xl border border-gray-200 border-t-6 border-t-brand bg-white px-6",
+                  unscorable ? "py-8" : "py-5",
+                )}
+              >
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Rottenness Score
                   </p>
                   {scopedTenants.length > 0 && <ClusterWideTag />}
                 </div>
-                <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
-                  {ready ? rottennessScore.toFixed(2) : <span className="text-2xl font-normal">–</span>}
-                </p>
-                <DriftRottennessSparkline fallback={<p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>} />
+                {unscorable ? (
+                  <>
+                    <p className="text-xl font-medium text-muted-foreground">{unscorable.value}</p>
+                    <p className="text-sm text-muted-foreground">{unscorable.caption}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className={cn("text-4xl font-semibold tabular-nums", valueToneText[rottennessTone])}>
+                      {ready ? rottennessScore.toFixed(2) : <span className="text-2xl font-normal">–</span>}
+                    </p>
+                    <DriftRottennessSparkline fallback={<p className="text-sm text-muted-foreground">0 = healthy · 1 = outdated</p>} />
+                  </>
+                )}
               </div>
 
               {/* Divider */}
               <div className="bg-gray-300" />
 
               <DriftBreakdown
-                ready={ready}
+                readiness={readiness}
                 total={usages.length}
                 ahead={aheadCount}
                 ok={okCount}
@@ -148,12 +186,27 @@ export default function ExecutiveSummaryPage() {
             {/* Section links */}
             <div className="flex w-full flex-wrap gap-5">
               <SectionLinkCard
+                href={reportId ? `/applications?report=${reportId}` : "/applications"}
+                title="Applications"
+                count={availableApps}
+                countEntity="applications"
+                countText={`${availableApps} available to you`}
+                hint={
+                  otherHosts === 0
+                    ? "Everything you can open on this cluster"
+                    : namespaces
+                      ? `Plus ${otherHosts} other hosts in your namespaces`
+                      : `Plus ${otherHosts} hosts discovered`
+                }
+                icon={LayoutGrid}
+              />
+              <SectionLinkCard
                 href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
                 title="Topmost Owners"
                 count={ready ? owners.tracked : null}
                 total={owners.total}
                 countEntity="owners"
-                hint="Controllers at the root of each workload subtree"
+                hint="Root controller of each workload"
                 icon={Boxes}
               />
               <SectionLinkCard
@@ -166,14 +219,22 @@ export default function ExecutiveSummaryPage() {
               />
             </div>
 
-            <DriftOverTime />
+            <DriftOverTime readiness={readiness} />
 
-            <TechnicalDebtEstimate outdatedWorkloadCount={ready ? patchCount + minorCount + majorCount : null}/>
+            <TechnicalDebtEstimate
+              outdatedWorkloadCount={ready ? patchCount + minorCount + majorCount : null}
+              readiness={readiness}
+            />
 
             <TopActions rows={topActions} currentCharts={currentCharts} reportId={reportId} />
 
             <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
-              <MostOutdatedWorkloads entries={topOutdatedWorkloads} reportId={reportId} matchHeight={issuesHeight} />
+              <MostOutdatedWorkloads
+                entries={topOutdatedWorkloads}
+                reportId={reportId}
+                matchHeight={issuesHeight}
+                readiness={readiness}
+              />
               <ScraperIssues issues={data?.issues ?? []} clusterWide={scopedTenants.length > 0} onCollapsedHeight={setIssuesHeight} />
             </div>
           </>

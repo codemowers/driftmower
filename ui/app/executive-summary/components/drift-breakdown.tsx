@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils/cn"
+import type { ReportReadiness } from "@/lib/cluster/report-readiness"
 import StatCard, { type StatAccent } from "./stat-card"
 
 type Props = {
-  ready?: boolean
+  readiness: ReportReadiness
   total: number
   ahead: number
   ok: number
@@ -31,9 +32,16 @@ const SEGMENTS = (ahead: number, ok: number, patch: number, minor: number, major
 
 const MIN_PERCENTAGE_FOR_LABEL = 5
 
-export default function DriftBreakdown({ ready = true, total, ahead, ok, patch, minor, major }: Props) {
+const UNMEASURED: Partial<Record<ReportReadiness, string>> = {
+  "no-reports": "Drift appears after the first analysis.",
+  unresolved: "No versions could be read from the registry. See Scraper issues below.",
+}
+
+export default function DriftBreakdown({ readiness, total, ahead, ok, patch, minor, major }: Props) {
   const segments = SEGMENTS(ahead, ok, patch, minor, major)
   const known = ahead + ok + patch + minor + major
+  const ready = readiness === "ready" || readiness === "unresolved"
+  const unmeasured = UNMEASURED[readiness]
 
   return (
     <div className="flex flex-col gap-3 pt-1.5">
@@ -48,20 +56,27 @@ export default function DriftBreakdown({ ready = true, total, ahead, ok, patch, 
         )}
       </div>
 
-      <div className="grid flex-1 auto-cols-fr grid-flow-col gap-4">
-        {segments
-          .filter(s => s.key !== "ahead" || !ready || s.count > 0)
-          .map(s => (
-            <StatCard
-              key={s.key}
-              value={ready ? s.count : <span className="text-2xl font-normal">–</span>}
-              accent={s.accent}
-              valueTone={s.accent}
-              label={s.label}
-              hint={s.hint}
-            />
-          ))}
-      </div>
+      {/* Zeros in traffic-light colours read as measured values, so the cells are replaced. */}
+      {unmeasured ? (
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-gray-300 px-6 py-8 text-center text-sm text-muted-foreground">
+          {unmeasured}
+        </div>
+      ) : (
+        <div className="grid flex-1 auto-cols-fr grid-flow-col gap-4">
+          {segments
+            .filter(s => s.key !== "ahead" || !ready || s.count > 0)
+            .map(s => (
+              <StatCard
+                key={s.key}
+                value={ready ? s.count : <span className="text-2xl font-normal">–</span>}
+                accent={s.accent}
+                valueTone={s.accent}
+                label={s.label}
+                hint={s.hint}
+              />
+            ))}
+        </div>
+      )}
 
       {ready && known > 0 && (
         <div className="mt-3 flex h-9 flex-row gap-1.5">

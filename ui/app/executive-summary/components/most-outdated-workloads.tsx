@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
+import type { ReportReadiness } from "@/lib/cluster/report-readiness"
 
 const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
   major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "major" },
@@ -28,9 +29,21 @@ export type OutdatedWorkloadEntry = {
   statusType: StatusType
 }
 
-type Props = { entries: OutdatedWorkloadEntry[]; reportId: string | null; matchHeight?: number | null }
+type Props = {
+  entries: OutdatedWorkloadEntry[]
+  reportId: string | null
+  matchHeight?: number | null
+  readiness: ReportReadiness
+}
 
-export default function MostOutdatedWorkloads({ entries, reportId, matchHeight }: Props) {
+const EMPTY_TEXT: Record<ReportReadiness, string> = {
+  loading: "Loading workloads…",
+  "no-reports": "Nothing analysed yet.",
+  unresolved: "No workload has a version to compare.",
+  ready: "No data available.",
+}
+
+export default function MostOutdatedWorkloads({ entries, reportId, matchHeight, readiness }: Props) {
   return (
     <div
       className="flex flex-col rounded-xl border border-gray-200 bg-white py-5"
@@ -40,7 +53,7 @@ export default function MostOutdatedWorkloads({ entries, reportId, matchHeight }
         Top 5 Most Outdated Workloads
       </p>
       {entries.length === 0 ? (
-        <p className="px-6 text-sm text-muted-foreground">No data available.</p>
+        <p className="px-6 text-sm text-muted-foreground">{EMPTY_TEXT[readiness]}</p>
       ) : (
         <div className="flex flex-col divide-y divide-gray-100">
           {entries.map(e => {

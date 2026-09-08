@@ -8,8 +8,9 @@ import { dayCount, percentLabel, windowSummary } from "@/lib/features/drift-hist
 import { BULK_RESOLUTION } from "@/lib/features/drift-history/build-series"
 import { useDriftHistory } from "@/lib/features/drift-history/use-drift-history"
 import { cn } from "@/lib/utils/cn"
+import type { ReportReadiness } from "@/lib/cluster/report-readiness"
 
-export default function DriftOverTime() {
+export default function DriftOverTime({ readiness }: { readiness: ReportReadiness }) {
   const { data: history, loading } = useDriftHistory()
 
   // Grouped by workload, not by series, so the ratio agrees with the History lens.
@@ -45,7 +46,11 @@ export default function DriftOverTime() {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Drift over time</p>
-        <p className="mt-2 text-sm text-muted-foreground">No drift history recorded yet.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {readiness === "unresolved"
+            ? "Drift history needs at least one resolvable version."
+            : "No drift history recorded yet."}
+        </p>
       </div>
     )
   }
