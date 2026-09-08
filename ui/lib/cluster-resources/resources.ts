@@ -3,7 +3,7 @@ import "server-only"
 import { isInCluster, kubeApiGet } from "@/lib/server/k8s"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { managerFromAnnotations, type ManagerInfo } from "./manager"
-import { derivePodStatus, type ContainerStatus } from "./pod-status"
+import { derivePodStatus, type RawPodStatus } from "./pod-status"
 
 type OwnerRef = { apiVersion: string; kind: string; name: string; uid: string }
 
@@ -28,13 +28,9 @@ type RawObject = {
     containers?: RawContainer[]
     initContainers?: RawContainer[]
   }
-  status?: {
-    phase?: string
-    reason?: string
+  status?: RawPodStatus & {
     podIP?: string
     podIPs?: { ip: string }[]
-    containerStatuses?: ContainerStatus[]
-    initContainerStatuses?: ContainerStatus[]
   }
 }
 

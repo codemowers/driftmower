@@ -22,6 +22,11 @@ export async function listContainers(ns: string, pod: string): Promise<string[]>
   return [...main, ...init]
 }
 
+function previousRunNotice(e: unknown): string {
+  const message = e instanceof Error ? e.message : String(e)
+  return message.replace(/^Kubernetes API \S+ returned \d+: /, "").trim()
+}
+
 export async function getPodLogs(args: {
   ns: string
   pod: string
@@ -30,15 +35,25 @@ export async function getPodLogs(args: {
   sinceNs: string | null
   limit?: number
   source?: LogSource | null
+  previous?: boolean
 }): Promise<LogsResponse> {
   const { ns, pod, uid, container, sinceNs } = args
   const limit = args.limit ?? TAIL_LINES
+  const previous = args.previous ?? false
 
   async function fetchKube(): Promise<LogLine[]> {
     const containers = container ? [container] : await listContainers(ns, pod)
     return container
-      ? fetchKubeContainer({ ns, pod, container, sinceNs, limit })
-      : fetchKubeAll({ ns, pod, containers, sinceNs, limit })
+      ? fetchKubeContainer({ ns, pod, container, sinceNs, limit, previous })
+      : fetchKubeAll({ ns, pod, containers, sinceNs, limit, previous })
+  }
+
+  if (previous) {
+    try {
+      return { source: "kube API", lines: await fetchKube() }
+    } catch (e) {
+      return { source: "kube API", lines: [], notice: previousRunNotice(e) }
+    }
   }
 
   if (args.source !== "kube API") {

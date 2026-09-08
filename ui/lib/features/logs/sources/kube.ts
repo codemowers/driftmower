@@ -19,17 +19,20 @@ export async function fetchKubeContainer(args: {
   container: string
   sinceNs: string | null
   limit: number
+  previous: boolean
 }): Promise<LogLine[]> {
-  const { ns, pod, container, sinceNs, limit } = args
+  const { ns, pod, container, sinceNs, limit, previous } = args
   const qs = new URLSearchParams({ container, timestamps: "true" })
-  if (sinceNs === null) qs.set("tailLines", String(limit))
+  if (previous) qs.set("previous", "true")
+  if (previous || sinceNs === null) qs.set("tailLines", String(limit))
   else qs.set("sinceTime", nsToRfc3339(sinceNs))
   const path = `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pod)}/log?${qs}`
 
   let body: string
   try {
     body = await kubeApiGetText(path)
-  } catch {
+  } catch (e) {
+    if (previous) throw e
     return []
   }
 
@@ -48,10 +51,11 @@ export async function fetchKubeAll(args: {
   containers: string[]
   sinceNs: string | null
   limit: number
+  previous: boolean
 }): Promise<LogLine[]> {
-  const { ns, pod, containers, sinceNs, limit } = args
+  const { ns, pod, containers, sinceNs, limit, previous } = args
   const perContainer = await Promise.all(
-    containers.map(container => fetchKubeContainer({ ns, pod, container, sinceNs, limit })),
+    containers.map(container => fetchKubeContainer({ ns, pod, container, sinceNs, limit, previous })),
   )
   const lines = perContainer.flat()
   lines.sort((a, b) => compareNs(a.tsNs, b.tsNs))

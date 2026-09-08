@@ -1,22 +1,27 @@
 import "server-only"
 
+import type { PodContainerStatus, PodStatus } from "@/lib/cluster/cluster-state"
+
 export type ContainerStatus = {
+  name?: string
   ready?: boolean
   restartCount?: number
   state?: {
-    waiting?: { reason?: string }
+    waiting?: { reason?: string; message?: string }
     terminated?: { reason?: string; exitCode?: number }
+  }
+  lastState?: {
+    terminated?: { reason?: string; exitCode?: number; finishedAt?: string }
   }
 }
 
-type RawPodStatus = {
+export type RawPodStatus = {
   phase?: string
   reason?: string
+  message?: string
   containerStatuses?: ContainerStatus[]
   initContainerStatuses?: ContainerStatus[]
 }
-
-export type PodStatus = { display: string; ready: boolean; restarts: number }
 
 export function derivePodStatus(
   deletionTimestamp: string | undefined,
@@ -28,6 +33,26 @@ export function derivePodStatus(
     display: podDisplayStatus(deletionTimestamp, status, containers, initContainers),
     ready: containers.length > 0 && containers.every(c => c.ready),
     restarts: [...initContainers, ...containers].reduce((sum, c) => sum + (c.restartCount ?? 0), 0),
+    message: status?.message ?? null,
+    containers: [
+      ...initContainers.map(c => toContainerStatus(c, true)),
+      ...containers.map(c => toContainerStatus(c, false)),
+    ],
+  }
+}
+
+function toContainerStatus(c: ContainerStatus, init: boolean): PodContainerStatus {
+  const waiting = c.state?.waiting
+  const terminated = c.lastState?.terminated
+  return {
+    name: c.name ?? "",
+    init,
+    ready: c.ready ?? false,
+    restartCount: c.restartCount ?? 0,
+    waiting: waiting?.reason ? { reason: waiting.reason, message: waiting.message ?? null } : null,
+    lastTerminated: terminated
+      ? { exitCode: terminated.exitCode ?? 0, reason: terminated.reason ?? "Error", finishedAt: terminated.finishedAt ?? null }
+      : null,
   }
 }
 

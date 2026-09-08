@@ -11,6 +11,7 @@ export type LogLine = {
 export type LogsResponse = {
   source: LogSource
   lines: LogLine[]
+  notice?: string
 }
 
 export type ContainersResponse = {

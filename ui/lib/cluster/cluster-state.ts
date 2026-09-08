@@ -7,6 +7,23 @@ import type { AlertsResult } from "@/lib/features/prometheus/alerts"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
 
+export type PodContainerStatus = {
+  name: string
+  init: boolean
+  ready: boolean
+  restartCount: number
+  waiting: { reason: string; message: string | null } | null
+  lastTerminated: { exitCode: number; reason: string; finishedAt: string | null } | null
+}
+
+export type PodStatus = {
+  display: string
+  ready: boolean
+  restarts: number
+  message: string | null
+  containers: PodContainerStatus[]
+}
+
 export type ClusterResource = {
   uid: string
   kind: string
@@ -20,7 +37,7 @@ export type ClusterResource = {
   declaredPorts?: { container: string; name?: string; port: number; protocol: string }[]
   nodeName?: string
   phase?: string
-  podStatus?: { display: string; ready: boolean; restarts: number }
+  podStatus?: PodStatus
 }
 
 export type ClusterState = {

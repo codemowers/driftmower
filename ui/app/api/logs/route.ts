@@ -18,9 +18,10 @@ export async function GET(req: Request) {
   const limitParam = sp.get("limit")
   const limit = limitParam ? Number(limitParam) : TAIL_LINES
   const source: LogSource | null = sp.get("source") === "kube" ? "kube API" : null
+  const previous = sp.get("previous") === "1"
 
   try {
-    const body = await getPodLogs({ ns, pod, uid, container, sinceNs, limit, source })
+    const body = await getPodLogs({ ns, pod, uid, container, sinceNs, limit, source, previous })
     return Response.json(body, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 })

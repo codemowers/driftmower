@@ -37,6 +37,16 @@ export function isInCluster(): boolean {
 }
 
 const KUBE_API_HOST = "kubernetes.default.svc"
+const TEXT_ACCEPT = "text/plain, application/json"
+const STATUS_MESSAGE_MAX = 300
+
+function statusMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { kind?: string; message?: string }
+    if (parsed.kind === "Status" && typeof parsed.message === "string") return parsed.message.slice(0, STATUS_MESSAGE_MAX)
+  } catch {}
+  return body.replace(/\s+/g, " ").slice(0, STATUS_MESSAGE_MAX)
+}
 
 async function kubeRequestText(path: string, accept: string): Promise<string> {
   const port = process.env.KUBERNETES_SERVICE_PORT ?? "443"
@@ -58,9 +68,10 @@ async function kubeRequestText(path: string, accept: string): Promise<string> {
           if (res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300) {
             resolve(body)
           } else {
-            console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${body.slice(0, 200)}`)
+            const detail = statusMessage(body)
+            console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${detail}`)
             reject(new KubeApiError(
-              `Kubernetes API ${path} returned ${res.statusCode}: ${body.slice(0, 200)}`,
+              `Kubernetes API ${path} returned ${res.statusCode}: ${detail}`,
               res.statusCode ?? 0,
             ))
           }
@@ -95,5 +106,5 @@ export async function kubeApiGet<T>(path: string): Promise<T> {
 }
 
 export async function kubeApiGetText(path: string): Promise<string> {
-  return await kubeRequestWithTokenRefresh(path, "text/plain")
+  return await kubeRequestWithTokenRefresh(path, TEXT_ACCEPT)
 }

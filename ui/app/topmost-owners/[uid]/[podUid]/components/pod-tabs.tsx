@@ -37,7 +37,7 @@ export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
     >
       {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
       {active === "Ports" && <PortsTab pod={pod} />}
-      {active === "Logs" && <LogsTab ns={pod.namespace} pod={pod.name} uid={pod.uid} />}
+      {active === "Logs" && <LogsTab pod={pod} />}
       {active === "Metadata" && <MetadataTab pod={pod} />}
     </TabBar>
   )
