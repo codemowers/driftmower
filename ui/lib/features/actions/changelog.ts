@@ -1,6 +1,6 @@
 import "server-only"
 
-import type { ActionFacts, ChangeEntry, Coverage } from "@/lib/features/actions/types"
+import type { ActionFacts, ChangeEntry, ChartAppVersions, Coverage } from "@/lib/features/actions/types"
 import { compareSemver, parseSemver } from "@/lib/features/actions/verdict"
 
 const SUCCESS_TTL_MS = 60 * 60 * 1000
@@ -23,13 +23,29 @@ export type Changelog = {
   versionsCovered: number
   versionsTotal: number
   sources: { label: string; url: string }[]
+  chartAppVersions: ChartAppVersions | null
 }
 
 type RawEntry = ChangeEntry & { tag: "breaking" | "security" | null; order: number }
 
 const cache = new Map<string, { value: Changelog | null; at: number }>()
 
-const EMPTY: Changelog = { entries: [], pretagBreaking: [], pretagSecurity: [], prekinded: false, source: "none", versionsCovered: 0, versionsTotal: 0, sources: [] }
+const EMPTY: Changelog = { entries: [], pretagBreaking: [], pretagSecurity: [], prekinded: false, source: "none", versionsCovered: 0, versionsTotal: 0, sources: [], chartAppVersions: null }
+
+const GITHUB_API = "https://api.github.com/"
+const RATE_LIMIT_FALLBACK_MS = 60 * 1000
+
+export class GithubRateLimitedError extends Error {
+  readonly resetAt: number
+
+  constructor(resetAt: number) {
+    super(`GitHub rate limit reached, resets at ${new Date(resetAt).toISOString()}`)
+    this.name = "GithubRateLimitedError"
+    this.resetAt = resetAt
+  }
+}
+
+let githubResetAt = 0
 
 export async function resolveChangelog(facts: ActionFacts): Promise<Changelog> {
   const key = facts.kind === "upgrade-chart"
@@ -42,15 +58,34 @@ export async function resolveChangelog(facts: ActionFacts): Promise<Changelog> {
     cache.set(key, { value, at: Date.now() })
     return value ?? EMPTY
   } catch (e) {
+    if (e instanceof GithubRateLimitedError) throw e
     console.warn(`[actions] changelog failed for ${key}:`, (e as Error).message)
     cache.set(key, { value: null, at: Date.now() })
     return EMPTY
   }
 }
 
+function rateLimitReset(res: Response): number | null {
+  if (res.status !== 403 && res.status !== 429) return null
+  const retryAfter = Number(res.headers.get("retry-after"))
+  if (retryAfter > 0) return Date.now() + retryAfter * 1000
+  if (res.headers.get("x-ratelimit-remaining") !== "0") return null
+  const reset = Number(res.headers.get("x-ratelimit-reset")) * 1000
+  return reset > Date.now() ? reset : Date.now() + RATE_LIMIT_FALLBACK_MS
+}
+
 async function fetchJson<T>(url: string, headers: Record<string, string> = {}, timeoutMs = FETCH_TIMEOUT_MS): Promise<T> {
+  const github = url.startsWith(GITHUB_API)
+  if (github && Date.now() < githubResetAt) throw new GithubRateLimitedError(githubResetAt)
   const res = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(timeoutMs) })
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  if (!res.ok) {
+    const resetAt = github ? rateLimitReset(res) : null
+    if (resetAt !== null) {
+      githubResetAt = resetAt
+      throw new GithubRateLimitedError(resetAt)
+    }
+    throw new Error(`${url} -> ${res.status}`)
+  }
   return (await res.json()) as T
 }
 
@@ -162,6 +197,7 @@ function finalize(raw: RawEntry[], source: Coverage["changelog"], versionsTotal:
     versionsCovered: new Set(kept.map(e => e.version)).size,
     versionsTotal,
     sources,
+    chartAppVersions: null,
   }
 }
 
@@ -275,7 +311,7 @@ async function githubChangelog(facts: ActionFacts): Promise<Changelog | null> {
 }
 
 type HubSearch = { packages: { name: string; repository: { name: string; url: string; official?: boolean; verified_publisher?: boolean } }[] }
-type HubPackage = { available_versions: { version: string }[]; home_url?: string; links?: { url: string }[]; repository?: { url?: string } }
+type HubPackage = { available_versions: { version: string; app_version?: string }[]; home_url?: string; links?: { url: string }[]; repository?: { url?: string } }
 type HubVersion = { changes?: { kind?: string; description: string }[] }
 
 function normalizeRepoUrl(url: string): string {
@@ -301,6 +337,7 @@ async function artifactHubChangelog(facts: ActionFacts): Promise<Changelog | nul
   const repoName = pkg.repository.name
   const hubPath = `${encodeURIComponent(repoName)}/${encodeURIComponent(chart.name)}`
   const detail = await fetchJson<HubPackage>(`${base}/packages/helm/${hubPath}`)
+  const chartAppVersions: ChartAppVersions = { from: hubAppVersion(detail, facts.from), to: hubAppVersion(detail, facts.to) }
   const versions = detail.available_versions
     .map(v => v.version)
     .filter(v => inRange(v, facts.from, facts.to))
@@ -329,8 +366,18 @@ async function artifactHubChangelog(facts: ActionFacts): Promise<Changelog | nul
     const links = [detail.home_url, ...(detail.links ?? []).map(l => l.url), detail.repository?.url]
     const repo = links.map(githubRepoFromUrl).find(Boolean)
     const fromGithub = repo ? await githubReleases(repo, facts) : null
-    if (fromGithub) return { ...fromGithub, sources: [...fromGithub.sources, hubSource] }
+    if (fromGithub) return { ...fromGithub, sources: [...fromGithub.sources, hubSource], chartAppVersions }
   }
   const prekinded = raw.length > 0 && [...perVersion.values()].every(v => (v.changes ?? []).every(c => !!c.kind))
-  return finalize(raw, "artifacthub", versions.length, [hubSource], prekinded)
+  return { ...finalize(raw, "artifacthub", versions.length, [hubSource], prekinded), chartAppVersions }
+}
+
+function hubAppVersion(detail: HubPackage, chartVersion: string): string | null {
+  const wanted = parseSemver(chartVersion)
+  if (!wanted) return null
+  const match = detail.available_versions.find(v => {
+    const s = parseSemver(v.version)
+    return s !== null && compareSemver(s, wanted) === 0
+  })
+  return match?.app_version ?? null
 }
