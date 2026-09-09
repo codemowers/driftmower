@@ -1,4 +1,5 @@
 import { isInCluster } from "@/lib/server/k8s"
+import { guardNamespace } from "@/lib/server/tenant-scope-filter"
 import { getResourceObject } from "@/lib/cluster-resources/resource-object"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 
@@ -17,6 +18,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
   if (!supportsYamlView(kind)) {
     return Response.json({ error: `YAML view is not available for kind ${kind}` }, { status: 400 })
   }
+
+  const denied = await guardNamespace(namespace)
+  if (denied) return denied
+
   if (!isInCluster()) {
     return Response.json({ error: "Kubernetes API not reachable outside the cluster" }, { status: 503 })
   }

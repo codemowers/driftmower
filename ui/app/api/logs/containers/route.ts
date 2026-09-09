@@ -1,4 +1,5 @@
 import { listContainers } from "@/lib/features/logs/pod"
+import { guardNamespace } from "@/lib/server/tenant-scope-filter"
 
 export const dynamic = "force-dynamic"
 
@@ -12,6 +13,9 @@ export async function GET(req: Request) {
   if (!ns || !pod) {
     return Response.json({ error: "ns, pod required" }, { status: 400 })
   }
+
+  const denied = await guardNamespace(ns)
+  if (denied) return denied
 
   const key = `${ns}/${pod}`
   const now = Date.now()

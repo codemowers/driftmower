@@ -5,7 +5,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FilterToggle } from "@/app/components/filter-bar"
 import { cn } from "@/lib/utils/cn"
-import { selectTenants, toggleTenant, useTenantContext } from "@/lib/tenancy/tenant-context"
+import {
+  ALL_TENANTS_LABEL,
+  selectTenants,
+  toggleTenant,
+  useTenantContext,
+  useTenantScope,
+} from "@/lib/tenancy/tenant-context"
 
 export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
   const hydrated = useTenantContext(s => s.hydrated)
@@ -13,27 +19,23 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
   const admin = useTenantContext(s => s.admin)
   const tenants = useTenantContext(s => s.tenants)
   const selectedTenants = useTenantContext(s => s.selectedTenants)
+  const { namespaces } = useTenantScope()
 
   if (!hydrated || !available) return null
 
+  const unscopedLabel = admin ? "Whole cluster" : ALL_TENANTS_LABEL
   const label =
     selectedTenants.length === 0
-      ? "Whole cluster"
+      ? unscopedLabel
       : selectedTenants.length === 1
         ? selectedTenants[0]
         : `${selectedTenants.length} tenants`
 
-  const showWholeCluster = admin || tenants.length === 0
+  const showUnscopedRow = admin || tenants.length > 1
   // A ?tenant= deep link can name tenants the user cannot see; still list them
   // so the current selection is visible and re-selectable.
   const unknownSelection = selectedTenants.filter(t => !tenants.some(k => k.tenant === t))
-  const isSingleTenantUser = !showWholeCluster && tenants.length === 1 && unknownSelection.length === 0
-  const namespacesInScope = new Set(
-    selectedTenants.flatMap(name => {
-      const tenant = tenants.find(t => t.tenant === name)
-      return tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : []
-    }),
-  )
+  const isSingleTenantUser = !admin && tenants.length === 1 && unknownSelection.length === 0
 
   const trigger = (
     <PopoverTrigger
@@ -100,12 +102,12 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
               )}
             </div>
 
-            {showWholeCluster && (
+            {showUnscopedRow && (
               <>
                 <FilterToggle
                   checked={selectedTenants.length === 0}
                   onToggle={() => selectTenants([])}
-                  label="Whole cluster"
+                  label={unscopedLabel}
                 />
                 <div className="my-1 h-px bg-gray-200" />
               </>
@@ -131,14 +133,16 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
               ))}
             </div>
 
-            {selectedTenants.length > 0 && (
+            {namespaces !== null && (
               <>
                 <div className="my-1 h-px bg-gray-200" />
                 <p className="px-3 pb-1 text-xs text-muted-foreground">
-                  {selectedTenants.length === 1
-                    ? "1 tenant selected"
-                    : `${selectedTenants.length} tenants selected`}
-                  , {namespacesInScope.size} namespaces in scope
+                  {selectedTenants.length === 0
+                    ? `All ${tenants.length} tenants`
+                    : selectedTenants.length === 1
+                      ? "1 tenant selected"
+                      : `${selectedTenants.length} tenants selected`}
+                  , {namespaces.length} namespaces in scope
                 </p>
               </>
             )}

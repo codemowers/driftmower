@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, ExternalLink, Layers } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
@@ -118,25 +117,11 @@ function WorkloadRow({
     </>
   )
 
-  const rowClass = cn("grid items-center gap-4 pl-6 pr-4 py-4", focus.gridCols)
-
-  if (!entry.inReport) {
-    return (
-      <Tooltip delayDuration={500}>
-        <TooltipTrigger asChild>
-          <div className={cn(rowClass, "bg-gray-50/60")}>
-            {cells}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          Not in the latest report. Shown live from the cluster. A refresh may include it.
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
-
   return (
-    <Link href={href} className={cn(rowClass, "hover:bg-brand-bg/40 transition-colors")}>
+    <Link
+      href={href}
+      className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", focus.gridCols)}
+    >
       {cells}
     </Link>
   )

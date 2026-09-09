@@ -2,17 +2,11 @@
 
 import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import {
-  defaultTenantSelection,
-  hydrateTenantContext,
-  syncTenantParam,
-  useTenantContext,
-} from "@/lib/tenancy/tenant-context"
+import { hydrateTenantContext, syncTenantParam, useTenantContext } from "@/lib/tenancy/tenant-context"
 
 // Bridges the ?tenant= URL contract and the tenant-context store:
 // - hydrates the tenant list once per session,
 // - lets ?tenant=<name> (platform-manager deep links) drive the selection,
-// - applies the default selection when the URL carries no tenant,
 // - re-mirrors the in-store selection after navigations that dropped the param.
 export default function TenantContextInit() {
   const searchParams = useSearchParams()
@@ -46,11 +40,9 @@ export default function TenantContextInit() {
       return
     }
 
-    // First load without a deep link: pick the default once tenants are known.
+    // First load without a deep link: no selection, which scopes a non-admin to all their tenants.
     if (!hydrated) return
-    const fallback = defaultTenantSelection(state)
-    useTenantContext.setState({ selectedTenants: fallback, initialized: true })
-    if (fallback.length > 0) syncTenantParam(fallback)
+    useTenantContext.setState({ initialized: true })
   }, [tenantParam, hydrated])
 
   return null

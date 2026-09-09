@@ -73,10 +73,6 @@ export function hydrateTenantContext(): void {
     )
 }
 
-export function defaultTenantSelection(state: TenantContextState): string[] {
-  return !state.admin && state.tenants.length > 0 ? [state.tenants[0].tenant] : []
-}
-
 export function syncTenantParam(tenants: string[]): void {
   if (typeof window === "undefined") return
   const value = tenants.join(",")
@@ -107,17 +103,33 @@ export type TenantScope = {
   namespaces: string[] | null
 }
 
+export const ALL_TENANTS_LABEL = "All tenants"
+
+function namespacesOf(tenants: TenantInfo[]): string[] {
+  return [...new Set(tenants.flatMap(t => [t.tenantNamespace, ...t.appNamespaces]))]
+}
+
 export function useTenantScope(): TenantScope {
   const selectedTenants = useTenantContext(s => s.selectedTenants)
   const tenants = useTenantContext(s => s.tenants)
+  const available = useTenantContext(s => s.available)
+  const admin = useTenantContext(s => s.admin)
 
   return useMemo(() => {
-    if (selectedTenants.length === 0) return { tenants: [], label: null, namespaces: null }
+    // No selection widens to the whole cluster only for admins, and only once they are known.
+    if (selectedTenants.length === 0) {
+      if (!available || admin) return { tenants: [], label: null, namespaces: null }
+      return {
+        tenants: tenants.map(t => t.tenant),
+        label: ALL_TENANTS_LABEL,
+        namespaces: namespacesOf(tenants),
+      }
+    }
 
     // A stale deep link naming an unknown tenant must scope to nothing, not widen back to the cluster.
-    const namespaces = selectedTenants.flatMap(name => {
+    const selected = selectedTenants.flatMap(name => {
       const tenant = tenants.find(t => t.tenant === name)
-      return tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : []
+      return tenant ? [tenant] : []
     })
 
     return {
@@ -126,7 +138,7 @@ export function useTenantScope(): TenantScope {
         selectedTenants.length === 1
           ? selectedTenants[0]
           : `${selectedTenants.length} tenants`,
-      namespaces: [...new Set(namespaces)],
+      namespaces: namespacesOf(selected),
     }
-  }, [selectedTenants, tenants])
+  }, [selectedTenants, tenants, available, admin])
 }
