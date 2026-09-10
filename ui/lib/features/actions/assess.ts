@@ -161,5 +161,6 @@ export async function assess(facts: ActionFacts, signal: AbortSignal): Promise<A
     sources: changelog.sources,
     valuesKey: inputs.valuesKey,
     interim,
+    chartAppVersions: changelog.chartAppVersions,
   }
 }
