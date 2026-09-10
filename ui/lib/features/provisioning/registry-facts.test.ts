@@ -101,3 +101,13 @@ test("a pull secret for a different registry does not count as covering", () => 
 test("empty and blank images are ignored rather than counted", () => {
   assert.deepEqual(summariseRegistries(["", "zot.example.com/a:1"], new Set()).map(f => f.host), ["zot.example.com"])
 })
+
+test("a single-segment image's colon is a tag, not a registry port", () => {
+  // Seen live: "redis:7-alpine" was reported as a registry host, inventing a
+  // registry nobody could push to.
+  assert.equal(registryHostOf("redis:7-alpine"), "docker.io")
+  assert.equal(registryHostOf("nginx:1.27"), "docker.io")
+  assert.equal(registryHostOf("redis"), "docker.io")
+  // A port is only a port when a path follows it.
+  assert.equal(registryHostOf("registry:5000/app:1"), "registry:5000")
+})
