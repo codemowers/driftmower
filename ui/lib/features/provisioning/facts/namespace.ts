@@ -2,6 +2,7 @@ import "server-only"
 
 import { kubeApiGet } from "@/lib/server/k8s"
 import { denialsFor, type AdmissionPolicyFact } from "../admission-facts"
+import { podSecurityFor } from "../pod-security-facts"
 import { mayCreate, type RawRoleBinding, type ResolvedRole } from "../authz-heuristic"
 import {
   computeHeadroom,
@@ -139,6 +140,7 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
       },
       mayCreate: permission.mayCreate,
       mayCreateReason: permission.reason,
+      podSecurity: podSecurityFor(meta.metadata?.labels),
     },
     degraded,
   }
