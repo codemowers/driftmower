@@ -23,11 +23,16 @@ const DOCKER_HUB = "docker.io"
 
 export function registryHostOf(image: string): string {
   const withoutDigest = image.split("@")[0]
-  const firstSegment = withoutDigest.split("/")[0]
-  // A registry host has a dot or a port, or is exactly "localhost". Anything
-  // else is a Docker Hub namespace, e.g. "codemowers/util".
-  const looksLikeHost = firstSegment.includes(".") || firstSegment.includes(":") || firstSegment === "localhost"
-  return looksLikeHost ? firstSegment : DOCKER_HUB
+  const segments = withoutDigest.split("/")
+  // A registry host only exists when something follows it. "redis:7-alpine" is
+  // one segment, so its colon is a tag rather than a port; reading that as a
+  // host invents a registry that does not exist.
+  if (segments.length < 2) return DOCKER_HUB
+  const first = segments[0]
+  // Within a multi-segment reference, a host has a dot or a port, or is exactly
+  // "localhost". Anything else is a Docker Hub namespace, e.g. "codemowers/util".
+  const looksLikeHost = first.includes(".") || first.includes(":") || first === "localhost"
+  return looksLikeHost ? first : DOCKER_HUB
 }
 
 // Registries that are never a push target for a tenant, so they must not be

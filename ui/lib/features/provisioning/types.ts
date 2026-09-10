@@ -171,13 +171,6 @@ export type IngressFact = {
   }[]
 }
 
-// Where images come from, and whether this namespace can pull them.
-export type RegistryScope = {
-  registries: { host: string; imageCount: number; isHouseRegistry: boolean }[]
-  // Per requested namespace: the pull secrets present, by name, and the advice.
-  namespaces: { namespace: string; pullSecrets: string[]; advice: string }[]
-}
-
 // A ValidatingAdmissionPolicy. These override RBAC, which is why the permission
 // verdict consults them before it trusts a RoleBinding.
 export type AdmissionFact = {
@@ -198,7 +191,6 @@ export type CapabilityResponse = {
   policies: PolicyFact[]
   admissionPolicies: AdmissionFact[]
   ingress: IngressFact
-  registry: RegistryScope
   priorityClasses: { name: string; value: number; isDefault: boolean; meaning: string }[]
   networkPolicyEngine: "cilium" | "native" | "none" | "unknown"
   monitoringOperator: boolean
