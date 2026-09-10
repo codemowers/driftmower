@@ -156,6 +156,9 @@ export type PolicyFact = {
 // is enforced by admission rather than convention.
 export type IngressFact = {
   domainSuffix: string | null
+  // "guard-params" is what admission compares against; "app-base-url" is
+  // derived from this app's own hostname and could differ from the guard.
+  domainSuffixSource: "guard-params" | "app-base-url" | null
   classes: { name: string; controller: string; isDefault: boolean }[]
   clusterIssuers: string[]
   sharedWildcard: boolean

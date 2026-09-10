@@ -9,7 +9,7 @@ import {
   type RawAdmissionPolicy,
 } from "../admission-facts"
 import { CLUSTER_FACT_TTL_MS } from "../constants"
-import { suffixFromParams } from "../ingress-facts"
+import { resolveDomainSuffix, suffixFromParams, type DomainSuffix } from "../ingress-facts"
 import type { Fact } from "../types"
 import { optional } from "./tolerate"
 
@@ -39,22 +39,30 @@ type RawConfigMap = { data?: Record<string, string> }
 // Reading the key the guard reads beats inferring the domain from existing
 // Ingresses, which would happily hand back the platform's own domain — a
 // hostname no sandbox may claim.
-async function loadIngressSuffix(): Promise<Fact<string | null>> {
+async function loadIngressSuffix(): Promise<Fact<DomainSuffix | null>> {
+  const appBaseUrl = process.env.APP_BASE_URL
+
   const facts = await getAdmissionFacts()
-  if (!facts.known) return facts
+  const guard = facts.known
+    ? facts.value.find(
+        fact => fact.paramRef !== null && fact.guards.some(g => g.resource === "ingresses"),
+      )
+    : undefined
 
-  const guard = facts.value.find(
-    fact => fact.paramRef !== null && fact.guards.some(g => g.resource === "ingresses"),
-  )
-  if (!guard?.paramRef) return { known: true, value: null }
-
-  const namespace = guard.paramRef.namespace ?? "kube-system"
-  return await optional("configmaps", async () => {
-    const configMap = await kubeApiGet<RawConfigMap>(
-      `/api/v1/namespaces/${encodeURIComponent(namespace)}/configmaps/${encodeURIComponent(guard.paramRef!.name)}`,
+  let fromParams: string | null = null
+  if (guard?.paramRef) {
+    const namespace = guard.paramRef.namespace ?? "kube-system"
+    const configMap = await optional("configmaps", () =>
+      kubeApiGet<RawConfigMap>(
+        `/api/v1/namespaces/${encodeURIComponent(namespace)}/configmaps/${encodeURIComponent(guard.paramRef!.name)}`,
+      ),
     )
-    return suffixFromParams(configMap.data)
-  })
+    if (configMap.known) fromParams = suffixFromParams(configMap.value.data)
+  }
+
+  // Deliberately never Unknown: the app's own URL always answers this, so a
+  // refused ConfigMap read costs provenance rather than the fact itself.
+  return { known: true, value: resolveDomainSuffix(fromParams, appBaseUrl) }
 }
 
 export const getIngressSuffix = createTtlCache(CLUSTER_FACT_TTL_MS, loadIngressSuffix)

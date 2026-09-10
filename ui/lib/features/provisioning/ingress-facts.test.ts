@@ -5,6 +5,8 @@ import {
   hostIsAllowed,
   hostRejectionReason,
   hostRuleFor,
+  resolveDomainSuffix,
+  suffixFromAppBaseUrl,
   suffixFromParams,
   tlsAdvice,
   toIngressClassFact,
@@ -79,4 +81,71 @@ test("TLS advice distinguishes a shared wildcard from a per-host certificate", (
   assert.match(tlsAdvice(["letsencrypt"], true), /needs no tls block/)
   assert.match(tlsAdvice(["letsencrypt"], false), /letsencrypt ClusterIssuer/)
   assert.match(tlsAdvice([], false), /not automatic/)
+})
+
+test("the suffix derives from the app's own URL, matching the guard on real clusters", () => {
+  // Both verified against the live sandbox-guard-params ConfigMap.
+  assert.equal(
+    suffixFromAppBaseUrl("https://driftmower.aws-us-west-2-bravo.codemowers.io"),
+    "aws-us-west-2-bravo.codemowers.io",
+  )
+  assert.equal(suffixFromAppBaseUrl("https://driftmower-dev.veebkolm.eu"), "veebkolm.eu")
+})
+
+test("derivation tolerates paths, ports and trailing slashes", () => {
+  assert.equal(suffixFromAppBaseUrl("https://app.example.com/"), "example.com")
+  assert.equal(suffixFromAppBaseUrl("https://app.example.com:8443"), "example.com")
+  assert.equal(suffixFromAppBaseUrl("http://app.example.com/base"), "example.com")
+})
+
+test("derivation refuses when dropping a label would leave no domain", () => {
+  // An apex deployment has no suffix to offer, and guessing "com" would be worse
+  // than saying nothing.
+  assert.equal(suffixFromAppBaseUrl("https://example.com"), null)
+  assert.equal(suffixFromAppBaseUrl("https://localhost:3000"), null)
+  assert.equal(suffixFromAppBaseUrl("not a url"), null)
+  assert.equal(suffixFromAppBaseUrl(undefined), null)
+  assert.equal(suffixFromAppBaseUrl(""), null)
+})
+
+test("the guard's parameter wins, because it is what admission compares against", () => {
+  const resolved = resolveDomainSuffix("guard.example.com", "https://app.other.example.com")
+  assert.deepEqual(resolved, { value: "guard.example.com", source: "guard-params" })
+})
+
+test("without the parameter the derivation is used, and says so", () => {
+  const resolved = resolveDomainSuffix(null, "https://driftmower.aws-us-west-2-bravo.codemowers.io")
+  assert.deepEqual(resolved, {
+    value: "aws-us-west-2-bravo.codemowers.io",
+    source: "app-base-url",
+  })
+})
+
+test("neither source available is null, not a guess", () => {
+  assert.equal(resolveDomainSuffix(null, undefined), null)
+  assert.equal(resolveDomainSuffix(null, "https://example.com"), null)
+})
+
+// Parity with the apiserver, not just with my reading of the CEL. Each case
+// below was submitted to a real sandbox-ingress-guard as a non-exempt sandbox
+// owner (kubectl create --dry-run=server, sandbox abc123-demo, suffix
+// veebkolm.eu) and the verdict recorded. If hostIsAllowed ever diverges, the
+// page starts promising hostnames admission will reject.
+test("hostIsAllowed matches what the guard actually decided", () => {
+  const rule = hostRuleFor("veebkolm.eu", "abc123-demo", "sandbox-ingress-guard")
+
+  const observed: [string, boolean][] = [
+    ["abc123-demo.veebkolm.eu", true],
+    ["abc123-demo-api.veebkolm.eu", true],
+    ["myapp.veebkolm.eu", false],
+    ["*.veebkolm.eu", false],
+    ["abc123-demo-a.b.veebkolm.eu", false],
+    // Another tenant's sandbox — the reason the guard exists.
+    ["536389-mint.veebkolm.eu", false],
+    ["abc123-demo.example.com", false],
+  ]
+
+  for (const [host, allowed] of observed) {
+    assert.equal(hostIsAllowed(host, rule), allowed, `${host} should be ${allowed ? "allowed" : "denied"}`)
+  }
 })
