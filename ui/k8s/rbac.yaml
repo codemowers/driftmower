@@ -56,3 +56,81 @@ subjects:
   - kind: ServiceAccount
     name: driftmower-ui
     namespace: driftmowers
+---
+# Read-only facts behind the Provisioning pages and MCP tools. Everything here
+# is get/list: the feature generates manifests for the user to apply with their
+# own credentials, so it holds no write verb anywhere.
+#
+# Not included on purpose: apiextensions.k8s.io. Aggregated API discovery
+# (/apis, granted to system:authenticated by system:discovery) already reports
+# every group, version, kind and plural, and `kubectl apply --dry-run=server`
+# validates fields authoritatively. Reading full CRD schemas would be megabytes
+# per request to re-derive that worse.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: driftmower-ui-provisioning-facts
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "resourcequotas", "limitranges", "persistentvolumeclaims", "services"]
+    verbs: ["get", "list"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "csidrivers"]
+    verbs: ["get", "list"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources: ["priorityclasses"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list"]
+  # Only Cilium can admit node-sourced traffic, which is what CNPG's health
+  # probes are. Absent on the AWS clusters (VPC CNI); a 404 degrades one fact.
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnetworkpolicies"]
+    verbs: ["get", "list"]
+  - apiGroups: ["kyverno.io"]
+    resources: ["clusterpolicies", "policies"]
+    verbs: ["get", "list"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["podmonitors"]
+    verbs: ["get", "list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list"]
+  # Narrowed deliberately. Answering "does your role cover this CRD?" needs the
+  # bound role's rules, and the aggregation controller flattens aggregated rules
+  # into `.rules` — so these three built-ins by name are enough, and we never
+  # read arbitrary ClusterRoles.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["admin", "edit", "view"]
+    verbs: ["get"]
+  # Provisioned resources: existence, name collisions, readiness. Read-only,
+  # per operator group, so a new operator needs an explicit rule here.
+  - apiGroups:
+      - postgresql.cnpg.io
+      - barmancloud.cnpg.io
+      - dragonflydb.io
+      - mongodbcommunity.mongodb.com
+      - rabbitmq.com
+      - cluster.redpanda.com
+      - opensearch.opster.io
+      - elasticsearch.k8s.elastic.co
+      - apps.emqx.io
+      - s3.onyxia.sh
+      - secretgenerator.mittwald.de
+    resources: ["*"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: driftmower-ui-provisioning-facts
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: driftmower-ui-provisioning-facts
+subjects:
+  - kind: ServiceAccount
+    name: driftmower-ui
+    namespace: driftmowers

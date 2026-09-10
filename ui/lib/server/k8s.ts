@@ -96,8 +96,11 @@ async function kubeRequestWithTokenRefresh(path: string, accept: string): Promis
   }
 }
 
-export async function kubeApiGet<T>(path: string): Promise<T> {
-  const body = await kubeRequestWithTokenRefresh(path, "application/json")
+// `accept` is threaded out so callers can content-negotiate: aggregated API
+// discovery needs `application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList`
+// to get kinds, plurals and scope in one request instead of one GET per group.
+export async function kubeApiGet<T>(path: string, accept = "application/json"): Promise<T> {
+  const body = await kubeRequestWithTokenRefresh(path, accept)
   try {
     return JSON.parse(body) as T
   } catch (e) {
