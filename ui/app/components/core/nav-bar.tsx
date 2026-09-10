@@ -15,6 +15,7 @@ import {
   Server,
   ServerOff,
   LayoutGrid,
+  PackagePlus,
   ShipWheel,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,9 @@ const navItems: NavItem[] = [
   // reports platform-manager is not deployed.
   { name: "Tenants", href: "/tenants", icon: BookUser },
   { name: "Applications", href: "/applications", icon: LayoutGrid },
+  // Always shown: the page renders its own not-in-cluster and
+  // nothing-installed states, which is the whole point of it.
+  { name: "Provisioning", href: "/provisioning", icon: PackagePlus },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {
