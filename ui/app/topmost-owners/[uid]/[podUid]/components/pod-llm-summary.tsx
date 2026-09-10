@@ -53,7 +53,7 @@ export default function PodLlmSummary({ pod }: Props) {
   useEffect(() => {
     const id = setInterval(() => {
       if (stable && podUsages.length > 0 && getLiveText(pod.uid) === null) {
-        ensureLive(pod.uid, podLiveFacts(pod, useNetstatd.getState(), clusterResources, staticRisk))
+        ensureLive(pod.uid, podLiveFacts(pod, useNetstatd.getState(), staticRisk))
       }
       setLiveText(getLiveText(pod.uid) ?? "")
     }, 1_000)
