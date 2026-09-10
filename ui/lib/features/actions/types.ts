@@ -1,7 +1,7 @@
 import type { StatusType } from "@/lib/cluster/reports"
 import type { VulnerabilitySeverity } from "@/lib/features/vulnerability/types"
 
-export const PROMPT_VERSION = 5
+export const PROMPT_VERSION = 7
 
 export type ActionKind = "update-image" | "upgrade-chart" | "pin-digest"
 export type Risk = "safe" | "review" | "risky"
