@@ -3,9 +3,7 @@ import { OFFERINGS_BY_ID } from "@/lib/features/provisioning/catalog/offerings"
 import { denialsFor } from "@/lib/features/provisioning/admission-facts"
 import { getAdmissionFacts } from "@/lib/features/provisioning/facts/admission"
 import { getNamespaceFacts } from "@/lib/features/provisioning/facts/namespace"
-import { getPullSecrets } from "@/lib/features/provisioning/facts/registry"
 import { hostRuleFor } from "@/lib/features/provisioning/ingress-facts"
-import { pushAdvice } from "@/lib/features/provisioning/registry-facts"
 import { gatherClusterFacts } from "@/lib/features/provisioning/facts"
 import type { CapabilityResponse, NamespaceFact, OfferingId } from "@/lib/features/provisioning/types"
 import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
@@ -80,15 +78,13 @@ export async function GET(req: Request) {
         // see these or it answers optimistically for anything a guard denies.
         admissionFacts,
       })
-      const pullSecrets = await getPullSecrets(namespace)
-      return { namespace, facts, pullSecrets }
+      return { namespace, facts }
     }),
   )
 
   const hostRules: CapabilityResponse["ingress"]["hostRules"] = []
-  const registryNamespaces: CapabilityResponse["registry"]["namespaces"] = []
 
-  for (const { namespace, facts, pullSecrets } of results) {
+  for (const { namespace, facts } of results) {
     namespaces.push(facts.fact)
     for (const entry of facts.degraded) {
       // One row per fact family, not per namespace: the fix is the same rule.
@@ -97,15 +93,6 @@ export async function GET(req: Request) {
 
     hostRules.push(hostRuleFrom(cluster, facts.fact.sandbox, namespace, admissionFacts))
 
-    const secrets = pullSecrets.known ? pullSecrets.value : []
-    registryNamespaces.push({
-      namespace,
-      pullSecrets: secrets.map(s => s.name),
-      advice: pushAdvice(
-        cluster.registry.registries.map(r => ({ ...r, requiresPullSecret: false })),
-        secrets,
-      ).advice,
-    })
   }
 
   return Response.json(
@@ -113,7 +100,6 @@ export async function GET(req: Request) {
       ...cluster,
       namespaces,
       ingress: { ...cluster.ingress, hostRules },
-      registry: { ...cluster.registry, namespaces: registryNamespaces },
       degraded,
     } satisfies CapabilityResponse,
     { headers: NO_STORE },

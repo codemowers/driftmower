@@ -5,12 +5,11 @@ import { availabilityOf } from "../availability"
 import { negotiateVersion, servesGroup } from "../api-surface"
 import { OFFERINGS } from "../catalog/offerings"
 import { tlsAdvice } from "../ingress-facts"
-import type { CapabilityResponse, DegradedRead, IngressFact, OfferingCard, RegistryScope } from "../types"
+import type { CapabilityResponse, DegradedRead, IngressFact, OfferingCard } from "../types"
 import { getApiSurface } from "./discovery"
 import { getOperatorHealth } from "./operators"
 import { getAdmissionFacts, getIngressSuffix } from "./admission"
 import { getIngressPlatform } from "./ingress"
-import { getClusterRegistries } from "./registry"
 import { getPolicies } from "./policy"
 import { getPriorityClasses } from "./scheduling"
 import { getStorageClasses } from "./storage"
@@ -32,8 +31,6 @@ const EMPTY_INGRESS: IngressFact = {
   hostRules: [],
 }
 
-const EMPTY_REGISTRY: RegistryScope = { registries: [], namespaces: [] }
-
 export async function gatherClusterFacts(): Promise<CapabilityResponse> {
   if (!isInCluster()) {
     return {
@@ -45,7 +42,6 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
       policies: [],
       admissionPolicies: [],
       ingress: EMPTY_INGRESS,
-      registry: EMPTY_REGISTRY,
       priorityClasses: [],
       networkPolicyEngine: "unknown",
       monitoringOperator: false,
@@ -62,7 +58,7 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
     }
   }
 
-  const [surface, storage, topology, policies, priorityClasses, operators, admission, suffix, ingress, registries] =
+  const [surface, storage, topology, policies, priorityClasses, operators, admission, suffix, ingress] =
     await Promise.all([
       getApiSurface(),
       getStorageClasses(),
@@ -73,7 +69,6 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
       getAdmissionFacts(),
       getIngressSuffix(),
       getIngressPlatform(),
-      getClusterRegistries(),
     ])
 
   note("storageclasses", storage)
@@ -83,7 +78,6 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
   note("deployments", operators)
   note("validatingadmissionpolicies", admission)
   note("ingressclasses", ingress)
-  note("pods", registries)
 
   const lookupOperator = operators.known ? operators.value : () => null
 
@@ -142,7 +136,6 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
       // which namespaces the caller may see.
       hostRules: [],
     },
-    registry: { registries: registries.known ? registries.value : [], namespaces: [] },
     priorityClasses: priorityClasses.known ? priorityClasses.value : [],
     // Cilium owns policy where its CRDs exist, because only entity-based rules
     // can admit node-sourced traffic such as CNPG's health probes.

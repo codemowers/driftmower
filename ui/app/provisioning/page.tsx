@@ -5,7 +5,6 @@ import ClusterScopePill from "../components/cluster-scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
 import AdmissionList from "./components/admission-list"
 import HostCard from "./components/host-card"
-import RegistryCard from "./components/registry-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
@@ -102,10 +101,6 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
             Pick a sandbox in the sidebar to see the hostnames its namespaces may claim.
           </p>
         )}
-      </Section>
-
-      <Section title="Image registry" hint="Where to push images so this cluster can pull them.">
-        <RegistryCard registry={capabilities.registry} />
       </Section>
 
       <Section title="Storage" count={capabilities.storageClasses.length}>
