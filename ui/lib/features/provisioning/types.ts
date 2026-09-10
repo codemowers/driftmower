@@ -115,6 +115,14 @@ export type NamespaceFact = {
   // (aggregated roles, wildcards), so it must never produce a blocker.
   mayCreate: "likely" | "likely-not" | "unknown"
   mayCreateReason: string
+  // Pod Security Admission is a built-in controller, so it appears in no
+  // ValidatingAdmissionPolicy or Kyverno listing — and on these clusters it is
+  // the constraint most likely to stop a first pod.
+  podSecurity: {
+    enforce: "privileged" | "baseline" | "restricted"
+    requires: string[]
+    summary: string
+  } | null
 }
 
 export type PolicySelector = {

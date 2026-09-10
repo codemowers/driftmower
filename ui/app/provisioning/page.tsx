@@ -5,6 +5,7 @@ import ClusterScopePill from "../components/cluster-scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
 import AdmissionList from "./components/admission-list"
 import HostCard from "./components/host-card"
+import PodSecurityCard from "./components/pod-security-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
@@ -112,7 +113,13 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
         count={capabilities.admissionPolicies.length}
         hint="These are checked after your permissions and can reject an apply your role otherwise allows."
       >
-        <AdmissionList policies={capabilities.admissionPolicies} />
+        <div className="flex flex-col gap-4">
+          {/* Pod Security first: it is enforced by the apiserver rather than by
+              a policy object, so it appears in no listing below, and it is the
+              rule most likely to reject a first pod. */}
+          <PodSecurityCard namespaces={capabilities.namespaces} />
+          <AdmissionList policies={capabilities.admissionPolicies} />
+        </div>
       </Section>
     </>
   )

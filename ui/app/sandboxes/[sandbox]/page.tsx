@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import Link from "next/link"
 import { useParams } from "next/navigation"
 import { Building2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -125,6 +126,21 @@ export default function SandboxDetailPage() {
         </header>
 
         <KubeconfigPanel key={sandbox.sandbox} sandbox={sandbox.sandbox} />
+
+        {/* linkTo carries the sandbox selection, so Provisioning opens already
+            scoped to this sandbox and shows its hostname rather than asking the
+            user to pick it again. */}
+        <p className="text-sm text-muted-foreground">
+          Deploying into this sandbox?{" "}
+          <Link
+            href={linkTo("/provisioning", { drop: ["focus"] })}
+            className="text-brand-label underline decoration-dotted underline-offset-2 hover:text-brand"
+          >
+            Provisioning
+          </Link>{" "}
+          shows the hostname it may claim, which storage classes exist, how much quota is left, and the
+          admission rules that will reject a deployment here.
+        </p>
       </main>
     </div>
   )

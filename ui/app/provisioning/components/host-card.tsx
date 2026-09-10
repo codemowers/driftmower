@@ -5,6 +5,27 @@ import { Globe } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { IngressFact } from "@/lib/features/provisioning/types"
 
+function ingressSnippet(host: string, namespace: string, ingressClass: string): string {
+  return `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  namespace: ${namespace}
+spec:
+  ingressClassName: ${ingressClass}
+  rules:
+    - host: ${host}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-app
+                port:
+                  number: 80`
+}
+
 // The answer to "what hostname may I use", which is the question that started
 // this feature. A sandbox id begins with a hash assigned at creation, so this
 // cannot be guessed — it has to be shown.
@@ -52,6 +73,22 @@ export default function HostCard({ ingress }: { ingress: IngressFact }) {
               Rejected hosts fail with: {rule.enforcedMessage}
             </p>
           )}
+
+          {/* Built from the host the guard will actually accept, so it can be
+              pasted instead of reassembled out of the prose above. */}
+          {rule.exactHost && (
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">An Ingress that would be accepted:</span>
+                <span className="relative z-10">
+                  <CopyButton value={ingressSnippet(rule.exactHost, rule.namespace, defaultClass(ingress))} />
+                </span>
+              </div>
+              <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
+                {ingressSnippet(rule.exactHost, rule.namespace, defaultClass(ingress))}
+              </pre>
+            </div>
+          )}
         </div>
       ))}
 
@@ -66,7 +103,9 @@ export default function HostCard({ ingress }: { ingress: IngressFact }) {
 }
 
 function defaultClass(ingress: IngressFact): string {
-  return (ingress.classes.find(c => c.isDefault) ?? ingress.classes[0]).name
+  // A cluster that reports no classes still needs a placeholder rather than a
+  // crash: the snippet is a starting point, not a promise.
+  return (ingress.classes.find(c => c.isDefault) ?? ingress.classes[0])?.name ?? "<ingress class>"
 }
 
 // A concrete hostname is copyable; a pattern is not, since <label> is a
