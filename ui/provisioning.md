@@ -20,6 +20,31 @@
 >    never reports ready.
 > 3. Every ZFS StorageClass in `codemowers-kube` omits `volumeBindingMode`,
 >    i.e. `Immediate` binding on a node-local provisioner.
+>
+> **Correction, found after the first draft.** The constraints on these clusters
+> are enforced by **ValidatingAdmissionPolicy**, which overrides RBAC and which
+> this document originally did not model at all. Three consequences, all now
+> reflected below:
+>
+> - `sandbox-egress-guard` denies sandbox users CREATE and UPDATE on
+>   NetworkPolicies **entirely**. So "here are the policies your database needs,
+>   run `kubectl apply`" is a dead end for exactly the users this feature
+>   targets. Those findings are blockers whose fix is *hand this to the platform
+>   team*, not *apply it yourself*.
+> - The permission heuristic must consult admission policies **before** it
+>   trusts a RoleBinding. A sandbox owner holds the namespaced `admin` role,
+>   which covers `networkpolicies`, so RBAC alone answers "likely" for something
+>   a guard rejects — and that is the optimistic direction.
+> - There are **no Kyverno ClusterPolicies** in `codemowers-kube` at all. Kyverno
+>   is a feature gate, but the constraints live in VAPs, so a Kyverno-only policy
+>   read finds nothing on these clusters.
+>
+> The same read answers the question this feature exists for: the ingress domain
+> suffix lives in the guard's own parameter ConfigMap
+> (`kube-system/sandbox-guard-params`, key `ingressDomainSuffix`), and hosts must
+> be exactly `<sandbox-id>.<suffix>` or `<sandbox-id>-<label>.<suffix>`. A
+> sandbox id begins with a creation-time random hash, so **a user cannot guess
+> their own hostname** — it has to be shown to them.
 
 ## Context
 
@@ -204,6 +229,8 @@ The honest answer is three-part, in this order:
 
    Because wildcards and aggregation make this approximate, the result type is
    `"likely" | "likely-not" | "unknown"` and it **never produces a blocker** — a warning at most.
+   RBAC is also not the only gate: a ValidatingAdmissionPolicy overrides it, so admission
+   denials are checked *first* and outrank any role-derived verdict.
    Narrow the RBAC to match: `clusterroles` with `resourceNames: ["admin","edit","view"]`, `get` only.
    **Verify per-operator on ee-lte-1 in phase 2**; upstream CloudNativePG does ship aggregated
    edit/view roles, but it is not vendored here and could not be confirmed offline.
@@ -387,7 +414,13 @@ instance name, but it is rendered **only when `apiserverEgress.cidrs` is non-emp
 chart default is empty. So the matcher has to evaluate both shapes, and "egress isolation is on,
 no apiserver-egress policy exists in either shape" is a real and currently-default blocker.
 
-**The three network findings are severity-conditional, and the rule matters.** If Cilium CRDs
+**The three network findings are severity-conditional, and the rule matters.** First, the
+overriding case: where `sandbox-egress-guard` is enforced the user may not create a
+NetworkPolicy **at all**, so generating one for them to apply is a dead end and every network
+finding becomes a **blocker** whose fix is "hand these manifests to someone with platform
+access". The manifests are still worth emitting — as something to pass on, not to run.
+
+Where no such guard applies: if Cilium CRDs
 are discovered, we *generate* the missing policies as part of the plan, so each is a **warning**
 ("applies once you include the policy below") — and toggling that optional object off in the
 apply step promotes it back to a **blocker**. If Cilium CRDs are absent (the codemowers AWS

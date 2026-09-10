@@ -4,9 +4,13 @@ import { isInCluster } from "@/lib/server/k8s"
 import { availabilityOf } from "../availability"
 import { negotiateVersion, servesGroup } from "../api-surface"
 import { OFFERINGS } from "../catalog/offerings"
-import type { CapabilityResponse, DegradedRead, OfferingCard } from "../types"
+import { tlsAdvice } from "../ingress-facts"
+import type { CapabilityResponse, DegradedRead, IngressFact, OfferingCard, RegistryScope } from "../types"
 import { getApiSurface } from "./discovery"
 import { getOperatorHealth } from "./operators"
+import { getAdmissionFacts, getIngressSuffix } from "./admission"
+import { getIngressPlatform } from "./ingress"
+import { getClusterRegistries } from "./registry"
 import { getPolicies } from "./policy"
 import { getPriorityClasses } from "./scheduling"
 import { getStorageClasses } from "./storage"
@@ -18,6 +22,17 @@ import { getTopology } from "./topology"
 
 const EMPTY_TOPOLOGY = { zones: [], schedulableNodes: 0, controlPlaneLabel: null }
 
+const EMPTY_INGRESS: IngressFact = {
+  domainSuffix: null,
+  classes: [],
+  clusterIssuers: [],
+  sharedWildcard: false,
+  tlsAdvice: "",
+  hostRules: [],
+}
+
+const EMPTY_REGISTRY: RegistryScope = { registries: [], namespaces: [] }
+
 export async function gatherClusterFacts(): Promise<CapabilityResponse> {
   if (!isInCluster()) {
     return {
@@ -27,6 +42,9 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
       topology: EMPTY_TOPOLOGY,
       namespaces: [],
       policies: [],
+      admissionPolicies: [],
+      ingress: EMPTY_INGRESS,
+      registry: EMPTY_REGISTRY,
       priorityClasses: [],
       networkPolicyEngine: "unknown",
       monitoringOperator: false,
@@ -43,20 +61,28 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
     }
   }
 
-  const [surface, storage, topology, policies, priorityClasses, operators] = await Promise.all([
-    getApiSurface(),
-    getStorageClasses(),
-    getTopology(),
-    getPolicies(),
-    getPriorityClasses(),
-    getOperatorHealth(),
-  ])
+  const [surface, storage, topology, policies, priorityClasses, operators, admission, suffix, ingress, registries] =
+    await Promise.all([
+      getApiSurface(),
+      getStorageClasses(),
+      getTopology(),
+      getPolicies(),
+      getPriorityClasses(),
+      getOperatorHealth(),
+      getAdmissionFacts(),
+      getIngressSuffix(),
+      getIngressPlatform(),
+      getClusterRegistries(),
+    ])
 
   note("storageclasses", storage)
   note("nodes", topology)
   note("kyverno clusterpolicies", policies)
   note("priorityclasses", priorityClasses)
   note("deployments", operators)
+  note("validatingadmissionpolicies", admission)
+  note("ingressclasses", ingress)
+  note("pods", registries)
 
   const lookupOperator = operators.known ? operators.value : () => null
 
@@ -90,6 +116,31 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
     topology: topology.known ? topology.value : EMPTY_TOPOLOGY,
     namespaces: [],
     policies: policies.known ? policies.value : [],
+    // paramRef is deliberately not forwarded: it is a pointer we follow
+    // server-side to read the guard's ConfigMap, and a client has no use for it.
+    admissionPolicies: admission.known
+      ? admission.value.map(fact => ({
+          name: fact.name,
+          enforced: fact.enforced,
+          enforcement: fact.enforcement,
+          guards: fact.guards,
+          messages: fact.messages,
+          scopedToNamespaceLabels: fact.scopedToNamespaceLabels,
+        }))
+      : [],
+    ingress: {
+      domainSuffix: suffix.known ? suffix.value : null,
+      classes: ingress.known ? ingress.value.classes : [],
+      clusterIssuers: ingress.known ? ingress.value.clusterIssuers : [],
+      sharedWildcard: ingress.known ? ingress.value.sharedWildcard : false,
+      tlsAdvice: ingress.known
+        ? tlsAdvice(ingress.value.clusterIssuers, ingress.value.sharedWildcard)
+        : "",
+      // Host rules are per namespace, so the route fills them in once it knows
+      // which namespaces the caller may see.
+      hostRules: [],
+    },
+    registry: { registries: registries.known ? registries.value : [], namespaces: [] },
     priorityClasses: priorityClasses.known ? priorityClasses.value : [],
     // Cilium owns policy where its CRDs exist, because only entity-based rules
     // can admit node-sourced traffic such as CNPG's health probes.

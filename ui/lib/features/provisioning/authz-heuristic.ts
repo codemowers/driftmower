@@ -31,6 +31,11 @@ export type ResolvedRole = { name: string; rules: RawPolicyRule[] }
 
 export type Verdict = { mayCreate: "likely" | "likely-not" | "unknown"; reason: string }
 
+// An admission policy that governs this operation outranks anything RBAC says.
+// Passing them in keeps this module pure and keeps the precedence explicit
+// rather than buried in whichever caller happens to check first.
+export type AdmissionDenial = { policy: string; message: string }
+
 export type Caller = {
   sub: string
   groups: string[]
@@ -67,7 +72,24 @@ export function mayCreate(
   roles: ResolvedRole[],
   caller: Caller,
   target: { group: string; plural: string },
+  // Denials are checked FIRST and on purpose. A sandbox owner holds the
+  // namespaced admin role, which covers networkpolicies, so RBAC alone answers
+  // "likely" for an operation sandbox-egress-guard rejects outright — and that
+  // is the optimistic direction, which is the one that wastes a beginner's
+  // afternoon.
+  admissionDenials: AdmissionDenial[] = [],
 ): Verdict {
+  if (admissionDenials.length > 0) {
+    const denial = admissionDenials[0]
+    return {
+      mayCreate: "likely-not",
+      reason:
+        `The ${denial.policy} admission policy governs this: ${denial.message}. ` +
+        "An admission policy overrides your role, so having permission is not enough here — " +
+        "this needs someone with platform access.",
+    }
+  }
+
   const byName = new Map(roles.map(r => [r.name, r]))
   const applicable = bindings.filter(binding => bindingAppliesTo(binding, caller))
 

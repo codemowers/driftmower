@@ -151,6 +151,44 @@ export type PolicyFact = {
   meaning: string
 }
 
+// Where an app is reachable from, and what hostname the cluster will accept.
+// Users cannot guess this: a sandbox id begins with a random hash, and the rule
+// is enforced by admission rather than convention.
+export type IngressFact = {
+  domainSuffix: string | null
+  classes: { name: string; controller: string; isDefault: boolean }[]
+  clusterIssuers: string[]
+  sharedWildcard: boolean
+  tlsAdvice: string
+  // Per requested namespace, the two hostnames its sandbox may claim.
+  hostRules: {
+    namespace: string
+    sandboxId: string | null
+    exactHost: string | null
+    labelledPattern: string | null
+    enforcedBy: string | null
+    note: string
+  }[]
+}
+
+// Where images come from, and whether this namespace can pull them.
+export type RegistryScope = {
+  registries: { host: string; imageCount: number; isHouseRegistry: boolean }[]
+  // Per requested namespace: the pull secrets present, by name, and the advice.
+  namespaces: { namespace: string; pullSecrets: string[]; advice: string }[]
+}
+
+// A ValidatingAdmissionPolicy. These override RBAC, which is why the permission
+// verdict consults them before it trusts a RoleBinding.
+export type AdmissionFact = {
+  name: string
+  enforced: boolean
+  enforcement: string
+  guards: { group: string; resource: string; operations: string[] }[]
+  messages: string[]
+  scopedToNamespaceLabels: Record<string, string> | null
+}
+
 export type CapabilityResponse = {
   inCluster: boolean
   offerings: OfferingCard[]
@@ -158,6 +196,9 @@ export type CapabilityResponse = {
   topology: TopologyFact
   namespaces: NamespaceFact[]
   policies: PolicyFact[]
+  admissionPolicies: AdmissionFact[]
+  ingress: IngressFact
+  registry: RegistryScope
   priorityClasses: { name: string; value: number; isDefault: boolean; meaning: string }[]
   networkPolicyEngine: "cilium" | "native" | "none" | "unknown"
   monitoringOperator: boolean

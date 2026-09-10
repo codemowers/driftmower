@@ -125,3 +125,38 @@ test("one covering binding wins even when another does not cover", () => {
   assert.equal(verdict.mayCreate, "likely")
   assert.match(verdict.reason, /cnpg-edit/)
 })
+
+test("an admission denial outranks a role that would otherwise allow it", () => {
+  // The correction: sandbox owners hold `admin`, which covers networkpolicies,
+  // so RBAC alone says "likely" for something sandbox-egress-guard rejects.
+  const netpolAdmin = [{ apiGroups: ["networking.k8s.io"], resources: ["networkpolicies"], verbs: ["*"] }]
+
+  const rbacOnly = mayCreate([SANDBOX_OWNERS], [{ name: "admin", rules: netpolAdmin }], CALLER, {
+    group: "networking.k8s.io",
+    plural: "networkpolicies",
+  })
+  assert.equal(rbacOnly.mayCreate, "likely")
+
+  const withAdmission = mayCreate(
+    [SANDBOX_OWNERS],
+    [{ name: "admin", rules: netpolAdmin }],
+    CALLER,
+    { group: "networking.k8s.io", plural: "networkpolicies" },
+    [{ policy: "sandbox-egress-guard", message: "Sandbox users cannot create or update NetworkPolicies" }],
+  )
+
+  assert.equal(withAdmission.mayCreate, "likely-not")
+  assert.match(withAdmission.reason, /sandbox-egress-guard/)
+  // The user must learn that fixing their role would not help.
+  assert.match(withAdmission.reason, /overrides your role/)
+  assert.match(withAdmission.reason, /platform access/)
+})
+
+test("no admission denial leaves the RBAC verdict untouched", () => {
+  const verdict = mayCreate([SANDBOX_OWNERS], [{ name: "admin", rules: ADMIN_RULES }], CALLER, {
+    group: "postgresql.cnpg.io",
+    plural: "clusters",
+  }, [])
+  assert.equal(verdict.mayCreate, "likely-not")
+  assert.match(verdict.reason, /aggregate-to-admin/)
+})

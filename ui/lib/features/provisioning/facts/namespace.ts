@@ -1,6 +1,7 @@
 import "server-only"
 
 import { kubeApiGet } from "@/lib/server/k8s"
+import { denialsFor, type AdmissionPolicyFact } from "../admission-facts"
 import { mayCreate, type RawRoleBinding, type ResolvedRole } from "../authz-heuristic"
 import {
   computeHeadroom,
@@ -31,6 +32,9 @@ export type NamespaceFactsInput = {
   // The target resource, for the permission hint.
   target: { group: string; plural: string } | null
   caller: { sub: string; groups: string[]; usernamePrefixes: string[] } | null
+  // ValidatingAdmissionPolicies override RBAC, so the permission verdict must
+  // see them or it answers optimistically for anything a guard denies.
+  admissionFacts?: AdmissionPolicyFact[]
 }
 
 export type NamespaceFactsResult = { fact: NamespaceFact; degraded: DegradedRead[] }
@@ -89,9 +93,25 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
     ? extractSelectors(input.offeringLabelKey, nativePolicies, ciliumPolicies)
     : []
 
+  const sandboxId = meta.metadata?.labels?.["codemowers.io/sandbox"] ?? null
+  const namespaceLabels: Record<string, string> = sandboxId
+    ? { "codemowers.io/sandbox": sandboxId }
+    : {}
+
   const permission =
     input.target && input.caller
-      ? mayCreate(bindingItems, await resolveRoles(bindingItems, degraded), input.caller, input.target)
+      ? mayCreate(
+          bindingItems,
+          await resolveRoles(bindingItems, degraded),
+          input.caller,
+          input.target,
+          denialsFor(input.admissionFacts ?? [], {
+            group: input.target.group,
+            resource: input.target.plural,
+            operation: "CREATE",
+            namespaceLabels,
+          }),
+        )
       : {
           mayCreate: "unknown" as const,
           reason: "No offering selected yet, so nothing has been checked.",
@@ -100,7 +120,7 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
   return {
     fact: {
       namespace,
-      tenant: meta.metadata?.labels?.["codemowers.io/sandbox"] ?? null,
+      tenant: sandboxId,
       quota: quota
         ? {
             name: quota.metadata?.name ?? "(unnamed)",

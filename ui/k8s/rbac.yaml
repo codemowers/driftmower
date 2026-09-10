@@ -81,7 +81,29 @@ rules:
     resources: ["priorityclasses"]
     verbs: ["get", "list"]
   - apiGroups: ["networking.k8s.io"]
-    resources: ["networkpolicies"]
+    resources: ["networkpolicies", "ingressclasses"]
+    verbs: ["get", "list"]
+  # The real gate on these clusters: a ValidatingAdmissionPolicy overrides RBAC,
+  # so a permission verdict that consults only RoleBindings answers
+  # optimistically for anything a guard denies. The bindings matter as much as
+  # the policies — an unbound policy does nothing, and one bound for Audit only
+  # does not block.
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingadmissionpolicies", "validatingadmissionpolicybindings"]
+    verbs: ["get", "list"]
+  # Narrowed to the one ConfigMap a guard names via paramRef. For the ingress
+  # guard that parameter IS the answer to "what hostname may I use", which is
+  # published nowhere else — and users cannot infer it, since a sandbox id
+  # begins with a hash assigned at creation.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["sandbox-guard-params"]
+    verbs: ["get"]
+  # TLS is cert-manager plus a ClusterIssuer here, so a user needs the issuer
+  # name for their Certificate — or to learn a shared wildcard already covers
+  # them and they need nothing.
+  - apiGroups: ["cert-manager.io"]
+    resources: ["clusterissuers"]
     verbs: ["get", "list"]
   # Only Cilium can admit node-sourced traffic, which is what CNPG's health
   # probes are. Absent on the AWS clusters (VPC CNI); a 404 degrades one fact.

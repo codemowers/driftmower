@@ -51,6 +51,10 @@ function toPolicyFact(raw: RawKyvernoPolicy): PolicyFact | null {
   }
 }
 
+// Kyverno is a feature gate on these clusters but ships no ClusterPolicies, so
+// this read legitimately returns nothing on them. The constraints that actually
+// bite live in ValidatingAdmissionPolicies — see facts/admission.ts. Both are
+// reported, because a cluster elsewhere in the fleet may well use Kyverno.
 async function listPolicies(): Promise<Fact<PolicyFact[]>> {
   return await optional("kyverno clusterpolicies", async () => {
     const list = await kubeApiGet<{ items?: RawKyvernoPolicy[] }>("/apis/kyverno.io/v1/clusterpolicies")

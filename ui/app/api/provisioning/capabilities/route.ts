@@ -1,6 +1,11 @@
 import { getSession } from "@/lib/auth/session"
 import { OFFERINGS_BY_ID } from "@/lib/features/provisioning/catalog/offerings"
+import { denialsFor } from "@/lib/features/provisioning/admission-facts"
+import { getAdmissionFacts } from "@/lib/features/provisioning/facts/admission"
 import { getNamespaceFacts } from "@/lib/features/provisioning/facts/namespace"
+import { getPullSecrets } from "@/lib/features/provisioning/facts/registry"
+import { hostRuleFor } from "@/lib/features/provisioning/ingress-facts"
+import { pushAdvice } from "@/lib/features/provisioning/registry-facts"
 import { gatherClusterFacts } from "@/lib/features/provisioning/facts"
 import type { CapabilityResponse, NamespaceFact, OfferingId } from "@/lib/features/provisioning/types"
 import { fetchTenantScope } from "@/lib/server/platform-manager-proxy"
@@ -61,26 +66,101 @@ export async function GET(req: Request) {
   const namespaces: NamespaceFact[] = []
   const degraded = [...cluster.degraded]
 
+  const admission = await getAdmissionFacts()
+  const admissionFacts = admission.known ? admission.value : []
+
   const results = await Promise.all(
-    targets.map(namespace =>
-      getNamespaceFacts({
+    targets.map(async namespace => {
+      const facts = await getNamespaceFacts({
         namespace,
         offeringLabelKey: spec ? (OFFERING_LABEL_KEY[spec.id] ?? "app") : null,
         target: spec ? { group: spec.group, plural: pluralFor(cluster, spec.id) } : null,
         caller,
-      }),
-    ),
+        // An admission policy overrides RBAC, so the permission verdict has to
+        // see these or it answers optimistically for anything a guard denies.
+        admissionFacts,
+      })
+      const pullSecrets = await getPullSecrets(namespace)
+      return { namespace, facts, pullSecrets }
+    }),
   )
 
-  for (const result of results) {
-    namespaces.push(result.fact)
-    for (const entry of result.degraded) {
+  const hostRules: CapabilityResponse["ingress"]["hostRules"] = []
+  const registryNamespaces: CapabilityResponse["registry"]["namespaces"] = []
+
+  for (const { namespace, facts, pullSecrets } of results) {
+    namespaces.push(facts.fact)
+    for (const entry of facts.degraded) {
       // One row per fact family, not per namespace: the fix is the same rule.
       if (!degraded.some(d => d.source === entry.source)) degraded.push(entry)
     }
+
+    hostRules.push(hostRuleFrom(cluster, facts.fact.tenant, namespace, admissionFacts))
+
+    const secrets = pullSecrets.known ? pullSecrets.value : []
+    registryNamespaces.push({
+      namespace,
+      pullSecrets: secrets.map(s => s.name),
+      advice: pushAdvice(
+        cluster.registry.registries.map(r => ({ ...r, requiresPullSecret: false })),
+        secrets,
+      ).advice,
+    })
   }
 
-  return Response.json({ ...cluster, namespaces, degraded } satisfies CapabilityResponse, { headers: NO_STORE })
+  return Response.json(
+    {
+      ...cluster,
+      namespaces,
+      ingress: { ...cluster.ingress, hostRules },
+      registry: { ...cluster.registry, namespaces: registryNamespaces },
+      degraded,
+    } satisfies CapabilityResponse,
+    { headers: NO_STORE },
+  )
+}
+
+// The hostname a namespace may claim. A namespace that is not a sandbox is not
+// governed by the guard, so it gets a different note rather than a fabricated
+// pattern.
+function hostRuleFrom(
+  cluster: CapabilityResponse,
+  sandboxId: string | null,
+  namespace: string,
+  admissionFacts: Parameters<typeof denialsFor>[0],
+): CapabilityResponse["ingress"]["hostRules"][number] {
+  const suffix = cluster.ingress.domainSuffix
+  const guard = denialsFor(admissionFacts, {
+    group: "networking.k8s.io",
+    resource: "ingresses",
+    operation: "CREATE",
+    namespaceLabels: sandboxId ? { "codemowers.io/sandbox": sandboxId } : {},
+  })[0]
+
+  if (!sandboxId || !suffix) {
+    return {
+      namespace,
+      sandboxId,
+      exactHost: null,
+      labelledPattern: null,
+      enforcedBy: guard?.policy ?? null,
+      note: !suffix
+        ? "No ingress domain is published for this cluster, so ask the platform team which hostnames you may use."
+        : "This namespace is not a sandbox, so the sandbox hostname rule does not apply to it.",
+    }
+  }
+
+  const rule = hostRuleFor(suffix, sandboxId, guard?.policy ?? null)
+  return {
+    namespace,
+    sandboxId,
+    exactHost: rule.exactHost,
+    labelledPattern: rule.labelledPattern,
+    enforcedBy: rule.enforcedBy,
+    note: rule.enforcedBy
+      ? `Only these hostnames are accepted here, and the ${rule.enforcedBy} admission policy enforces it — the ingress controller is shared, and the sandbox-id prefix is what keeps one tenant from claiming another's traffic.`
+      : "These are the hostnames this namespace's sandbox id maps to.",
+  }
 }
 
 // The plural comes from discovery rather than the recipe, so the permission
