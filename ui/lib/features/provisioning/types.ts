@@ -170,6 +170,9 @@ export type IngressFact = {
     exactHost: string | null
     labelledPattern: string | null
     enforcedBy: string | null
+    // The guard's own denial text, so the consequence of getting it wrong is
+    // visible before the apiserver says it.
+    enforcedMessage: string | null
     note: string
   }[]
 }

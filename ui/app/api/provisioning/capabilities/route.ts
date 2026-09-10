@@ -136,6 +136,9 @@ function hostRuleFrom(
     operation: "CREATE",
     namespaceLabels: sandboxId ? { "codemowers.io/sandbox": sandboxId } : {},
   })[0]
+  // The message about hosts, not the one about IngressRoute: the guard carries
+  // both, and only the first explains a rejected hostname.
+  const hostMessage = guard?.messages.find(m => /host/i.test(m)) ?? guard?.messages[0] ?? null
 
   if (!sandboxId || !suffix) {
     return {
@@ -144,6 +147,7 @@ function hostRuleFrom(
       exactHost: null,
       labelledPattern: null,
       enforcedBy: guard?.policy ?? null,
+      enforcedMessage: hostMessage,
       note: !suffix
         ? "This cluster publishes no ingress domain and none could be derived from this app's own address, so ask the platform team which hostnames you may use."
         : "This namespace is not a sandbox, so the sandbox hostname rule does not apply to it.",
@@ -166,6 +170,7 @@ function hostRuleFrom(
     exactHost: rule.exactHost,
     labelledPattern: rule.labelledPattern,
     enforcedBy: rule.enforcedBy,
+    enforcedMessage: hostMessage,
     note:
       (rule.enforcedBy
         ? `Only these hostnames are accepted here, and the ${rule.enforcedBy} admission policy enforces it — the ingress controller is shared, and the sandbox-id prefix is what keeps one tenant from claiming another's traffic.`
