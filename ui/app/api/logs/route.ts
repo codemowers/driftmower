@@ -1,5 +1,5 @@
 import { getPodLogs } from "@/lib/features/logs/pod"
-import { guardNamespace } from "@/lib/server/tenant-scope-filter"
+import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { TAIL_LINES } from "@/lib/features/logs/constants"
 import type { LogSource } from "@/lib/features/logs/types"
 

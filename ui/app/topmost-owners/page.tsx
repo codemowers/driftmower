@@ -11,9 +11,9 @@ import type { FocusKey, WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "@/lib/utils/pods-by-root"
 import { useWorkloadHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
 import { reportWorkloadRoots } from "@/lib/utils/report-roots"
-import TenantEmptyState from "../components/tenant-empty-state"
+import SandboxEmptyState from "../components/sandbox-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
@@ -31,7 +31,7 @@ function TopmostOwnersContent() {
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const searchParams = useSearchParams()
-  const { tenants: scopedTenants, namespaces } = useTenantScope()
+  const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope()
 
   const [storedFocus, setStoredFocus] = useState<string | null>(null)
   const [focusResolved, setFocusResolved] = useState(false)
@@ -152,8 +152,8 @@ function TopmostOwnersContent() {
           pills={focus.pills(workloads)}
           leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
-        {scopedTenants.length > 0 && workloads.length === 0 ? (
-          <TenantEmptyState tenants={scopedTenants} entity="workloads" />
+        {scopedSandboxes.length > 0 && workloads.length === 0 ? (
+          <SandboxEmptyState sandboxes={scopedSandboxes} entity="workloads" />
         ) : (
           <WorkloadList key={focus.key} entries={workloads} focus={focus} syncUrl={focusResolved} />
         )}

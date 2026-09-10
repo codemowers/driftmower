@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
-import { useTenantScope } from "@/lib/tenancy/tenant-context";
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context";
 import { currentChartScopes, deriveClusterActions } from "@/lib/features/actions/derive";
 import TopActions from "./components/top-actions";
 import { type StatValueTone } from "./components/stat-card";
@@ -15,7 +15,7 @@ import MostOutdatedWorkloads, { worstStatus, type OutdatedWorkloadEntry } from "
 import ScraperIssues from "./components/scraper-issues";
 import PageHeader from "../components/page-header";
 import ClusterWideTag from "../components/cluster-wide-tag";
-import TenantEmptyState from "../components/tenant-empty-state";
+import SandboxEmptyState from "../components/sandbox-empty-state";
 import { cn } from "@/lib/utils/cn";
 import { Boxes, LayoutGrid, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
@@ -63,7 +63,7 @@ const UNSCORABLE: Partial<Record<ReportReadiness, { value: string; caption: stri
 export default function ExecutiveSummaryPage() {
   const { data, reportId, clusterResources, vulnerabilityReports, isFetchingReport } = useClusterState();
   const { launcher, inventory } = useApplications();
-  const { tenants: scopedTenants, namespaces } = useTenantScope();
+  const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
   const topActions = useMemo(
     () => (data ? deriveClusterActions(data, clusterResources, vulnerabilityReports, namespaces ? new Set(namespaces) : null) : []),
@@ -126,8 +126,8 @@ export default function ExecutiveSummaryPage() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
 
-  // The selected tenant's namespaces match nothing in the current report.
-  const tenantEmpty = scopedTenants.length > 0 && data !== null && usages.length === 0
+  // The selected sandbox's namespaces match nothing in the current report.
+  const sandboxEmpty = scopedSandboxes.length > 0 && data !== null && usages.length === 0
 
   return (
     <div className="min-h-full flex flex-col items-center">
@@ -136,8 +136,8 @@ export default function ExecutiveSummaryPage() {
         {/* Header */}
         <PageHeader title="Executive Summary" subtitle="Monitor container drift across your cluster" />
 
-        {tenantEmpty ? (
-          <TenantEmptyState tenants={scopedTenants} entity="tracked containers" />
+        {sandboxEmpty ? (
+          <SandboxEmptyState sandboxes={scopedSandboxes} entity="tracked containers" />
         ) : (
           <>
             <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
@@ -152,7 +152,7 @@ export default function ExecutiveSummaryPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Rottenness Score
                   </p>
-                  {scopedTenants.length > 0 && <ClusterWideTag />}
+                  {scopedSandboxes.length > 0 && <ClusterWideTag />}
                 </div>
                 {unscorable ? (
                   <>
@@ -234,7 +234,7 @@ export default function ExecutiveSummaryPage() {
                 matchHeight={issuesHeight}
                 readiness={readiness}
               />
-              <ScraperIssues issues={data?.issues ?? []} clusterWide={scopedTenants.length > 0} onCollapsedHeight={setIssuesHeight} />
+              <ScraperIssues issues={data?.issues ?? []} clusterWide={scopedSandboxes.length > 0} onCollapsedHeight={setIssuesHeight} />
             </div>
           </>
         )}

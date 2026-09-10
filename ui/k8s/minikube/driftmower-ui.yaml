@@ -2,7 +2,7 @@
 # Differences from the codemowers/production manifests:
 #   - image -> locally-built localhost/driftmower-ui:local, imagePullPolicy: Never
 #   - no imagePullSecrets (image built into the node)
-#   - APP_BASE_URL -> https://driftmower.veebkolm.eu
+#   - APP_BASE_URL -> https://driftmower-dev.veebkolm.eu
 #   - ingressClassName traefik -> cloudflare-tunnel, no TLS block (Cloudflare
 #     terminates TLS at the edge; no cert-manager in this cluster)
 #   - OIDC_* still sourced from the passmower-generated secret
@@ -38,7 +38,7 @@ spec:
                 secretKeyRef:
                   name: llama-api-token
                   key: token
-            # Tenancy control plane behind the Tenants page; unset disables it.
+            # Tenancy control plane behind the Sandboxes page; unset disables it.
             - name: PLATFORM_MANAGER_URL
               value: "http://platform-manager-dev.default.svc"
             # Resource indicator requested for platform-manager tokens; must
@@ -46,7 +46,7 @@ spec:
             - name: PLATFORM_MANAGER_AUDIENCE
               value: "https://platform-manager-api"
             - name: APP_BASE_URL
-              value: "https://driftmower.veebkolm.eu"
+              value: "https://driftmower-dev.veebkolm.eu"
             - name: OIDC_AUDIENCE
               value: "https://driftmower-api"
             - name: OIDC_CLIENT_ID
@@ -90,7 +90,7 @@ metadata:
 spec:
   ingressClassName: cloudflare-tunnel
   rules:
-    - host: driftmower.veebkolm.eu
+    - host: driftmower-dev.veebkolm.eu
       http:
         paths:
           - path: /

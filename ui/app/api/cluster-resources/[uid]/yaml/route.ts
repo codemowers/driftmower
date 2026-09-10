@@ -1,5 +1,5 @@
 import { isInCluster } from "@/lib/server/k8s"
-import { guardNamespace } from "@/lib/server/tenant-scope-filter"
+import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { getResourceObject } from "@/lib/cluster-resources/resource-object"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 

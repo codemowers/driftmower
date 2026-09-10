@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useParams } from "next/navigation"
-import { openNetstatdSession, resetNetstatdStable } from "@/lib/cluster/netstatd"
+import { openNetstatdSession, resetNetstatdStable } from "@/lib/features/netstatd"
 import { useWorkloadLivePrewarm } from "./components/use-workload-live-prewarm"
 
 export default function WorkloadLayout({ children }: { children: React.ReactNode }) {

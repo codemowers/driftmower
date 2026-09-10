@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { NETSTATD_STREAM_URL } from "@/lib/cluster/constants"
-import { tenantScopeNamespaces, useTenantContext } from "@/lib/tenancy/tenant-context"
+import { sandboxScopeNamespaces, useSandboxContext } from "@/lib/tenancy/sandbox-context"
 import type {
   AggregateBucket,
   ConnDelta,
@@ -38,7 +38,7 @@ let source: EventSource | null = null
 let refCount = 0
 let currentWorkloadUid: string | null = null
 let currentNamespaceKey: string | null = null
-let tenantUnsub: (() => void) | null = null
+let sandboxUnsub: (() => void) | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectAttempt = 0
 let pruneTimer: ReturnType<typeof setInterval> | null = null
@@ -184,7 +184,7 @@ function openSource() {
   if (currentWorkloadUid === null) return
   closeSource()
 
-  const namespaces = tenantScopeNamespaces(useTenantContext.getState())
+  const namespaces = sandboxScopeNamespaces(useSandboxContext.getState())
   currentNamespaceKey = namespaceKey(namespaces)
 
   const params = new URLSearchParams({ workload: currentWorkloadUid })
@@ -239,9 +239,9 @@ function resetAndReopen() {
   openSource()
 }
 
-function onTenantChange() {
+function onSandboxChange() {
   if (refCount === 0) return
-  const key = namespaceKey(tenantScopeNamespaces(useTenantContext.getState()))
+  const key = namespaceKey(sandboxScopeNamespaces(useSandboxContext.getState()))
   if (key === currentNamespaceKey) return
   resetAndReopen()
 }
@@ -256,9 +256,9 @@ function teardown() {
     clearTimeout(flushTimer)
     flushTimer = null
   }
-  if (tenantUnsub !== null) {
-    tenantUnsub()
-    tenantUnsub = null
+  if (sandboxUnsub !== null) {
+    sandboxUnsub()
+    sandboxUnsub = null
   }
   pending = []
   reconnectAttempt = 0
@@ -271,7 +271,7 @@ export function openNetstatdSession(workloadUid: string): () => void {
   refCount++
   if (refCount === 1) {
     currentWorkloadUid = workloadUid
-    tenantUnsub = useTenantContext.subscribe(onTenantChange)
+    sandboxUnsub = useSandboxContext.subscribe(onSandboxChange)
     pruneTimer = setInterval(prune, PRUNE_INTERVAL_MS)
     resetAndReopen()
   } else if (currentWorkloadUid !== workloadUid) {

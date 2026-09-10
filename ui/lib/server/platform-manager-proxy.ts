@@ -9,21 +9,35 @@ export function platformManagerUrl(): string | null {
   return url ? url.replace(/\/+$/, "") : null
 }
 
-export type TenantScope =
+export type SandboxScope =
   | { state: "ok"; admin: boolean; namespaces: string[] }
   | { state: "not-configured" | "unauthenticated" | "unreachable" }
 
-type TenantsResponse = {
-  admin: boolean
-  tenants: { tenantNamespace: string; appNamespaces: string[] }[]
+// platform-manager's shape. A sandbox is exactly one namespace: the older model
+// of a tenant namespace plus 0..n application namespaces is gone, and the
+// endpoint moved from /api/tenants to /api/sandboxes with it.
+export type SandboxRecord = {
+  sandbox: string
+  name: string
+  namespace: string
+  owners?: string[]
+  creator?: string
+  stackChannel?: string
 }
+
+type SandboxesResponse = {
+  admin: boolean
+  sandboxes: SandboxRecord[]
+}
+
+export const SANDBOXES_PATH = "/api/sandboxes"
 
 const SCOPE_TTL_MS = 15_000
 // Failures are cached too: an absent platform-manager costs one attempt per interval, not per request.
 const SCOPE_FAILURE_TTL_MS = 30_000
-const scopeCache = new Map<string, { scope: TenantScope; expiresAt: number }>()
+const scopeCache = new Map<string, { scope: SandboxScope; expiresAt: number }>()
 
-function rememberScope(key: string, scope: TenantScope, now: number): TenantScope {
+function rememberScope(key: string, scope: SandboxScope, now: number): SandboxScope {
   const ttl = scope.state === "ok" ? SCOPE_TTL_MS : SCOPE_FAILURE_TTL_MS
   scopeCache.set(key, { scope, expiresAt: now + ttl })
   for (const [cached, entry] of scopeCache) {
@@ -33,7 +47,7 @@ function rememberScope(key: string, scope: TenantScope, now: number): TenantScop
 }
 
 // Server-to-server read: callers scope their own response, so they need the values not a body.
-export async function fetchTenantScope(): Promise<TenantScope> {
+export async function fetchSandboxScope(): Promise<SandboxScope> {
   const baseUrl = platformManagerUrl()
 
   if (!baseUrl) {
@@ -61,13 +75,13 @@ export async function fetchTenantScope(): Promise<TenantScope> {
 
   let response: Response
   try {
-    response = await fetch(`${baseUrl}/api/tenants`, {
+    response = await fetch(`${baseUrl}${SANDBOXES_PATH}`, {
       headers: { authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     })
   } catch (e) {
     const cause = e instanceof Error && e.cause ? String(e.cause) : String(e)
-    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> unreachable: ${cause}`)
+    console.error(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> unreachable: ${cause}`)
     return rememberScope(key, { state: "unreachable" }, now)
   }
 
@@ -76,12 +90,12 @@ export async function fetchTenantScope(): Promise<TenantScope> {
   }
 
   if (!response.ok) {
-    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> ${response.status} ${response.statusText}`)
+    console.error(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status} ${response.statusText}`)
     return rememberScope(key, { state: "unreachable" }, now)
   }
 
-  const body = (await response.json()) as TenantsResponse
-  const namespaces = body.tenants.flatMap(t => [t.tenantNamespace, ...t.appNamespaces])
+  const body = (await response.json()) as SandboxesResponse
+  const namespaces = (body.sandboxes ?? []).map(s => s.namespace).filter(Boolean)
 
   return rememberScope(
     key,

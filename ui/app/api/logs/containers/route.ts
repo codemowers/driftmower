@@ -1,5 +1,5 @@
 import { listContainers } from "@/lib/features/logs/pod"
-import { guardNamespace } from "@/lib/server/tenant-scope-filter"
+import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 
 export const dynamic = "force-dynamic"
 

@@ -43,7 +43,7 @@ spec:
                   name: github-token
                   key: token
                   optional: true
-            # Tenancy control plane behind the Tenants page; unset disables it.
+            # Tenancy control plane behind the Sandboxes page; unset disables it.
             - name: PLATFORM_MANAGER_URL
               value: "http://platform-manager.platform-manager.svc"
             # Resource indicator requested for platform-manager tokens; must

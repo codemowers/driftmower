@@ -4,15 +4,15 @@ import { Suspense } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import ReleaseList, { type ReleaseEntry } from "./components/release-list"
-import TenantEmptyState from "../components/tenant-empty-state"
+import SandboxEmptyState from "../components/sandbox-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, SEVERITY_ORDER, driftSummaryPills, isNoData } from "@/lib/cluster/styles/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function HelmReleasesPage() {
   const { data } = useClusterState()
-  const { tenants: scopedTenants, namespaces } = useTenantScope()
+  const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope()
   const scopeSet = namespaces ? new Set(namespaces) : null
 
   const entries: ReleaseEntry[] = data
@@ -61,8 +61,8 @@ export default function HelmReleasesPage() {
           secondary={{ label: "containers", count: totalContainers }}
           pills={driftSummaryPills(statusCounts, noDataCount)}
         />
-        {scopedTenants.length > 0 && entries.length === 0 ? (
-          <TenantEmptyState tenants={scopedTenants} entity="Helm releases" />
+        {scopedSandboxes.length > 0 && entries.length === 0 ? (
+          <SandboxEmptyState sandboxes={scopedSandboxes} entity="Helm releases" />
         ) : (
           <Suspense>
             <ReleaseList entries={entries} />
