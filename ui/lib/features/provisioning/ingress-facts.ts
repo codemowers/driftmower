@@ -63,9 +63,50 @@ export function hostRejectionReason(host: string, rule: IngressHostRule): string
 // may claim.
 export const INGRESS_SUFFIX_KEY = "ingressDomainSuffix"
 
+// Where the suffix came from, because the two sources do not carry the same
+// authority. The guard's own parameter is what admission enforces; anything
+// else is an inference that could disagree with it.
+export type SuffixSource = "guard-params" | "app-base-url"
+
+export type DomainSuffix = { value: string; source: SuffixSource }
+
 export function suffixFromParams(data: Record<string, string> | undefined): string | null {
   const value = data?.[INGRESS_SUFFIX_KEY]?.trim()
   return value ? value.replace(/^\.+/, "") : null
+}
+
+// The app is itself deployed at <name>.<suffix>, so its own public URL carries
+// the answer — no cluster read and no RBAC, since APP_BASE_URL is required
+// config. Verified to agree with the guard's parameter on every cluster we can
+// check, but it is still a derivation: a deployment that does not follow the
+// one-label convention would produce the wrong suffix, which is why callers
+// are told which source they got.
+export function suffixFromAppBaseUrl(appBaseUrl: string | undefined): string | null {
+  if (!appBaseUrl) return null
+
+  let hostname: string
+  try {
+    hostname = new URL(appBaseUrl).hostname
+  } catch {
+    return null
+  }
+
+  const labels = hostname.split(".").filter(Boolean)
+  // Dropping the app's own label has to leave a real domain behind. An apex
+  // deployment (example.com) or a bare host has no suffix to offer.
+  if (labels.length < 3) return null
+  return labels.slice(1).join(".")
+}
+
+// The guard's parameter wins wherever it is readable: it is the value the
+// admission policy actually compares against.
+export function resolveDomainSuffix(
+  fromParams: string | null,
+  appBaseUrl: string | undefined,
+): DomainSuffix | null {
+  if (fromParams) return { value: fromParams, source: "guard-params" }
+  const derived = suffixFromAppBaseUrl(appBaseUrl)
+  return derived ? { value: derived, source: "app-base-url" } : null
 }
 
 export type IngressClassFact = { name: string; controller: string; isDefault: boolean }

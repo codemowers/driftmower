@@ -22,9 +22,18 @@ export default function HostCard({ ingress }: { ingress: IngressFact }) {
     <div className="flex flex-col gap-4">
       {ingress.hostRules.map(rule => (
         <div key={rule.namespace} className="rounded-lg border border-border bg-card px-5 py-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Globe className="size-4 shrink-0 text-brand-icon" />
             <span className="font-mono text-xs text-muted-foreground">{rule.namespace}</span>
+            {/* The hostnames anchor on the sandbox id, which is not the
+                namespace name — sandbox abc123-demo lives in namespace
+                sb-abc123-demo. Without saying so, the prefix below looks like
+                a typo. */}
+            {rule.sandboxId && rule.sandboxId !== rule.namespace && (
+              <span className="text-xs text-muted-foreground">
+                sandbox <code className="font-mono text-brand-label">{rule.sandboxId}</code>
+              </span>
+            )}
           </div>
 
           {rule.exactHost ? (
@@ -35,6 +44,14 @@ export default function HostCard({ ingress }: { ingress: IngressFact }) {
           ) : null}
 
           <p className="mt-3 text-sm text-muted-foreground">{rule.note}</p>
+
+          {/* The guard's own words. A user who gets the hostname wrong would
+              otherwise meet this message for the first time in their terminal. */}
+          {rule.enforcedMessage && (
+            <p className="mt-2 text-sm text-status-minor-label">
+              Rejected hosts fail with: {rule.enforcedMessage}
+            </p>
+          )}
         </div>
       ))}
 

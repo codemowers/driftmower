@@ -23,6 +23,7 @@ const EMPTY_TOPOLOGY = { zones: [], schedulableNodes: 0, controlPlaneLabel: null
 
 const EMPTY_INGRESS: IngressFact = {
   domainSuffix: null,
+  domainSuffixSource: null,
   classes: [],
   clusterIssuers: [],
   sharedWildcard: false,
@@ -123,7 +124,8 @@ export async function gatherClusterFacts(): Promise<CapabilityResponse> {
         }))
       : [],
     ingress: {
-      domainSuffix: suffix.known ? suffix.value : null,
+      domainSuffix: suffix.known ? (suffix.value?.value ?? null) : null,
+      domainSuffixSource: suffix.known ? (suffix.value?.source ?? null) : null,
       classes: ingress.known ? ingress.value.classes : [],
       clusterIssuers: ingress.known ? ingress.value.clusterIssuers : [],
       sharedWildcard: ingress.known ? ingress.value.sharedWildcard : false,
