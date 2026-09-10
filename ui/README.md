@@ -35,6 +35,12 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+## Design docs
+
+- [`provisioning.md`](provisioning.md) — self-service provisioning: the
+  operators-and-constraints capability layer, the MCP server and the UI views, plus the
+  phase sequencing. Phases 1–2 are implemented.
+
 ## Environment variables
 
 Everything is read at runtime by the Next.js server (no `NEXT_PUBLIC_` build-time values), so one image
