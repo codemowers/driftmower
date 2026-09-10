@@ -8,10 +8,9 @@ import WorkloadList from "./components/workload-list"
 import FocusSelect from "./components/focus-select"
 import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./focus"
 import type { FocusKey, WorkloadEntry } from "./focus/types"
-import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "./utils/pod-summary"
-import { liveWorkloadEntries } from "./utils/live-entries"
+import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "@/lib/utils/pods-by-root"
 import { useWorkloadHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
-import { reportWorkloadRoots } from "./utils/report-roots"
+import { reportWorkloadRoots } from "@/lib/utils/report-roots"
 import SandboxEmptyState from "../components/sandbox-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
@@ -31,8 +30,6 @@ export default function TopmostOwnersPage() {
 function TopmostOwnersContent() {
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
-  const isLoading = useClusterState(s => s.isLoading)
-  const isFetchingReport = useClusterState(s => s.isFetchingReport)
   const searchParams = useSearchParams()
   const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope()
 
@@ -84,83 +81,62 @@ function TopmostOwnersContent() {
     }
   }
 
-  const resolvedLiveUids = new Set<string>()
-
   const reportEntries: WorkloadEntry[] = reportWorkloadRoots(data)
-    .map(({ groupKey, kind, namespace, name, uid, usages }): WorkloadEntry => {
-          const ri = usages[0]?.releaseInfo
-          const releaseUid = ri ? releaseUidByGroupKey.get(ri.groupKey) : undefined
-          const liveRoot = usages[0]?.workloadRootInfo
-            ? findWorkloadRoot(clusterResources, usages[0].workloadRootInfo)
-            : undefined
-          if (liveRoot) resolvedLiveUids.add(liveRoot.uid)
-          const argoApp = liveRoot?.argoApp
-          const manager: WorkloadEntry["manager"] =
-            ri?.managementKind === "helm" && releaseUid
-              ? { kind: "helm", name: ri.name, uid: releaseUid }
-              : argoApp
-                ? { kind: "argo", name: argoApp.name, url: argoApp.url }
-                : { kind: "standalone" }
+    .map((root): WorkloadEntry => {
+      const { groupKey, kind, namespace, name, uid, usages } = root
+      const ri = usages[0]?.releaseInfo
+      const releaseUid = ri ? releaseUidByGroupKey.get(ri.groupKey) : undefined
+      const liveRoot = findWorkloadRoot(clusterResources, root)
+      const argoApp = liveRoot?.argoApp
+      const manager: WorkloadEntry["manager"] =
+        ri?.managementKind === "helm" && releaseUid
+          ? { kind: "helm", name: ri.name, uid: releaseUid }
+          : argoApp
+            ? { kind: "argo", name: argoApp.name, url: argoApp.url }
+            : { kind: "standalone" }
 
-          const repoStatus = new Map<string, StatusType>()
-          for (const u of usages) {
-            const repo = `${u.imageInfo.registry}/${u.imageInfo.repository}`
-            const prev = repoStatus.get(repo)
-            const cur = u.versionStatus.statusType
-            if (prev === undefined || SEVERITY_ORDER[cur] > SEVERITY_ORDER[prev]) {
-              repoStatus.set(repo, cur)
-            }
-          }
-          const distinctRepoCount = repoStatus.size
-          const staleRepoCount = Array.from(repoStatus.values()).filter(s => STALE_STATUSES.includes(s)).length
+      const repoStatus = new Map<string, StatusType>()
+      for (const u of usages) {
+        const repo = `${u.imageInfo.registry}/${u.imageInfo.repository}`
+        const prev = repoStatus.get(repo)
+        const cur = u.versionStatus.statusType
+        if (prev === undefined || SEVERITY_ORDER[cur] > SEVERITY_ORDER[prev]) {
+          repoStatus.set(repo, cur)
+        }
+      }
+      const distinctRepoCount = repoStatus.size
+      const staleRepoCount = Array.from(repoStatus.values()).filter(s => STALE_STATUSES.includes(s)).length
 
-          const worstStatus = usages.reduce<StatusType>((worst, u) => {
-            const s = u.versionStatus.statusType
-            return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
-          }, "no_data")
+      const worstStatus = usages.reduce<StatusType>((worst, u) => {
+        const s = u.versionStatus.statusType
+        return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
+      }, "no_data")
 
-          const issueCount = (data?.issues ?? []).filter(i =>
-            usages.some(u => u.image.includes(i.image))
-          ).length
+      const issueCount = (data?.issues ?? []).filter(i =>
+        usages.some(u => u.image.includes(i.image))
+      ).length
 
-          const pods = liveRoot
-            ? podSummaries.get(liveRoot.uid) ?? EMPTY_POD_SUMMARY
-            : undefined
-
-          return {
-            groupKey,
-            uid,
-            kind,
-            name,
-            namespace,
-            manager,
-            worstStatus,
-            issueCount,
-            inReport: true,
-            repos: [...repoStatus.keys()],
-            drift: {
-              containerCount: usages.length,
-              staleRepoCount,
-              distinctRepoCount,
-            },
-            pods,
-          }
-        })
-
-  const reportSettled = data !== null || (!isLoading && !isFetchingReport)
-  const excludeUids = new Set(resolvedLiveUids)
-  const excludeGroupKeys = new Set<string>()
-  for (const entry of reportEntries) {
-    excludeUids.add(entry.uid)
-    excludeGroupKeys.add(entry.groupKey)
-  }
-  const liveEntries = reportSettled
-    ? liveWorkloadEntries(clusterResources, podSummaries, excludeUids, excludeGroupKeys)
-    : []
+      return {
+        groupKey,
+        uid,
+        kind,
+        name,
+        namespace,
+        manager,
+        worstStatus,
+        issueCount,
+        repos: [...repoStatus.keys()],
+        drift: {
+          containerCount: usages.length,
+          staleRepoCount,
+          distinctRepoCount,
+        },
+        pods: liveRoot ? podSummaries.get(liveRoot.uid) ?? EMPTY_POD_SUMMARY : undefined,
+      }
+    })
 
   const scopeSet = namespaces ? new Set(namespaces) : null
-  const scoped = [...reportEntries, ...liveEntries]
-    .filter(w => !scopeSet || scopeSet.has(w.namespace))
+  const scoped = reportEntries.filter(w => !scopeSet || scopeSet.has(w.namespace))
   const workloads = focus.key === "history"
     ? scoped.map(w => ({ ...w, history: history[w.groupKey] }))
     : scoped

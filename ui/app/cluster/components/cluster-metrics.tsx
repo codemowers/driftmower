@@ -1,10 +1,13 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes } from "@/lib/utils/format-bytes"
 import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
-import { classifyPod } from "@/lib/cluster/styles/pod-status-style"
+import type { Report } from "@/lib/cluster/reports"
+import { findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { summarizePodsByRoot } from "@/lib/utils/pods-by-root"
+import { reportWorkloadRoots } from "@/lib/utils/report-roots"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 
 type Memory = NonNullable<ClusterMetrics["memory"]>
@@ -78,15 +81,20 @@ function MemoryBar({ memory }: { memory: Memory }) {
 
 type PodStats = { total: number; healthy: number; failed: number; unknown: number; pending: number }
 
-function countPods(resources: ClusterResource[] | null): PodStats | null {
-  if (!resources) return null
+const COUNTED_SEVERITIES = ["healthy", "failed", "unknown", "pending"] as const
+
+function countReportedPods(data: Report, resources: ClusterResource[]): PodStats {
+  const summaries = summarizePodsByRoot(resources)
   const stats: PodStats = { total: 0, healthy: 0, failed: 0, unknown: 0, pending: 0 }
-  for (const resource of resources) {
-    if (resource.kind !== "Pod") continue
-    stats.total++
-    const severity = classifyPod(resource)
-    if (severity !== "succeeded") stats[severity]++
+
+  for (const root of reportWorkloadRoots(data)) {
+    const liveRoot = findWorkloadRoot(resources, root)
+    const summary = liveRoot ? summaries.get(liveRoot.uid) : undefined
+    if (!summary) continue
+    stats.total += summary.total
+    for (const severity of COUNTED_SEVERITIES) stats[severity] += summary.counts[severity]
   }
+
   return stats
 }
 
@@ -103,8 +111,12 @@ function attentionLabel(stats: PodStats): ReactNode {
 export default function ClusterMetrics({ matchHeight }: { matchHeight?: number | null }) {
   const metrics = useClusterState(s => s.clusterMetrics)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const data = useClusterState(s => s.data)
 
-  const podStats = countPods(clusterResources)
+  const podStats = useMemo(
+    () => (data && clusterResources ? countReportedPods(data, clusterResources) : null),
+    [data, clusterResources],
+  )
   const metricsEmpty = !metrics || (metrics.storage === null && metrics.memory === null && metrics.cpuLoad === null)
   if (metricsEmpty && !podStats) return null
 

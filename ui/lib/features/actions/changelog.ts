@@ -8,17 +8,20 @@ const FAILURE_TTL_MS = 5 * 60 * 1000
 const FETCH_TIMEOUT_MS = 8000
 const GITHUB_FETCH_TIMEOUT_MS = 20000
 const GITHUB_PAGE_SIZE = 50
-const ENTRY_CAP = 30
+const ENTRY_CAP = 50
 const ENTRY_MAX_CHARS = 300
 const GITHUB_MAX_PAGES = 6
 const ARTIFACT_HUB_MAX_VERSIONS = 12
 const ARTIFACT_HUB_CONCURRENCY = 3
+const LABEL_MAX_WORDS = 4
+const LABEL_MAX_CHARS = 40
+
+const LIST_ITEM = /^(\s*)(?:[-*+•]|\d+[.)])\s+(.*)$/
 
 export type Changelog = {
   entries: ChangeEntry[]
   pretagBreaking: number[]
   pretagSecurity: number[]
-  prekinded: boolean
   source: Coverage["changelog"]
   versionsCovered: number
   versionsTotal: number
@@ -26,11 +29,13 @@ export type Changelog = {
   chartAppVersions: ChartAppVersions | null
 }
 
-type RawEntry = ChangeEntry & { tag: "breaking" | "security" | null; order: number }
+type Section = "breaking" | "security" | null
+
+type RawEntry = ChangeEntry & { tag: Section; order: number }
 
 const cache = new Map<string, { value: Changelog | null; at: number }>()
 
-const EMPTY: Changelog = { entries: [], pretagBreaking: [], pretagSecurity: [], prekinded: false, source: "none", versionsCovered: 0, versionsTotal: 0, sources: [], chartAppVersions: null }
+const EMPTY: Changelog = { entries: [], pretagBreaking: [], pretagSecurity: [], source: "none", versionsCovered: 0, versionsTotal: 0, sources: [], chartAppVersions: null }
 
 const GITHUB_API = "https://api.github.com/"
 const RATE_LIMIT_FALLBACK_MS = 60 * 1000
@@ -135,31 +140,62 @@ export function cleanEntryText(raw: string): string | null {
   return truncateAtBoundary(text, ENTRY_MAX_CHARS)
 }
 
-function pretag(text: string, inBreakingSection: boolean): RawEntry["tag"] {
-  if (/CVE-\d{4}-\d+|security|vulnerab|GHSA-/i.test(text)) return "security"
-  if (inBreakingSection || /\bbreaking\b|\bremoved?\b.*\b(flag|option|setting|support|api|field)\b|\bno longer supported\b/i.test(text)) return "breaking"
+function sectionFromLabel(label: string): Section {
+  if (/^(security|vulnerabilit)|security (fixes|updates|patches|advisories)/i.test(label.trim())) return "security"
+  if (/breaking|upgrade notes|migration/i.test(label)) return "breaking"
+  return null
+}
+
+function isLabelLike(text: string): boolean {
+  const bare = text.replace(/[*_`:]/g, "").trim()
+  if (bare.length === 0 || bare.length > LABEL_MAX_CHARS || /[.!?]$/.test(bare)) return false
+  if (bare.split(/\s+/).length > LABEL_MAX_WORDS) return false
+  return bare === bare.toUpperCase() || text.trim().endsWith(":") || /^\*\*[^*]+\*\*$/.test(text.trim())
+}
+
+function pretag(text: string, section: Section): RawEntry["tag"] {
+  if (section === "security" || /CVE-\d{4}-\d+|security|vulnerab|GHSA-/i.test(text)) return "security"
+  if (section === "breaking" || /\bbreaking\b|\bremoved?\b.*\b(flag|option|setting|support|api|field)\b|\bno longer supported\b/i.test(text)) return "breaking"
   return null
 }
 
 function splitBody(body: string, version: string, url: string, startOrder: number): RawEntry[] {
   const entries: RawEntry[] = []
-  let inBreaking = false
+  const lines = body.split(/\r?\n/)
+  const items = lines.map(line => LIST_ITEM.exec(line))
+  const childIndent = lines.map(() => -1)
+  for (let i = lines.length - 1, next = -1; i >= 0; i--) {
+    childIndent[i] = next
+    if (items[i]) next = items[i]![1].length
+  }
+  const stack: { indent: number; section: Section }[] = []
+  let headingSection: Section = null
   let order = startOrder
-  for (const line of body.split(/\r?\n/)) {
-    const heading = /^\s*#{1,6}\s*(.+)$/.exec(line)
-    if (heading) {
-      inBreaking = /breaking|upgrade notes|migration/i.test(heading[1])
+  for (let i = 0; i < lines.length; i++) {
+    const item = items[i]
+    if (!item) {
+      const heading = /^\s*#{1,6}\s*(.+)$/.exec(lines[i])
+      if (heading) {
+        headingSection = sectionFromLabel(heading[1])
+        stack.length = 0
+      }
       continue
     }
-    if (!/^\s*(?:[-*+•]|\d+[.)])\s+/.test(line)) continue
-    const text = cleanEntryText(line)
+    const indent = item[1].length
+    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop()
+    const section = stack[stack.length - 1]?.section ?? headingSection
+    if (childIndent[i] > indent && isLabelLike(item[2])) {
+      stack.push({ indent, section: sectionFromLabel(item[2]) ?? section })
+      continue
+    }
+    const text = cleanEntryText(item[2])
     if (!text) continue
-    entries.push({ text, version, url, tag: pretag(text, inBreaking), order: order++ })
+    entries.push({ text, version, url, tag: pretag(text, section), order: order++ })
   }
   return entries
 }
 
-function finalize(raw: RawEntry[], source: Coverage["changelog"], versionsTotal: number, sources: Changelog["sources"], prekinded: boolean): Changelog {
+function finalize(raw: RawEntry[], source: Coverage["changelog"], versionsTotal: number, sources: Changelog["sources"]): Changelog {
   const seen = new Set<string>()
   const deduped = raw.filter(e => {
     const k = e.text.toLowerCase().replace(/\s*\(enterprise\)$/, "")
@@ -167,7 +203,10 @@ function finalize(raw: RawEntry[], source: Coverage["changelog"], versionsTotal:
     seen.add(k)
     return true
   })
-  const tagged = deduped.filter(e => e.tag !== null).slice(0, ENTRY_CAP)
+  const tagged = deduped
+    .filter(e => e.tag !== null)
+    .sort((a, b) => Number(b.tag === "breaking") - Number(a.tag === "breaking"))
+    .slice(0, ENTRY_CAP)
   const byVersion = new Map<string, RawEntry[]>()
   for (const e of deduped) {
     if (e.tag !== null) continue
@@ -192,7 +231,6 @@ function finalize(raw: RawEntry[], source: Coverage["changelog"], versionsTotal:
     entries: kept.map(({ text, version, url }) => ({ text, version, url })),
     pretagBreaking: kept.flatMap((e, i) => (e.tag === "breaking" ? [i] : [])),
     pretagSecurity: kept.flatMap((e, i) => (e.tag === "security" ? [i] : [])),
-    prekinded,
     source: kept.length > 0 ? source : "none",
     versionsCovered: new Set(kept.map(e => e.version)).size,
     versionsTotal,
@@ -299,7 +337,7 @@ async function githubReleases(repo: string, facts: ActionFacts): Promise<Changel
     order += entries.length
     raw.push(...entries)
   }
-  return finalize(raw, "github", inSpan.length, [{ label: "GitHub releases", url: `https://github.com/${repo}/releases` }], false)
+  return finalize(raw, "github", inSpan.length, [{ label: "GitHub releases", url: `https://github.com/${repo}/releases` }])
 }
 
 async function githubChangelog(facts: ActionFacts): Promise<Changelog | null> {
@@ -357,7 +395,7 @@ async function artifactHubChangelog(facts: ActionFacts): Promise<Changelog | nul
       const text = cleanEntryText(change.description)
       if (!text) continue
       const kind = change.kind?.toLowerCase()
-      const tag: RawEntry["tag"] = kind === "security" ? "security" : kind === "removed" || kind === "deprecated" ? "breaking" : pretag(text, false)
+      const tag: RawEntry["tag"] = kind === "security" ? "security" : kind === "removed" || kind === "deprecated" ? "breaking" : pretag(text, null)
       raw.push({ text, version, url, tag, order: order++ })
     }
   }
@@ -368,8 +406,7 @@ async function artifactHubChangelog(facts: ActionFacts): Promise<Changelog | nul
     const fromGithub = repo ? await githubReleases(repo, facts) : null
     if (fromGithub) return { ...fromGithub, sources: [...fromGithub.sources, hubSource], chartAppVersions }
   }
-  const prekinded = raw.length > 0 && [...perVersion.values()].every(v => (v.changes ?? []).every(c => !!c.kind))
-  return { ...finalize(raw, "artifacthub", versions.length, [hubSource], prekinded), chartAppVersions }
+  return { ...finalize(raw, "artifacthub", versions.length, [hubSource]), chartAppVersions }
 }
 
 function hubAppVersion(detail: HubPackage, chartVersion: string): string | null {

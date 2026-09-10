@@ -16,21 +16,15 @@ function DriftCells({ entry }: { entry: WorkloadEntry }) {
   return (
     <>
       <div>
-        {drift ? (
-          <span className="text-sm tabular-nums text-foreground">{drift.containerCount} {drift.containerCount === 1 ? "container" : "containers"}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
-        )}
+        <span className="text-sm tabular-nums text-foreground">
+          {drift.containerCount} {drift.containerCount === 1 ? "container" : "containers"}
+        </span>
       </div>
 
       <div>
-        {drift ? (
-          <span className={cn("text-sm tabular-nums font-medium", staleColor(drift.staleRepoCount, drift.distinctRepoCount))}>
-            {drift.staleRepoCount}/{drift.distinctRepoCount}
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
-        )}
+        <span className={cn("text-sm tabular-nums font-medium", staleColor(drift.staleRepoCount, drift.distinctRepoCount))}>
+          {drift.staleRepoCount}/{drift.distinctRepoCount}
+        </span>
       </div>
 
       <div className="flex items-center">
@@ -55,7 +49,7 @@ export const DRIFT_FOCUS: FocusDefinition = {
   ],
   secondary: entries => ({
     label: "containers",
-    count: entries.reduce((sum, e) => sum + (e.drift?.containerCount ?? 0), 0),
+    count: entries.reduce((sum, e) => sum + e.drift.containerCount, 0),
   }),
   pills: entries => driftSummaryPills(
     Object.fromEntries(

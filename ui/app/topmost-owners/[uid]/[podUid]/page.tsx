@@ -133,6 +133,7 @@ export default function PodDetailPage() {
             <NetworkCard
               href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/network-topology`)}
               podIPs={pod.ips ?? []}
+              podUid={pod.uid}
             />
           </div>
         </div>

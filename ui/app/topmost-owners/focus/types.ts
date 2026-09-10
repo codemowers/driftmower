@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { SummaryPill } from "@/lib/cluster/styles/status-style"
-import type { PodSummary } from "../utils/pod-summary"
+import type { PodSummary } from "@/lib/utils/pods-by-root"
 import type { SeriesStats, Span } from "@/lib/features/drift-history/types"
 
 export type WorkloadEntry = {
@@ -16,9 +16,8 @@ export type WorkloadEntry = {
     | { kind: "standalone" }
   worstStatus: StatusType
   issueCount: number
-  inReport: boolean
   repos: string[]
-  drift?: {
+  drift: {
     containerCount: number
     staleRepoCount: number
     distinctRepoCount: number

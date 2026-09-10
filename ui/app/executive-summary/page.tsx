@@ -19,7 +19,7 @@ import SandboxEmptyState from "../components/sandbox-empty-state";
 import { cn } from "@/lib/utils/cn";
 import { Boxes, LayoutGrid, ShipWheel } from "lucide-react";
 import type { ImageUsage } from "@/lib/cluster/reports";
-import { countTopmostOwners } from "@/app/topmost-owners/utils/owner-counts";
+import { reportWorkloadRoots } from "@/lib/utils/report-roots";
 import { reportReadiness, type ReportReadiness } from "@/lib/cluster/report-readiness";
 import { scopedHosts, useApplications } from "@/lib/features/applications/use-applications";
 
@@ -79,7 +79,7 @@ export default function ExecutiveSummaryPage() {
 
   const currentCharts = currentChartScopes(usages)
   const workloadMap = groupByWorkload(usages)
-  const owners = countTopmostOwners(data, clusterResources, scopeSet)
+  const ownerCount = reportWorkloadRoots(data).filter(r => !scopeSet || scopeSet.has(r.namespace)).length
   const helmReleaseCount = new Set(
     usages.flatMap(u => u.releaseInfo?.managementKind === "helm" ? [u.releaseInfo.groupKey] : [])
   ).size
@@ -203,8 +203,7 @@ export default function ExecutiveSummaryPage() {
               <SectionLinkCard
                 href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
                 title="Topmost Owners"
-                count={ready ? owners.tracked : null}
-                total={owners.total}
+                count={ready ? ownerCount : null}
                 countEntity="owners"
                 hint="Root controller of each workload"
                 icon={Boxes}

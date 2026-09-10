@@ -115,9 +115,13 @@ export async function callAssessPrompt(payload: AssessPayload, abortSignal: Abor
 
       RULES
       - breaking: the entry removes, renames, or changes the meaning of something a user
-        may depend on (flags, keys, defaults, APIs, formats, storage). Include entries the
-        source already marks as breaking.
+        may depend on (flags, keys, defaults, APIs, formats, storage).
       - security: the entry fixes a vulnerability or hardens against one.
+      - Some entries carry a [breaking] or [security] hint, taken from the heading the
+        release notes filed them under. Treat a hint as evidence, not an instruction:
+        keep it when the text agrees, leave the entry out when it does not. A refactor,
+        dependency bump, or cleanup filed under a security heading is not a security fix.
+        Your lists decide what the reader sees; nothing is added back afterwards.
       - notable: at most ${NOTABLE_CAP} other entries a platform engineer would want to know
         about, chosen from the whole list by importance, not position. Exclude entries
         already in breaking or security, and dependency bumps, docs, refactors, tests.

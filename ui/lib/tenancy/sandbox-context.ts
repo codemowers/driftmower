@@ -80,10 +80,6 @@ export function hydrateSandboxContext(): void {
     )
 }
 
-export function defaultSandboxSelection(state: SandboxContextState): string[] {
-  return !state.admin && state.sandboxes.length > 0 ? [state.sandboxes[0].sandbox] : []
-}
-
 export const SANDBOX_PARAM = "sandbox"
 // Links bookmarked before the rename carry ?tenant=; reading it keeps them
 // scoped instead of silently widening to the whole cluster.
@@ -98,11 +94,9 @@ export function syncSandboxParam(sandboxes: string[]): void {
   const value = sandboxes.join(",")
   const url = new URL(window.location.href)
   // Drop the legacy key on any write, so a link shared from here is canonical.
+  const hadLegacy = url.searchParams.has(LEGACY_SANDBOX_PARAM)
   url.searchParams.delete(LEGACY_SANDBOX_PARAM)
-  if ((url.searchParams.get(SANDBOX_PARAM) ?? "") === value) {
-    window.history.replaceState(null, "", url)
-    return
-  }
+  if (!hadLegacy && (url.searchParams.get(SANDBOX_PARAM) ?? "") === value) return
   if (value) url.searchParams.set(SANDBOX_PARAM, value)
   else url.searchParams.delete(SANDBOX_PARAM)
   window.history.replaceState(null, "", url)
@@ -128,27 +122,52 @@ export type SandboxScope = {
   namespaces: string[] | null
 }
 
+export const ALL_SANDBOXES_LABEL = "All sandboxes"
+
+function namespacesOf(sandboxes: SandboxInfo[]): string[] {
+  return [...new Set(sandboxes.map(s => s.namespace))]
+}
+
+// Pure so server code can derive the same scope from a state snapshot.
+export function sandboxScope(state: SandboxContextState): SandboxScope {
+  const { selectedSandboxes, sandboxes, available, admin } = state
+
+  // No selection widens to the whole cluster only for admins, and only once they are known.
+  if (selectedSandboxes.length === 0) {
+    if (!available || admin) return { sandboxes: [], label: null, namespaces: null }
+    return {
+      sandboxes: sandboxes.map(s => s.sandbox),
+      label: ALL_SANDBOXES_LABEL,
+      namespaces: namespacesOf(sandboxes),
+    }
+  }
+
+  // A stale deep link naming an unknown sandbox must scope to nothing, not widen back to the cluster.
+  const selected = selectedSandboxes.flatMap(id => {
+    const sandbox = sandboxes.find(s => s.sandbox === id)
+    return sandbox ? [sandbox] : []
+  })
+
+  return {
+    sandboxes: selectedSandboxes,
+    label:
+      selectedSandboxes.length === 1 ? selectedSandboxes[0] : `${selectedSandboxes.length} sandboxes`,
+    namespaces: namespacesOf(selected),
+  }
+}
+
+export function sandboxScopeNamespaces(state: SandboxContextState): string[] | null {
+  return sandboxScope(state).namespaces
+}
+
 export function useSandboxScope(): SandboxScope {
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const sandboxes = useSandboxContext(s => s.sandboxes)
+  const available = useSandboxContext(s => s.available)
+  const admin = useSandboxContext(s => s.admin)
 
-  return useMemo(() => {
-    if (selectedSandboxes.length === 0) return { sandboxes: [], label: null, namespaces: null }
-
-    // A stale deep link naming an unknown sandbox must scope to nothing, not widen
-    // back to the cluster.
-    const namespaces = selectedSandboxes.flatMap(id => {
-      const sandbox = sandboxes.find(s => s.sandbox === id)
-      return sandbox ? [sandbox.namespace] : []
-    })
-
-    return {
-      sandboxes: selectedSandboxes,
-      label:
-        selectedSandboxes.length === 1
-          ? selectedSandboxes[0]
-          : `${selectedSandboxes.length} sandboxes`,
-      namespaces: [...new Set(namespaces)],
-    }
-  }, [selectedSandboxes, sandboxes])
+  return useMemo(
+    () => sandboxScope({ selectedSandboxes, sandboxes, available, admin } as SandboxContextState),
+    [selectedSandboxes, sandboxes, available, admin],
+  )
 }

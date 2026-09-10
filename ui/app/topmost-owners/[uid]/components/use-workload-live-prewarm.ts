@@ -42,7 +42,7 @@ export function useWorkloadLivePrewarm(workloadUid: string, enabled = true): voi
       if (!podRes) continue
       const facts = staticFacts(usages, vulnReports)
       const staticRisk = { riskDriver: facts.riskDriver, worstSeverity: facts.worstSeverity }
-      ensureLive(podRes.uid, podLiveFacts(podRes, net, clusterResources, staticRisk))
+      ensureLive(podRes.uid, podLiveFacts(podRes, net, staticRisk))
     }
   }, [enabled, stable, data, clusterResources, vulnReports, workloadUid])
 }

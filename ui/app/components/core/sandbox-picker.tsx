@@ -5,7 +5,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FilterToggle } from "@/app/components/filter-bar"
 import { cn } from "@/lib/utils/cn"
-import { selectSandboxes, toggleSandbox, useSandboxContext } from "@/lib/tenancy/sandbox-context"
+import {
+  ALL_SANDBOXES_LABEL,
+  selectSandboxes,
+  toggleSandbox,
+  useSandboxContext,
+  useSandboxScope,
+} from "@/lib/tenancy/sandbox-context"
 
 export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
   const hydrated = useSandboxContext(s => s.hydrated)
@@ -13,29 +19,23 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
   const admin = useSandboxContext(s => s.admin)
   const sandboxes = useSandboxContext(s => s.sandboxes)
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
+  const { namespaces } = useSandboxScope()
 
   if (!hydrated || !available) return null
 
+  const unscopedLabel = admin ? "Whole cluster" : ALL_SANDBOXES_LABEL
   const label =
     selectedSandboxes.length === 0
-      ? "Whole cluster"
+      ? unscopedLabel
       : selectedSandboxes.length === 1
         ? selectedSandboxes[0]
         : `${selectedSandboxes.length} sandboxes`
 
-  const showWholeCluster = admin || sandboxes.length === 0
+  const showUnscopedRow = admin || sandboxes.length > 1
   // A ?sandbox= deep link can name sandboxes the user cannot see; still list
   // them so the current selection is visible and re-selectable.
   const unknownSelection = selectedSandboxes.filter(id => !sandboxes.some(s => s.sandbox === id))
-  const isSingleSandboxUser =
-    !showWholeCluster && sandboxes.length === 1 && unknownSelection.length === 0
-  // A sandbox is one namespace, so the scope is one entry per selection.
-  const namespacesInScope = new Set(
-    selectedSandboxes.flatMap(id => {
-      const sandbox = sandboxes.find(s => s.sandbox === id)
-      return sandbox ? [sandbox.namespace] : []
-    }),
-  )
+  const isSingleSandboxUser = !admin && sandboxes.length === 1 && unknownSelection.length === 0
 
   const trigger = (
     <PopoverTrigger
@@ -102,12 +102,12 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
               )}
             </div>
 
-            {showWholeCluster && (
+            {showUnscopedRow && (
               <>
                 <FilterToggle
                   checked={selectedSandboxes.length === 0}
                   onToggle={() => selectSandboxes([])}
-                  label="Whole cluster"
+                  label={unscopedLabel}
                 />
                 <div className="my-1 h-px bg-gray-200" />
               </>
@@ -133,14 +133,16 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
               ))}
             </div>
 
-            {selectedSandboxes.length > 0 && (
+            {namespaces !== null && (
               <>
                 <div className="my-1 h-px bg-gray-200" />
                 <p className="px-3 pb-1 text-xs text-muted-foreground">
-                  {selectedSandboxes.length === 1
-                    ? "1 sandbox selected"
-                    : `${selectedSandboxes.length} sandboxes selected`}
-                  , {namespacesInScope.size} namespaces in scope
+                  {selectedSandboxes.length === 0
+                    ? `All ${sandboxes.length} sandboxes`
+                    : selectedSandboxes.length === 1
+                      ? "1 sandbox selected"
+                      : `${selectedSandboxes.length} sandboxes selected`}
+                  , {namespaces.length} namespaces in scope
                 </p>
               </>
             )}

@@ -1,4 +1,5 @@
 import { getPodLogs } from "@/lib/features/logs/pod"
+import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { TAIL_LINES } from "@/lib/features/logs/constants"
 import type { LogSource } from "@/lib/features/logs/types"
 
@@ -12,6 +13,9 @@ export async function GET(req: Request) {
   if (!ns || !pod || !uid) {
     return Response.json({ error: "ns, pod, uid required" }, { status: 400 })
   }
+
+  const denied = await guardNamespace(ns)
+  if (denied) return denied
 
   const container = sp.get("container") ?? undefined
   const sinceNs = sp.get("sinceNs")

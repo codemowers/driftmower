@@ -9,8 +9,7 @@ type Props = {
 
 export default function PortsTab({ pod }: Props) {
   const listening = useNetstatd(s => s.listening)
-  const podIPs = new Set(pod.ips ?? [])
-  const rows = filterListening(listening, podIPs)
+  const rows = filterListening(listening, new Set([pod.uid]))
   const declared = [...(pod.declaredPorts ?? [])].sort((a, b) => a.port - b.port)
 
   return (
@@ -54,11 +53,7 @@ export default function PortsTab({ pod }: Props) {
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Listening
         </h3>
-        {podIPs.size === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-            <p className="text-sm text-muted-foreground">Pod has no IP yet.</p>
-          </div>
-        ) : rows.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
             <p className="text-sm text-muted-foreground">
               No listening ports observed.

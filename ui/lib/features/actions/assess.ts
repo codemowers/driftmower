@@ -104,16 +104,12 @@ export function filterConfigKeys(keys: ConfigKey[], entries: ChangeEntry[]): Con
   return scored.slice(0, CONFIG_KEY_CAP).map(x => x.key)
 }
 
-function shouldSkipModel(facts: ActionFacts, entries: ChangeEntry[], configKeys: ConfigKey[], prekinded: boolean): boolean {
-  if (facts.kind === "pin-digest") return true
-  if (entries.length === 0) return true
-  if (facts.drift === "patch" && configKeys.length === 0) return true
-  if (prekinded && configKeys.length === 0) return true
-  return false
+function shouldSkipModel(facts: ActionFacts, entries: ChangeEntry[]): boolean {
+  return facts.kind === "pin-digest" || entries.length === 0
 }
 
-function union(ordered: number[], extras: number[]): number[] {
-  return [...ordered, ...extras.filter(i => !ordered.includes(i)).sort((x, y) => x - y)]
+function answered(model: Classification): boolean {
+  return model.breaking.length > 0 || model.security.length > 0 || model.notable.length > 0
 }
 
 export async function assess(facts: ActionFacts, signal: AbortSignal): Promise<AssessResult> {
@@ -123,16 +119,11 @@ export async function assess(facts: ActionFacts, signal: AbortSignal): Promise<A
   const sentKeys = filterConfigKeys(inputs.configKeys, entries)
 
   let classification: Classification = { breaking: changelog.pretagBreaking, security: changelog.pretagSecurity, notable: [], affects: [] }
-  const modelUsed = !shouldSkipModel(facts, entries, sentKeys, changelog.prekinded)
+  const modelUsed = !shouldSkipModel(facts, entries)
   if (modelUsed) {
     const payload = buildAssessPayload(facts, entries, sentKeys, { breaking: changelog.pretagBreaking, security: changelog.pretagSecurity })
     const model = await callAssessPrompt(payload, signal)
-    classification = {
-      breaking: union(model.breaking, changelog.pretagBreaking),
-      security: union(model.security, changelog.pretagSecurity),
-      notable: model.notable,
-      affects: model.affects,
-    }
+    classification = answered(model) ? model : { ...model, breaking: changelog.pretagBreaking, security: changelog.pretagSecurity }
   }
 
   const tagged = new Set([...classification.breaking, ...classification.security])

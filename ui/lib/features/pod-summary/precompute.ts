@@ -162,14 +162,13 @@ export function liveFacts(
 export function podLiveFacts(
   pod: ClusterResource,
   net: NetstatdState,
-  clusterResources: ClusterResource[] | null,
   staticRisk?: StaticRisk,
 ): LiveFacts {
   const podIPs = new Set(pod.ips ?? [])
   return liveFacts(
     pod,
-    aggregate(net.aggregates, clusterResources, net.hosts, podIPs),
-    groupListening(filterListening(net.listening, podIPs)),
+    aggregate(net.aggregates, podIPs),
+    groupListening(filterListening(net.listening, new Set([pod.uid]))),
     net.hiddenCount,
     staticRisk,
   )

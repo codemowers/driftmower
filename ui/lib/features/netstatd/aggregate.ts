@@ -1,12 +1,11 @@
-import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import type { AggregateBucket, HostInfo, ListeningPort } from "./types"
-import { isPrivateOrSpecial } from "./rdns"
+import type { AggregateBucket, ListeningPort, PeerRef } from "./types"
 
 export type PeerKind = "workload" | "unknown" | "external"
 
 export type AggRow = {
   key: string
   label: string
+  peer: PeerRef
   port: number | string
   protocol: string
   count: number
@@ -21,10 +20,24 @@ export type Aggregated = {
   inbound: AggRow[]
 }
 
+export function peerLabel(peer: PeerRef, peerIP: string): string {
+  if (peer.class === "workload") {
+    if (peer.restricted) return `pod in ${peer.namespace ?? "?"}`
+    return `${peer.ownerKind}/${peer.namespace}/${peer.name}`
+  }
+  if (peer.class === "service") return `Service/${peer.namespace}/${peer.name}`
+  if (peer.class === "node") return peer.nodeName ?? peerIP
+  return peerIP || "?"
+}
+
+export function peerKind(peer: PeerRef): PeerKind {
+  if (peer.class === "workload" || peer.class === "service") return "workload"
+  if (peer.class === "external") return "external"
+  return "unknown"
+}
+
 export function aggregate(
   aggregates: Map<string, AggregateBucket>,
-  resources: ClusterResource[] | null,
-  hosts: Map<string, HostInfo>,
   localIPFilter?: Set<string>,
 ): Aggregated {
   const inClusterOut: AggRow[] = []
@@ -32,33 +45,14 @@ export function aggregate(
   const external: AggRow[] = []
   const inbound: AggRow[] = []
 
-  const podByIP = new Map<string, ClusterResource>()
-  const hostIPs = new Set<string>()
-
-  if (resources) {
-    for (const r of resources) {
-      if (r.kind === "Pod") {
-        for (const ip of r.ips ?? []) podByIP.set(ip, r)
-      }
-    }
-  }
-  for (const host of hosts.values()) {
-    for (const ip of host.hostIPs) hostIPs.add(ip)
-  }
-
-  const ownerByUid = new Map<string, ClusterResource>(
-    resources ? resources.map(r => [r.uid, r]) : [],
-  )
-
   for (const bucket of aggregates.values()) {
     if (localIPFilter && !intersects(bucket.localIPs, localIPFilter)) continue
 
-    const peerPod = podByIP.get(bucket.peerIP)
-    const kind = classifyPeer(bucket.peerIP, peerPod, hostIPs)
-
+    const kind = peerKind(bucket.peer)
     const row: AggRow = {
       key: bucket.key,
-      label: peerPod ? labelForOwner(peerPod, ownerByUid) : bucket.peerIP || "?",
+      label: peerLabel(bucket.peer, bucket.peerIP),
+      peer: bucket.peer,
       port: bucket.port,
       protocol: bucket.protocol,
       count: bucket.count,
@@ -99,11 +93,11 @@ export function recentCounts(
 
 export function filterListening(
   listening: Map<string, ListeningPort>,
-  ourPodIPs: Set<string>,
+  ourPodUids: Set<string>,
 ): ListeningPort[] {
   const out: ListeningPort[] = []
   for (const port of listening.values()) {
-    if (ourPodIPs.has(port.ip)) out.push(port)
+    if (port.ownerPodUid && ourPodUids.has(port.ownerPodUid)) out.push(port)
   }
   out.sort((a, b) => {
     if (a.port !== b.port) return a.port - b.port
@@ -154,29 +148,8 @@ function stableSort(rows: AggRow[]): AggRow[] {
   })
 }
 
-function classifyPeer(
-  ip: string,
-  peerPod: ClusterResource | undefined,
-  hostIPs: Set<string>,
-): PeerKind {
-  if (peerPod) return "workload"
-  if (hostIPs.has(ip) || isPrivateOrSpecial(ip)) return "unknown"
-  return "external"
-}
-
 function intersects(a: Set<string>, b: Set<string>): boolean {
   const [small, large] = a.size <= b.size ? [a, b] : [b, a]
   for (const v of small) if (large.has(v)) return true
   return false
-}
-
-function labelForOwner(pod: ClusterResource, ownerByUid: Map<string, ClusterResource>): string {
-  let cur: ClusterResource | undefined = pod
-  while (cur?.ownerUID) {
-    const next = ownerByUid.get(cur.ownerUID)
-    if (!next) break
-    cur = next
-  }
-  if (!cur) return pod.name
-  return `${cur.kind}/${cur.namespace}/${cur.name}`
 }

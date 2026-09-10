@@ -105,9 +105,11 @@ export function verdictText(risk: Risk, facts: ActionFacts, c: Classification, c
   if (coverage.changelog === "none") {
     parts.push(`No release notes found for this ${span} jump; verdict uses version distance and the scan only.`)
   } else {
+    const partial = coverage.versionsCovered < coverage.versionsTotal
+    const count = (n: number, word: string, words?: string) => `${partial ? "at least " : ""}${plural(n, word, words)}`
     const bits = [
-      c.breaking.length > 0 ? plural(c.breaking.length, "breaking change") : "no breaking changes",
-      c.security.length > 0 ? plural(c.security.length, "security fix", "security fixes") : null,
+      c.breaking.length > 0 ? count(c.breaking.length, "breaking change") : "no breaking changes",
+      c.security.length > 0 ? count(c.security.length, "security fix", "security fixes") : null,
     ].filter(Boolean)
     parts.push(`${capitalize(span)} update with ${bits.join(" and ")}.`)
   }

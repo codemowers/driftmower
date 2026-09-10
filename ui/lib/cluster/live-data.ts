@@ -35,14 +35,14 @@ export function startLiveDataFetching(): () => void {
           .catch(() => {}),
         ...(shouldFetchResources ? [
           fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })
-            .then(res => res.json())
-            .then(data => { if (!cancelled) useClusterState.setState({ clusterResources: data }) })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data && !cancelled) useClusterState.setState({ clusterResources: data }) })
             .catch(() => {}),
         ] : []),
         ...(isConnected ? [
           fetch(CLUSTER_NODES_URL, { cache: "no-store" })
-            .then(res => res.json())
-            .then(data => { if (!cancelled) useClusterState.setState({ nodeDrift: data }) })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data && !cancelled) useClusterState.setState({ nodeDrift: data }) })
             .catch(() => {}),
         ] : []),
       ])

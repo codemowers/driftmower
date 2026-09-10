@@ -9,6 +9,7 @@ import { useNetstatd, recentCounts, filterListening, groupListening } from "@/li
 type Props = {
   href?: string
   podIPs?: string[]
+  podUid?: string
 }
 
 const RECENT_WINDOW_MS = 15_000
@@ -56,7 +57,7 @@ function ActivityLine({ active, listening }: { active: number; listening: number
   )
 }
 
-export default function NetworkCard({ href, podIPs }: Props) {
+export default function NetworkCard({ href, podIPs, podUid }: Props) {
   const status = useNetstatd(s => s.status)
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
@@ -70,7 +71,9 @@ export default function NetworkCard({ href, podIPs }: Props) {
   const podIPSet = useMemo(() => (podIPs ? new Set(podIPs) : undefined), [podIPs])
 
   const { inbound, outbound } = recentCounts(aggregates, now, RECENT_WINDOW_MS, podIPSet)
-  const listeningPorts = podIPSet ? filterListening(listening, podIPSet) : [...listening.values()]
+  const listeningPorts = podUid
+    ? filterListening(listening, new Set([podUid]))
+    : [...listening.values()]
   const listeningCount = groupListening(listeningPorts).length
 
   const inner = (
