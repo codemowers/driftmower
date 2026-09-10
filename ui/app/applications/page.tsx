@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import ApplicationTile from "./components/application-tile"
 import { scopedHosts, useApplications } from "@/lib/features/applications/use-applications"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { resolveManagerLink } from "@/lib/features/applications/manager-link"
 import type { ApplicationEntry } from "@/lib/features/applications/types"
 
@@ -22,7 +22,7 @@ function matches(entry: ApplicationEntry, query: string): boolean {
 export default function ApplicationsPage() {
   const { launcher, inventory } = useApplications()
   const releaseScores = useClusterState(s => s.data?.rotenness.releaseScores)
-  const { namespaces } = useTenantScope()
+  const { namespaces } = useSandboxScope()
   const [query, setQuery] = useState("")
   const [showAll, setShowAll] = useState(false)
 

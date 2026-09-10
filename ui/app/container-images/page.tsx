@@ -3,17 +3,17 @@
 import { Suspense } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
-import TenantEmptyState from "../components/tenant-empty-state"
+import SandboxEmptyState from "../components/sandbox-empty-state"
 import ImageList from "./components/image-list"
 import { imageEntries } from "./utils/image-entries"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { DISPLAY_ORDER, DRIFT_PILL_STATUSES, driftSummaryPills, isNoData } from "@/lib/cluster/styles/status-style"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function ContainerImagesPage() {
   const { data } = useClusterState()
-  const { tenants: scopedTenants, namespaces } = useTenantScope()
+  const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope()
 
   const entries = imageEntries(data, namespaces ? new Set(namespaces) : null)
     .sort((a, b) =>
@@ -38,8 +38,8 @@ export default function ContainerImagesPage() {
           secondary={{ label: "containers", count: totalContainers }}
           pills={driftSummaryPills(statusCounts, noDataCount)}
         />
-        {scopedTenants.length > 0 && entries.length === 0 ? (
-          <TenantEmptyState tenants={scopedTenants} entity="images" />
+        {scopedSandboxes.length > 0 && entries.length === 0 ? (
+          <SandboxEmptyState sandboxes={scopedSandboxes} entity="images" />
         ) : (
           <Suspense>
             <ImageList entries={entries} />

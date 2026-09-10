@@ -4,7 +4,7 @@ import { Suspense, useMemo } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { Layers } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 import { currentChartScopes, deriveImageActions } from "@/lib/features/actions/derive"
@@ -105,7 +105,7 @@ function ContainerImageDetailContent() {
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
-  const { namespaces } = useTenantScope()
+  const { namespaces } = useSandboxScope()
   const { linkTo } = useContextHref()
 
   const scope = useMemo(() => (namespaces ? new Set(namespaces) : null), [namespaces])

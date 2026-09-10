@@ -38,7 +38,7 @@ spec:
                 secretKeyRef:
                   name: llama-api-token
                   key: token
-            # Tenancy control plane behind the Tenants page; unset disables it.
+            # Tenancy control plane behind the Sandboxes page; unset disables it.
             - name: PLATFORM_MANAGER_URL
               value: "http://platform-manager-dev.default.svc"
             # Resource indicator requested for platform-manager tokens; must

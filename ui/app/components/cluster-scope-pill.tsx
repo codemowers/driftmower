@@ -13,7 +13,7 @@ export default function ClusterScopePill() {
       </TooltipTrigger>
       <TooltipContent side="right">
         <p className="max-w-56">
-          This page shows the whole cluster. It is not filtered by the selected tenant.
+          This page shows the whole cluster. It is not filtered by the selected sandbox.
         </p>
       </TooltipContent>
     </Tooltip>

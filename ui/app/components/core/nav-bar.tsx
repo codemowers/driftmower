@@ -22,10 +22,10 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/session"
-import { useTenantContext } from "@/lib/tenancy/tenant-context"
+import { useSandboxContext } from "@/lib/tenancy/sandbox-context"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
-import TenantPicker from "./tenant-picker"
+import SandboxPicker from "./sandbox-picker"
 
 type NavItem = {
   name: string
@@ -41,7 +41,7 @@ const navItems: NavItem[] = [
   { name: "Cluster", href: "/cluster", icon: Cpu },
   // Always shown: the page renders a "not configured" state when the BFF
   // reports platform-manager is not deployed.
-  { name: "Tenants", href: "/tenants", icon: BookUser },
+  { name: "Sandboxes", href: "/sandboxes", icon: BookUser },
   { name: "Applications", href: "/applications", icon: LayoutGrid },
   // Always shown: the page renders its own not-in-cluster and
   // nothing-installed states, which is the whole point of it.
@@ -55,12 +55,12 @@ function isNavActive(pathname: string, href: string): boolean {
 export default function NavBar({ claims }: { claims: SessionClaims }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const { isConnected, clusterName, reportId } = useClusterState()
-  const selectedTenants = useTenantContext(s => s.selectedTenants)
+  const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
 
   const carriedParams = new URLSearchParams()
   if (reportId) carriedParams.set("report", reportId)
-  if (selectedTenants.length > 0) carriedParams.set("tenant", selectedTenants.join(","))
+  if (selectedSandboxes.length > 0) carriedParams.set("sandbox", selectedSandboxes.join(","))
   const carriedQuery = carriedParams.toString()
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function NavBar({ claims }: { claims: SessionClaims }) {
 
       {/* Nav items */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <TenantPicker isExpanded={isExpanded} />
+        <SandboxPicker isExpanded={isExpanded} />
 
         {isExpanded && (
           <h2 className="mt-5 w-full px-5 font-mono text-sm font-medium tracking-wide text-gray-400">

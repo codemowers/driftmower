@@ -91,7 +91,7 @@ export type NetworkPosture = "default-deny" | "open" | "unknown"
 
 export type NamespaceFact = {
   namespace: string
-  tenant: string | null
+  sandbox: string | null
   quota: { name: string; used: QuotaAmounts; hard: QuotaAmounts } | null
   // Pre-computed so the planner never re-parses Kubernetes quantity strings.
   headroom: {

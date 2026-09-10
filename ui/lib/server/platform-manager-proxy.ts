@@ -9,17 +9,31 @@ export function platformManagerUrl(): string | null {
   return url ? url.replace(/\/+$/, "") : null
 }
 
-export type TenantScope =
+export type SandboxScope =
   | { state: "ok"; admin: boolean; namespaces: string[] }
   | { state: "not-configured" | "unauthenticated" | "unreachable" }
 
-type TenantsResponse = {
-  admin: boolean
-  tenants: { tenantNamespace: string; appNamespaces: string[] }[]
+// platform-manager's shape. A sandbox is exactly one namespace: the older model
+// of a tenant namespace plus 0..n application namespaces is gone, and the
+// endpoint moved from /api/tenants to /api/sandboxes with it.
+export type SandboxRecord = {
+  sandbox: string
+  name: string
+  namespace: string
+  owners?: string[]
+  creator?: string
+  stackChannel?: string
 }
 
+type SandboxesResponse = {
+  admin: boolean
+  sandboxes: SandboxRecord[]
+}
+
+export const SANDBOXES_PATH = "/api/sandboxes"
+
 // Server-to-server read: callers scope their own response, so they need the values not a body.
-export async function fetchTenantScope(): Promise<TenantScope> {
+export async function fetchSandboxScope(): Promise<SandboxScope> {
   const baseUrl = platformManagerUrl()
 
   if (!baseUrl) {
@@ -35,13 +49,13 @@ export async function fetchTenantScope(): Promise<TenantScope> {
 
   let response: Response
   try {
-    response = await fetch(`${baseUrl}/api/tenants`, {
+    response = await fetch(`${baseUrl}${SANDBOXES_PATH}`, {
       headers: { authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     })
   } catch (e) {
     const cause = e instanceof Error && e.cause ? String(e.cause) : String(e)
-    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> unreachable: ${cause}`)
+    console.error(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> unreachable: ${cause}`)
     return { state: "unreachable" }
   }
 
@@ -50,12 +64,12 @@ export async function fetchTenantScope(): Promise<TenantScope> {
   }
 
   if (!response.ok) {
-    console.error(`[pm-scope] GET ${baseUrl}/api/tenants -> ${response.status} ${response.statusText}`)
+    console.error(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status} ${response.statusText}`)
     return { state: "unreachable" }
   }
 
-  const body = (await response.json()) as TenantsResponse
-  const namespaces = body.tenants.flatMap(t => [t.tenantNamespace, ...t.appNamespaces])
+  const body = (await response.json()) as SandboxesResponse
+  const namespaces = (body.sandboxes ?? []).map(s => s.namespace).filter(Boolean)
 
   return { state: "ok", admin: body.admin, namespaces: [...new Set(namespaces)] }
 }

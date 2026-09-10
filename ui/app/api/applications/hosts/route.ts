@@ -1,5 +1,5 @@
 import { isInCluster } from "@/lib/server/k8s"
-import { fetchTenantScope } from "@/lib/server/platform-manager-proxy"
+import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
 import { getHostEntries } from "@/lib/features/applications/hosts"
 import { fetchRegisteredApps } from "@/lib/features/applications/registered"
 import { hostOf } from "@/lib/features/applications/host-url"
@@ -11,7 +11,7 @@ const NO_STORE = { "Cache-Control": "no-store" }
 // Two grants: hosts backing the caller's own registered apps, plus, when platform-manager
 // answers, every host in the namespaces they may read.
 export async function GET() {
-  const [registered, scope] = await Promise.all([fetchRegisteredApps(), fetchTenantScope()])
+  const [registered, scope] = await Promise.all([fetchRegisteredApps(), fetchSandboxScope()])
   const tenancy = scope.state === "ok" ? "ok" : scope.state
 
   if (!isInCluster()) {

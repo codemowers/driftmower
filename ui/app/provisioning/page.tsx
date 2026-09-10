@@ -9,7 +9,7 @@ import RegistryCard from "./components/registry-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
-import { useTenantScope } from "@/lib/tenancy/tenant-context"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import type { CapabilityResponse } from "@/lib/features/provisioning/types"
 
 const SUBTITLE =
@@ -19,8 +19,8 @@ const NOT_IN_CLUSTER =
   "Provisioning reads what this cluster supports from the Kubernetes API, which is unavailable when not running in-cluster."
 
 export default function ProvisioningPage() {
-  const { namespaces } = useTenantScope()
-  // Namespace-scoped facts are only read for the selected tenant's namespaces;
+  const { namespaces } = useSandboxScope()
+  // Namespace-scoped facts are only read for the selected sandbox's namespaces;
   // unscoped, the page still shows everything cluster-wide.
   const state = useCapabilities(namespaces ?? [])
 
@@ -99,7 +99,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           <HostCard ingress={capabilities.ingress} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Pick a tenant in the sidebar to see the hostnames its namespaces may claim.
+            Pick a sandbox in the sidebar to see the hostnames its namespaces may claim.
           </p>
         )}
       </Section>

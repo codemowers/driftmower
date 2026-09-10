@@ -14,19 +14,19 @@ type FetchState =
 
 const cache = new Map<string, string>()
 
-export default function KubeconfigPanel({ tenant }: { tenant: string }) {
+export default function KubeconfigPanel({ sandbox }: { sandbox: string }) {
   const [state, setState] = useState<FetchState>(() => {
-    const cached = cache.get(tenant)
+    const cached = cache.get(sandbox)
     return cached ? { status: "ready", yaml: cached } : { status: "loading" }
   })
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (cache.has(tenant)) return
+    if (cache.has(sandbox)) return
 
     let cancelled = false
 
-    fetch(`/api/tenants/${encodeURIComponent(tenant)}/kubeconfig`)
+    fetch(`/api/sandboxes/${encodeURIComponent(sandbox)}/kubeconfig`)
       .then(async res => {
         if (cancelled) return
         if (!res.ok) {
@@ -35,7 +35,7 @@ export default function KubeconfigPanel({ tenant }: { tenant: string }) {
         }
         const yaml = await res.text()
         if (cancelled) return
-        cache.set(tenant, yaml)
+        cache.set(sandbox, yaml)
         setState({ status: "ready", yaml })
       })
       .catch(e => {
@@ -45,9 +45,9 @@ export default function KubeconfigPanel({ tenant }: { tenant: string }) {
     return () => {
       cancelled = true
     }
-  }, [tenant])
+  }, [sandbox])
 
-  const filename = `kubeconfig-${tenant}.yaml`
+  const filename = `kubeconfig-${sandbox}.yaml`
   const command = `kubectl --kubeconfig ${filename} get pods`
 
   function handleCopy() {

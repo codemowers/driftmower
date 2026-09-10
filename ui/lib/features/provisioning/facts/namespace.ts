@@ -121,7 +121,7 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
   return {
     fact: {
       namespace,
-      tenant: sandboxId,
+      sandbox: sandboxId,
       quota: quota
         ? {
             name: quota.metadata?.name ?? "(unnamed)",

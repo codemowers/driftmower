@@ -5,39 +5,41 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FilterToggle } from "@/app/components/filter-bar"
 import { cn } from "@/lib/utils/cn"
-import { selectTenants, toggleTenant, useTenantContext } from "@/lib/tenancy/tenant-context"
+import { selectSandboxes, toggleSandbox, useSandboxContext } from "@/lib/tenancy/sandbox-context"
 
-export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
-  const hydrated = useTenantContext(s => s.hydrated)
-  const available = useTenantContext(s => s.available)
-  const admin = useTenantContext(s => s.admin)
-  const tenants = useTenantContext(s => s.tenants)
-  const selectedTenants = useTenantContext(s => s.selectedTenants)
+export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
+  const hydrated = useSandboxContext(s => s.hydrated)
+  const available = useSandboxContext(s => s.available)
+  const admin = useSandboxContext(s => s.admin)
+  const sandboxes = useSandboxContext(s => s.sandboxes)
+  const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
 
   if (!hydrated || !available) return null
 
   const label =
-    selectedTenants.length === 0
+    selectedSandboxes.length === 0
       ? "Whole cluster"
-      : selectedTenants.length === 1
-        ? selectedTenants[0]
-        : `${selectedTenants.length} tenants`
+      : selectedSandboxes.length === 1
+        ? selectedSandboxes[0]
+        : `${selectedSandboxes.length} sandboxes`
 
-  const showWholeCluster = admin || tenants.length === 0
-  // A ?tenant= deep link can name tenants the user cannot see; still list them
-  // so the current selection is visible and re-selectable.
-  const unknownSelection = selectedTenants.filter(t => !tenants.some(k => k.tenant === t))
-  const isSingleTenantUser = !showWholeCluster && tenants.length === 1 && unknownSelection.length === 0
+  const showWholeCluster = admin || sandboxes.length === 0
+  // A ?sandbox= deep link can name sandboxes the user cannot see; still list
+  // them so the current selection is visible and re-selectable.
+  const unknownSelection = selectedSandboxes.filter(id => !sandboxes.some(s => s.sandbox === id))
+  const isSingleSandboxUser =
+    !showWholeCluster && sandboxes.length === 1 && unknownSelection.length === 0
+  // A sandbox is one namespace, so the scope is one entry per selection.
   const namespacesInScope = new Set(
-    selectedTenants.flatMap(name => {
-      const tenant = tenants.find(t => t.tenant === name)
-      return tenant ? [tenant.tenantNamespace, ...tenant.appNamespaces] : []
+    selectedSandboxes.flatMap(id => {
+      const sandbox = sandboxes.find(s => s.sandbox === id)
+      return sandbox ? [sandbox.namespace] : []
     }),
   )
 
   const trigger = (
     <PopoverTrigger
-      aria-label={`Tenant context: ${label}`}
+      aria-label={`Sandbox context: ${label}`}
       className={cn(
         "flex cursor-pointer items-center rounded-md text-sm text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-muted aria-expanded:text-foreground",
         isExpanded ? "w-full gap-3 px-3 py-3" : "justify-center px-2 py-3 mx-0.5",
@@ -45,7 +47,7 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
     >
       <span className="relative inline-flex shrink-0">
         <Building2 className="size-5 text-muted-foreground" aria-hidden />
-        {!isExpanded && selectedTenants.length > 0 && (
+        {!isExpanded && selectedSandboxes.length > 0 && (
           <span className="absolute -right-1 -top-1 size-1.5 rounded-full bg-brand" aria-hidden />
         )}
       </span>
@@ -89,10 +91,10 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
               <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Tenant context
               </span>
-              {!isSingleTenantUser && selectedTenants.length > 0 && (
+              {!isSingleSandboxUser && selectedSandboxes.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => selectTenants([])}
+                  onClick={() => selectSandboxes([])}
                   className="text-xs text-muted-foreground hover:text-brand-label hover:underline"
                 >
                   Clear
@@ -103,8 +105,8 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
             {showWholeCluster && (
               <>
                 <FilterToggle
-                  checked={selectedTenants.length === 0}
-                  onToggle={() => selectTenants([])}
+                  checked={selectedSandboxes.length === 0}
+                  onToggle={() => selectSandboxes([])}
                   label="Whole cluster"
                 />
                 <div className="my-1 h-px bg-gray-200" />
@@ -112,32 +114,32 @@ export default function TenantPicker({ isExpanded }: { isExpanded: boolean }) {
             )}
 
             <div className="max-h-64 overflow-y-auto">
-              {tenants.map(t => (
+              {sandboxes.map(s => (
                 <FilterToggle
-                  key={t.tenant}
-                  checked={selectedTenants.includes(t.tenant)}
-                  onToggle={() => toggleTenant(t.tenant)}
-                  label={<span className="font-mono">{t.tenant}</span>}
-                  count={1 + t.appNamespaces.length}
+                  key={s.sandbox}
+                  checked={selectedSandboxes.includes(s.sandbox)}
+                  onToggle={() => toggleSandbox(s.sandbox)}
+                  label={<span className="font-mono">{s.sandbox}</span>}
+                  count={1}
                 />
               ))}
               {unknownSelection.map(t => (
                 <FilterToggle
                   key={t}
                   checked
-                  onToggle={() => toggleTenant(t)}
+                  onToggle={() => toggleSandbox(t)}
                   label={<span className="font-mono">{t}</span>}
                 />
               ))}
             </div>
 
-            {selectedTenants.length > 0 && (
+            {selectedSandboxes.length > 0 && (
               <>
                 <div className="my-1 h-px bg-gray-200" />
                 <p className="px-3 pb-1 text-xs text-muted-foreground">
-                  {selectedTenants.length === 1
-                    ? "1 tenant selected"
-                    : `${selectedTenants.length} tenants selected`}
+                  {selectedSandboxes.length === 1
+                    ? "1 sandbox selected"
+                    : `${selectedSandboxes.length} sandboxes selected`}
                   , {namespacesInScope.size} namespaces in scope
                 </p>
               </>

@@ -12,55 +12,55 @@ import { FilterSearchInput } from "../components/filter-bar"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { cn } from "@/lib/utils/cn"
 import {
-  hydrateTenantContext,
-  selectTenants,
-  toggleTenant,
-  useTenantContext,
-  type TenantInfo,
-} from "@/lib/tenancy/tenant-context"
+  hydrateSandboxContext,
+  selectSandboxes,
+  toggleSandbox,
+  useSandboxContext,
+  type SandboxInfo,
+} from "@/lib/tenancy/sandbox-context"
 
 const UNAVAILABLE_COPY = {
   "not-configured":
-    "Tenant management is not configured for this cluster, so there is nothing to list.",
+    "Sandbox management is not configured for this cluster, so there is nothing to list.",
   "stale-session":
     "Your session cannot obtain a platform-manager token. Log out and back in to refresh it.",
   unreachable:
     "platform-manager is configured but did not respond. Check that PLATFORM_MANAGER_URL points at a running service.",
-  error: "Tenants could not be loaded.",
+  error: "Sandboxes could not be loaded.",
 }
 
 const ROW_GRID =
   "grid grid-cols-[minmax(0,1.7fr)_minmax(0,1.6fr)_minmax(0,1.7fr)_96px_120px] items-center gap-4"
 
-function matches(tenant: TenantInfo, query: string): boolean {
+function matches(sandbox: SandboxInfo, query: string): boolean {
   const haystack = [
-    tenant.tenant,
-    tenant.tenantNamespace,
-    ...tenant.appNamespaces,
-    ...tenant.owners,
-    tenant.creator ?? "",
+    sandbox.sandbox,
+    sandbox.name,
+    sandbox.namespace,
+    ...sandbox.owners,
+    sandbox.creator ?? "",
   ]
   return haystack.some(v => v.toLowerCase().includes(query))
 }
 
-export default function TenantsPage() {
+export default function SandboxesPage() {
   const [query, setQuery] = useState("")
-  const hydrated = useTenantContext(s => s.hydrated)
-  const available = useTenantContext(s => s.available)
-  const unavailableReason = useTenantContext(s => s.unavailableReason)
-  const admin = useTenantContext(s => s.admin)
-  const tenants = useTenantContext(s => s.tenants)
-  const selectedTenants = useTenantContext(s => s.selectedTenants)
+  const hydrated = useSandboxContext(s => s.hydrated)
+  const available = useSandboxContext(s => s.available)
+  const unavailableReason = useSandboxContext(s => s.unavailableReason)
+  const admin = useSandboxContext(s => s.admin)
+  const sandboxes = useSandboxContext(s => s.sandboxes)
+  const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const { linkTo } = useContextHref()
 
   useEffect(() => {
-    hydrateTenantContext()
+    hydrateSandboxContext()
   }, [])
 
   const normalized = query.trim().toLowerCase()
   const filtered = useMemo(
-    () => (normalized ? tenants.filter(t => matches(t, normalized)) : tenants),
-    [tenants, normalized],
+    () => (normalized ? sandboxes.filter(s => matches(s, normalized)) : sandboxes),
+    [sandboxes, normalized],
   )
 
   const adminPill = admin ? (
@@ -72,7 +72,7 @@ export default function TenantsPage() {
         Platform admin
       </TooltipTrigger>
       <TooltipContent side="right">
-        <p className="max-w-56">You are a platform admin. All managed tenants are listed.</p>
+        <p className="max-w-56">You are a platform admin. All managed sandboxes are listed.</p>
       </TooltipContent>
     </Tooltip>
   ) : null
@@ -81,12 +81,12 @@ export default function TenantsPage() {
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
         <PageHeader
-          title="Tenants"
-          subtitle="Your tenants and their kubeconfig snippets"
+          title="Sandboxes"
+          subtitle="Your sandboxes and their kubeconfig snippets"
           accessory={adminPill}
         />
 
-        {!hydrated && <p className="text-sm text-muted-foreground">Loading tenants…</p>}
+        {!hydrated && <p className="text-sm text-muted-foreground">Loading sandboxes…</p>}
 
         {hydrated && !available && (
           <p className="text-sm text-muted-foreground">
@@ -94,24 +94,24 @@ export default function TenantsPage() {
           </p>
         )}
 
-        {hydrated && available && tenants.length === 0 && (
-          <p className="text-sm text-muted-foreground">No tenants available.</p>
+        {hydrated && available && sandboxes.length === 0 && (
+          <p className="text-sm text-muted-foreground">No sandboxes available.</p>
         )}
 
-        {hydrated && available && tenants.length > 0 && (
+        {hydrated && available && sandboxes.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <div className="flex items-center gap-5 border-b border-gray-200 px-5 py-3.5">
               <FilterSearchInput
                 value={query}
                 onChange={setQuery}
-                placeholder="Search tenants, namespaces, owners..."
+                placeholder="Search sandboxes, namespaces, owners..."
               />
               <div className="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="xs"
-                  onClick={() => selectTenants([...new Set([...selectedTenants, ...filtered.map(t => t.tenant)])])}
+                  onClick={() => selectSandboxes([...new Set([...selectedSandboxes, ...filtered.map(s => s.sandbox)])])}
                 >
                   Select all
                 </Button>
@@ -119,15 +119,15 @@ export default function TenantsPage() {
                   type="button"
                   variant="outline"
                   size="xs"
-                  disabled={selectedTenants.length === 0}
-                  onClick={() => selectTenants([])}
+                  disabled={selectedSandboxes.length === 0}
+                  onClick={() => selectSandboxes([])}
                 >
                   Select none
                 </Button>
               </div>
               <div className="flex shrink-0 items-center gap-3 whitespace-nowrap">
                 <span className="text-xs text-muted-foreground">
-                  {selectedTenants.length} selected &middot; showing {filtered.length} of {tenants.length}
+                  {selectedSandboxes.length} selected &middot; showing {filtered.length} of {sandboxes.length}
                 </span>
                 <button
                   type="button"
@@ -140,7 +140,7 @@ export default function TenantsPage() {
             </div>
 
             <div className={cn(ROW_GRID, "border-b border-gray-200 px-5 py-3 text-xs font-medium text-muted-foreground")}>
-              <span>Tenant</span>
+              <span>Sandbox</span>
               <span>App namespaces</span>
               <span>Owners</span>
               <span>Channel</span>
@@ -149,15 +149,15 @@ export default function TenantsPage() {
 
             {filtered.length === 0 ? (
               <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-                No tenants match your search.
+                No sandboxes match your search.
               </p>
             ) : (
-              filtered.map(tenant => {
-                const isSelected = selectedTenants.includes(tenant.tenant)
+              filtered.map(sandbox => {
+                const isSelected = selectedSandboxes.includes(sandbox.sandbox)
                 return (
                   <Link
-                    key={tenant.tenant}
-                    href={linkTo(`/tenants/${encodeURIComponent(tenant.tenant)}`, { drop: ["focus"] })}
+                    key={sandbox.sandbox}
+                    href={linkTo(`/sandboxes/${encodeURIComponent(sandbox.sandbox)}`, { drop: ["focus"] })}
                     className={cn(
                       ROW_GRID,
                       "border-b border-gray-200 px-5 py-4 transition-colors last:border-b-0 hover:bg-brand-bg/40",
@@ -166,25 +166,20 @@ export default function TenantsPage() {
                   >
                     <span className="flex min-w-0 flex-col gap-0.5">
                       <span className="truncate font-mono text-sm font-semibold text-foreground">
-                        {tenant.tenant}
+                        {sandbox.sandbox}
                       </span>
                       <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                        <span className="truncate">{tenant.tenantNamespace}</span>
-                        <CopyButton value={tenant.tenantNamespace} className="relative z-10 shrink-0" />
+                        <span className="truncate">{sandbox.namespace}</span>
+                        <CopyButton value={sandbox.namespace} className="relative z-10 shrink-0" />
                       </span>
                     </span>
 
-                    <OverflowPills
-                      values={tenant.appNamespaces}
-                      label="App namespaces"
-                      copyable
-                      promote={normalized || undefined}
-                    />
+                    <span className="truncate text-sm text-muted-foreground">{sandbox.name}</span>
 
-                    <OverflowPills values={tenant.owners} label="Owners" />
+                    <OverflowPills values={sandbox.owners} label="Owners" />
 
                     <span className="w-fit rounded-full bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
-                      {tenant.stackChannel}
+                      {sandbox.stackChannel}
                     </span>
 
                     <Button
@@ -195,7 +190,7 @@ export default function TenantsPage() {
                       onClick={e => {
                         e.preventDefault()
                         e.stopPropagation()
-                        toggleTenant(tenant.tenant)
+                        toggleSandbox(sandbox.sandbox)
                       }}
                       className={cn(
                         "relative z-10 w-[104px] justify-center",

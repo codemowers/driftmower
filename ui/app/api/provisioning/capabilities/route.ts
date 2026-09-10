@@ -8,7 +8,7 @@ import { hostRuleFor } from "@/lib/features/provisioning/ingress-facts"
 import { pushAdvice } from "@/lib/features/provisioning/registry-facts"
 import { gatherClusterFacts } from "@/lib/features/provisioning/facts"
 import type { CapabilityResponse, NamespaceFact, OfferingId } from "@/lib/features/provisioning/types"
-import { fetchTenantScope } from "@/lib/server/platform-manager-proxy"
+import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
 
 export const dynamic = "force-dynamic"
 
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   const offering = url.searchParams.get("offering") as OfferingId | null
   const spec = offering ? OFFERINGS_BY_ID.get(offering) : undefined
 
-  const [cluster, scope] = await Promise.all([gatherClusterFacts(), fetchTenantScope()])
+  const [cluster, scope] = await Promise.all([gatherClusterFacts(), fetchSandboxScope()])
 
   if (!cluster.inCluster) {
     return Response.json(cluster satisfies CapabilityResponse, { headers: NO_STORE })
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
   // Scope namespace reads to the caller's tenancy. An admin gets whatever they
   // asked for; anyone else is confined to their own namespaces, so a crafted
-  // ?ns= cannot read another tenant's quota.
+  // ?ns= cannot read another sandbox's quota.
   const asked = requested(url, "ns")
   const permitted =
     scope.state === "ok" && !scope.admin ? asked.filter(n => scope.namespaces.includes(n)) : asked
@@ -95,7 +95,7 @@ export async function GET(req: Request) {
       if (!degraded.some(d => d.source === entry.source)) degraded.push(entry)
     }
 
-    hostRules.push(hostRuleFrom(cluster, facts.fact.tenant, namespace, admissionFacts))
+    hostRules.push(hostRuleFrom(cluster, facts.fact.sandbox, namespace, admissionFacts))
 
     const secrets = pullSecrets.known ? pullSecrets.value : []
     registryNamespaces.push({

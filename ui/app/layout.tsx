@@ -4,7 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import NavBar from "./components/core/nav-bar"
 import RefreshingOverlay from "./components/core/refreshing-overlay"
 import ClusterInit from "./components/cluster-init"
-import TenantContextInit from "./components/tenant-context-init"
+import SandboxContextInit from "./components/sandbox-context-init"
 import { getSession } from "@/lib/auth/session"
 import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -47,7 +47,7 @@ export default async function RootLayout({
         {claims ? (
           <>
             <Suspense><ClusterInit /></Suspense>
-            <Suspense><TenantContextInit /></Suspense>
+            <Suspense><SandboxContextInit /></Suspense>
             <RefreshingOverlay />
 
             <TooltipProvider>

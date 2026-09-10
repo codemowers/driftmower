@@ -13,7 +13,7 @@ export type CapabilityState =
   | { status: "ready"; capabilities: CapabilityResponse }
 
 // Namespace-scoped facts (quota, host rule, pull secrets) are only read for the
-// namespaces asked for, so the caller passes its tenant scope in.
+// namespaces asked for, so the caller passes its sandbox scope in.
 export function useCapabilities(namespaces: string[]): CapabilityState {
   const [state, setState] = useState<CapabilityState>({ status: "loading" })
   // Joined so the effect re-runs on a real change, not on a new array identity.
