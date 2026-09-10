@@ -13,7 +13,19 @@ export default function AggregatedList({ rows }: Props) {
           key={row.key}
           className="flex items-center gap-4 px-4 py-2.5 transition-colors hover:bg-gray-50"
         >
-          <span className="truncate font-mono text-sm text-foreground">{row.label}</span>
+          <span
+            className={cn(
+              "truncate font-mono text-sm",
+              row.peer.restricted ? "text-muted-foreground" : "text-foreground",
+            )}
+          >
+            {row.label}
+          </span>
+          {row.peer.restricted && (
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              outside tenant context
+            </span>
+          )}
           <span className="font-mono text-xs text-muted-foreground">
             :{row.port} {row.protocol}
           </span>

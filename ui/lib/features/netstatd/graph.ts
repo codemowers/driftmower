@@ -15,6 +15,7 @@ export type GraphNode = {
   ports: string[]
   groupId: string | null
   peerCount: number
+  restricted: boolean
 }
 
 export type PodGraph = {
@@ -30,7 +31,8 @@ type PeerAccum = {
   typeTag: string
   groupId: string
   namespace: string
-  primaryPort: number | string
+  subtitle: string
+  restricted: boolean
   inCount: number
   outCount: number
   lastSeen: number
@@ -90,6 +92,7 @@ export function buildPodGraph(aggregated: Aggregated, podName: string, podNamesp
       ports: [],
       groupId: null,
       peerCount: 0,
+      restricted: false,
     },
   ]
 
@@ -106,6 +109,7 @@ export function buildPodGraph(aggregated: Aggregated, podName: string, podNamesp
       ports: [],
       groupId: null,
       peerCount: group.peers.size,
+      restricted: false,
     })
   }
 
@@ -115,13 +119,14 @@ export function buildPodGraph(aggregated: Aggregated, podName: string, podNamesp
       kind: peer.kind,
       name: peer.name,
       typeTag: peer.typeTag,
-      subtitle: peer.kind === "workload" ? peer.namespace : `:${peer.primaryPort}`,
+      subtitle: peer.subtitle,
       inCount: peer.inCount,
       outCount: peer.outCount,
       lastSeen: peer.lastSeen,
       ports: peer.ports,
       groupId: peer.groupId,
       peerCount: 0,
+      restricted: peer.restricted,
     })
   }
 
@@ -129,35 +134,33 @@ export function buildPodGraph(aggregated: Aggregated, podName: string, podNamesp
 }
 
 function newPeer(id: string, row: AggRow): PeerAccum {
-  if (row.kind === "workload") {
-    const [kind, namespace, name] = row.label.split("/")
+  const peer = row.peer
+  const base = { id, inCount: 0, outCount: 0, lastSeen: 0, ports: [] }
+
+  if (peer.class === "workload" || peer.class === "service") {
+    const namespace = peer.namespace ?? "—"
     return {
-      id,
+      ...base,
       kind: "workload",
-      name: name ?? row.label,
-      typeTag: (kind ?? "WORKLOAD").toUpperCase(),
-      groupId: `ns:${namespace ?? "—"}`,
-      namespace: namespace ?? "—",
-      primaryPort: row.port,
-      inCount: 0,
-      outCount: 0,
-      lastSeen: 0,
-      ports: [],
+      name: peer.restricted ? `pod in ${namespace}` : (peer.name ?? row.label),
+      typeTag: (peer.ownerKind ?? "WORKLOAD").toUpperCase(),
+      groupId: `ns:${namespace}`,
+      namespace,
+      subtitle: peer.restricted ? "OUTSIDE TENANT CONTEXT" : namespace,
+      restricted: peer.restricted === true,
     }
   }
-  const external = row.kind === "external"
+
+  const external = peer.class === "external"
   return {
-    id,
+    ...base,
     kind: row.kind,
-    name: row.label,
+    name: peer.class === "node" ? (peer.nodeName ?? row.label) : row.label,
     typeTag: external ? "EXTERNAL" : "NODE",
     groupId: external ? "grp:external" : "grp:cluster-nodes",
     namespace: "",
-    primaryPort: row.port,
-    inCount: 0,
-    outCount: 0,
-    lastSeen: 0,
-    ports: [],
+    subtitle: `:${row.port}`,
+    restricted: false,
   }
 }
 

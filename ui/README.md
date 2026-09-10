@@ -71,7 +71,7 @@ What you gain by setting each one, and exactly what you miss by leaving it out.
 | **AI workload and pod summaries** | `LLM_BASE_URL` and `OPENAI_API_KEY` (any OpenAI-compatible endpoint) | The summary panels are unavailable and `/api/llm` answers 503. There is deliberately no default endpoint, so an unconfigured deployment never calls someone else's host |
 | **Release notes in the Actions card** | `GITHUB_TOKEN` (a token with no scopes is enough) | Changelogs for images are fetched from the GitHub Releases API anonymously, which allows 60 requests per hour per egress IP; a busy cluster hits that and the affected rows fall back to a verdict from version distance and the CVE scan only |
 | **Argo CD deep links** | `ARGO_URL` | Argo-managed resources are still detected and labelled, they just aren't clickable through to Argo |
-| **Network topology** | nothing | Works with no configuration: netstatd's Ingress is discovered through the Kubernetes API (label `app=netstatd`). If netstatd isn't installed, the Topology tab renders an empty state |
+| **Network topology** | nothing | Works with no configuration: the server finds the netstatd DaemonSet pods through the Kubernetes API (label `app=netstatd`), merges their streams itself and serves the result over an authenticated SSE endpoint scoped to the viewer's tenants. The browser never talks to netstatd. If netstatd isn't installed, the Topology tab renders an empty state |
 | **Cluster metrics and node storage** | nothing | In-cluster the target is hardwired to `prometheus-operated.monitoring:9090`. Without kube-prometheus-stack the cards are simply hidden. This is not repointable in-cluster today |
 | **Pod logs** | nothing | In-cluster Loki is hardwired to `loki.monitoring:3100`. When it is unreachable or empty the Logs tab falls back to the Kubernetes API `pods/log` subresource, so logs work either way |
 
@@ -86,7 +86,7 @@ What you gain by setting each one, and exactly what you miss by leaving it out.
 | `K8S_DISTRO` | auto-detected from node versions | Detection gets it wrong. One of `k3s`, `rke2`, `vanilla` |
 | `PROMETHEUS_URL` | in-cluster: hardwired | **Local dev only.** Ignored in-cluster, where the variable is never read. Outside a cluster the metrics cards stay hidden without it |
 | `LOKI_URL` | in-cluster: hardwired | **Local dev only**, same as above. Loki has no Ingress, so reach it with `kubectl port-forward svc/loki -n monitoring 3100` |
-| `NETSTATD_URL` | in-cluster: auto-discovered | **Local dev only**, where the process has no ServiceAccount token to query the Kubernetes API with |
+| `NETSTATD_LABEL_SELECTOR` | `app=netstatd` | netstatd's pods carry a different label. This is the Kubernetes label selector the server uses to find them, and it streams from every pod that matches. Leaving it unset is normal and disables nothing |
 | `ENDOFLIFE_BASE_URL` | `https://endoflife.date/api/v1/products` | Air-gapped cluster or a mirror. Unreachable simply hides the support-schedule info |
 | `ARTIFACT_HUB_BASE_URL` | `https://artifacthub.io/api/v1` | Air-gapped cluster or a mirror. Unreachable leaves chart actions without release notes |
 | `K8S_VERSION_STABLE_URL` | `https://dl.k8s.io/release/stable.txt` | Air-gapped cluster or a mirror |

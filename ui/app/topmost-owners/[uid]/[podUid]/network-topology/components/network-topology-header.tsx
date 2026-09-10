@@ -1,13 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { ExternalLink } from "lucide-react"
-import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useMemo } from "react"
 import {
   useNetstatd,
   type NetstatdStatus,
   aggregate,
-  fetchNetstatdUrl,
   filterListening,
   groupListening,
 } from "@/lib/features/netstatd"
@@ -53,24 +50,21 @@ export default function NetworkTopologyHeader({
   nodeName,
   podIPs,
 }: Props) {
-  const clusterResources = useClusterState(s => s.clusterResources)
   const status = useNetstatd(s => s.status)
   const error = useNetstatd(s => s.error)
   const lastFlushedAt = useNetstatd(s => s.lastFlushedAt)
   const hiddenCount = useNetstatd(s => s.hiddenCount)
+  const upstream = useNetstatd(s => s.upstream)
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
-  const hosts = useNetstatd(s => s.hosts)
 
   const podIPSet = useMemo(() => new Set(podIPs), [podIPs])
+  const podUidSet = useMemo(() => new Set([podUid]), [podUid])
 
-  const aggregated = useMemo(
-    () => aggregate(aggregates, clusterResources, hosts, podIPSet),
-    [aggregates, clusterResources, hosts, podIPSet],
-  )
+  const aggregated = useMemo(() => aggregate(aggregates, podIPSet), [aggregates, podIPSet])
   const listeningGroups = useMemo(
-    () => groupListening(filterListening(listening, podIPSet)),
-    [listening, podIPSet],
+    () => groupListening(filterListening(listening, podUidSet)),
+    [listening, podUidSet],
   )
 
   const peerTotal = aggregated.inClusterOut.length
@@ -125,6 +119,7 @@ export default function NetworkTopologyHeader({
           </div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
             live · netstatd · /conntrack
+            {upstream && ` · ${upstream.connected}/${upstream.total} nodes`}
           </p>
           {hiddenCount > 0 && (
             <p className="font-mono text-[10px] tracking-wider text-muted-foreground/70 tabular-nums">
@@ -142,7 +137,6 @@ export default function NetworkTopologyHeader({
           externalTotal={externalTotal}
           portTotal={portTotal}
         />
-        <NetstatdLink />
       </div>
 
       {error && (
@@ -151,41 +145,6 @@ export default function NetworkTopologyHeader({
         </p>
       )}
     </header>
-  )
-}
-
-function NetstatdLink() {
-  const [url, setUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-    fetchNetstatdUrl()
-      .then(resolved => active && setUrl(resolved))
-      .catch(() => active && setUrl(""))
-    return () => {
-      active = false
-    }
-  }, [])
-
-  if (url === null) return null
-  return (
-    <div className="absolute bottom-0 right-0">
-      {url ? (
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-brand/40 hover:bg-brand-bg/30 hover:text-brand"
-        >
-          View on netstatd
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
-      ) : (
-        <span className="text-xs font-medium text-muted-foreground">
-          netstatd env var not set or missing ingress
-        </span>
-      )}
-    </div>
   )
 }
 

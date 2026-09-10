@@ -27,14 +27,18 @@ export default function TopologyNode({ node, side, collapsed, expanded, onToggle
       onClick={onToggle}
       className={cn(
         "flex h-full w-full flex-col overflow-hidden rounded-md px-3 py-[9px] text-left",
-        isPod ? "bg-brand text-white" : "border border-border bg-card transition-colors hover:border-muted-foreground/40",
+        isPod
+          ? "bg-brand text-white"
+          : "border bg-card transition-colors hover:border-muted-foreground/40",
+        !isPod && (node.restricted ? "border-dashed border-muted-foreground/50" : "border-border"),
       )}
     >
       <div className="flex items-start justify-between gap-1.5">
         <span
           className={cn(
-            "break-words font-mono text-[13px] font-semibold leading-[18px]",
-            isPod ? "text-white" : "text-foreground",
+            "break-words font-mono text-[13px] leading-[18px]",
+            isPod && "font-semibold text-white",
+            !isPod && (node.restricted ? "font-medium text-muted-foreground" : "font-semibold text-foreground"),
           )}
         >
           {node.name}

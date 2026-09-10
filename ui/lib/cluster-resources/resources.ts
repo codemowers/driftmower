@@ -25,6 +25,7 @@ type RawObject = {
   }
   spec?: {
     nodeName?: string
+    hostNetwork?: boolean
     containers?: RawContainer[]
     initContainers?: RawContainer[]
   }
@@ -113,6 +114,7 @@ function toClusterResource(
     if (ips.length) resource.ips = ips
     const declaredPorts = declaredPodPorts(obj.spec)
     if (declaredPorts.length) resource.declaredPorts = declaredPorts
+    if (obj.spec?.hostNetwork) resource.hostNetwork = true
     if (obj.spec?.nodeName) resource.nodeName = obj.spec.nodeName
     if (obj.status?.phase) resource.phase = obj.status.phase
     resource.podStatus = derivePodStatus(meta.deletionTimestamp, obj.status)

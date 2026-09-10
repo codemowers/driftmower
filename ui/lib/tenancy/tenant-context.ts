@@ -109,36 +109,44 @@ function namespacesOf(tenants: TenantInfo[]): string[] {
   return [...new Set(tenants.flatMap(t => [t.tenantNamespace, ...t.appNamespaces]))]
 }
 
+export function tenantScope(state: TenantContextState): TenantScope {
+  const { selectedTenants, tenants, available, admin } = state
+
+  // No selection widens to the whole cluster only for admins, and only once they are known.
+  if (selectedTenants.length === 0) {
+    if (!available || admin) return { tenants: [], label: null, namespaces: null }
+    return {
+      tenants: tenants.map(t => t.tenant),
+      label: ALL_TENANTS_LABEL,
+      namespaces: namespacesOf(tenants),
+    }
+  }
+
+  // A stale deep link naming an unknown tenant must scope to nothing, not widen back to the cluster.
+  const selected = selectedTenants.flatMap(name => {
+    const tenant = tenants.find(t => t.tenant === name)
+    return tenant ? [tenant] : []
+  })
+
+  return {
+    tenants: selectedTenants,
+    label: selectedTenants.length === 1 ? selectedTenants[0] : `${selectedTenants.length} tenants`,
+    namespaces: namespacesOf(selected),
+  }
+}
+
+export function tenantScopeNamespaces(state: TenantContextState): string[] | null {
+  return tenantScope(state).namespaces
+}
+
 export function useTenantScope(): TenantScope {
   const selectedTenants = useTenantContext(s => s.selectedTenants)
   const tenants = useTenantContext(s => s.tenants)
   const available = useTenantContext(s => s.available)
   const admin = useTenantContext(s => s.admin)
 
-  return useMemo(() => {
-    // No selection widens to the whole cluster only for admins, and only once they are known.
-    if (selectedTenants.length === 0) {
-      if (!available || admin) return { tenants: [], label: null, namespaces: null }
-      return {
-        tenants: tenants.map(t => t.tenant),
-        label: ALL_TENANTS_LABEL,
-        namespaces: namespacesOf(tenants),
-      }
-    }
-
-    // A stale deep link naming an unknown tenant must scope to nothing, not widen back to the cluster.
-    const selected = selectedTenants.flatMap(name => {
-      const tenant = tenants.find(t => t.tenant === name)
-      return tenant ? [tenant] : []
-    })
-
-    return {
-      tenants: selectedTenants,
-      label:
-        selectedTenants.length === 1
-          ? selectedTenants[0]
-          : `${selectedTenants.length} tenants`,
-      namespaces: namespacesOf(selected),
-    }
-  }, [selectedTenants, tenants, available, admin])
+  return useMemo(
+    () => tenantScope({ selectedTenants, tenants, available, admin } as TenantContextState),
+    [selectedTenants, tenants, available, admin],
+  )
 }

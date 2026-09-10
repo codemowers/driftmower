@@ -4,6 +4,8 @@ metadata:
   name: driftmower-ui
   namespace: driftmowers
 spec:
+  # The netstatd fan-in hub is per-process; a second replica would double the upstream sockets.
+  replicas: 1
   selector:
     matchLabels:
       app: driftmower-ui

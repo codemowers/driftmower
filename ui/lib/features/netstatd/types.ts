@@ -1,74 +1,15 @@
 export type Protocol = "TCP" | "UDP"
 
-export type ConnState =
-  | "ESTABLISHED" | "SYN_SENT" | "SYN_RECV" | "FIN_WAIT1" | "FIN_WAIT2"
-  | "TIME_WAIT" | "CLOSE" | "CLOSE_WAIT" | "LAST_ACK" | "LISTEN" | "CLOSING"
+export type PeerClass = "workload" | "service" | "node" | "external" | "unknown"
 
-export type ConnectionEvent = {
-  type: "connection.event" | "connection.accepted"
-  timestamp: string
-  nodeName?: string
-  protocol: Protocol
-  state: ConnState
-  sockCookie: string | number
-  localIP: string
-  remoteIP: string
-  localPort?: number
-  remotePort?: number
-  pid?: number
-}
-
-export type PortListeningEvent = {
-  type: "port.listening"
-  timestamp: string
-  nodeName?: string
-  protocol: Protocol
-  ip: string
-  port: number
-  netns: number
-  isHostNetNS: boolean
-}
-
-export type ProcessMetainfoEvent = {
-  type: "process.metainfo"
-  timestamp: string
-  nodeName: string
-  pid: number
-  exe?: string
-  netns: number
-  isHostNetNS: boolean
-  cgroupSlice: string
-  containerUid?: string
-}
-
-export type ContainerEvent = {
-  type: "container.added" | "container.metainfo"
-  timestamp: string
-  nodeName?: string
-  containerUid: string
-  name?: string
-  podName?: string
+export type PeerRef = {
+  class: PeerClass
+  ownerKind?: string
   namespace?: string
-  podUid?: string
-  containerName?: string
-  image?: string
-  labels?: Record<string, string>
-}
-
-export type HostInfoEvent = {
-  type: "host.info"
-  timestamp: string
+  name?: string
   nodeName?: string
-  hostIPs: string[]
-  hostNetNS: number
+  restricted?: true
 }
-
-export type NetstatdEvent =
-  | ConnectionEvent
-  | PortListeningEvent
-  | ProcessMetainfoEvent
-  | ContainerEvent
-  | HostInfoEvent
 
 export type ListeningPort = {
   key: string
@@ -78,7 +19,7 @@ export type ListeningPort = {
   nodeName?: string
   netns: number
   isHostNetNS: boolean
-  containerUid?: string
+  ownerPodUid?: string
 }
 
 export type HostInfo = {
@@ -93,6 +34,7 @@ export type AggregateBucket = {
   key: string
   direction: AggregateDirection
   peerIP: string
+  peer: PeerRef
   port: number
   protocol: Protocol
   count: number
@@ -103,6 +45,47 @@ export type AggregateBucket = {
 
 export type NetstatdStatus = "idle" | "connecting" | "open" | "closed" | "error"
 
+export type UpstreamHealth = {
+  total: number
+  connected: number
+}
+
+export type ConnDelta = {
+  key: string
+  direction: AggregateDirection
+  localIP: string
+  peerIP: string
+  peer: PeerRef
+  port: number
+  protocol: Protocol
+  count: number
+  lastSeen: number
+}
+
+export type HostWire = {
+  nodeName: string
+  hostIPs: string[]
+  hostNetNS: number
+}
+
+export type SnapshotFrame = {
+  hosts: HostWire[]
+  listening: ListeningPort[]
+}
+
+export type DeltaFrame = {
+  conns?: ConnDelta[]
+  listeningAdded?: ListeningPort[]
+  listeningRemoved?: string[]
+  hosts?: HostWire[]
+  dropped?: number
+}
+
+export type StatusFrame = {
+  upstream: UpstreamHealth
+  indexBuiltAt: number
+}
+
 export type NetstatdState = {
   status: NetstatdStatus
   error: string | null
@@ -112,4 +95,5 @@ export type NetstatdState = {
   listening: Map<string, ListeningPort>
   hosts: Map<string, HostInfo>
   hiddenCount: number
+  upstream: UpstreamHealth | null
 }

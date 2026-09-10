@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useNetstatd, aggregate, buildPodGraph } from "@/lib/features/netstatd"
 import { buildLayout, edgeEndpoints, elbowPath } from "./graph-layout"
 import { usePanZoom } from "./use-pan-zoom"
@@ -29,14 +28,12 @@ const IDLE_MS = 90_000
 const EDGE_FLOOR = 0.3
 
 export default function NetworkTopologyGraph({ podName, podNamespace, podIPs }: Props) {
-  const clusterResources = useClusterState(s => s.clusterResources)
   const aggregates = useNetstatd(s => s.aggregates)
-  const hosts = useNetstatd(s => s.hosts)
 
   const podIPSet = useMemo(() => new Set(podIPs), [podIPs])
   const graph = useMemo(
-    () => buildPodGraph(aggregate(aggregates, clusterResources, hosts, podIPSet), podName, podNamespace),
-    [aggregates, clusterResources, hosts, podIPSet, podName, podNamespace],
+    () => buildPodGraph(aggregate(aggregates, podIPSet), podName, podNamespace),
+    [aggregates, podIPSet, podName, podNamespace],
   )
 
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())

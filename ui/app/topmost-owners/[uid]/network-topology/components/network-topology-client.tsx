@@ -35,22 +35,19 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
   const lastFlushedAt = useNetstatd(s => s.lastFlushedAt)
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
-  const hosts = useNetstatd(s => s.hosts)
   const hiddenCount = useNetstatd(s => s.hiddenCount)
+  const upstream = useNetstatd(s => s.upstream)
 
   const scope = useMemo(
     () => findDescendantPodUids(clusterResources, uid),
     [clusterResources, uid],
   )
 
-  const aggregated = useMemo(
-    () => aggregate(aggregates, clusterResources, hosts),
-    [aggregates, clusterResources, hosts],
-  )
+  const aggregated = useMemo(() => aggregate(aggregates), [aggregates])
 
   const ourListening = useMemo(
-    () => filterListening(listening, scope.podIPs),
-    [listening, scope.podIPs],
+    () => filterListening(listening, scope.podUids),
+    [listening, scope.podUids],
   )
 
   const listeningGroups = useMemo(() => groupListening(ourListening), [ourListening])
@@ -86,6 +83,7 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
           status={status}
           lastFlushedAt={lastFlushedAt}
           hiddenCount={hiddenCount}
+          upstream={upstream}
           error={error}
           peerTotal={peerTotal}
           inboundCount={inboundCount}
