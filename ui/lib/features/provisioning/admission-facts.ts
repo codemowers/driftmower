@@ -24,6 +24,7 @@ export type RawAdmissionPolicy = {
     failurePolicy?: string
     paramKind?: { apiVersion?: string; kind?: string }
     matchConstraints?: { resourceRules?: RawResourceRule[] }
+    variables?: { name?: string; expression?: string }[]
     validations?: { expression?: string; message?: string; messageExpression?: string; reason?: string }[]
   }
 }
@@ -61,6 +62,15 @@ export type AdmissionPolicyFact = {
   // The label a binding scopes on, e.g. codemowers.io/sandbox. Null means it
   // applies everywhere.
   scopedToNamespaceLabels: Record<string, string> | null
+  // Namespace label keys the policy's own CEL reads. Observed on real clusters:
+  // the bindings carry no namespaceSelector at all and the sandbox scoping lives
+  // in the expressions, so without this a guard reads as governing every
+  // namespace — including platform ones it actually exempts.
+  scopedToNamespaceLabelKeys: string[]
+  // Groups the policy's CEL exempts, parsed from `'x' in request.userInfo.groups`.
+  // The real guards exempt by IDENTITY rather than by namespace, so without
+  // this an admin is told they cannot do something they plainly can.
+  exemptGroups: string[]
   // The ConfigMap a parameterised policy reads, so the caller knows to fetch it.
   paramRef: { name: string; namespace: string | null } | null
 }
@@ -81,6 +91,40 @@ function guardsOf(policy: RawAdmissionPolicy): GuardedOperation[] {
     }
   }
   return guarded
+}
+
+// Matches namespaceObject.metadata.labels['key'] and the ["key"] form. We are
+// not evaluating the CEL — only noticing which namespace label it keys on,
+// which is a checkable signal rather than a guess.
+const NAMESPACE_LABEL_REF = /namespaceObject\.metadata\.labels\[\s*['"]([^'"]+)['"]\s*\]/g
+
+function namespaceLabelKeysOf(policy: RawAdmissionPolicy): string[] {
+  const expressions = [
+    ...(policy.spec?.variables ?? []).map(v => v.expression ?? ""),
+    ...(policy.spec?.validations ?? []).flatMap(v => [v.expression ?? "", v.messageExpression ?? ""]),
+  ]
+
+  const keys = new Set<string>()
+  for (const expression of expressions) {
+    for (const match of expression.matchAll(NAMESPACE_LABEL_REF)) keys.add(match[1])
+  }
+  return [...keys]
+}
+
+// Matches `'group' in request.userInfo.groups`, the shape every guard here uses
+// for its escape hatch.
+const EXEMPT_GROUP_REF = /['"]([^'"]+)['"]\s*in\s+request\.userInfo\.groups/g
+
+function exemptGroupsOf(policy: RawAdmissionPolicy): string[] {
+  const expressions = [
+    ...(policy.spec?.variables ?? []).map(v => v.expression ?? ""),
+    ...(policy.spec?.validations ?? []).map(v => v.expression ?? ""),
+  ]
+  const groups = new Set<string>()
+  for (const expression of expressions) {
+    for (const match of expression.matchAll(EXEMPT_GROUP_REF)) groups.add(match[1])
+  }
+  return [...groups]
 }
 
 function messagesOf(policy: RawAdmissionPolicy): string[] {
@@ -123,6 +167,8 @@ export function toAdmissionFacts(
       guards: guardsOf(policy),
       messages: messagesOf(policy),
       scopedToNamespaceLabels: scoping && Object.keys(scoping).length > 0 ? scoping : null,
+      scopedToNamespaceLabelKeys: namespaceLabelKeysOf(policy),
+      exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
     })
   }
@@ -137,13 +183,37 @@ export type DenialCheck = {
   // Namespace labels, so a policy scoped to sandboxes is not applied to a
   // namespace that is not one.
   namespaceLabels: Record<string, string>
+  // The caller's groups. These guards exempt by identity, so an admin must not
+  // be told they cannot do something they can.
+  callerGroups?: string[]
 }
 
-export type Denial = { policy: string; message: string }
+export type Denial = {
+  policy: string
+  // Every message the policy carries, not just the first. The real egress guard
+  // has two — one about platform-managed policies specifically, one about the
+  // blanket rule — and only the second explains a beginner's failure, so
+  // picking one arbitrarily loses the useful half.
+  messages: string[]
+}
 
 function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string, string>): boolean {
-  if (!fact.scopedToNamespaceLabels) return true
-  return Object.entries(fact.scopedToNamespaceLabels).every(([key, value]) => namespaceLabels[key] === value)
+  // A binding selector is the explicit, authoritative scope.
+  if (fact.scopedToNamespaceLabels) {
+    const matches = Object.entries(fact.scopedToNamespaceLabels).every(
+      ([key, value]) => namespaceLabels[key] === value,
+    )
+    if (!matches) return false
+  }
+
+  // Failing that, a policy whose CEL reads a namespace label only governs
+  // namespaces that carry it. On the real clusters the bindings have no
+  // selector, so this is what stops a sandbox guard reading as cluster-wide.
+  if (fact.scopedToNamespaceLabelKeys.length > 0) {
+    return fact.scopedToNamespaceLabelKeys.some(key => namespaceLabels[key] !== undefined)
+  }
+
+  return true
 }
 
 function guardMatches(guard: GuardedOperation, check: DenialCheck): boolean {
@@ -163,10 +233,16 @@ export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): De
     if (!fact.enforced) continue
     if (!scopeApplies(fact, check.namespaceLabels)) continue
     if (!fact.guards.some(guard => guardMatches(guard, check))) continue
+    // Identity exemption: the guards let argocd, kube-system and the admin
+    // groups through, and telling such a caller they are blocked would be wrong.
+    if (fact.exemptGroups.some(group => check.callerGroups?.includes(group))) continue
 
     denials.push({
       policy: fact.name,
-      message: fact.messages[0] ?? `The ${fact.name} admission policy governs ${check.operation} on ${check.resource}.`,
+      messages:
+        fact.messages.length > 0
+          ? fact.messages
+          : [`The ${fact.name} admission policy governs ${check.operation} on ${check.resource}.`],
     })
   }
 

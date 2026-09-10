@@ -110,6 +110,7 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
             resource: input.target.plural,
             operation: "CREATE",
             namespaceLabels,
+            callerGroups: input.caller.groups,
           }),
         )
       : {

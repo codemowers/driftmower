@@ -142,7 +142,7 @@ test("an admission denial outranks a role that would otherwise allow it", () => 
     [{ name: "admin", rules: netpolAdmin }],
     CALLER,
     { group: "networking.k8s.io", plural: "networkpolicies" },
-    [{ policy: "sandbox-egress-guard", message: "Sandbox users cannot create or update NetworkPolicies" }],
+    [{ policy: "sandbox-egress-guard", messages: ["Sandbox users cannot create or update NetworkPolicies"] }],
   )
 
   assert.equal(withAdmission.mayCreate, "likely-not")

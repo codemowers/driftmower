@@ -34,7 +34,7 @@ export type Verdict = { mayCreate: "likely" | "likely-not" | "unknown"; reason: 
 // An admission policy that governs this operation outranks anything RBAC says.
 // Passing them in keeps this module pure and keeps the precedence explicit
 // rather than buried in whichever caller happens to check first.
-export type AdmissionDenial = { policy: string; message: string }
+export type AdmissionDenial = { policy: string; messages: string[] }
 
 export type Caller = {
   sub: string
@@ -81,10 +81,13 @@ export function mayCreate(
 ): Verdict {
   if (admissionDenials.length > 0) {
     const denial = admissionDenials[0]
+    // Every message, because a policy often carries a specific rule and a
+    // blanket one and only the blanket one explains a beginner's failure.
+    const said = denial.messages.map(m => m.replace(/\.$/, "")).join(". ")
     return {
       mayCreate: "likely-not",
       reason:
-        `The ${denial.policy} admission policy governs this: ${denial.message}. ` +
+        `The ${denial.policy} admission policy governs this: ${said}. ` +
         "An admission policy overrides your role, so having permission is not enough here — " +
         "this needs someone with platform access.",
     }
