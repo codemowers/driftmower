@@ -28,6 +28,11 @@ type TokenState =
   | { status: "idle" }
   | { status: "minting" }
   | { status: "error"; message: string; hint?: string }
+  // A session that predates MCP being enabled carries no grant for the MCP
+  // audience. Nothing is broken and no administrator is needed — the user just
+  // has to sign in again — so it gets its own state with the fix attached
+  // rather than being rendered as a failure.
+  | { status: "needs-reauth"; hint: string }
   | { status: "ready"; token: string; expiresInMinutes: number }
 
 export default function McpPanel() {
@@ -93,6 +98,11 @@ export default function McpPanel() {
       const res = await fetch("/api/mcp/token", { cache: "no-store" })
       const body = await res.json()
 
+      if (body.action === "reauthenticate") {
+        setToken({ status: "needs-reauth", hint: body.hint ?? "Sign in again to get an MCP token." })
+        return
+      }
+
       if (!res.ok) {
         setToken({ status: "error", message: body.detail ?? body.error ?? "Could not mint a token", hint: body.hint })
         return
@@ -143,6 +153,21 @@ export default function McpPanel() {
           <p className="mt-3 text-sm text-status-major">
             {token.message}
             {token.hint ? ` ${token.hint}` : null}
+          </p>
+        )}
+
+        {token.status === "needs-reauth" && (
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-status-minor-label">
+            <TriangleAlert className="size-4 shrink-0" />
+            <span>{token.hint}</span>
+            {/* returnTo brings them back here rather than to the home page,
+                so the next click is the one they wanted in the first place. */}
+            <a
+              href="/api/auth/login?returnTo=%2Fprovisioning"
+              className="font-medium text-brand-text underline underline-offset-2"
+            >
+              Sign in again
+            </a>
           </p>
         )}
 

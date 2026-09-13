@@ -88,18 +88,36 @@ export async function GET() {
     )
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
+    // A cause carries the IdP's own error code; the message alone often does not.
+    const cause = error instanceof Error && error.cause ? String((error.cause as Error).message ?? error.cause) : ""
+    const text = `${detail} ${cause}`.trim()
 
-    // invalid_target here means the MCP resource was not in the original grant:
-    // the user signed in before MCP_ENABLED was turned on and must sign in again.
-    return Response.json(
-      {
-        error: "token_grant_failed",
-        detail,
-        hint: detail.includes("invalid_target")
-          ? "Sign out and back in: the MCP resource must be present in the original authorization grant."
-          : undefined,
-      },
-      { status: 502, headers: NO_STORE }
-    )
+    // Without this a failure here is a 502 with nothing in the logs, which is
+    // the worst combination to debug from — the detail only ever reached the
+    // browser.
+    console.error("[mcp] token grant failed:", text)
+
+    // Two different situations, and only one of them is the server's fault.
+    //
+    // invalid_target: the MCP resource was not in the original grant, because
+    // the session was created before MCP_ENABLED was turned on. invalid_grant:
+    // the refresh token is spent or revoked. Both are fixed by signing in
+    // again, neither is a bad gateway, and answering 502 tells the user to go
+    // find an administrator when they could have fixed it in two clicks.
+    const needsReauthentication = /invalid_target|invalid_grant/.test(text)
+
+    if (needsReauthentication) {
+      return Response.json(
+        {
+          error: "session_predates_mcp",
+          detail: text,
+          action: "reauthenticate",
+          hint: "Your session was created before MCP was enabled, so it carries no grant for the MCP audience. Signing in again fixes it.",
+        },
+        { status: 409, headers: NO_STORE }
+      )
+    }
+
+    return Response.json({ error: "token_grant_failed", detail: text }, { status: 502, headers: NO_STORE })
   }
 }
