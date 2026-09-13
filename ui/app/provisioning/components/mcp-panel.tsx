@@ -96,22 +96,45 @@ export default function McpPanel() {
 
     try {
       const res = await fetch("/api/mcp/token", { cache: "no-store" })
-      const body = await res.json()
+      // Not necessarily JSON: a proxy or CDN in front of this app can replace
+      // an error response with an HTML page of its own, and `res.json()` would
+      // then throw a parse error that tells the reader nothing about what
+      // actually failed.
+      const raw = await res.text()
+      let body: Record<string, unknown>
+
+      try {
+        body = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        setToken({
+          status: "error",
+          message: `The server returned a ${res.status} that was not JSON, so something between this page and the app replaced the response.`,
+          hint: "Check the driftmower-ui logs for a line starting [mcp].",
+        })
+        return
+      }
 
       if (body.action === "reauthenticate") {
-        setToken({ status: "needs-reauth", hint: body.hint ?? "Sign in again to get an MCP token." })
+        setToken({
+          status: "needs-reauth",
+          hint: String(body.hint ?? "Sign in again to get an MCP token."),
+        })
         return
       }
 
       if (!res.ok) {
-        setToken({ status: "error", message: body.detail ?? body.error ?? "Could not mint a token", hint: body.hint })
+        setToken({
+          status: "error",
+          message: String(body.detail ?? body.error ?? "Could not mint a token"),
+          hint: typeof body.hint === "string" ? body.hint : undefined,
+        })
         return
       }
 
       setToken({
         status: "ready",
-        token: body.accessToken,
-        expiresInMinutes: Math.max(1, Math.round((body.expiresIn ?? 3600) / 60)),
+        token: String(body.accessToken),
+        expiresInMinutes: Math.max(1, Math.round(Number(body.expiresIn ?? 3600) / 60)),
       })
       setRevealed(false)
     } catch (e) {

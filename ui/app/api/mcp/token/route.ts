@@ -87,30 +87,26 @@ export async function GET() {
       { headers: NO_STORE }
     )
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    // A cause carries the IdP's own error code; the message alone often does not.
-    const cause = error instanceof Error && error.cause ? String((error.cause as Error).message ?? error.cause) : ""
-    const text = `${detail} ${cause}`.trim()
+    const oauth = oauthErrorOf(error)
+    const detail = oauth
+      ? `${oauth.code}${oauth.description ? `: ${oauth.description}` : ""}`
+      : error instanceof Error
+        ? error.message
+        : String(error)
 
-    // Without this a failure here is a 502 with nothing in the logs, which is
-    // the worst combination to debug from — the detail only ever reached the
-    // browser.
-    console.error("[mcp] token grant failed:", text)
+    console.error("[mcp] token grant failed:", detail)
 
     // Two different situations, and only one of them is the server's fault.
     //
     // invalid_target: the MCP resource was not in the original grant, because
     // the session was created before MCP_ENABLED was turned on. invalid_grant:
     // the refresh token is spent or revoked. Both are fixed by signing in
-    // again, neither is a bad gateway, and answering 502 tells the user to go
-    // find an administrator when they could have fixed it in two clicks.
-    const needsReauthentication = /invalid_target|invalid_grant/.test(text)
-
-    if (needsReauthentication) {
+    // again, and neither is a server failure.
+    if (oauth && (oauth.code === "invalid_target" || oauth.code === "invalid_grant")) {
       return Response.json(
         {
           error: "session_predates_mcp",
-          detail: text,
+          detail,
           action: "reauthenticate",
           hint: "Your session was created before MCP was enabled, so it carries no grant for the MCP audience. Signing in again fixes it.",
         },
@@ -118,6 +114,39 @@ export async function GET() {
       )
     }
 
-    return Response.json({ error: "token_grant_failed", detail: text }, { status: 502, headers: NO_STORE })
+    // Any other rejection by the IdP is still a 4xx, deliberately.
+    //
+    // This app is served through Cloudflare, which replaces the body of a 5xx
+    // from the origin with its own HTML error page — so a 502 carrying a
+    // careful JSON explanation reaches the browser as an unbranded "Bad
+    // gateway" and the reason is lost. An error the caller is meant to read
+    // has to be a 4xx to survive the edge.
+    if (oauth) {
+      return Response.json(
+        { error: "token_grant_rejected", detail, code: oauth.code },
+        { status: 400, headers: NO_STORE }
+      )
+    }
+
+    // A transport failure reaching the IdP genuinely is a bad gateway. The body
+    // may not survive Cloudflare, which is why the line above is logged.
+    return Response.json({ error: "token_grant_failed", detail }, { status: 502, headers: NO_STORE })
+  }
+}
+
+// oauth4webapi throws ResponseBodyError for an OAuth-shaped rejection, carrying
+// the code on `.error` and the text on `.error_description`. `.cause` is the
+// parsed JSON body — stringifying that yields "[object Object]", which is how
+// an invalid_target spent a while looking like an unexplained 502.
+function oauthErrorOf(error: unknown): { code: string; description?: string } | null {
+  if (typeof error !== "object" || error === null) return null
+
+  const candidate = error as { error?: unknown; error_description?: unknown }
+
+  if (typeof candidate.error !== "string") return null
+
+  return {
+    code: candidate.error,
+    description: typeof candidate.error_description === "string" ? candidate.error_description : undefined,
   }
 }
