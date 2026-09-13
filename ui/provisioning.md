@@ -495,10 +495,27 @@ existing YAML pages too) or fall back to `js-yaml` in production for that path.
 > **What did not change.** Nearly everything below is still the design, just
 > implemented one repo over: strict audience checking (`https://driftmower-mcp`),
 > RFC 9728 protected-resource metadata with the `resource_metadata` pointer on
-> every 401, the JWKS `kid`-stamping workaround, the read-only tool annotations,
-> the markdown-plus-structuredContent result shape, the public `driftmower-mcp`
-> OIDCClient for PKCE, and the no-DCR risk. See `driftmower-mcp/src/auth/` and
-> `driftmower-mcp/manifests/`.
+> every 401, the read-only tool annotations, the markdown-plus-structuredContent
+> result shape, the public `driftmower-mcp` OIDCClient for PKCE, and the no-DCR
+> risk. See `driftmower-mcp/src/auth/` and `driftmower-mcp/manifests/`.
+>
+> **One thing below is wrong: the JWKS `kid` gotcha.** The section headed
+> "JWKS verification, the gotcha already paid for once" says passmower's
+> `jwks_uri` returns keys with no `kid`, so `createRemoteJWKSet` never matches
+> and thumbprints must be stamped locally. The *published endpoint* does carry a
+> `kid`: oidc-provider stamps the RFC 7638 thumbprint when it registers a key
+> (`initialize_keystore.js`, `key.kid ??= calculateKid(key)`), so a bare key from
+> `oidc-key-manager` is published with one. Verified against a real
+> oidc-provider 9.12.2 — `createRemoteJWKSet` verifies, including with
+> `algorithms: ["RS256"]` against a published key carrying no `alg`.
+>
+> What is true is passmower's *internal* path: `src/utils/session/bearer-account.js`
+> stamps thumbprints because it reads the raw `OIDC_JWKS` env var — the
+> configured keys, before oidc-provider sees them — and its integration test
+> pins that shape. A resource server reads the endpoint and needs none of it.
+> Both `lib/auth/bearer.ts` here and `driftmower-mcp/src/auth/jwks.ts` use
+> `createRemoteJWKSet`. Check `curl $OIDC_IDP_URI/jwks` before reinstating a
+> workaround.
 >
 > **What changed.**
 >

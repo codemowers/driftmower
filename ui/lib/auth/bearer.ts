@@ -1,7 +1,7 @@
 import "server-only"
 
-import { calculateJwkThumbprint, createLocalJWKSet, errors, jwtVerify } from "jose"
-import type { JSONWebKeySet, JWTPayload, JWTVerifyGetKey } from "jose"
+import { createRemoteJWKSet, jwtVerify } from "jose"
+import type { JWTPayload, JWTVerifyGetKey } from "jose"
 
 import { getOidcRuntimeConfig } from "./oidc"
 
@@ -65,7 +65,7 @@ export async function verifyBearer(req: Request): Promise<BearerResult> {
   const { issuer } = getOidcRuntimeConfig()
 
   try {
-    const { payload } = await jwtVerify(token, await keySet(issuer), {
+    const { payload } = await jwtVerify(token, keySet(issuer), {
       issuer,
       audience: mcpAudience(),
       algorithms: ["RS256"],
@@ -76,26 +76,6 @@ export async function verifyBearer(req: Request): Promise<BearerResult> {
 
     return { ok: true, caller: projectCaller(payload) }
   } catch (error) {
-    // Key rotation looks like a key miss. Drop the cached set and retry once.
-    if (error instanceof errors.JWKSNoMatchingKey) {
-      invalidateKeySet()
-
-      try {
-        const { payload } = await jwtVerify(token, await keySet(issuer), {
-          issuer,
-          audience: mcpAudience(),
-          algorithms: ["RS256"],
-          clockTolerance: 60,
-        })
-
-        if (!payload.sub) return { ok: false, reason: "token has no sub claim" }
-
-        return { ok: true, caller: projectCaller(payload) }
-      } catch (retryError) {
-        return { ok: false, reason: messageOf(retryError) }
-      }
-    }
-
     return { ok: false, reason: messageOf(error) }
   }
 }
@@ -122,54 +102,31 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// Deliberately not createRemoteJWKSet, and deliberately not createTtlCache.
+// jose's own remote key set, which handles fetch caching, a cooldown, and
+// refetching when a token arrives with an unknown kid (key rotation).
 //
-// passmower's jwks_uri can return keys with no `kid` and no `alg`, while
-// oidc-provider signs with the RFC 7638 thumbprint as `kid` — so jose's key
-// matching finds no candidate and every token fails. Stamping the thumbprint on
-// locally is the fix. createTtlCache has no notion of invalidation, which key
-// rotation needs.
-const KEY_SET_TTL_MS = 10 * 60 * 1000
+// provisioning.md records passmower's jwks_uri as returning keys with no kid,
+// which would need thumbprint stamping. That is not what the published
+// endpoint does: oidc-provider stamps the RFC 7638 thumbprint when registering
+// a key (initialize_keystore.js, `key.kid ??= calculateKid(key)`), so the
+// document carries a kid even though oidc-key-manager's configured key has
+// none. Verified against a real oidc-provider 9.12.2 with a bare key of that
+// shape, including `algorithms: ["RS256"]` against a published key with no alg.
+//
+// The doc's claim describes passmower's *internal* path, which reads the raw
+// OIDC_JWKS env var rather than the endpoint. Do not reinstate a workaround
+// here without first checking `curl $OIDC_IDP_URI/jwks`.
+let cachedKeySet: { uri: string; getKey: JWTVerifyGetKey } | null = null
 
-let cachedKeySet: { getKey: JWTVerifyGetKey; expiresAt: number } | null = null
-
-function invalidateKeySet(): void {
-  cachedKeySet = null
-}
-
-async function keySet(issuer: string): Promise<JWTVerifyGetKey> {
-  const now = Date.now()
-
-  if (cachedKeySet && cachedKeySet.expiresAt > now) return cachedKeySet.getKey
-
+function keySet(issuer: string): JWTVerifyGetKey {
   const jwksUri = process.env.OIDC_JWKS_URI || `${issuer.replace(/\/+$/, "")}/jwks`
-  const response = await fetch(jwksUri, {
-    headers: { accept: "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(5000),
-  })
 
-  if (!response.ok) {
-    throw new Error(`JWKS request to ${jwksUri} failed with status ${response.status}`)
+  if (cachedKeySet?.uri !== jwksUri) {
+    cachedKeySet = {
+      uri: jwksUri,
+      getKey: createRemoteJWKSet(new URL(jwksUri), { timeoutDuration: 5000 }),
+    }
   }
 
-  const body = (await response.json()) as Partial<JSONWebKeySet>
-
-  if (!Array.isArray(body.keys)) {
-    throw new Error(`JWKS response from ${jwksUri} has no keys array`)
-  }
-
-  const keys = await Promise.all(
-    body.keys.map(async (key) => ({
-      ...key,
-      kid: key.kid ?? (await calculateJwkThumbprint(key)),
-      alg: key.alg ?? "RS256",
-    }))
-  )
-
-  const getKey = createLocalJWKSet({ keys })
-
-  cachedKeySet = { getKey, expiresAt: now + KEY_SET_TTL_MS }
-
-  return getKey
+  return cachedKeySet.getKey
 }
