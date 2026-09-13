@@ -159,7 +159,7 @@ function hostRuleFrom(
     enforcedMessage: hostMessage,
     note:
       (rule.enforcedBy
-        ? `Only these hostnames are accepted here, and the ${rule.enforcedBy} admission policy enforces it — the ingress controller is shared, and the sandbox-id prefix is what keeps one tenant from claiming another's traffic.`
+        ? `Only these hostnames are accepted here, and the ${rule.enforcedBy} admission policy enforces it — the ingress controller is shared, and the sandbox-id prefix is what keeps one sandbox from claiming another's traffic.`
         : "These are the hostnames this namespace's sandbox id maps to.") + provenance,
   }
 }

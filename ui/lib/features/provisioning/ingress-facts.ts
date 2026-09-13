@@ -49,11 +49,11 @@ export function hostIsAllowed(host: string, rule: IngressHostRule): boolean {
 export function hostRejectionReason(host: string, rule: IngressHostRule): string | null {
   if (hostIsAllowed(host, rule)) return null
   if (host.startsWith("*")) {
-    return "Wildcard hosts are rejected: the ingress controller is shared, so a wildcard would claim other tenants' hostnames too."
+    return "Wildcard hosts are rejected: the ingress controller is shared, so a wildcard would claim other sandboxes' hostnames too."
   }
   return (
     `Hosts here must be ${rule.exactHost} or ${rule.labelledPattern} — anchored on your sandbox id, ` +
-    "because the ingress controller is shared and the prefix is what stops one tenant claiming another's traffic."
+    "because the ingress controller is shared and the prefix is what stops one sandbox claiming another's traffic."
   )
 }
 

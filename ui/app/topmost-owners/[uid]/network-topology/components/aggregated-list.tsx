@@ -23,7 +23,7 @@ export default function AggregatedList({ rows }: Props) {
           </span>
           {row.peer.restricted && (
             <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
-              outside tenant context
+              outside your scope
             </span>
           )}
           <span className="font-mono text-xs text-muted-foreground">

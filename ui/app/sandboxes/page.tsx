@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Building2, Check } from "lucide-react"
+import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import PageHeader from "../components/page-header"
@@ -197,7 +197,7 @@ export default function SandboxesPage() {
                         isSelected && "border-brand text-brand hover:bg-background hover:text-brand",
                       )}
                     >
-                      {isSelected ? <Check aria-hidden /> : <Building2 aria-hidden />}
+                      {isSelected ? <Check aria-hidden /> : <Package aria-hidden />}
                       {isSelected ? "Selected" : "Select"}
                     </Button>
                   </Link>

@@ -1,6 +1,6 @@
 "use client"
 
-import { Building2, ChevronsUpDown } from "lucide-react"
+import { BookUser, ChevronsUpDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FilterToggle } from "@/app/components/filter-bar"
@@ -46,7 +46,7 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
       )}
     >
       <span className="relative inline-flex shrink-0">
-        <Building2 className="size-5 text-muted-foreground" aria-hidden />
+        <BookUser className="size-5 text-muted-foreground" aria-hidden />
         {!isExpanded && selectedSandboxes.length > 0 && (
           <span className="absolute -right-1 -top-1 size-1.5 rounded-full bg-brand" aria-hidden />
         )}
@@ -66,7 +66,7 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
     <div className="flex w-full flex-col">
       {isExpanded && (
         <h2 className="mt-5 w-full px-5 font-mono text-sm font-medium tracking-wide text-gray-400">
-          Tenant
+          Sandbox
         </h2>
       )}
       <div className={cn("mt-2 flex w-full flex-col", isExpanded ? "px-3" : "px-0")}>
@@ -77,7 +77,7 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
             <Tooltip>
               <TooltipTrigger asChild>{trigger}</TooltipTrigger>
               <TooltipContent side="right">
-                <p className="font-medium">Tenant: {label}</p>
+                <p className="font-medium">Sandbox: {label}</p>
               </TooltipContent>
             </Tooltip>
           )}
@@ -89,7 +89,7 @@ export default function SandboxPicker({ isExpanded }: { isExpanded: boolean }) {
           >
             <div className="flex items-center justify-between px-3 pb-1 pt-1">
               <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Tenant context
+                Scope
               </span>
               {!isSingleSandboxUser && selectedSandboxes.length > 0 && (
                 <button

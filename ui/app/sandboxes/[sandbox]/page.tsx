@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { Building2, Check } from "lucide-react"
+import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Breadcrumbs from "../../components/breadcrumbs"
 import RefreshButton from "../../components/core/refresh-button"
@@ -60,7 +60,7 @@ export default function SandboxDetailPage() {
           <div className="flex items-start justify-between gap-8">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <Building2 className="size-6 shrink-0 text-brand-icon" aria-hidden />
+                <Package className="size-6 shrink-0 text-brand-icon" aria-hidden />
                 <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
                   {sandbox.sandbox}
                 </h1>
@@ -119,7 +119,7 @@ export default function SandboxDetailPage() {
                 isSelected && "border-brand text-brand hover:bg-background hover:text-brand",
               )}
             >
-              {isSelected ? <Check aria-hidden /> : <Building2 aria-hidden />}
+              {isSelected ? <Check aria-hidden /> : <Package aria-hidden />}
               {isSelected ? "Selected" : "Select"}
             </Button>
           </div>
