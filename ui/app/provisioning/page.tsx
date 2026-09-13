@@ -92,6 +92,16 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
         </Section>
       )}
 
+      {/* Everything above is also available to a coding agent, over one
+          authenticated endpoint, alongside the drift analysis. The tool list is
+          the easy part; getting a token into a client is what needs showing. */}
+      <Section
+        title="Connect a coding agent"
+        hint="The MCP gateway answers these same questions, scoped to the namespaces you can access. Read-only — it changes nothing."
+      >
+        <McpPanel />
+      </Section>
+
       <Section
         title="Your hostname"
         hint="The ingress controller is shared, so the hostname you may claim is anchored on your namespace and enforced on admission."
@@ -103,16 +113,6 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
             Pick a sandbox in the sidebar to see the hostnames its namespaces may claim.
           </p>
         )}
-      </Section>
-
-      {/* Everything above is also available to a coding agent, over one
-          authenticated endpoint, alongside the drift analysis. The tool list is
-          the easy part; getting a token into a client is what needs showing. */}
-      <Section
-        title="Connect a coding agent"
-        hint="The MCP gateway answers these same questions, scoped to the namespaces you can access. Read-only — it changes nothing."
-      >
-        <McpPanel />
       </Section>
 
       <Section title="Storage" count={capabilities.storageClasses.length}>
