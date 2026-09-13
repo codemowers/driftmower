@@ -3,6 +3,7 @@ import * as oidc from "openid-client"
 import { mcpAudience } from "@/lib/auth/bearer"
 import { getOidcConfig } from "@/lib/auth/oidc"
 import { getSession } from "@/lib/auth/session"
+import { claudeCodePasteCommand } from "@/lib/features/provisioning/mcp-quickstarts"
 
 // Mints an MCP-audience access token for the signed-in user, so they can paste
 // one into an MCP client and be connected in a minute.
@@ -75,7 +76,13 @@ export async function GET() {
         // The caveat travels with the token, so nobody wires this into a client
         // expecting it to keep working.
         caveat: `This token expires in about ${Math.round(expiresIn / 60)} minutes. For a connection that keeps working, use the OAuth flow instead of a pasted token.`,
-        command: `claude mcp add --transport http driftmower ${mcpUrl.replace(/\/+$/, "")}/mcp --header "Authorization: Bearer ${tokens.access_token}"`,
+        // Built by the same function the provisioning panel renders, so a
+        // curl user and the page cannot be told different things.
+        command: claudeCodePasteCommand({
+          mcpUrl: `${mcpUrl.replace(/\/+$/, "")}/mcp`,
+          token: tokens.access_token,
+          clientId: null,
+        }),
       },
       { headers: NO_STORE }
     )
