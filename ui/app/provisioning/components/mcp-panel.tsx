@@ -268,7 +268,8 @@ function SnippetBlock({
 
   return (
     <div className="flex flex-col gap-2">
-      {snippet.caption && <p className="text-sm text-muted-foreground">{snippet.caption}</p>}
+      <p className="text-sm font-medium text-foreground">{snippet.heading}</p>
+      {snippet.caption && <p className="-mt-1 text-sm text-muted-foreground">{snippet.caption}</p>}
       <div className="relative">
         <span className="absolute right-3 top-2 z-10">
           <CopyButton value={snippet.text} />

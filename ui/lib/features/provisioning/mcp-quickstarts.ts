@@ -14,6 +14,10 @@ export type McpClientId = "claude-code" | "codex" | "other"
 
 export type Snippet = {
   kind: "shell" | "json"
+  // "Installing via Claude Code CLI" — names the thing you are about to run,
+  // so a reader scanning for their own client finds it without reading the
+  // command first.
+  heading: string
   text: string
   // Rendered above the snippet when it needs one line of explanation.
   caption?: string
@@ -52,16 +56,18 @@ export function mcpQuickstarts({ mcpUrl, token, clientId }: QuickstartInput): Qu
       paste: [
         {
           kind: "shell",
-          text: `claude mcp add --transport http ${SERVER_NAME} ${mcpUrl} \\\n  --header "Authorization: Bearer ${secret}"`,
+          heading: "Installing via Claude Code CLI",
+          text: `claude mcp add --transport http ${SERVER_NAME} ${mcpUrl} --header "Authorization: Bearer ${secret}"`,
         },
       ],
       oauth: clientId
         ? [
             {
               kind: "shell",
+              heading: "Installing via Claude Code CLI, signing in from the client",
               caption:
                 "Omit the header and Claude Code runs the OAuth flow itself, refreshing the token as it expires.",
-              text: `claude mcp add --transport http ${SERVER_NAME} ${mcpUrl} \\\n  --client-id ${clientId}`,
+              text: `claude mcp add --transport http ${SERVER_NAME} ${mcpUrl} --client-id ${clientId}`,
             },
           ]
         : null,
@@ -76,16 +82,18 @@ export function mcpQuickstarts({ mcpUrl, token, clientId }: QuickstartInput): Qu
           // environment variable it reads at connect time. Exporting it in the
           // same shell as `codex mcp add` is not enough — it has to be set
           // wherever codex actually runs, which is what the caption says.
+          heading: "Installing via Codex CLI",
           caption: `Codex reads the token from an environment variable rather than a header, so ${TOKEN_ENV_VAR} must be set wherever you run codex — not only when adding the server.`,
-          text: `export ${TOKEN_ENV_VAR}='${secret}'\ncodex mcp add ${SERVER_NAME} --url ${mcpUrl} \\\n  --bearer-token-env-var ${TOKEN_ENV_VAR}`,
+          text: `export ${TOKEN_ENV_VAR}='${secret}'\ncodex mcp add ${SERVER_NAME} --url ${mcpUrl} --bearer-token-env-var ${TOKEN_ENV_VAR}`,
         },
       ],
       oauth: clientId
         ? [
             {
               kind: "shell",
+              heading: "Installing via Codex CLI, signing in from the client",
               caption: "Codex then keeps its own token and refreshes it.",
-              text: `codex mcp add ${SERVER_NAME} --url ${mcpUrl} \\\n  --oauth-client-id ${clientId}`,
+              text: `codex mcp add ${SERVER_NAME} --url ${mcpUrl} --oauth-client-id ${clientId}`,
             },
           ]
         : null,
@@ -96,6 +104,7 @@ export function mcpQuickstarts({ mcpUrl, token, clientId }: QuickstartInput): Qu
       paste: [
         {
           kind: "json",
+          heading: "Installing via a config file",
           caption:
             "Most MCP clients read a config file in this shape — Cursor, Claude Desktop, VS Code and others. Check yours for where the file lives.",
           text: JSON.stringify(

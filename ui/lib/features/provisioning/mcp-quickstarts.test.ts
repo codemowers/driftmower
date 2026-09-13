@@ -39,6 +39,28 @@ test("Codex reads the token from an env var and takes no header flag", () => {
   assert.match(snippet.caption ?? "", /wherever you run codex/)
 })
 
+test("every snippet names the thing you are about to run", () => {
+  for (const quickstart of mcpQuickstarts(DEFAULT_INPUT)) {
+    for (const snippet of [...quickstart.paste, ...(quickstart.oauth ?? [])]) {
+      assert.match(snippet.heading, /^Installing via /)
+    }
+  }
+})
+
+test("no shell command relies on a line continuation", () => {
+  // A trailing backslash is a POSIX shell continuation. These get pasted by
+  // people on Windows too, where it breaks, so each command stands on one line
+  // and a multi-line snippet is a sequence of whole commands.
+  for (const quickstart of mcpQuickstarts(DEFAULT_INPUT)) {
+    for (const snippet of [...quickstart.paste, ...(quickstart.oauth ?? [])]) {
+      if (snippet.kind !== "shell") continue
+      for (const line of snippet.text.split("\n")) {
+        assert.doesNotMatch(line, /\\$/, `line ends with a continuation: ${line}`)
+      }
+    }
+  }
+})
+
 test("the generic config is valid JSON in the shape clients expect", () => {
   const parsed = JSON.parse(find("other").paste[0].text)
   assert.deepEqual(parsed.mcpServers.driftmower, {
