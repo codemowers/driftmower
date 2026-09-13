@@ -3,10 +3,24 @@ import { NextResponse, type NextRequest } from "next/server"
 
 import { getSessionOptions, type SessionData } from "@/lib/auth/session"
 
+const PROVISIONING_CAPABILITIES_PATH = "/api/provisioning/capabilities"
+
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl
 
   if (pathname.startsWith("/api/auth/")) {
+    return NextResponse.next()
+  }
+
+  // The provisioning capability route also serves driftmower-mcp, the platform's
+  // MCP gateway, whose callers hold a bearer token and no session cookie. Let
+  // those through so the route can do its own token verification; without this
+  // they would get this middleware's 401 JSON before the route ever ran.
+  //
+  // Exact match, and only when a bearer is actually present: a prefix match
+  // would un-gate sibling routes, and skipping the cookie check for cookieless
+  // requests generally would un-gate the route for anyone.
+  if (pathname === PROVISIONING_CAPABILITIES_PATH && req.headers.get("authorization")) {
     return NextResponse.next()
   }
 
