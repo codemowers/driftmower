@@ -168,7 +168,17 @@ function MarkerRow({ marker, showContainer }: { marker: Marker; showContainer: b
 
 function emptyMessage(pod: ClusterResource, statuses: PodContainerStatus[], notice: string | null): string {
   const neverStarted = statuses.find(c => c.waiting && c.restartCount === 0 && !c.lastTerminated)
-  if (neverStarted?.waiting) return `No logs: the container never started (${neverStarted.waiting.reason}).`
+  if (neverStarted?.waiting) {
+    // The reason alone is a category, not a diagnosis: CreateContainerConfigError
+    // is equally "that Secret does not exist" and "this image's USER is a name,
+    // so the kubelet cannot prove it is non-root". The kubelet says which in the
+    // message, and we already carry it — so print it rather than sending the
+    // reader to kubectl describe for the half of the answer that matters.
+    const { reason, message } = neverStarted.waiting
+    return message
+      ? `No logs: the container never started (${reason}). ${message}`
+      : `No logs: the container never started (${reason}).`
+  }
   if (pod.podStatus?.display === "Evicted") {
     const detail = pod.podStatus.message ? ` ${pod.podStatus.message}` : ""
     return `No logs: the pod was evicted.${detail}`
