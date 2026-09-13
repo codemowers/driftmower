@@ -36,7 +36,11 @@ export function isInCluster(): boolean {
   return typeof process.env.KUBERNETES_SERVICE_HOST === "string" && process.env.KUBERNETES_SERVICE_HOST !== ""
 }
 
+export type KubeMethod = "GET" | "POST" | "PATCH" | "DELETE"
+export type KubeRequestInit = { body?: unknown; contentType?: string; accept?: string }
+
 const KUBE_API_HOST = "kubernetes.default.svc"
+const JSON_ACCEPT = "application/json"
 const TEXT_ACCEPT = "text/plain, application/json"
 const STATUS_MESSAGE_MAX = 300
 
@@ -48,18 +52,23 @@ function statusMessage(body: string): string {
   return body.replace(/\s+/g, " ").slice(0, STATUS_MESSAGE_MAX)
 }
 
-async function kubeRequestText(path: string, accept: string): Promise<string> {
+async function kubeRequestText(method: KubeMethod, path: string, init: KubeRequestInit): Promise<string> {
   const port = process.env.KUBERNETES_SERVICE_PORT ?? "443"
   if (!isInCluster()) throw new Error("Not running inside a Kubernetes pod (KUBERNETES_SERVICE_HOST unset)")
   const [token, ca] = await Promise.all([readToken(), readCa()])
+  const payload = init.body === undefined ? null : Buffer.from(JSON.stringify(init.body), "utf8")
   const headers: OutgoingHttpHeaders = {
     Authorization: `Bearer ${token}`,
-    Accept: accept,
+    Accept: init.accept ?? JSON_ACCEPT,
+  }
+  if (payload) {
+    headers["Content-Type"] = init.contentType ?? JSON_ACCEPT
+    headers["Content-Length"] = payload.length
   }
 
   return await new Promise<string>((resolve, reject) => {
     const req = request(
-      { host: KUBE_API_HOST, port: Number(port), path, method: "GET", headers, ca },
+      { host: KUBE_API_HOST, port: Number(port), path, method, headers, ca },
       res => {
         const chunks: Buffer[] = []
         res.on("data", chunk => chunks.push(chunk))
@@ -69,7 +78,7 @@ async function kubeRequestText(path: string, accept: string): Promise<string> {
             resolve(body)
           } else {
             const detail = statusMessage(body)
-            console.error(`[kube-api] GET ${path} -> ${res.statusCode}: ${detail}`)
+            console.error(`[kube-api] ${method} ${path} -> ${res.statusCode}: ${detail}`)
             reject(new KubeApiError(
               `Kubernetes API ${path} returned ${res.statusCode}: ${detail}`,
               res.statusCode ?? 0,
@@ -79,28 +88,26 @@ async function kubeRequestText(path: string, accept: string): Promise<string> {
       },
     )
     req.on("error", e => {
-      console.error(`[kube-api] GET ${path} -> request error:`, (e as Error).message)
+      console.error(`[kube-api] ${method} ${path} -> request error:`, (e as Error).message)
       reject(e)
     })
+    if (payload) req.write(payload)
     req.end()
   })
 }
 
-async function kubeRequestWithTokenRefresh(path: string, accept: string): Promise<string> {
+async function kubeRequestWithTokenRefresh(method: KubeMethod, path: string, init: KubeRequestInit): Promise<string> {
   try {
-    return await kubeRequestText(path, accept)
+    return await kubeRequestText(method, path, init)
   } catch (e) {
     if (!(e instanceof KubeApiError) || e.status !== 401) throw e
     cachedToken = null
-    return await kubeRequestText(path, accept)
+    return await kubeRequestText(method, path, init)
   }
 }
 
-// `accept` is threaded out so callers can content-negotiate: aggregated API
-// discovery needs `application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList`
-// to get kinds, plurals and scope in one request instead of one GET per group.
-export async function kubeApiGet<T>(path: string, accept = "application/json"): Promise<T> {
-  const body = await kubeRequestWithTokenRefresh(path, accept)
+function parseJson<T>(path: string, body: string): T {
+  if (body.trim() === "") return {} as T
   try {
     return JSON.parse(body) as T
   } catch (e) {
@@ -108,6 +115,17 @@ export async function kubeApiGet<T>(path: string, accept = "application/json"): 
   }
 }
 
+export async function kubeApiRequest<T>(method: KubeMethod, path: string, init: KubeRequestInit = {}): Promise<T> {
+  return parseJson<T>(path, await kubeRequestWithTokenRefresh(method, path, init))
+}
+
+// `accept` is threaded out so callers can content-negotiate: aggregated API
+// discovery needs `application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList`
+// to get kinds, plurals and scope in one request instead of one GET per group.
+export async function kubeApiGet<T>(path: string, accept = JSON_ACCEPT): Promise<T> {
+  return kubeApiRequest<T>("GET", path, { accept })
+}
+
 export async function kubeApiGetText(path: string): Promise<string> {
-  return await kubeRequestWithTokenRefresh(path, TEXT_ACCEPT)
+  return await kubeRequestWithTokenRefresh("GET", path, { accept: TEXT_ACCEPT })
 }

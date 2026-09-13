@@ -6,6 +6,7 @@ import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
 import type { AlertsResult } from "@/lib/features/prometheus/alerts"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
+import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upgrade/types"
 
 export type PodContainerStatus = {
   name: string
@@ -32,7 +33,7 @@ export type ClusterResource = {
   labels?: Record<string, string>
   ownerUID?: string
   managerUID?: string
-  argoApp?: { name: string; url?: string; kind?: string; resourceRef?: string }
+  argoApp?: { name: string; url?: string; detailsUrl?: string; kind?: string; resourceRef?: string }
   ips?: string[]
   declaredPorts?: { container: string; name?: string; port: number; protocol: string }[]
   hostNetwork?: boolean
@@ -53,6 +54,7 @@ export type ClusterState = {
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
   clusterResources: ClusterResource[] | null
+  livePatchUpgrades: LivePatchUpgradeListResponse | null
   nodeDrift: ClusterNodesResponse | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: boolean
@@ -73,6 +75,7 @@ export const useClusterState = create<ClusterState>(() => ({
   socketProgress: null,
   containerCount: null,
   clusterResources: null,
+  livePatchUpgrades: null,
   nodeDrift: null,
   vulnerabilityReports: null,
   vulnerabilityReportsError: false,

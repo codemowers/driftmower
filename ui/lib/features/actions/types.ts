@@ -1,5 +1,6 @@
 import type { StatusType } from "@/lib/cluster/reports"
 import type { VulnerabilitySeverity } from "@/lib/features/vulnerability/types"
+import type { LivePatchUpgradeTarget } from "@/lib/features/live-patch-upgrade/types"
 
 export const PROMPT_VERSION = 7
 
@@ -35,6 +36,7 @@ export type ActionRow = {
   verb: string
   name: string
   statusType: StatusType
+  target?: LivePatchUpgradeTarget
 }
 
 export type ClusterActionRow = ActionRow & {

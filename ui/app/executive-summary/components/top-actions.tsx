@@ -7,6 +7,8 @@ import { useActionAssessments } from "@/lib/features/actions/use-action-assessme
 import { reasonLine, VALUE_LEAD } from "@/lib/features/actions/verdict"
 import type { ClusterActionRow, Risk } from "@/lib/features/actions/types"
 import { CHIP_STYLE, enrichRow, RiskChip, type EnrichedRow } from "@/app/components/actions-chip"
+import LivePatchUpgradePill from "@/app/components/live-patch-upgrade-pill"
+import { useLivePatchUpgrade, useLivePatchUpgradeCount } from "@/lib/features/live-patch-upgrade/use-live-patch-upgrade"
 
 const INITIAL_COUNT = 5
 
@@ -31,9 +33,41 @@ function rowHref(row: ClusterActionRow, reportId: string | null): string {
   return `${path}?${params.toString()}`
 }
 
+function TopActionRow({ item, reportId }: { item: EnrichedRow<ClusterActionRow>; reportId: string | null }) {
+  const { row, result, chip, value } = item
+  const livePatchUpgrade = useLivePatchUpgrade(row.facts)
+  const showPill = livePatchUpgrade.active !== null && chip !== "assessing"
+  return (
+    <Link
+      href={rowHref(row, reportId)}
+      className="flex cursor-pointer items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg"
+    >
+      <span className="w-[84px] shrink-0">
+        <RiskChip state={chip} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm">
+          <span className="font-semibold">{row.verb}</span>
+          <span className="ml-1.5 text-muted-foreground">{row.name}</span>
+          <span className="ml-1.5 font-mono text-xs text-muted-foreground">{row.owner.namespace}/{row.owner.name}</span>
+        </p>
+        <p className="truncate text-[12.5px] text-muted-foreground">
+          {value && <><span className="font-semibold text-foreground">{VALUE_LEAD[value]}</span> · </>}
+          {reasonLine(row.facts, result, { relation: row.relation, absorbed: row.absorbed, displayFrom: row.displayFrom })}
+        </p>
+      </div>
+      <span className="flex shrink-0 items-center gap-3 font-mono text-[12.5px]">
+        {showPill && <LivePatchUpgradePill />}
+        <span>{row.displayFrom}<span className="px-1 text-muted-foreground">→</span><span className="font-semibold">{row.facts.to}</span></span>
+      </span>
+    </Link>
+  )
+}
+
 export default function TopActions({ rows, currentCharts, reportId }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { displayRows, results, unavailable } = useActionAssessments(rows, currentCharts, { focus: false })
+  const livePatchUpgradeCount = useLivePatchUpgradeCount()
 
   if (displayRows.length === 0) return null
 
@@ -62,31 +96,7 @@ export default function TopActions({ rows, currentCharts, reportId }: Props) {
       </div>
 
       <div className={cn("flex flex-col divide-y divide-gray-100", expanded && "max-h-160 overflow-y-auto")}>
-        {shown.map(({ row, result, chip, value }) => (
-          <Link
-            key={row.key}
-            href={rowHref(row, reportId)}
-            className="flex cursor-pointer items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg"
-          >
-            <span className="w-[84px] shrink-0">
-              <RiskChip state={chip} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">
-                <span className="font-semibold">{row.verb}</span>
-                <span className="ml-1.5 text-muted-foreground">{row.name}</span>
-                <span className="ml-1.5 font-mono text-xs text-muted-foreground">{row.owner.namespace}/{row.owner.name}</span>
-              </p>
-              <p className="truncate text-[12.5px] text-muted-foreground">
-                {value && <><span className="font-semibold text-foreground">{VALUE_LEAD[value]}</span> · </>}
-                {reasonLine(row.facts, result, { relation: row.relation, absorbed: row.absorbed, displayFrom: row.displayFrom })}
-              </p>
-            </div>
-            <span className="shrink-0 font-mono text-[12.5px]">
-              {row.displayFrom}<span className="px-1 text-muted-foreground">→</span><span className="font-semibold">{row.facts.to}</span>
-            </span>
-          </Link>
-        ))}
+        {shown.map(item => <TopActionRow key={item.row.key} item={item} reportId={reportId} />)}
       </div>
 
       {overflow > 0 && !expanded && (
@@ -104,6 +114,12 @@ export default function TopActions({ rows, currentCharts, reportId }: Props) {
         >
           show less
         </button>
+      )}
+
+      {livePatchUpgradeCount > 0 && (
+        <p className="mt-3 px-6 text-[11.5px] text-muted-foreground">
+          <span className="font-semibold text-foreground tabular-nums">{livePatchUpgradeCount}</span> temporary {livePatchUpgradeCount === 1 ? "fix" : "fixes"} active
+        </p>
       )}
 
       {unavailable && (
