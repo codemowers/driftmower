@@ -11,6 +11,7 @@ import PodSecurityCard from "./components/pod-security-card"
 import RegistryCard from "./components/registry-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
+import TableOfContents, { type TocEntry } from "./components/table-of-contents"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
 import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import type { CapabilityResponse } from "@/lib/features/provisioning/types"
@@ -58,8 +59,22 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
   const zones = capabilities.topology.zones.filter(z => z.zone !== "(no zone label)")
   const enforced = capabilities.admissionPolicies.filter(p => p.enforced)
 
+  // Mirrors the render conditions below so the list never links to a section
+  // that is not on the page.
+  const toc: TocEntry[] = [
+    ...(capabilities.degraded.length > 0 ? [{ id: "not-checked", title: "Not checked" }] : []),
+    { id: "coding-agent", title: "Connect a coding agent" },
+    { id: "hostname", title: "Your hostname" },
+    ...(scoped ? [{ id: "registry", title: "Container registry" }] : []),
+    { id: "operators", title: "Databases and other operators" },
+    { id: "storage", title: "Storage" },
+    { id: "admission", title: "Admission policies" },
+  ]
+
   return (
-    <>
+    <div className="flex flex-col gap-8 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:items-start xl:gap-x-10">
+      <TableOfContents entries={toc} />
+      <div className="flex min-w-0 flex-col gap-8">
       <StatGrid>
         <StatCell label="Operators installed">
           <StatValue>{runningOfferings.length}</StatValue>
@@ -84,7 +99,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
       {/* Degraded reads name the rule to add, following the habit in
           lib/cluster-resources/nodes.ts. */}
       {capabilities.degraded.length > 0 && (
-        <Section title="Not checked" count={capabilities.degraded.length}>
+        <Section id="not-checked" title="Not checked" count={capabilities.degraded.length}>
           <div className="flex flex-col gap-2">
             {capabilities.degraded.map(entry => (
               <p key={entry.source} className="text-sm text-muted-foreground">
@@ -99,6 +114,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           authenticated endpoint, alongside the drift analysis. The tool list is
           the easy part; getting a token into a client is what needs showing. */}
       <Section
+        id="coding-agent"
         title="Connect a coding agent"
         hint="The MCP gateway answers these same questions, scoped to the namespaces you can access. Read-only — it changes nothing."
       >
@@ -106,6 +122,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
       </Section>
 
       <Section
+        id="hostname"
         title="Your hostname"
         hint="The ingress controller is shared, so the hostname you may claim is anchored on your namespace and enforced on admission."
       >
@@ -118,10 +135,21 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
         )}
       </Section>
 
+      {scoped && (
+        <Section
+          id="registry"
+          title="Container registry"
+          hint="Your sandbox's private Zot registry, with commands for pushing and pulling images."
+        >
+          <RegistryCard namespaces={capabilities.namespaces} ingress={capabilities.ingress} />
+        </Section>
+      )}
+
       {/* The offerings the stat tile counts, with the manifest each one takes.
           Same intent as the Ingress snippet above: the answer to "how do I ask
           for one" should be copyable, not reconstructed from operator docs. */}
       <Section
+        id="operators"
         title="Databases and other operators"
         count={runningOfferings.length}
         hint="Each sample is the smallest manifest this cluster would accept, at the API version it actually serves. Sized for trying something out — one replica, a small disk."
@@ -133,20 +161,12 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
         />
       </Section>
 
-      {scoped && (
-        <Section
-          title="Container registry"
-          hint="Your sandbox's private Zot registry, with commands for pushing and pulling images."
-        >
-          <RegistryCard namespaces={capabilities.namespaces} ingress={capabilities.ingress} />
-        </Section>
-      )}
-
-      <Section title="Storage" count={capabilities.storageClasses.length}>
+      <Section id="storage" title="Storage" count={capabilities.storageClasses.length}>
         <StorageList classes={capabilities.storageClasses} />
       </Section>
 
       <Section
+        id="admission"
         title="Admission policies"
         count={capabilities.admissionPolicies.length}
         hint="These are checked after your permissions and can reject an apply your role otherwise allows."
@@ -159,6 +179,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           <AdmissionList policies={capabilities.admissionPolicies} />
         </div>
       </Section>
-    </>
+      </div>
+    </div>
   )
 }
