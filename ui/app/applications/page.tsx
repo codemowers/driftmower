@@ -5,10 +5,11 @@ import PageHeader from "../components/page-header"
 import { FilterSearchInput } from "../components/filter-bar"
 import { Switch } from "@/components/ui/switch"
 import ApplicationTile from "./components/application-tile"
-import { scopedHosts, useApplications } from "@/lib/features/applications/use-applications"
+import { scopedHosts, useApplications, useDomainSuffix } from "@/lib/features/applications/use-applications"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
+import { useSandboxContext, useSandboxScope, useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
 import { resolveManagerLink } from "@/lib/features/applications/manager-link"
+import { ownApps } from "@/lib/features/applications/ownership"
 import type { ApplicationEntry } from "@/lib/features/applications/types"
 
 function matches(entry: ApplicationEntry, query: string): boolean {
@@ -23,12 +24,27 @@ export default function ApplicationsPage() {
   const { launcher, inventory } = useApplications()
   const releaseScores = useClusterState(s => s.data?.rotenness.releaseScores)
   const { namespaces } = useSandboxScope()
+  const seesEverything = useSeesClusterWideViews()
+  const tenancyKnown = useSandboxContext(s => s.hydrated)
+  const sandboxes = useSandboxContext(s => s.sandboxes)
+  const domainSuffix = useDomainSuffix()
   const [query, setQuery] = useState("")
   const [showAll, setShowAll] = useState(false)
 
   const search = query.trim().toLowerCase()
 
-  const available = launcher.status === "ready" ? launcher.entries.filter(e => matches(e, search)) : []
+  // passmower filters /api/apps by group, not by tenancy, so a registration
+  // pointing at a platform host -- its Prometheus, its Alertmanager, a Thanos
+  // host whose workload is long gone -- reaches sandbox users too. They have
+  // their own `<id>-prom`; the platform's is not theirs to open.
+  const offered =
+    launcher.status === "ready"
+      ? seesEverything
+        ? launcher.entries
+        : ownApps(launcher.entries, sandboxes.map(s => s.sandbox), domainSuffix)
+      : []
+
+  const available = offered.filter(e => matches(e, search))
 
   const others =
     inventory.status === "ready"
@@ -55,7 +71,7 @@ export default function ApplicationsPage() {
           subtitle="Applications you can reach, and the other hosts in your namespaces"
         />
 
-        {launcher.status === "loading" && (
+        {(launcher.status === "loading" || (launcher.status === "ready" && !tenancyKnown)) && (
           <p className="text-sm text-muted-foreground">Loading applications…</p>
         )}
 
@@ -77,7 +93,7 @@ export default function ApplicationsPage() {
           </p>
         )}
 
-        {launcher.status === "ready" && (
+        {launcher.status === "ready" && tenancyKnown && (
           <>
             <div className="flex items-center gap-4">
               <FilterSearchInput

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { suffixFromAppBaseUrl } from "@/lib/features/provisioning/ingress-facts"
 import { hostOf } from "./host-url"
 import type { ApplicationEntry, HostsResponse, OidcApp, TenancyState } from "./types"
 
@@ -122,4 +123,16 @@ export function useApplications(): ApplicationsState {
   }, [])
 
   return state
+}
+
+// The app is itself deployed at `<name>.<suffix>`, so its own location carries
+// the cluster's domain suffix -- no cluster read and no extra round trip.
+// Guarded for the server render, which has no location; the launcher is still
+// loading then, so the two renders agree on what they draw either way.
+export function useDomainSuffix(): string | null {
+  const [suffix] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : suffixFromAppBaseUrl(window.location.origin),
+  )
+
+  return suffix
 }

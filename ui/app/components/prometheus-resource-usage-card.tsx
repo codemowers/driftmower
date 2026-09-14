@@ -9,6 +9,7 @@ import { usageBarColor } from "@/lib/utils/usage-color"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { PodVolume, ResourceTriplet } from "@/lib/features/prometheus/query"
 import type { PerPodMetrics } from "@/lib/features/prometheus/workload-metrics"
+import { useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const MAX_VISIBLE = 5
@@ -49,6 +50,10 @@ function nameSeries(expr: string, name: string): string {
 
 export default function PrometheusResourceUsageCard({ metrics, graphQueries, emptyHint, podCount, perPod, qosBreakdown, podHref }: Props) {
   const prometheusUrl = useClusterState(s => s.prometheusAlerts?.prometheusUrl ?? null)
+  // This link points at the platform Prometheus, which a sandbox user is not
+  // meant to open -- they have their own `<id>-prom`. The card itself stays:
+  // the numbers on it are their own pods', whatever instance served them.
+  const seesClusterWideViews = useSeesClusterWideViews()
 
   if (!metrics) return null
 
@@ -57,7 +62,8 @@ export default function PrometheusResourceUsageCard({ metrics, graphQueries, emp
     nameSeries(graphQueries.cpuUsage, "cpu"),
     ...(metrics.volumes.length > 0 && graphQueries.volUsed ? [nameSeries(graphQueries.volUsed, "volume")] : []),
   ]
-  const link = prometheusUrl ? buildPrometheusGraphLink(prometheusUrl, exprs) : null
+  const link =
+    prometheusUrl && seesClusterWideViews ? buildPrometheusGraphLink(prometheusUrl, exprs) : null
 
   const hasComputeUsage = metrics.memory.usage !== null || metrics.cpu.usage !== null
   const noBars = !metricHasBar(metrics.memory) && !metricHasBar(metrics.cpu)
