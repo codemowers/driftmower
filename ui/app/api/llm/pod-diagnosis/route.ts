@@ -1,5 +1,5 @@
 import { hasSession } from "@/lib/auth/session"
-import { isLlmConfigured } from "@/lib/llm"
+import { llmConfigError } from "@/lib/llm"
 import { sync } from "@/lib/features/pod-diagnosis/diagnose"
 import { MAX_PODS_PER_REQUEST } from "@/lib/features/pod-diagnosis/client"
 import type { DiagnosisFacts } from "@/lib/features/pod-diagnosis/types"
@@ -35,8 +35,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "pods must be an array of diagnosis facts" }, { status: 400 })
   }
 
-  if (!isLlmConfigured()) {
-    return Response.json({ error: "LLM_BASE_URL is not set" }, { status: 503 })
+  const configError = llmConfigError()
+  if (configError) {
+    return Response.json({ error: configError }, { status: 503 })
   }
 
   return Response.json(

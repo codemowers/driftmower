@@ -1,5 +1,5 @@
 import { hasSession } from "@/lib/auth/session"
-import { isLlmConfigured } from "@/lib/llm"
+import { llmConfigError } from "@/lib/llm"
 import type { ActionFacts } from "@/lib/features/actions/types"
 import { sync } from "@/lib/features/actions/queue"
 import { MAX_ACTIONS_PER_REQUEST } from "@/lib/features/actions/client"
@@ -40,8 +40,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "actions must be an array of action facts" }, { status: 400 })
   }
 
-  if (!isLlmConfigured()) {
-    return Response.json({ error: "LLM_BASE_URL is not set" }, { status: 503 })
+  const configError = llmConfigError()
+  if (configError) {
+    return Response.json({ error: configError }, { status: 503 })
   }
 
   return Response.json({ results: sync(body.actions, body.focus === true) }, { headers: { "Cache-Control": "no-store" } })
