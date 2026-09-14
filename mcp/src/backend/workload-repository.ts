@@ -1,5 +1,5 @@
-import type { Knex } from 'knex'
 import { parseReleaseInfo } from '../domain/release-info.js'
+import { releaseInfoFor, type ImageUsageRow, type ReportRows, type ReportRowLoader } from './report-rows.js'
 import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
 
 interface WorkloadGroupCandidateRow {
@@ -9,17 +9,6 @@ interface WorkloadGroupCandidateRow {
   workloadNamespace: string | null
   workloadName: string | null
   searchRepository: string | null
-  releaseInfo: string | null
-}
-
-interface WorkloadDetailDatabaseRow extends WorkloadGroupCandidateRow {
-  releaseGroupKey: string | null
-  registry: string
-  repository: string
-  deployedTag: string | null
-  latestTag: string | null
-  imageStatus: string
-  versionStatus: string | null
   releaseInfo: string | null
 }
 
@@ -37,7 +26,6 @@ export interface WorkloadDetailRow extends MatchingWorkloadGroupRow {
   latestTag: string | null
   imageStatus: string
   versionStatus: string | null
-  releaseInfo: string | null
 }
 
 export interface WorkloadRepository {
@@ -45,9 +33,9 @@ export interface WorkloadRepository {
   loadWorkloadDetails(selectedGroups: MatchingWorkloadGroupRow[]): Promise<WorkloadDetailRow[]>
 }
 
-export class SqliteWorkloadRepository implements WorkloadRepository {
+export class BackendWorkloadRepository implements WorkloadRepository {
   constructor(
-    private readonly database: Knex,
+    private readonly rowLoader: ReportRowLoader,
     private readonly reportSnapshotRepository: ReportSnapshotRepository
   ) {}
 
@@ -58,11 +46,11 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
       return []
     }
 
-    const candidates = await this.loadGroupCandidates(latestReports.map(report => report.reportId))
+    const candidates = await this.loadGroupCandidates(latestReports)
     const reportsById = new Map(latestReports.map(report => [report.reportId, report]))
     const normalizedQuery = query.toLocaleLowerCase()
 
-    return uniqueGroupCandidates(candidates)
+    return candidates
       .map(candidate => enrichMatchingGroup(candidate, reportsById, normalizedQuery))
       .filter((group): group is MatchingWorkloadGroupRow => group !== null)
       .sort(compareMatchingGroups)
@@ -74,85 +62,126 @@ export class SqliteWorkloadRepository implements WorkloadRepository {
       return []
     }
 
-    const rows = await this.buildDetailQuery(selectedGroups)
     const groupsById = new Map(selectedGroups.map(group => [workloadGroupId(group), group]))
+    const rowsByReport = await this.loadReports(uniqueReportIds(selectedGroups))
+    const details: WorkloadDetailRow[] = []
 
-    return rows.map(row => ({
-      ...row,
-      ...groupsById.get(workloadGroupId(row))!
-    }))
+    for (const [reportId, rows] of rowsByReport) {
+      // Every image row of each selected workload, with the Helm analysis
+      // attached wherever release_group_key names a release score in the same
+      // report — the join the SQL used to do.
+      const selected = rows.imageUsages
+        .filter(usage => groupsById.has(workloadGroupId({ reportId, workloadGroupKey: usage.workloadGroupKey })))
+        .sort(compareDetailRows)
+
+      for (const usage of selected) {
+        const group = groupsById.get(
+          workloadGroupId({ reportId, workloadGroupKey: usage.workloadGroupKey })
+        )!
+
+        details.push({
+          ...group,
+          releaseGroupKey: usage.releaseGroupKey,
+          registry: usage.registry,
+          repository: usage.repository,
+          deployedTag: usage.deployedTag,
+          latestTag: usage.latestTag,
+          imageStatus: usage.status,
+          versionStatus: usage.versionStatus,
+          releaseInfo: releaseInfoFor(rows, usage.releaseGroupKey)
+        })
+      }
+    }
+
+    return details
   }
 
-  private async loadGroupCandidates(reportIds: string[]): Promise<WorkloadGroupCandidateRow[]> {
-    // Find distinct workload search candidates only in the selected latest reports.
-    // Matching and ranking happen in TypeScript so user input never becomes SQL text.
-    return (await this.database<WorkloadGroupCandidateRow>('image_usages as iu')
-      .distinct([
-        'iu.report_id as reportId',
-        'iu.workload_group_key as workloadGroupKey',
-        'iu.workload_kind as workloadKind',
-        'iu.workload_namespace as workloadNamespace',
-        'iu.workload_name as workloadName',
-        'iu.repository as searchRepository',
-        'rs.release_info as releaseInfo'
-      ])
-      .leftJoin('release_scores as rs', join => {
-        join.on('rs.report_id', '=', 'iu.report_id')
-        join.andOn('rs.group_key', '=', 'iu.release_group_key')
-      })
-      .whereIn('iu.report_id', reportIds)
-      .orderBy([
-        { column: 'iu.report_id', order: 'asc' },
-        { column: 'iu.workload_group_key', order: 'asc' },
-        { column: 'iu.workload_name', order: 'asc' },
-        { column: 'iu.repository', order: 'asc' }
-      ])) as WorkloadGroupCandidateRow[]
+  private async loadGroupCandidates(reports: ReportSnapshot[]): Promise<WorkloadGroupCandidateRow[]> {
+    const rowsByReport = await this.loadReports(reports.map(report => report.reportId))
+    const candidates = new Map<string, WorkloadGroupCandidateRow>()
+
+    for (const [reportId, rows] of rowsByReport) {
+      // One candidate per workload group. Matching and ranking happen here
+      // rather than in the query so user input never reaches the backend as a
+      // filter expression.
+      for (const usage of [...rows.imageUsages].sort(compareCandidateRows)) {
+        const id = workloadGroupId({ reportId, workloadGroupKey: usage.workloadGroupKey })
+
+        if (candidates.has(id)) {
+          continue
+        }
+
+        candidates.set(id, {
+          reportId,
+          workloadGroupKey: usage.workloadGroupKey,
+          workloadKind: usage.workloadKind,
+          workloadNamespace: usage.workloadNamespace,
+          workloadName: usage.workloadName,
+          searchRepository: usage.repository,
+          releaseInfo: releaseInfoFor(rows, usage.releaseGroupKey)
+        })
+      }
+    }
+
+    return [...candidates.values()]
   }
 
-  private buildDetailQuery(selectedGroups: MatchingWorkloadGroupRow[]): Promise<WorkloadDetailDatabaseRow[]> {
-    // Load every image row for each selected workload and attach persisted Helm analysis when
-    // release_group_key identifies a matching release score in the same report snapshot.
-    return this.database<WorkloadDetailDatabaseRow>('image_usages as iu')
-      .select([
-        'iu.report_id as reportId',
-        'iu.workload_group_key as workloadGroupKey',
-        'iu.workload_kind as workloadKind',
-        'iu.workload_namespace as workloadNamespace',
-        'iu.workload_name as workloadName',
-        'iu.release_group_key as releaseGroupKey',
-        'iu.registry',
-        'iu.repository',
-        'iu.deployed_tag as deployedTag',
-        'iu.latest_tag as latestTag',
-        'iu.status as imageStatus',
-        'iu.version_status as versionStatus',
-        'rs.release_info as releaseInfo'
-      ])
-      .leftJoin('release_scores as rs', join => {
-        join.on('rs.report_id', '=', 'iu.report_id')
-        join.andOn('rs.group_key', '=', 'iu.release_group_key')
-      })
-      .where(builder => addSelectedGroupConditions(builder, selectedGroups))
-      .orderBy([
-        { column: 'iu.workload_group_key', order: 'asc' },
-        { column: 'iu.repository', order: 'asc' },
-        { column: 'iu.container_name', order: 'asc' }
-      ]) as unknown as Promise<WorkloadDetailDatabaseRow[]>
+  private async loadReports(reportIds: string[]): Promise<Map<string, ReportRows>> {
+    const loaded = await Promise.all(
+      reportIds.map(async reportId => [reportId, await this.rowLoader.load(reportId)] as const)
+    )
+
+    return new Map(loaded)
   }
 }
 
-function uniqueGroupCandidates(rows: WorkloadGroupCandidateRow[]): WorkloadGroupCandidateRow[] {
-  const groups = new Map<string, WorkloadGroupCandidateRow>()
+function uniqueReportIds(groups: MatchingWorkloadGroupRow[]): string[] {
+  return [...new Set(groups.map(group => group.reportId))]
+}
 
-  for (const row of rows) {
-    const id = workloadGroupId(row)
+// Row ordering is compared byte-wise, as the backend's database orders text:
+// it decides which image row represents a workload group in search, so a
+// locale-aware comparison would change which repository a workload can be
+// found by.
+function compareCandidateRows(left: ImageUsageRow, right: ImageUsageRow): number {
+  return (
+    compareText(left.workloadGroupKey, right.workloadGroupKey) ||
+    compareNullableText(left.workloadName, right.workloadName) ||
+    compareText(left.repository, right.repository)
+  )
+}
 
-    if (!groups.has(id)) {
-      groups.set(id, row)
-    }
+function compareDetailRows(left: ImageUsageRow, right: ImageUsageRow): number {
+  return (
+    compareText(left.workloadGroupKey, right.workloadGroupKey) ||
+    compareText(left.repository, right.repository) ||
+    compareNullableText(left.containerName, right.containerName)
+  )
+}
+
+function compareText(left: string, right: string): number {
+  if (left === right) {
+    return 0
   }
 
-  return [...groups.values()]
+  return left < right ? -1 : 1
+}
+
+// Nulls sort first, as they do in an ascending SQL order.
+function compareNullableText(left: string | null, right: string | null): number {
+  if (left === right) {
+    return 0
+  }
+
+  if (left === null) {
+    return -1
+  }
+
+  if (right === null) {
+    return 1
+  }
+
+  return compareText(left, right)
 }
 
 function enrichMatchingGroup(
@@ -239,18 +268,5 @@ function compareNullableStrings(left: string | null, right: string | null): numb
 }
 
 function workloadGroupId(group: Pick<WorkloadGroupCandidateRow, 'reportId' | 'workloadGroupKey'>): string {
-  return `${group.reportId}\u0000${group.workloadGroupKey}`
-}
-
-function addSelectedGroupConditions(
-  builder: Knex.QueryBuilder,
-  selectedGroups: MatchingWorkloadGroupRow[]
-): void {
-  for (const group of selectedGroups) {
-    builder.orWhere(groupBuilder => {
-      groupBuilder
-        .where('iu.report_id', group.reportId)
-        .andWhere('iu.workload_group_key', group.workloadGroupKey)
-    })
-  }
+  return `${group.reportId} ${group.workloadGroupKey}`
 }

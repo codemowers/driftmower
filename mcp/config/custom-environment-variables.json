@@ -12,8 +12,13 @@
     },
     "logLevel": "DRIFTMOWER_MCP_LOG_LEVEL"
   },
-  "database": {
-    "path": "DRIFTMOWER_MCP_DB_PATH"
+  "backend": {
+    "url": "DRIFTMOWER_BE_URL",
+    "serviceToken": "DRIFTMOWER_BE_SERVICE_TOKEN",
+    "timeoutMs": {
+      "__name": "DRIFTMOWER_BE_TIMEOUT_MS",
+      "__format": "number"
+    }
   },
   "search": {
     "defaultLimit": {

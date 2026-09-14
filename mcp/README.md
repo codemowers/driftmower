@@ -2,14 +2,18 @@
 
 MCP server for exposing persisted Driftmower analysis snapshots to coding agents.
 
-The server opens a Driftmower SQLite database in read-only mode and provides tools
-for finding workloads and planning image updates from persisted analysis snapshots.
-It never modifies the database or a target repository.
+The server reads persisted analysis snapshots from the driftmower-be API and
+provides tools for finding workloads and planning image updates. It only ever
+reads: it never writes to the backend or to a target repository.
 
 ## Requirements
 
 - Node.js 24 or compatible current LTS runtime
-- A Driftmower SQLite database, usually `driftmower-be.sqlite`
+- A reachable driftmower-be, and a service token it accepts
+
+The backend must be recent enough to allow `id` and `status` in a `/reports`
+query. Without that this server cannot select the fields it needs, and every
+report listing would make the backend assemble its full body.
 
 ## Install
 
@@ -24,7 +28,9 @@ Default configuration lives in `config/default.json` and can be overridden with
 environment variables:
 
 ```bash
-DRIFTMOWER_MCP_DB_PATH=/data/driftmower-be.sqlite
+DRIFTMOWER_BE_URL=http://driftmower-be:3030
+DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_...
+DRIFTMOWER_BE_TIMEOUT_MS=15000
 DRIFTMOWER_MCP_TRANSPORT=stdio
 DRIFTMOWER_MCP_HOST=127.0.0.1
 DRIFTMOWER_MCP_PORT=3000
@@ -34,24 +40,33 @@ DRIFTMOWER_MCP_MAX_LIMIT=100
 DRIFTMOWER_MCP_LOG_LEVEL=info
 ```
 
-The database path can also be passed with `--db`:
+The backend URL can also be passed with `--backend-url`:
 
 ```bash
-driftmower-mcp --db /data/driftmower-be.sqlite
+driftmower-mcp --backend-url http://127.0.0.1:3030
 ```
+
+The service token has no CLI flag: a credential on the command line is visible
+to every process on the machine.
+
+`DRIFTMOWER_BE_SERVICE_TOKEN` must be a token driftmower-be lists in
+`auth.serviceTokens` (it authenticates as a service principal, which is exempt
+from the backend's own tenancy scoping — this server scopes what it returns
+itself).
 
 ## Run
 
 For local MCP clients, use the default `stdio` transport:
 
 ```bash
-npm run start -- --db /data/driftmower-be.sqlite
+DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... npm run start -- --backend-url http://127.0.0.1:3030
 ```
 
 For HTTP testing:
 
 ```bash
-DRIFTMOWER_MCP_TRANSPORT=http npm run start -- --db /data/driftmower-be.sqlite
+DRIFTMOWER_MCP_TRANSPORT=http DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
+  npm run start -- --backend-url http://127.0.0.1:3030
 ```
 
 HTTP mode exposes:
@@ -77,13 +92,14 @@ Register the server:
 
 ```bash
 DRIFTMOWER_MCP_DIR=/path/to/driftmower-mcp
-DRIFTMOWER_DB=/path/to/driftmower-be.sqlite
+DRIFTMOWER_BE_URL=http://127.0.0.1:3030
 
 codex mcp add driftmower \
   --env NODE_CONFIG_DIR="$DRIFTMOWER_MCP_DIR/config" \
+  --env DRIFTMOWER_BE_SERVICE_TOKEN="dm_svc_..." \
   -- \
   node "$DRIFTMOWER_MCP_DIR/dist/index.js" \
-  --db "$DRIFTMOWER_DB"
+  --backend-url "$DRIFTMOWER_BE_URL"
 ```
 
 Check the registration:
@@ -112,7 +128,7 @@ codex mcp add driftmower-http --url http://127.0.0.1:3000/mcp
 ```
 
 For local machine usage, `stdio` is the recommended mode. It does not require a
-separate long-running server process and keeps the SQLite database path explicit.
+separate long-running server process.
 
 ## Docker Usage
 
@@ -122,16 +138,16 @@ Build a local image:
 docker build -t driftmower-mcp:local .
 ```
 
-Run HTTP mode with a read-only database mount:
+Run HTTP mode against a backend:
 
 ```bash
 docker run --rm \
   -e DRIFTMOWER_MCP_TRANSPORT=http \
-  -e DRIFTMOWER_MCP_DB_PATH=/data/driftmower-be.sqlite \
+  -e DRIFTMOWER_BE_URL=http://driftmower-be:3030 \
+  -e DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
   -e DRIFTMOWER_MCP_HOST=0.0.0.0 \
   -p 3000:3000 \
   -p 3001:3001 \
-  -v /path/to/driftmower-data:/data:ro \
   driftmower-mcp:local
 ```
 
@@ -146,11 +162,27 @@ curl http://127.0.0.1:3001/readyz
 Kubernetes manifests live in `manifests/`. They deploy the MCP server in HTTP
 mode as an internal `ClusterIP` service in the `driftmowers` namespace.
 
-The deployment mounts the existing Driftmower backend PVC
-`driftmower-be-data-v2` at `/data` read-only and uses pod affinity to co-locate
-with `app: driftmower-be`, matching the ReadWriteOnce SQLite volume constraint.
-The in-cluster HTTP server binds to `::` so Kubernetes can probe it in IPv6 or
-dual-stack clusters.
+The deployment reads from driftmower-be over the cluster network, so it needs
+no volume, no pod affinity and no particular node. The in-cluster HTTP server
+binds to `::` so Kubernetes can probe it in IPv6 or dual-stack clusters.
+
+The pod reads its service token from the Secret `driftmower-mcp-be-auth-token`
+(key `token`), which no manifest creates: a credential does not belong in the
+repository. Mint one and register it with driftmower-be before the first
+apply — the deployment stays in `CreateContainerConfigError` until the Secret
+exists, and the pod never becomes ready until the backend accepts the token.
+
+```bash
+# The raw token is what this server sends; driftmower-be only ever holds its
+# SHA-256, listed in its auth.serviceTokens (AUTH_SERVICE_TOKENS) as
+# {"serviceName":"driftmower-mcp","tokenHash":"<hash>"}.
+DRIFTMOWER_MCP_TOKEN="dm_svc_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+DRIFTMOWER_MCP_TOKEN_HASH="$(printf %s "$DRIFTMOWER_MCP_TOKEN" | sha256sum | awk '{print $1}')"
+
+kubectl create secret generic driftmower-mcp-be-auth-token \
+  -n driftmowers \
+  --from-literal=token="$DRIFTMOWER_MCP_TOKEN"
+```
 
 Apply manually:
 
@@ -283,4 +315,7 @@ npm test
 ```
 
 The test suite includes repository tests, service tests, MCP transport tests, and
-fixture-backed integration coverage using `test/fixtures/driftmower-be.sqlite`.
+fixture-backed integration coverage: `test/fixtures/backend/` holds rows
+recorded from a real full-cluster analysis, and `test/fake-backend.ts` serves
+them over the same HTTP path production uses, rejecting any query the real
+backend's schemas would reject.

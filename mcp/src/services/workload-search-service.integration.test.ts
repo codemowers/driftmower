@@ -1,28 +1,24 @@
-import { fileURLToPath } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SqliteReportSnapshotRepository } from '../db/report-snapshot-repository.js'
-import { checkDatabaseSchema } from '../db/schema-check.js'
-import { openReadOnlyDatabase, type Database } from '../db/sqlite.js'
-import { SqliteWorkloadRepository } from '../db/workload-repository.js'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { BackendReportSnapshotRepository } from '../backend/report-snapshot-repository.js'
+import { ReportRowLoader } from '../backend/report-rows.js'
+import { BackendWorkloadRepository } from '../backend/workload-repository.js'
+import { createFakeBackend } from '../../test/fake-backend.js'
 import { WorkloadSearchService } from './workload-search-service.js'
 
-const FIXTURE_PATH = fileURLToPath(new URL('../../test/fixtures/driftmower-be.sqlite', import.meta.url))
-
-describe('WorkloadSearchService backend database fixture', () => {
-  let database: Database
+// Drives the service against rows recorded from a real full-cluster analysis,
+// served over the same HTTP path production uses.
+describe('WorkloadSearchService against recorded backend rows', () => {
   let service: WorkloadSearchService
 
-  beforeAll(async () => {
-    database = await openReadOnlyDatabase(FIXTURE_PATH)
-    await checkDatabaseSchema(database)
-    const reportSnapshotRepository = new SqliteReportSnapshotRepository(database)
-    const workloadRepository = new SqliteWorkloadRepository(database, reportSnapshotRepository)
+  beforeAll(() => {
+    const { client } = createFakeBackend()
+    const reportSnapshotRepository = new BackendReportSnapshotRepository(client)
+    const workloadRepository = new BackendWorkloadRepository(
+      new ReportRowLoader(client),
+      reportSnapshotRepository
+    )
 
     service = new WorkloadSearchService(workloadRepository, 20, 100)
-  })
-
-  afterAll(async () => {
-    await database.destroy()
   })
 
   it('returns persisted image and Helm analysis from a real full-cluster snapshot', async () => {

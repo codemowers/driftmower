@@ -15,13 +15,8 @@ spec:
       labels:
         app: driftmower-mcp
     spec:
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  app: driftmower-be
-              topologyKey: kubernetes.io/hostname
+      # No pod affinity and no volume: the analysis is read from driftmower-be
+      # over the cluster network, so this pod can run anywhere.
       imagePullSecrets:
         - name: sergii-gitea-registry-secret
       containers:
@@ -39,8 +34,16 @@ spec:
               value: 'default'
             - name: DRIFTMOWER_MCP_TRANSPORT
               value: 'http'
-            - name: DRIFTMOWER_MCP_DB_PATH
-              value: '/data/driftmower-be.sqlite'
+            - name: DRIFTMOWER_BE_URL
+              value: 'http://driftmower-be:3030'
+            # A token driftmower-be lists in auth.serviceTokens. It
+            # authenticates as a service principal, which the backend exempts
+            # from its own tenancy scoping; this server scopes what it returns.
+            - name: DRIFTMOWER_BE_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: driftmower-mcp-be-auth-token
+                  key: token
             - name: DRIFTMOWER_MCP_HOST
               value: '::'
             - name: DRIFTMOWER_MCP_PORT
@@ -51,22 +54,22 @@ spec:
               value: '20'
             - name: DRIFTMOWER_MCP_MAX_LIMIT
               value: '100'
-          volumeMounts:
-            - name: data
-              mountPath: /data
-              readOnly: true
           livenessProbe:
             httpGet:
               path: /healthz
               port: health
+          # Readiness and startup make a live call to driftmower-be, which the
+          # server bounds at 3s; the probe has to outlast that.
           readinessProbe:
             httpGet:
               path: /readyz
               port: health
+            timeoutSeconds: 5
           startupProbe:
             httpGet:
               path: /startupz
               port: health
+            timeoutSeconds: 5
             failureThreshold: 30
             periodSeconds: 2
           resources:
@@ -80,7 +83,3 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: driftmower-be-data-v2

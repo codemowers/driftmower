@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
+import { DriftmowerBackendClient } from './backend/client.js'
+import { BackendImageUpdateRepository } from './backend/image-update-repository.js'
+import { BackendReportSnapshotRepository } from './backend/report-snapshot-repository.js'
+import { ReportRowLoader } from './backend/report-rows.js'
+import { BackendWorkloadRepository } from './backend/workload-repository.js'
 import { loadAppConfig } from './config.js'
-import { SqliteImageUpdateRepository } from './db/image-update-repository.js'
-import { SqliteReportSnapshotRepository } from './db/report-snapshot-repository.js'
-import { checkDatabaseSchema } from './db/schema-check.js'
-import { openReadOnlyDatabase, type Database } from './db/sqlite.js'
-import { SqliteWorkloadRepository } from './db/workload-repository.js'
 import { startHealthServer } from './http/health.js'
 import { createLogger } from './logger.js'
 import { createMcpServer } from './mcp/create-server.js'
@@ -17,27 +17,30 @@ import { WorkloadSearchService } from './services/workload-search-service.js'
 async function main(): Promise<void> {
   const appConfig = loadAppConfig()
   const logger = createLogger(appConfig.logLevel)
+  const client = new DriftmowerBackendClient({
+    baseUrl: appConfig.backendUrl,
+    serviceToken: appConfig.backendServiceToken,
+    timeoutMs: appConfig.backendTimeoutMs
+  })
   const healthServer =
     appConfig.transport === 'http'
       ? await startHealthServer({
           host: appConfig.host,
           port: appConfig.healthPort,
-          databasePath: appConfig.databasePath
+          client
         })
       : undefined
-  let database: Database | undefined
 
   try {
-    database = await openReadOnlyDatabase(appConfig.databasePath)
-    await checkDatabaseSchema(database)
-    const reportSnapshotRepository = new SqliteReportSnapshotRepository(database)
-    const repository = new SqliteWorkloadRepository(database, reportSnapshotRepository)
+    const rowLoader = new ReportRowLoader(client)
+    const reportSnapshotRepository = new BackendReportSnapshotRepository(client)
+    const repository = new BackendWorkloadRepository(rowLoader, reportSnapshotRepository)
     const workloadSearchService = new WorkloadSearchService(
       repository,
       appConfig.defaultLimit,
       appConfig.maximumLimit
     )
-    const imageUpdateRepository = new SqliteImageUpdateRepository(database)
+    const imageUpdateRepository = new BackendImageUpdateRepository(rowLoader)
     const imageUpdatePlanningService = new ImageUpdatePlanningService(
       imageUpdateRepository,
       reportSnapshotRepository,
@@ -71,13 +74,10 @@ async function main(): Promise<void> {
     registerShutdown(async () => {
       await Promise.all([
         closeServer(httpServer),
-        healthServer ? closeServer(healthServer) : Promise.resolve(),
-        database?.destroy()
+        healthServer ? closeServer(healthServer) : Promise.resolve()
       ])
     })
   } catch (error) {
-    await database?.destroy()
-
     if (!healthServer) {
       throw error
     }

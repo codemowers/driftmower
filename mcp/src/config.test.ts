@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { loadAppConfig } from './config.js'
 
 const SOURCE_VALUES: Record<string, unknown> = {
-  'database.path': '/data/driftmower-be.sqlite',
+  'backend.url': 'http://driftmower-be:3030',
+  'backend.serviceToken': 'dm_svc_token',
+  'backend.timeoutMs': 15_000,
   'mcp.transport': 'stdio',
   'mcp.host': '127.0.0.1',
   'mcp.port': 3000,
@@ -29,7 +31,9 @@ function sourceWith(overrides: Record<string, unknown>) {
 describe('loadAppConfig', () => {
   it('loads config source values', () => {
     expect(loadAppConfig([], source)).toMatchObject({
-      databasePath: '/data/driftmower-be.sqlite',
+      backendUrl: 'http://driftmower-be:3030',
+      backendServiceToken: 'dm_svc_token',
+      backendTimeoutMs: 15_000,
       transport: 'stdio',
       port: 3000,
       defaultLimit: 20,
@@ -37,11 +41,12 @@ describe('loadAppConfig', () => {
     })
   })
 
-  it('gives the database CLI argument precedence over config values', () => {
-    const result = loadAppConfig(['--db', '/tmp/override.sqlite'], source)
+  it('gives the backend URL CLI argument precedence over config values', () => {
+    const result = loadAppConfig(['--backend-url', 'http://localhost:3030/'], source)
 
     expect(result).toMatchObject({
-      databasePath: '/tmp/override.sqlite',
+      // The trailing slash is dropped so paths are appended to one known shape.
+      backendUrl: 'http://localhost:3030',
       transport: 'stdio',
       port: 3000,
       defaultLimit: 20
@@ -60,12 +65,25 @@ describe('loadAppConfig', () => {
     ).toThrow('defaultLimit must be an integer between 1 and 10')
   })
 
-  it('rejects an empty database path', () => {
-    expect(() => loadAppConfig(['--db', '   '], source)).toThrow('databasePath must be a non-empty string')
+  it('rejects a missing or relative backend URL', () => {
+    expect(() => loadAppConfig(['--backend-url', '   '], source)).toThrow(
+      'backendUrl must be a non-empty string'
+    )
+    expect(() => loadAppConfig(['--backend-url', '/reports'], source)).toThrow(
+      'backendUrl must be an absolute URL'
+    )
+  })
+
+  it('rejects a missing service token', () => {
+    expect(() => loadAppConfig([], sourceWith({ 'backend.serviceToken': '' }))).toThrow(
+      'backendServiceToken must be a non-empty string'
+    )
   })
 
   it('rejects unsupported or malformed CLI options', () => {
     expect(() => loadAppConfig(['--transport', 'http'], source)).toThrow("unknown option '--transport'")
-    expect(() => loadAppConfig(['--db'], source)).toThrow("option '--db <path>' argument missing")
+    expect(() => loadAppConfig(['--backend-url'], source)).toThrow(
+      "option '--backend-url <url>' argument missing"
+    )
   })
 })
