@@ -171,3 +171,17 @@ export function useSandboxScope(): SandboxScope {
     [selectedSandboxes, sandboxes, available, admin],
   )
 }
+
+// Client mirror of the server's view rule (lib/server/scope-rules.ts): a caller
+// nothing narrows is cluster-wide. Lets client components drop links into
+// cluster-scoped pages that would 404 for a sandbox user.
+//
+// Deliberately not derived from useSandboxScope(): picking a sandbox narrows an
+// admin's scope for the page they are on, but it does not stop them being an
+// admin, and the Cluster page must stay reachable from that view.
+export function useSeesClusterWideViews(): boolean {
+  const available = useSandboxContext(s => s.available)
+  const admin = useSandboxContext(s => s.admin)
+
+  return !available || admin
+}

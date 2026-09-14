@@ -6,6 +6,7 @@ import RefreshingOverlay from "./components/core/refreshing-overlay"
 import ClusterInit from "./components/cluster-init"
 import SandboxContextInit from "./components/sandbox-context-init"
 import { getSession } from "@/lib/auth/session"
+import { callerSeesClusterWideViews } from "@/lib/server/sandbox-scope-filter"
 import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import "./globals.css"
@@ -32,6 +33,7 @@ export default async function RootLayout({
 }>) {
   const session = await getSession()
   const claims = session.accessToken ? session.claims : undefined
+  const seesClusterWideViews = claims ? await callerSeesClusterWideViews() : false
 
   return (
     <html
@@ -53,7 +55,7 @@ export default async function RootLayout({
             <TooltipProvider>
               <div className="flex min-h-0 flex-1 flex-row">
                 <aside className="flex h-full min-h-0 shrink-0 flex-col border-r border-border bg-background">
-                  <NavBar claims={claims} />
+                  <NavBar claims={claims} seesClusterWideViews={seesClusterWideViews} />
                 </aside>
                 <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
                   <div className="mx-auto w-full max-w-[1400px] min-h-full">

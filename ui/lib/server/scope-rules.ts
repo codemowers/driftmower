@@ -42,3 +42,14 @@ export function writeVerdict(scope: ScopeLike, namespace: string): WriteVerdict 
 
   return { allow: true }
 }
+
+// VIEW path: may this caller see cluster-scoped pages at all? The Cluster
+// overview (nodes, control-plane lifecycle, cluster-wide Prometheus) is not a
+// sandbox user's business and there is nothing to narrow it to -- an empty
+// version of it would only be confusing. Mirrors the READ rule on purpose:
+// whoever nothing narrows is a cluster-wide caller, so a control plane that did
+// not answer leaves the page where it was rather than making it vanish
+// mid-outage.
+export function seesClusterWideViews(scope: ScopeLike): boolean {
+  return namespaceAllowList(scope) === null
+}

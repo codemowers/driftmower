@@ -31,6 +31,9 @@ type NavItem = {
   name: string
   href: string
   icon: LucideIcon
+  // Shows the whole cluster and cannot be narrowed to a sandbox, so it is
+  // hidden from sandbox users -- the route 404s for them either way.
+  clusterWide?: true
 }
 
 const navItems: NavItem[] = [
@@ -38,7 +41,7 @@ const navItems: NavItem[] = [
   { name: "Topmost Owners", href: "/topmost-owners", icon: Boxes },
   { name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
   { name: "Container Images", href: "/container-images", icon: Layers },
-  { name: "Cluster", href: "/cluster", icon: Cpu },
+  { name: "Cluster", href: "/cluster", icon: Cpu, clusterWide: true },
   { name: "Applications", href: "/applications", icon: LayoutGrid },
   { name: "Sandboxes", href: "/sandboxes", icon: Package },
   { name: "Provisioning", href: "/provisioning", icon: PackagePlus },
@@ -48,11 +51,20 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function NavBar({ claims }: { claims: SessionClaims }) {
+export default function NavBar({
+  claims,
+  seesClusterWideViews,
+}: {
+  claims: SessionClaims
+  seesClusterWideViews: boolean
+}) {
   const [isExpanded, setIsExpanded] = useState(true)
   const { isConnected, clusterName, reportId } = useClusterState()
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
+
+  // Resolved on the server, so a hidden item never flashes in on first paint.
+  const visibleItems = navItems.filter(item => seesClusterWideViews || !item.clusterWide)
 
   const carriedParams = new URLSearchParams()
   if (reportId) carriedParams.set("report", reportId)
@@ -113,7 +125,7 @@ export default function NavBar({ claims }: { claims: SessionClaims }) {
           className={cn("mt-2 flex w-full flex-col", isExpanded ? "px-3" : "items-center px-0")}
         >
           <ul className="flex w-full flex-col gap-1">
-            {navItems.map((item) => {
+            {visibleItems.map((item) => {
               const Icon = item.icon
               const active = isNavActive(pathname, item.href)
 
