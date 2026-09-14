@@ -21,6 +21,7 @@ type RawObject = {
     labels?: Record<string, string>
     annotations?: Record<string, string>
     ownerReferences?: OwnerRef[]
+    creationTimestamp?: string
     deletionTimestamp?: string
   }
   spec?: {
@@ -99,6 +100,7 @@ function toClusterResource(
     name: meta.name,
     namespace: meta.namespace ?? "",
   }
+  if (meta.creationTimestamp) resource.createdAt = meta.creationTimestamp
   if (meta.labels) resource.labels = meta.labels
 
   const ownerUID = meta.ownerReferences?.[0]?.uid

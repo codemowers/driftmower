@@ -146,7 +146,7 @@ function newPeer(id: string, row: AggRow): PeerAccum {
       typeTag: (peer.ownerKind ?? "WORKLOAD").toUpperCase(),
       groupId: `ns:${namespace}`,
       namespace,
-      subtitle: peer.restricted ? "OUTSIDE TENANT CONTEXT" : namespace,
+      subtitle: peer.restricted ? "OUTSIDE YOUR SCOPE" : namespace,
       restricted: peer.restricted === true,
     }
   }

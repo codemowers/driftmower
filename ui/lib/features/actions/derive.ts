@@ -7,6 +7,7 @@ import { resolvedVersion } from "@/lib/utils/image-artifacts"
 import { sourceRepoUrl } from "@/lib/utils/oci-labels"
 import { compareChartVersions } from "@/lib/features/helm-releases/chart-versions"
 import { compareSemver, parseSemver, severeFixableCount } from "./verdict"
+import type { LivePatchUpgradeTarget } from "@/lib/features/live-patch-upgrade/types"
 import {
   assessKey,
   managerScope,
@@ -42,7 +43,7 @@ export function managerFacts(usages: ImageUsage[], root: ClusterResource | undef
       chartVersion: release.chartVersion,
     }
   }
-  if (root?.argoApp) return { kind: "argo", app: root.argoApp.name, url: root.argoApp.url }
+  if (root?.argoApp) return { kind: "argo", app: root.argoApp.name, url: root.argoApp.detailsUrl ?? root.argoApp.url }
   const info = first?.workloadRootInfo
   const workloadKind = info?.kind ?? root?.kind ?? "Deployment"
   const namespace = info?.namespace ?? root?.namespace ?? first?.namespace ?? ""
@@ -79,6 +80,12 @@ function cveFacts(usage: ImageUsage, vulnReports: Record<string, VulnerabilityRe
   return facts.slice(0, CVE_CAP)
 }
 
+function livePatchUpgradeTarget(usage: ImageUsage): LivePatchUpgradeTarget | undefined {
+  const info = usage.workloadRootInfo
+  if (!info) return undefined
+  return { namespace: info.namespace, kind: info.kind, name: info.name, uid: info.uid }
+}
+
 function shortName(repository: string): string {
   return repository.split("/").pop() ?? repository
 }
@@ -110,7 +117,7 @@ function imageRows(repository: string, usage: ImageUsage, manager: ManagerFacts,
       cves: cveFacts(usage, vulnReports),
       manager,
     }
-    rows.push({ key: assessKey(facts), facts, verb: "Update image", name: shortName(repository), statusType: usage.versionStatus.statusType })
+    rows.push({ key: assessKey(facts), facts, verb: "Update image", name: shortName(repository), statusType: usage.versionStatus.statusType, target: livePatchUpgradeTarget(usage) })
   }
   if (usage.tagStatus === "mismatch" && from) {
     const facts: ActionFacts = {
@@ -365,21 +372,16 @@ export function commandsFor(row: ActionRow, result: AssessResult | null, relatio
       }]
     }
     case "argo": {
-      const tag = interim ?? facts.to
-      const helmValue = facts.kind === "pin-digest" && facts.digest ? `${facts.to}@${facts.digest}` : tag
-      return [
-        {
-          label: "argocd",
-          value: `argocd app set ${manager.app} --helm-set image.tag=${helmValue}`,
-          hint: "For a Helm source. Plain manifests need the tag changed in the source repo and a sync; kubectl set image is reverted on the next sync.",
-          link: argoLink,
-        },
-        {
-          label: "argocd",
-          value: `argocd app set ${manager.app} --kustomize-image ${interim ? `${facts.repository}:${interim}` : target}`,
-          hint: interim ? `For a Kustomize source. Interim ${interim} avoids the breaking change in ${facts.to}.` : "For a Kustomize source.",
-        },
-      ]
+      const image = interim ? `${facts.repository}:${interim}` : target
+      const change = facts.kind === "pin-digest"
+        ? `Pin the ${facts.repository} image to this digest`
+        : `Change the ${facts.repository} image tag from ${facts.from} to ${interim ?? facts.to}`
+      return [{
+        label: "argocd",
+        value: image,
+        hint: `${change} in the Git source of Argo app ${manager.app}, commit, and let Argo sync. Argo reverts anything changed directly on the workload.${interim ? ` Interim ${interim} avoids the breaking change in ${facts.to}.` : ""}`,
+        link: argoLink,
+      }]
     }
     case "standalone": {
       const kind = manager.workloadKind.toLowerCase()

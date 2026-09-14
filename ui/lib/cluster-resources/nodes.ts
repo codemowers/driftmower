@@ -34,6 +34,10 @@ function readinessOf(node: RawNode): "Ready" | "NotReady" | "Unknown" {
   return "Unknown"
 }
 
+function conditionTrue(node: RawNode, type: string): boolean {
+  return node.status?.conditions?.find(c => c.type === type)?.status === "True"
+}
+
 function envDistro(): Distro | null {
   const value = process.env.K8S_DISTRO
   return value === "k3s" || value === "rke2" || value === "vanilla" ? value : null
@@ -82,6 +86,11 @@ export async function getClusterNodes(): Promise<ClusterNodesResponse> {
       role: roleOf(node.metadata.labels),
       readiness: readinessOf(node),
       schedulable: !(node.spec?.unschedulable ?? false),
+      pressure: {
+        memory: conditionTrue(node, "MemoryPressure"),
+        disk: conditionTrue(node, "DiskPressure"),
+        pid: conditionTrue(node, "PIDPressure"),
+      },
       version,
       creationTimestamp: node.metadata.creationTimestamp ?? null,
       support: classifySupport(version, releases),

@@ -5,11 +5,15 @@ import { useSearchParams } from "next/navigation"
 import { ChevronRight, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import CopyButton from "./copy-button"
-import { CHIP_STYLE, enrichRow, RISK_RANK, RiskChip, VALUE_RANK, type Assessed, type ChipState, type EnrichedRow } from "./actions-chip"
+import { CHIP_STYLE, enrichRow, RISK_RANK, RiskChip, VALUE_RANK, type Assessed, type EnrichedRow } from "./actions-chip"
 import { commandsFor } from "@/lib/features/actions/derive"
 import { reasonLine, VALUE_LEAD, VERDICT_LEAD } from "@/lib/features/actions/verdict"
-import type { ActionRow, AssessResult, AssessState, DisplayRow, HowCommand } from "@/lib/features/actions/types"
+import type { ActionRow, AssessResult, AssessState, HowCommand } from "@/lib/features/actions/types"
 import type { ActionAssessments } from "@/lib/features/actions/use-action-assessments"
+import { livePatchUpgradeEligible } from "@/lib/features/live-patch-upgrade/gate"
+import { useLivePatchUpgrade } from "@/lib/features/live-patch-upgrade/use-live-patch-upgrade"
+import LivePatchUpgradeBlock from "./live-patch-upgrade-block"
+import LivePatchUpgradePill from "./live-patch-upgrade-pill"
 
 const VISIBLE_ROWS = 4
 const VISIBLE_BULLETS = 4
@@ -204,10 +208,14 @@ function AbsorbedStrip({ item }: { item: Assessed }) {
   )
 }
 
-function Detail({ row, result, state, absorbed }: { row: DisplayRow; result: AssessResult; state: ChipState; absorbed: Assessed[] }) {
+function Detail({ item, result }: { item: EnrichedRow; result: AssessResult }) {
+  const { row, chip: state, absorbed } = item
+  const livePatchUpgrade = useLivePatchUpgrade(row.facts)
   const isPin = row.facts.kind === "pin-digest"
   const lead = state === "unassessed" ? "Not assessed." : VERDICT_LEAD[result.risk]
   const commands = commandsFor(row, result, row.relation)
+  const target = row.target
+  const showLivePatchUpgrade = livePatchUpgrade.available && state !== "assessing" && (livePatchUpgrade.active !== null || livePatchUpgradeEligible(item))
   return (
     <div className="flex flex-col gap-3 border-t border-gray-200 px-5 pb-5 pt-4">
       <div className="grid grid-cols-[110px_1fr] items-baseline gap-4 rounded-lg border border-gray-200 px-4 py-3 text-[13.5px]">
@@ -236,16 +244,37 @@ function Detail({ row, result, state, absorbed }: { row: DisplayRow; result: Ass
         <div className="border-b border-gray-200 px-4 py-2.5">
           <span className={SECTION_LABEL}>How to fix</span>
         </div>
-        <div className="flex flex-col gap-2 px-4 py-3">
-          {commands.map(c => <CommandLine key={c.label + (c.value ?? "")} command={c} />)}
-        </div>
+        {showLivePatchUpgrade && target ? (
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <div className="flex flex-col gap-2">
+              <span className={SECTION_LABEL}>Temporary fix</span>
+              <LivePatchUpgradeBlock row={row} target={target} state={livePatchUpgrade} />
+            </div>
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-3">
+              <span className={SECTION_LABEL}>Permanent fix</span>
+              {commands.map(c => <CommandLine key={c.label + (c.value ?? "")} command={{ ...c, hint: permanentHint(c.hint) }} />)}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 px-4 py-3">
+            {commands.map(c => <CommandLine key={c.label + (c.value ?? "")} command={c} />)}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
+const PERMANENT_HINT = "Still needed after the temporary fix."
+
+function permanentHint(hint: string | undefined): string {
+  return hint ? `${hint} ${PERMANENT_HINT}` : PERMANENT_HINT
+}
+
 function Row({ item, open, onToggle }: { item: EnrichedRow; open: boolean; onToggle: () => void }) {
-  const { row, state, result, absorbed, chip, value } = item
+  const { row, state, result, chip, value } = item
+  const livePatchUpgrade = useLivePatchUpgrade(row.facts)
+  const showPill = livePatchUpgrade.active !== null && chip !== "assessing"
   const reason = reasonLine(row.facts, result, { relation: row.relation, absorbed: row.absorbed, displayFrom: row.displayFrom })
   return (
     <div className="border-b border-gray-200 last:border-b-0">
@@ -254,7 +283,7 @@ function Row({ item, open, onToggle }: { item: EnrichedRow; open: boolean; onTog
         onClick={onToggle}
         aria-expanded={open}
         className={cn(
-          "grid h-16 w-full grid-cols-[74px_minmax(0,1fr)_190px_16px] items-center gap-4 px-5 text-left transition-colors hover:bg-gray-50",
+          "grid h-16 w-full grid-cols-[74px_minmax(0,1fr)_minmax(190px,auto)_16px] items-center gap-4 px-5 text-left transition-colors hover:bg-gray-50",
           open && "bg-gray-50",
         )}
       >
@@ -269,12 +298,13 @@ function Row({ item, open, onToggle }: { item: EnrichedRow; open: boolean; onTog
             {reason}
           </span>
         </span>
-        <span className="text-right font-mono text-[12.5px]">
-          {row.displayFrom}<span className="px-1 text-muted-foreground">→</span><span className="font-semibold">{row.facts.to}</span>
+        <span className="flex items-center justify-end gap-3 font-mono text-[12.5px]">
+          {showPill && <LivePatchUpgradePill />}
+          <span>{row.displayFrom}<span className="px-1 text-muted-foreground">→</span><span className="font-semibold">{row.facts.to}</span></span>
         </span>
         <ChevronRight className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
-      {open && result && <Detail row={row} result={result} state={chip} absorbed={absorbed} />}
+      {open && result && <Detail item={item} result={result} />}
       {open && !result && state?.state === "pending" && (
         <p className="border-t border-gray-200 px-5 py-4 text-sm text-muted-foreground">Assessing this action. The verdict appears here when it is ready.</p>
       )}

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 // emits only "sandbox".
 const CARRY = ["report", "sandbox", "tenant", "filters", "q", "focus", "wtab", "ptab", "htab"] as const
 
-export type LinkTo = (path: string, opts?: { drop?: string[] }) => string
+export type LinkTo = (path: string, opts?: { drop?: string[]; set?: Record<string, string> }) => string
 
 export function useContextHref() {
   const searchParams = useSearchParams()
@@ -17,6 +17,7 @@ export function useContextHref() {
       const value = searchParams.get(key)
       if (value) params.set(key, value)
     }
+    for (const [key, value] of Object.entries(opts?.set ?? {})) params.set(key, value)
     const query = params.toString()
     return query ? `${path}?${query}` : path
   }

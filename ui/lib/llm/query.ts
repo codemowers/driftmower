@@ -32,12 +32,15 @@ export async function query(args: QueryArgs): Promise<string> {
   return text
 }
 
-export async function queryObject<T extends z.ZodType>(args: QueryArgs & { schema: T }): Promise<z.infer<T>> {
-  const text = await query(args)
+function parseObject<T extends z.ZodType>(text: string, schema: T): z.infer<T> {
   const start = text.indexOf("{")
   const end = text.lastIndexOf("}")
-  if (start < 0 || end <= start) throw new Error("model returned no JSON object")
-  return args.schema.parse(JSON.parse(text.slice(start, end + 1)))
+  if (start < 0 || end <= start) throw new Error(`model returned no JSON object, got ${text.length} chars: ${text.slice(0, 300).replace(/\s+/g, " ")}`)
+  return schema.parse(JSON.parse(text.slice(start, end + 1)))
+}
+
+export async function queryObject<T extends z.ZodType>(args: QueryArgs & { schema: T }): Promise<z.infer<T>> {
+  return parseObject(await query(args), args.schema)
 }
 
 export function streamQuery(args: QueryArgs) {

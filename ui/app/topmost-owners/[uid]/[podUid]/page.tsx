@@ -12,9 +12,9 @@ import NetworkCard from "@/app/components/network-card"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
-import PodLlmSummary from "./components/pod-llm-summary"
 import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
+import DiagnosisCard from "./components/diagnosis-card"
 import { usePodMetrics } from "./hooks/use-pod-metrics"
 
 export default function PodDetailPage() {
@@ -117,7 +117,7 @@ export default function PodDetailPage() {
           normalizedScore={normalizedScore}
         />
 
-        <PodLlmSummary pod={pod} />
+        <DiagnosisCard pod={pod} workloadUid={workloadUid} />
 
         <PrometheusResourceUsageCard
           metrics={podMetrics}

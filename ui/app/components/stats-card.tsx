@@ -14,9 +14,9 @@ export function StatGrid({ children }: { children: ReactNode }) {
   )
 }
 
-export function StatCell({ label, children }: { label: string; children: ReactNode }) {
+export function StatCell({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5 px-6 py-5">
+    <div className={cn("flex flex-col gap-1.5 px-6 py-5", className)}>
       <p className={CELL_LABEL}>{label}</p>
       {children}
     </div>

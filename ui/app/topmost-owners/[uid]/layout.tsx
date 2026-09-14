@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { useParams } from "next/navigation"
 import { openNetstatdSession, resetNetstatdStable } from "@/lib/features/netstatd"
-import { useWorkloadLivePrewarm } from "./components/use-workload-live-prewarm"
 
 export default function WorkloadLayout({ children }: { children: React.ReactNode }) {
   const { uid } = useParams<{ uid: string }>()
@@ -12,8 +11,6 @@ export default function WorkloadLayout({ children }: { children: React.ReactNode
     resetNetstatdStable(uid)
     return openNetstatdSession(uid)
   }, [uid])
-
-  useWorkloadLivePrewarm(uid)
 
   return <>{children}</>
 }

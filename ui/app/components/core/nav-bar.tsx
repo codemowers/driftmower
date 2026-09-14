@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import {
-  BookUser,
   Boxes,
   BarChart3,
   Cpu,
@@ -15,6 +14,7 @@ import {
   Server,
   ServerOff,
   LayoutGrid,
+  Package,
   PackagePlus,
   ShipWheel,
 } from "lucide-react"
@@ -39,12 +39,8 @@ const navItems: NavItem[] = [
   { name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
   { name: "Container Images", href: "/container-images", icon: Layers },
   { name: "Cluster", href: "/cluster", icon: Cpu },
-  // Always shown: the page renders a "not configured" state when the BFF
-  // reports platform-manager is not deployed.
-  { name: "Sandboxes", href: "/sandboxes", icon: BookUser },
   { name: "Applications", href: "/applications", icon: LayoutGrid },
-  // Always shown: the page renders its own not-in-cluster and
-  // nothing-installed states, which is the whole point of it.
+  { name: "Sandboxes", href: "/sandboxes", icon: Package },
   { name: "Provisioning", href: "/provisioning", icon: PackagePlus },
 ]
 

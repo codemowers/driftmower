@@ -4,6 +4,7 @@ import type { PodContainerStatus, PodStatus } from "@/lib/cluster/cluster-state"
 
 export type ContainerStatus = {
   name?: string
+  image?: string
   ready?: boolean
   restartCount?: number
   state?: {
@@ -46,6 +47,7 @@ function toContainerStatus(c: ContainerStatus, init: boolean): PodContainerStatu
   const terminated = c.lastState?.terminated
   return {
     name: c.name ?? "",
+    image: c.image ?? "",
     init,
     ready: c.ready ?? false,
     restartCount: c.restartCount ?? 0,
