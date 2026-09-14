@@ -4,6 +4,18 @@ import { Command } from 'commander'
 const TRANSPORTS = ['stdio', 'http'] as const
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 
+export interface OidcConfig {
+  issuer: string
+  jwksUri: string
+  audience: string
+  namespacesClaim: string
+}
+
+export interface ProvisioningConfig {
+  driftmowerUiUrl: string
+  requestTimeoutMs: number
+}
+
 export interface AppConfig {
   backendUrl: string
   backendServiceToken: string
@@ -15,6 +27,17 @@ export interface AppConfig {
   defaultLimit: number
   maximumLimit: number
   logLevel: 'debug' | 'info' | 'warn' | 'error'
+  publicUrl: string
+  // Bearer verification on the HTTP transport. Ignored by stdio, which is a
+  // local process with no network surface.
+  authEnabled: boolean
+  // Present only when authentication is on; the loader refuses to start an
+  // authenticated HTTP server without it rather than silently serving open.
+  oidc: OidcConfig | null
+  // Present only when a driftmower-ui base URL is configured. Absent means the
+  // provisioning tools are not registered at all, which is a clearer failure
+  // than registering tools that always error.
+  provisioning: ProvisioningConfig | null
 }
 
 interface ConfigSource {
@@ -70,6 +93,26 @@ function readInteger(value: unknown, name: string, maximum?: number): number {
   return parsedValue
 }
 
+function readOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null
+  }
+
+  return value.trim()
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().toLowerCase() !== 'false'
+  }
+
+  return fallback
+}
+
 function readEnum<const Values extends readonly string[]>(
   value: unknown,
   name: string,
@@ -89,6 +132,9 @@ export function loadAppConfig(
   const cli = parseCliArguments(arguments_)
   const maximumLimit = readInteger(source.get<number>('search.maximumLimit'), 'maximumLimit')
   const defaultLimit = readInteger(source.get<number>('search.defaultLimit'), 'defaultLimit', maximumLimit)
+  const transport = readEnum(source.get<string>('mcp.transport'), 'transport', TRANSPORTS)
+  const authEnabled = readBoolean(source.get<unknown>('mcp.authEnabled'), true)
+  const port = readInteger(source.get<number>('mcp.port'), 'port', 65_535)
 
   return {
     backendUrl: readUrl(cli.backendUrl ?? source.get<string>('backend.url'), 'backendUrl'),
@@ -96,12 +142,51 @@ export function loadAppConfig(
     // misconfiguration worth failing on at startup rather than on first tool call.
     backendServiceToken: readString(source.get<string>('backend.serviceToken'), 'backendServiceToken'),
     backendTimeoutMs: readInteger(source.get<number>('backend.timeoutMs'), 'backendTimeoutMs'),
-    transport: readEnum(source.get<string>('mcp.transport'), 'transport', TRANSPORTS),
+    transport,
     host: readString(source.get<string>('mcp.host'), 'host'),
-    port: readInteger(source.get<number>('mcp.port'), 'port', 65_535),
+    port,
     healthPort: readInteger(source.get<number>('mcp.healthPort'), 'healthPort', 65_535),
     defaultLimit,
     maximumLimit,
-    logLevel: readEnum(source.get<string>('mcp.logLevel'), 'logLevel', LOG_LEVELS)
+    logLevel: readEnum(source.get<string>('mcp.logLevel'), 'logLevel', LOG_LEVELS),
+    publicUrl: readOptionalString(source.get<string>('mcp.publicUrl')) ?? `http://127.0.0.1:${port}`,
+    authEnabled,
+    oidc: transport === 'http' && authEnabled ? readOidcConfig(source) : null,
+    provisioning: readProvisioningConfig(source)
+  }
+}
+
+// Refusing to start beats starting open. An HTTP server published on an ingress
+// with authEnabled defaulting true and no issuer configured would otherwise
+// have to choose between serving unauthenticated and rejecting every call; both
+// are worse than a startup error naming the missing variable.
+function readOidcConfig(source: ConfigSource): OidcConfig {
+  const issuer = readOptionalString(source.get<string>('oidc.issuer'))
+
+  if (!issuer) {
+    throw new Error(
+      'OIDC_ISSUER is required when the HTTP transport runs with authentication ' +
+        '(set MCP_AUTH_ENABLED=false only for a server that is not reachable from outside the cluster)'
+    )
+  }
+
+  return {
+    issuer,
+    jwksUri: readOptionalString(source.get<string>('oidc.jwksUri')) ?? `${issuer.replace(/\/+$/, '')}/jwks`,
+    audience: readString(source.get<string>('oidc.audience'), 'audience'),
+    namespacesClaim: readString(source.get<string>('oidc.namespacesClaim'), 'namespacesClaim')
+  }
+}
+
+function readProvisioningConfig(source: ConfigSource): ProvisioningConfig | null {
+  const driftmowerUiUrl = readOptionalString(source.get<string>('provisioning.driftmowerUiUrl'))
+
+  if (!driftmowerUiUrl) {
+    return null
+  }
+
+  return {
+    driftmowerUiUrl: driftmowerUiUrl.replace(/\/+$/, ''),
+    requestTimeoutMs: readInteger(source.get<number>('provisioning.requestTimeoutMs'), 'requestTimeoutMs')
   }
 }

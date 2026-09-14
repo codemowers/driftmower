@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import type { WorkloadSearchService } from '../../services/workload-search-service.js'
+import { callerScope } from './caller-scope.js'
 
 export const SEARCH_WORKLOADS_TOOL_NAME = 'search_workloads'
 
@@ -18,8 +19,12 @@ export function registerSearchWorkloadsTool(
         limit: z.number().int().min(1).optional()
       }
     },
-    async ({ query, limit }) => {
-      const result = await workloadSearchService.searchWorkloads({ query, limit })
+    async ({ query, limit }, context) => {
+      const result = await workloadSearchService.searchWorkloads({
+        query,
+        limit,
+        scope: callerScope(context)
+      })
 
       return {
         structuredContent: { ...result },

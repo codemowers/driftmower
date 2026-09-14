@@ -10,12 +10,15 @@ import type {
   WorkloadRepository
 } from '../backend/workload-repository.js'
 import { parseReleaseInfo } from '../domain/release-info.js'
+import { describeScope, UNRESTRICTED_SCOPE, type ResolvedScope } from '../domain/tenancy.js'
 
 const CURRENT_VERSION_STATUSES = new Set(['up_to_date', 'current'])
 
 export interface SearchWorkloadsInput {
   query: string
   limit?: number
+  // Derived from the caller's verified token, never from tool arguments.
+  scope?: ResolvedScope
 }
 
 export class WorkloadSearchService {
@@ -33,13 +36,15 @@ export class WorkloadSearchService {
     }
 
     const limit = normalizeLimit(input.limit, this.defaultLimit, this.maximumLimit)
-    const groups = await this.repository.searchMatchingGroups(query, limit)
-    const details = await this.repository.loadWorkloadDetails(groups)
+    const scope = input.scope ?? UNRESTRICTED_SCOPE
+    const groups = await this.repository.searchMatchingGroups(query, limit, scope.scope)
+    const details = await this.repository.loadWorkloadDetails(groups, scope.scope)
     const detailsByGroup = groupDetails(details)
 
     return {
       query,
-      matches: groups.map(group => mapWorkloadMatch(group, detailsByGroup.get(groupId(group)) ?? []))
+      matches: groups.map(group => mapWorkloadMatch(group, detailsByGroup.get(groupId(group)) ?? [])),
+      scope: describeScope(scope, groups.length)
     }
   }
 }

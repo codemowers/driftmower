@@ -4,12 +4,24 @@
     "host": "127.0.0.1",
     "port": 3000,
     "healthPort": 3001,
-    "logLevel": "info"
+    "logLevel": "info",
+    "publicUrl": "http://127.0.0.1:3000",
+    "authEnabled": true
+  },
+  "oidc": {
+    "issuer": "",
+    "jwksUri": "",
+    "audience": "https://driftmower-mcp",
+    "namespacesClaim": "codemowers.io/namespaces"
   },
   "backend": {
     "url": "http://driftmower-be:3030",
     "serviceToken": "",
     "timeoutMs": 15000
+  },
+  "provisioning": {
+    "driftmowerUiUrl": "",
+    "requestTimeoutMs": 10000
   },
   "search": {
     "defaultLimit": 20,

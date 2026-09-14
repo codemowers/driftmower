@@ -1,0 +1,39 @@
+# Minikube adaptation of manifests/oidcclient.yaml.
+#
+# Public client: an MCP client runs on a laptop and can keep no secret, so it is
+# `native` with tokenEndpointAuthMethod: none and PKCE. passmower requires that
+# shape before it accepts a loopback redirect URI at all.
+#
+# One entry per loopback hostname: oidc-provider ignores the PORT of an http
+# loopback redirect for a native client, but not the hostname, and not the path.
+# Claude Code and Codex both use http://localhost:<port>/callback.
+apiVersion: codemowers.cloud/v1
+kind: OIDCClient
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+spec:
+  applicationType: native
+  displayName: Driftmower MCP (minikube)
+  uri: https://driftmower-mcp-dev.veebkolm.eu/
+  redirectUris:
+    - http://localhost:33418/callback
+    - http://127.0.0.1:33418/callback
+    - http://[::1]:33418/callback
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  # `namespaces` carries the codemowers.io/namespaces tenancy claim that every
+  # tool scopes on. Without it the claim is absent and, by design, the caller
+  # sees nothing at all.
+  availableScopes:
+    - openid
+    - profile
+    - email
+    - groups
+    - namespaces
+    - offline_access
+  tokenEndpointAuthMethod: none
+  pkce: true

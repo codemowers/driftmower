@@ -1,4 +1,10 @@
 import { createHash } from 'node:crypto'
+import {
+  describeScope,
+  UNRESTRICTED_SCOPE,
+  type NamespaceScope,
+  type ResolvedScope
+} from '../domain/tenancy.js'
 import type {
   DirectImageUpdateActionGroup,
   HelmImageUpdateActionGroup,
@@ -42,12 +48,18 @@ export interface PlanImageUpdatesInput {
   versionStatuses?: ActionableVersionStatus[]
   limit?: number
   cursor?: string
+  // Derived from the caller's verified token, never from tool arguments, and
+  // deliberately kept out of `ImageUpdateFilters` so it can never travel in a
+  // cursor. A cursor is caller-supplied: a scope encoded there would be a scope
+  // the caller could widen.
+  scope?: ResolvedScope
 }
 
 interface NormalizedPlanningRequest {
   filters: ImageUpdateFilters
   limit: number
   cursor: ImageUpdateCursorPayload | null
+  scope: ResolvedScope
 }
 
 interface VersionCandidate {
@@ -68,10 +80,10 @@ export class ImageUpdatePlanningService {
     const snapshot = await resolveSnapshot(this.reportSnapshotRepository, request)
 
     if (snapshot === null) {
-      return noReadyReportResult(request.filters)
+      return noReadyReportResult(request.filters, request.scope)
     }
 
-    const repositoryFilters = filtersForSnapshot(snapshot, request.filters)
+    const repositoryFilters = filtersForSnapshot(snapshot, request.filters, request.scope.scope)
     const groups = await this.repository.listActionGroups({
       ...repositoryFilters,
       after: request.cursor?.lastAction ?? null,
@@ -101,7 +113,8 @@ function normalizeRequest(
   return {
     filters,
     limit: normalizeLimit(input.limit, defaultLimit, maximumLimit),
-    cursor
+    cursor,
+    scope: input.scope ?? UNRESTRICTED_SCOPE
   }
 }
 
@@ -145,11 +158,12 @@ function buildPlanResult(
     summary,
     actions,
     nextCursor,
-    warnings: [...PLAN_WARNINGS]
+    warnings: [...PLAN_WARNINGS],
+    scope: describeScope(request.scope, summary.totalActions)
   }
 }
 
-function noReadyReportResult(filters: ImageUpdateFilters): PlanImageUpdatesResult {
+function noReadyReportResult(filters: ImageUpdateFilters, scope: ResolvedScope): PlanImageUpdatesResult {
   return {
     status: 'no_ready_report',
     filters,
@@ -157,7 +171,8 @@ function noReadyReportResult(filters: ImageUpdateFilters): PlanImageUpdatesResul
     summary: emptySummary(),
     actions: [],
     nextCursor: null,
-    warnings: [...PLAN_WARNINGS]
+    warnings: [...PLAN_WARNINGS],
+    scope: describeScope(scope, 0)
   }
 }
 
@@ -363,12 +378,14 @@ function encodeNextCursor(
 
 function filtersForSnapshot(
   snapshot: ReportSnapshot,
-  filters: ImageUpdateFilters
+  filters: ImageUpdateFilters,
+  allowedNamespaces: NamespaceScope
 ): ImageUpdateRepositoryFilters {
   return {
     reportId: snapshot.reportId,
     namespace: filters.namespace,
-    versionStatuses: filters.versionStatuses
+    versionStatuses: filters.versionStatuses,
+    allowedNamespaces
   }
 }
 

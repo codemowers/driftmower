@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlanImageUpdatesResult } from '../domain/image-update-plan.js'
+import { UNRESTRICTED_SCOPE } from '../domain/tenancy.js'
 import type { ImageUpdatePlanningService } from '../services/image-update-planning-service.js'
 import type { WorkloadSearchService } from '../services/workload-search-service.js'
 import { createMcpServer } from './create-server.js'
@@ -23,7 +24,8 @@ const NO_READY_REPORT_RESULT: PlanImageUpdatesResult = {
   },
   actions: [],
   nextCursor: null,
-  warnings: ['This plan is based on a Driftmower analysis snapshot, not live cluster state.']
+  warnings: ['This plan is based on a Driftmower analysis snapshot, not live cluster state.'],
+  scope: { scoped: false, namespaces: null, note: null }
 }
 
 describe('createMcpServer', () => {
@@ -46,7 +48,7 @@ describe('createMcpServer', () => {
     })
 
     expect(tools.tools.map(tool => tool.name)).toContain('search_workloads')
-    expect(searchWorkloads).toHaveBeenCalledWith({ query: 'api', limit: 3 })
+    expect(searchWorkloads).toHaveBeenCalledWith({ query: 'api', limit: 3, scope: UNRESTRICTED_SCOPE })
     expect(toolResult.structuredContent).toEqual(result)
     expect(toolResult.content).toEqual([{ type: 'text', text: JSON.stringify(result) }])
   })
@@ -92,7 +94,8 @@ describe('createMcpServer', () => {
     expect(planImageUpdates).toHaveBeenCalledWith({
       namespace: 'payments',
       versionStatuses: ['major_behind', 'patch_behind'],
-      limit: 25
+      limit: 25,
+      scope: UNRESTRICTED_SCOPE
     })
     expect(result.structuredContent).toEqual(NO_READY_REPORT_RESULT)
     expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(NO_READY_REPORT_RESULT) }])
