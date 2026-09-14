@@ -11,6 +11,27 @@ export const RELEASE_SCORES_PATH = 'release-scores'
 // least-recently-used so the working set stays resident.
 const MAXIMUM_CACHED_REPORTS = 16
 
+// The columns this server reads. Selecting them is what keeps a report load
+// small: `payload` is most of every row by weight and nothing here reads it.
+// The backend only allows `$select` on its query properties, so this list is
+// also a statement of which columns it must expose.
+const IMAGE_USAGE_SELECTION = [
+  'id',
+  'reportId',
+  'workloadGroupKey',
+  'workloadKind',
+  'workloadNamespace',
+  'workloadName',
+  'releaseGroupKey',
+  'containerName',
+  'registry',
+  'repository',
+  'deployedTag',
+  'latestTag',
+  'status',
+  'versionStatus'
+]
+
 export interface ImageUsageRow {
   reportId: string
   workloadGroupKey: string
@@ -75,9 +96,16 @@ export class ReportRowLoader {
   }
 
   private async fetch(reportId: string): Promise<ReportRows> {
+    // Both reads are paged, so each is sorted on a key unique within a report
+    // — a page boundary must fall in the same place on every request or rows
+    // are skipped or seen twice.
     const [imageUsages, releaseScores] = await Promise.all([
-      this.client.findAll<ImageUsageRow>(IMAGE_USAGES_PATH, { reportId }),
-      this.client.findAll<ReleaseScoreRow>(RELEASE_SCORES_PATH, { reportId })
+      this.client.findAll<ImageUsageRow>(IMAGE_USAGES_PATH, {
+        reportId,
+        $select: IMAGE_USAGE_SELECTION,
+        $sort: { id: 1 }
+      }),
+      this.client.findAll<ReleaseScoreRow>(RELEASE_SCORES_PATH, { reportId, $sort: { groupKey: 1 } })
     ])
 
     return {

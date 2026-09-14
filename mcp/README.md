@@ -12,8 +12,10 @@ reads: it never writes to the backend or to a target repository.
 - A reachable driftmower-be, and a service token it accepts
 
 The backend must be recent enough to allow `id` and `status` in a `/reports`
-query. Without that this server cannot select the fields it needs, and every
-report listing would make the backend assemble its full body.
+query and to allow `$select` of the workload and tag columns on
+`/image-usages` (driftmower-be #59 and #82). An older backend answers 400 to
+these queries; the readiness probe then reports not ready rather than the
+tools failing one call at a time.
 
 ## Install
 
