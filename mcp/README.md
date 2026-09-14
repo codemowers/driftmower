@@ -187,7 +187,7 @@ For iterative development:
 skaffold dev --port-forward
 ```
 
-The Skaffold config builds `ghcr.io/codemowers/driftmower-mcp`,
+The Skaffold config builds `git.codemowers.io/uq69adc8851/driftmower-mcp`,
 deploys the raw manifests, and port-forwards the MCP endpoint to
 `localhost:3000` and health endpoints to `localhost:3001`.
 

@@ -7,7 +7,7 @@ build:
   local:
     useBuildkit: true
   artifacts:
-    - image: ghcr.io/codemowers/driftmower-mcp
+    - image: git.codemowers.io/uq69adc8851/driftmower-mcp
       platforms:
         - linux/amd64
       docker:

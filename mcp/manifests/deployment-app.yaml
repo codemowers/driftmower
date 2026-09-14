@@ -22,12 +22,11 @@ spec:
                 matchLabels:
                   app: driftmower-be
               topologyKey: kubernetes.io/hostname
-      # No imagePullSecrets: the GHCR package is pulled anonymously. If the
-      # package is kept private, create a docker-registry secret holding a PAT
-      # with read:packages and list it here.
+      imagePullSecrets:
+        - name: sergii-gitea-registry-secret
       containers:
         - name: driftmower-mcp
-          image: ghcr.io/codemowers/driftmower-mcp:latest
+          image: git.codemowers.io/uq69adc8851/driftmower-mcp:latest
           ports:
             - containerPort: 3000
               name: mcp
