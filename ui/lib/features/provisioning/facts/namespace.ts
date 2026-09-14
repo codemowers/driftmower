@@ -123,6 +123,7 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
     fact: {
       namespace,
       sandbox: sandboxId,
+      registryEnabled: meta.metadata?.annotations?.["codemowers.io/feature-registry"] === "true",
       quota: quota
         ? {
             name: quota.metadata?.name ?? "(unnamed)",

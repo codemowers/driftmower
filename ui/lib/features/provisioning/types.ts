@@ -92,6 +92,10 @@ export type NetworkPosture = "default-deny" | "open" | "unknown"
 export type NamespaceFact = {
   namespace: string
   sandbox: string | null
+  // platform-manager enables the sandbox's Zot instance with this namespace
+  // annotation. The UI derives its public host from the sandbox id and the
+  // same ingress domain used by the sandbox-stack chart.
+  registryEnabled: boolean
   quota: { name: string; used: QuotaAmounts; hard: QuotaAmounts } | null
   // Pre-computed so the planner never re-parses Kubernetes quantity strings.
   headroom: {

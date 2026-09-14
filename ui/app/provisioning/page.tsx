@@ -8,6 +8,7 @@ import HostCard from "./components/host-card"
 import McpPanel from "./components/mcp-panel"
 import OfferingList from "./components/offering-list"
 import PodSecurityCard from "./components/pod-security-card"
+import RegistryCard from "./components/registry-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
@@ -50,9 +51,10 @@ export default function ProvisioningPage() {
 }
 
 function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; scoped: boolean }) {
-  const installed = capabilities.offerings.filter(
-    o => o.availability.state === "ready" || o.availability.state === "degraded",
-  )
+  // Only count offerings whose controller is actually running. A served CRD
+  // on its own (or a Deployment with no ready replicas) must not make a
+  // database look available on the provisioning page.
+  const runningOfferings = capabilities.offerings.filter(o => o.availability.state === "ready")
   const zones = capabilities.topology.zones.filter(z => z.zone !== "(no zone label)")
   const enforced = capabilities.admissionPolicies.filter(p => p.enforced)
 
@@ -60,8 +62,8 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
     <>
       <StatGrid>
         <StatCell label="Operators installed">
-          <StatValue>{installed.length}</StatValue>
-          <StatCaption>of {capabilities.offerings.length} known</StatCaption>
+          <StatValue>{runningOfferings.length}</StatValue>
+          <StatCaption>running and ready</StatCaption>
         </StatCell>
         <StatCell label="Storage classes">
           <StatValue>{capabilities.storageClasses.length}</StatValue>
@@ -121,15 +123,24 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           for one" should be copyable, not reconstructed from operator docs. */}
       <Section
         title="Databases and other operators"
-        count={capabilities.offerings.length}
+        count={runningOfferings.length}
         hint="Each sample is the smallest manifest this cluster would accept, at the API version it actually serves. Sized for trying something out — one replica, a small disk."
       >
         <OfferingList
-          offerings={capabilities.offerings}
+          offerings={runningOfferings}
           storageClasses={capabilities.storageClasses}
           namespace={capabilities.namespaces[0]?.namespace ?? null}
         />
       </Section>
+
+      {scoped && (
+        <Section
+          title="Container registry"
+          hint="Your sandbox's private Zot registry, with commands for pushing and pulling images."
+        >
+          <RegistryCard namespaces={capabilities.namespaces} ingress={capabilities.ingress} />
+        </Section>
+      )}
 
       <Section title="Storage" count={capabilities.storageClasses.length}>
         <StorageList classes={capabilities.storageClasses} />
