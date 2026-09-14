@@ -10,6 +10,7 @@ import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upg
 
 export type PodContainerStatus = {
   name: string
+  image: string
   init: boolean
   ready: boolean
   restartCount: number
@@ -30,6 +31,7 @@ export type ClusterResource = {
   kind: string
   name: string
   namespace: string
+  createdAt?: string
   labels?: Record<string, string>
   ownerUID?: string
   managerUID?: string

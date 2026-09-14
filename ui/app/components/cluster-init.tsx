@@ -8,6 +8,7 @@ import { startLiveDataFetching } from "@/lib/cluster/live-data"
 import { getAnalysisSocket, waitForSocketConnect } from "@/lib/cluster/analysis-socket"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { prewarmActions } from "@/lib/features/actions/client"
+import { prewarmDiagnoses } from "@/lib/features/pod-diagnosis/client"
 
 const SOCKET_SLOT_WAIT_MS = 3000
 
@@ -17,6 +18,8 @@ export default function ClusterInit() {
   const reportId = useClusterState(state => state.reportId)
   const data = useClusterState(state => state.data)
   const clusterResources = useClusterState(state => state.clusterResources)
+  const nodeDrift = useClusterState(state => state.nodeDrift)
+  const nodeStorage = useClusterState(state => state.nodeStorage)
   const vulnerabilityReports = useClusterState(state => state.vulnerabilityReports)
   const vulnerabilityReportsError = useClusterState(state => state.vulnerabilityReportsError)
   const reportParam = searchParams.get("report")
@@ -28,6 +31,11 @@ export default function ClusterInit() {
     if (!vulnerabilityReports && !vulnerabilityReportsError) return
     prewarmActions(reportId, data, clusterResources, vulnerabilityReports)
   }, [reportId, data, clusterResources, vulnerabilityReports, vulnerabilityReportsError])
+
+  // Seed the pod diagnosis queue after each resources poll, at background priority.
+  useEffect(() => {
+    prewarmDiagnoses(clusterResources, nodeDrift, nodeStorage)
+  }, [clusterResources, nodeDrift, nodeStorage])
 
   // Start the polled live-data loop once for the app's lifetime.
   useEffect(() => startLiveDataFetching(), [])

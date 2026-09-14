@@ -9,11 +9,12 @@ type Props<T extends string> = {
   onSelect: (tab: T) => void
   children: ReactNode
   rootRef?: Ref<HTMLDivElement>
+  id?: string
 }
 
-export default function TabBar<T extends string>({ tabs, active, onSelect, children, rootRef }: Props<T>) {
+export default function TabBar<T extends string>({ tabs, active, onSelect, children, rootRef, id }: Props<T>) {
   return (
-    <div ref={rootRef} className="flex flex-col gap-4">
+    <div id={id} ref={rootRef} className="flex flex-col gap-4">
       <div className="flex border-b border-gray-200">
         {tabs.map(tab => (
           <button

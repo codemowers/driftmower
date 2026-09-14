@@ -11,7 +11,8 @@ import PortsTab from "./ports-tab"
 import LogsTab from "./logs-tab"
 import MetadataTab from "./metadata-tab"
 
-const TABS = ["Images", "Ports", "Logs", "Metadata"] as const
+export const POD_TABS = ["Images", "Ports", "Logs", "Metadata"] as const
+export const POD_TABS_ID = "pod-tabs"
 
 type Props = {
   pod: ClusterResource
@@ -21,13 +22,14 @@ type Props = {
 }
 
 export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
-  const [active, setActive] = useTabParam("ptab", TABS)
+  const [active, setActive] = useTabParam("ptab", POD_TABS)
   const { suffix: contextQuery } = useContextHref()
   const { rootRef, requestScroll } = useScrollTabIntoView(active)
 
   return (
     <TabBar
-      tabs={TABS}
+      id={POD_TABS_ID}
+      tabs={POD_TABS}
       active={active}
       onSelect={tab => {
         if (tab === "Logs") requestScroll()
