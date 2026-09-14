@@ -1,3 +1,3 @@
-export { isLlmConfigured, llmBaseUrl } from "./config"
+export { isLlmConfigured, llmBaseUrl, llmConfigError } from "./config"
 export * from "./models"
 export * from "./query"

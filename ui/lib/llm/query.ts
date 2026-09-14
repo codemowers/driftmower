@@ -1,7 +1,7 @@
 import { generateText, streamText, type JSONValue } from "ai"
 import type { z } from "zod"
 import { llamaModel } from "./config"
-import { MODELS, type ModelKey, type ModelSpec } from "./models"
+import { PROVIDER_KEY, resolveSpec, type ModelKey, type ModelSpec } from "./models"
 
 export type QueryArgs = {
   model: ModelKey
@@ -11,7 +11,7 @@ export type QueryArgs = {
 }
 
 function callParams({ model, userPrompt, systemPrompt, abortSignal }: QueryArgs) {
-  const spec: ModelSpec = MODELS[model]
+  const spec: ModelSpec = resolveSpec(model)
   return {
     model: llamaModel(spec.id),
     system: systemPrompt,
@@ -22,7 +22,7 @@ function callParams({ model, userPrompt, systemPrompt, abortSignal }: QueryArgs)
     topP: spec.topP,
     presencePenalty: spec.presencePenalty,
     providerOptions: spec.extraBody
-      ? { llama: spec.extraBody as Record<string, JSONValue> }
+      ? { [PROVIDER_KEY]: spec.extraBody as Record<string, JSONValue> }
       : undefined,
   }
 }

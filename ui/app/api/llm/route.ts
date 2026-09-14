@@ -1,11 +1,12 @@
-import { MODELS, isLlmConfigured, query, streamQuery, type ModelKey } from "@/lib/llm"
+import { MODELS, llmConfigError, query, streamQuery, type ModelKey } from "@/lib/llm"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
 export async function POST(req: Request) {
-  if (!isLlmConfigured()) {
-    return Response.json({ error: "LLM_BASE_URL is not set" }, { status: 503 })
+  const configError = llmConfigError()
+  if (configError) {
+    return Response.json({ error: configError }, { status: 503 })
   }
 
   let body: { model?: string; systemPrompt?: string; userPrompt?: string; stream?: boolean }
