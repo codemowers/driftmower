@@ -1,19 +1,25 @@
 import "server-only"
 
 import { fetchSandboxScope, type SandboxScope } from "./platform-manager-proxy"
+import { namespaceAllowList, writeVerdict } from "./scope-rules"
 
-// null means every namespace is readable: without a usable tenancy control plane, nothing narrows.
+// READ path. null means every namespace is readable: without a usable tenancy
+// control plane, nothing narrows.
+//
+// Deliberately not reused for writes. Widening a listing when scope is
+// indeterminate shows a user rows they may not be entitled to; doing the same on
+// a write lets them change another sandbox's workloads, which is a different
+// kind of mistake. guardNamespace draws that line -- see scope-rules.ts for
+// which states mean what.
 export function namespaceFilter(scope: SandboxScope): ((namespace: string) => boolean) | null {
-  if (scope.state !== "ok" || scope.admin) return null
-  const permitted = new Set(scope.namespaces)
-  return namespace => permitted.has(namespace)
+  const permitted = namespaceAllowList(scope)
+  return permitted && (namespace => permitted.has(namespace))
 }
 
+// WRITE path: may this caller act on this namespace? Returns a Response to send
+// back, or null to proceed.
 export async function guardNamespace(namespace: string): Promise<Response | null> {
-  const allows = namespaceFilter(await fetchSandboxScope())
-
-  if (allows && !allows(namespace)) {
-    return Response.json({ error: `namespace ${namespace} is out of scope` }, { status: 403 })
-  }
-  return null
+  const verdict = writeVerdict(await fetchSandboxScope(), namespace)
+  if (verdict.allow) return null
+  return Response.json({ error: verdict.reason }, { status: verdict.status })
 }
