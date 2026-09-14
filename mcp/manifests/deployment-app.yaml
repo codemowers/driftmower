@@ -54,6 +54,30 @@ spec:
               value: '20'
             - name: DRIFTMOWER_MCP_MAX_LIMIT
               value: '100'
+            # Public URL of this server. Used to build the RFC 9728 resource
+            # identifier and the resource_metadata pointer on every 401, which
+            # is how an OAuth-capable MCP client discovers the flow.
+            - name: MCP_PUBLIC_URL
+              value: 'https://driftmower-mcp.ee-lte-1.codemowers.io'
+            # RFC 8707 resource indicator, verified strictly as `aud` on every
+            # request. Must equal what a client passes as `resource`, and must
+            # NOT equal driftmower-be's OIDC_AUDIENCE: a token for the API is
+            # not a token for this server.
+            - name: MCP_AUDIENCE
+              value: 'https://driftmower-mcp'
+            # passmower's public URL, matched against the token `iss` claim.
+            # JWKS is fetched from ${OIDC_ISSUER}/jwks unless OIDC_JWKS_URI is
+            # set. Same secret and key driftmower-be reads.
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-ui-owner-secrets
+                  key: OIDC_IDP_URI
+            # Cluster-internal base URL of driftmower-ui, which owns the
+            # provisioning capability layer and the RBAC behind it. Unset means
+            # the provisioning tools are not registered at all.
+            - name: DRIFTMOWER_UI_URL
+              value: 'http://driftmower-ui'
           livenessProbe:
             httpGet:
               path: /healthz

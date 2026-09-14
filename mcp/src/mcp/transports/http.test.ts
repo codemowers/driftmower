@@ -5,6 +5,7 @@ import type { Server } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMcpServer } from '../create-server.js'
 import { startHttpTransport } from './http.js'
+import { UNRESTRICTED_SCOPE } from '../../domain/tenancy.js'
 
 describe('HTTP MCP transport', () => {
   let httpServer: Server | undefined
@@ -66,7 +67,11 @@ describe('HTTP MCP transport', () => {
     })
 
     expect(result.structuredContent).toEqual({ query: 'api', matches: [] })
-    expect(searchWorkloads).toHaveBeenCalledWith({ query: 'api', limit: undefined })
+    expect(searchWorkloads).toHaveBeenCalledWith({
+      query: 'api',
+      limit: undefined,
+      scope: UNRESTRICTED_SCOPE
+    })
   })
 
   it('accepts a second client initialization as a separate HTTP session', async () => {

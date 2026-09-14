@@ -10,13 +10,31 @@
       "__name": "DRIFTMOWER_MCP_HEALTH_PORT",
       "__format": "number"
     },
-    "logLevel": "DRIFTMOWER_MCP_LOG_LEVEL"
+    "logLevel": "DRIFTMOWER_MCP_LOG_LEVEL",
+    "publicUrl": "MCP_PUBLIC_URL",
+    "authEnabled": {
+      "__name": "MCP_AUTH_ENABLED",
+      "__format": "boolean"
+    }
+  },
+  "oidc": {
+    "issuer": "OIDC_ISSUER",
+    "jwksUri": "OIDC_JWKS_URI",
+    "audience": "MCP_AUDIENCE",
+    "namespacesClaim": "MCP_NAMESPACES_CLAIM"
   },
   "backend": {
     "url": "DRIFTMOWER_BE_URL",
     "serviceToken": "DRIFTMOWER_BE_SERVICE_TOKEN",
     "timeoutMs": {
       "__name": "DRIFTMOWER_BE_TIMEOUT_MS",
+      "__format": "number"
+    }
+  },
+  "provisioning": {
+    "driftmowerUiUrl": "DRIFTMOWER_UI_URL",
+    "requestTimeoutMs": {
+      "__name": "DRIFTMOWER_UI_TIMEOUT_MS",
       "__format": "number"
     }
   },

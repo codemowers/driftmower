@@ -1,6 +1,12 @@
+import type { ScopeNotice } from './tenancy.js'
+
 export interface SearchWorkloadsResult {
   query: string
   matches: WorkloadMatch[]
+  // Whether the caller's tenancy limited these matches. Always present so an
+  // empty result is never ambiguous between "no such workload" and "not yours
+  // to see".
+  scope: ScopeNotice
 }
 
 export interface WorkloadMatch {

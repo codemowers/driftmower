@@ -1,0 +1,75 @@
+# Registers driftmower-mcp with passmower as a PUBLIC client, so an MCP client
+# (Claude Code, Cursor, a Claude custom connector) can obtain a token itself via
+# authorization code + PKCE rather than having one pasted into it.
+#
+# This is a second, separate client from `driftmower-ui` (driftmower-ui/k8s/oidcclient.yaml)
+# on purpose:
+#
+#   * driftmower-ui is a confidential `web` client holding a secret in a pod.
+#     An MCP client runs on a laptop and can keep no secret, so it must be
+#     `applicationType: native` with `tokenEndpointAuthMethod: none` — the shape
+#     passmower requires before it will accept a loopback redirect URI at all
+#     (see passmower/examples/native-app-sample-client.yaml).
+#   * The audience differs. This server verifies `aud` strictly against
+#     `https://driftmower-mcp`; a token minted for `https://driftmower-api`
+#     (what every browser session already holds) must not open it.
+#
+# A client requests the audience with the RFC 8707 `resource` parameter.
+# passmower's resourceIndicators feature then issues a self-contained RS256 JWT
+# bound to it, which is what this server validates against the JWKS endpoint —
+# without a resource parameter passmower issues an opaque token instead, and
+# verification here will fail.
+#
+# KNOWN LIMITATION — read before assuming a client will connect.
+# passmower has no dynamic client registration (`features.registration` is
+# absent from its src/configuration.js, verified against develop @ 03f3f94), so
+# a strict DCR-only MCP client cannot connect here even with perfect
+# protected-resource metadata. `features.deviceFlow` is enabled, which is the
+# headless fallback.
+#
+# REDIRECT URI MATCHING, verified against the real matcher in
+# oidc-provider 9.12.2 (`Client#redirectAllowed`, lib/models/client.js):
+#   * The **port is ignored** for http loopback URIs — but only because this is
+#     `applicationType: native`. A client picking a random port therefore
+#     matches, which is the usual MCP client behaviour. On a `web` client the
+#     comparison is exact and every such client would fail.
+#   * The **hostname is not normalised**. `localhost`, `127.0.0.1` and `[::1]`
+#     are three different things, so all three are registered below; a client
+#     that resolves loopback to IPv6 would otherwise be refused.
+#   * The **path must match exactly**. `/callback` is what MCP clients use; a
+#     client wanting another path needs it added here.
+apiVersion: codemowers.cloud/v1
+kind: OIDCClient
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+spec:
+  applicationType: native
+  displayName: Driftmower MCP
+  uri: https://driftmower-mcp.ee-lte-1.codemowers.io/
+  # One entry per loopback hostname. The port shown is arbitrary and ignored at
+  # match time; the hostname and path are not.
+  redirectUris:
+    - http://localhost:33418/callback
+    - http://127.0.0.1:33418/callback
+    - http://[::1]:33418/callback
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  # Must cover every scope this server's tokens need. `namespaces` carries the
+  # `codemowers.io/namespaces` tenancy claim that the drift tools scope on and
+  # that driftmower-ui uses to confine the provisioning reads; without it every
+  # tool correctly returns nothing. `offline_access` lets a client refresh
+  # rather than re-authorize every hour.
+  availableScopes:
+    - openid
+    - profile
+    - email
+    - groups
+    - namespaces
+    - offline_access
+  # Public client: no secret, PKCE instead.
+  tokenEndpointAuthMethod: none
+  pkce: true

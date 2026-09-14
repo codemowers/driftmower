@@ -1,0 +1,149 @@
+# Minikube adaptation of manifests/deployment-app.yaml + service.yaml +
+# ingress.yaml + certificate.yaml.
+#
+# Differences from the production manifests:
+#   - image -> locally-built localhost/driftmower-mcp:local, imagePullPolicy: Never
+#   - no imagePullSecrets (image built into the node)
+#   - MCP_PUBLIC_URL -> https://driftmower-mcp-dev.veebkolm.eu
+#   - ingressClassName traefik -> cloudflare-tunnel, and no Certificate at all
+#     (Cloudflare terminates TLS at the edge; no cert-manager in this cluster)
+#   - DRIFTMOWER_UI_URL points at the in-cluster Service, not the public host
+#   - OIDC_ISSUER still comes from the passmower-generated secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+  labels:
+    app: driftmower-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: driftmower-mcp
+  template:
+    metadata:
+      labels:
+        app: driftmower-mcp
+    spec:
+      # The backend's SQLite volume is ReadWriteOnce, so this has to land on the
+      # node already running driftmower-be. Trivially satisfied on single-node
+      # minikube, kept so the manifest does not quietly depend on that.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: driftmower-be
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: driftmower-mcp
+          image: localhost/driftmower-mcp:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+              name: mcp
+            - containerPort: 3001
+              name: health
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: NODE_CONFIG_ENV
+              value: 'default'
+            - name: DRIFTMOWER_MCP_TRANSPORT
+              value: 'http'
+            - name: DRIFTMOWER_MCP_DB_PATH
+              value: '/data/driftmower-be.sqlite'
+            - name: DRIFTMOWER_MCP_HOST
+              value: '::'
+            - name: DRIFTMOWER_MCP_PORT
+              value: '3000'
+            - name: DRIFTMOWER_MCP_HEALTH_PORT
+              value: '3001'
+            - name: DRIFTMOWER_MCP_LOG_LEVEL
+              value: 'debug'
+            - name: MCP_PUBLIC_URL
+              value: 'https://driftmower-mcp-dev.veebkolm.eu'
+            - name: MCP_AUDIENCE
+              value: 'https://driftmower-mcp'
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-ui-owner-secrets
+                  key: OIDC_IDP_URI
+            # In-cluster Service: the provisioning tools proxy driftmower-ui,
+            # and routing that back out through the public hostname would leave
+            # the cluster and come back for no reason.
+            - name: DRIFTMOWER_UI_URL
+              value: 'http://driftmower-ui.driftmowers.svc'
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: health
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '50m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: driftmower-be-data-v2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+spec:
+  type: ClusterIP
+  selector:
+    app: driftmower-mcp
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: mcp
+---
+# Port 3000 only. The health port stays cluster-internal: its readiness probe
+# reports database and schema state, which is nobody's business outside.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: driftmower-mcp
+  namespace: driftmowers
+spec:
+  ingressClassName: cloudflare-tunnel
+  rules:
+    - host: driftmower-mcp-dev.veebkolm.eu
+      http:
+        paths:
+          # Covers /mcp and the RFC 9728 metadata documents under
+          # /.well-known/oauth-protected-resource, which the server routes itself.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: driftmower-mcp
+                port:
+                  name: mcp

@@ -1,3 +1,5 @@
+import type { ScopeNotice } from './tenancy.js'
+
 export const ACTIONABLE_VERSION_STATUSES = ['major_behind', 'minor_behind', 'patch_behind', 'behind'] as const
 
 export type ActionableVersionStatus = (typeof ACTIONABLE_VERSION_STATUSES)[number]
@@ -106,6 +108,10 @@ interface ImageUpdatePlanResultBase {
   actions: ImageUpdateAction[]
   nextCursor: string | null
   warnings: string[]
+  // Whether the caller's tenancy limited what this plan could contain. Always
+  // present so an empty plan is never ambiguous between "nothing is behind" and
+  // "you may not see it".
+  scope: ScopeNotice
 }
 
 export interface ImageUpdatePlanResult extends ImageUpdatePlanResultBase {

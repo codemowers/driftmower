@@ -1,4 +1,5 @@
 import { parseReleaseInfo } from '../domain/release-info.js'
+import type { NamespaceScope } from '../domain/tenancy.js'
 import { releaseInfoFor, type ImageUsageRow, type ReportRows, type ReportRowLoader } from './report-rows.js'
 import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
 
@@ -29,8 +30,15 @@ export interface WorkloadDetailRow extends MatchingWorkloadGroupRow {
 }
 
 export interface WorkloadRepository {
-  searchMatchingGroups(query: string, limit: number): Promise<MatchingWorkloadGroupRow[]>
-  loadWorkloadDetails(selectedGroups: MatchingWorkloadGroupRow[]): Promise<WorkloadDetailRow[]>
+  searchMatchingGroups(
+    query: string,
+    limit: number,
+    scope: NamespaceScope
+  ): Promise<MatchingWorkloadGroupRow[]>
+  loadWorkloadDetails(
+    selectedGroups: MatchingWorkloadGroupRow[],
+    scope: NamespaceScope
+  ): Promise<WorkloadDetailRow[]>
 }
 
 export class BackendWorkloadRepository implements WorkloadRepository {
@@ -39,14 +47,18 @@ export class BackendWorkloadRepository implements WorkloadRepository {
     private readonly reportSnapshotRepository: ReportSnapshotRepository
   ) {}
 
-  async searchMatchingGroups(query: string, limit: number): Promise<MatchingWorkloadGroupRow[]> {
+  async searchMatchingGroups(
+    query: string,
+    limit: number,
+    scope: NamespaceScope = null
+  ): Promise<MatchingWorkloadGroupRow[]> {
     const latestReports = await this.reportSnapshotRepository.findLatestReadyFullClusterReports()
 
     if (latestReports.length === 0) {
       return []
     }
 
-    const candidates = await this.loadGroupCandidates(latestReports)
+    const candidates = await this.loadGroupCandidates(latestReports, scope)
     const reportsById = new Map(latestReports.map(report => [report.reportId, report]))
     const normalizedQuery = query.toLocaleLowerCase()
 
@@ -57,7 +69,10 @@ export class BackendWorkloadRepository implements WorkloadRepository {
       .slice(0, limit)
   }
 
-  async loadWorkloadDetails(selectedGroups: MatchingWorkloadGroupRow[]): Promise<WorkloadDetailRow[]> {
+  async loadWorkloadDetails(
+    selectedGroups: MatchingWorkloadGroupRow[],
+    scope: NamespaceScope = null
+  ): Promise<WorkloadDetailRow[]> {
     if (selectedGroups.length === 0) {
       return []
     }
@@ -71,6 +86,7 @@ export class BackendWorkloadRepository implements WorkloadRepository {
       // attached wherever release_group_key names a release score in the same
       // report — the join the SQL used to do.
       const selected = rows.imageUsages
+        .filter(usage => isInScope(usage, scope))
         .filter(usage => groupsById.has(workloadGroupId({ reportId, workloadGroupKey: usage.workloadGroupKey })))
         .sort(compareDetailRows)
 
@@ -96,7 +112,10 @@ export class BackendWorkloadRepository implements WorkloadRepository {
     return details
   }
 
-  private async loadGroupCandidates(reports: ReportSnapshot[]): Promise<WorkloadGroupCandidateRow[]> {
+  private async loadGroupCandidates(
+    reports: ReportSnapshot[],
+    scope: NamespaceScope
+  ): Promise<WorkloadGroupCandidateRow[]> {
     const rowsByReport = await this.loadReports(reports.map(report => report.reportId))
     const candidates = new Map<string, WorkloadGroupCandidateRow>()
 
@@ -104,7 +123,7 @@ export class BackendWorkloadRepository implements WorkloadRepository {
       // One candidate per workload group. Matching and ranking happen here
       // rather than in the query so user input never reaches the backend as a
       // filter expression.
-      for (const usage of [...rows.imageUsages].sort(compareCandidateRows)) {
+      for (const usage of rows.imageUsages.filter(usage => isInScope(usage, scope)).sort(compareCandidateRows)) {
         const id = workloadGroupId({ reportId, workloadGroupKey: usage.workloadGroupKey })
 
         if (candidates.has(id)) {
@@ -133,6 +152,19 @@ export class BackendWorkloadRepository implements WorkloadRepository {
 
     return new Map(loaded)
   }
+}
+
+// Confines rows to the namespaces a caller may see. An empty scope matches
+// nothing on purpose: a token whose tenancy claim lists no namespaces grants no
+// visibility. Rows without a workload namespace are never in a scope — data
+// whose namespace is unknown must not leak across tenants — which is also how
+// driftmower-be scopes the same column.
+export function isInScope(row: Pick<ImageUsageRow, 'workloadNamespace'>, scope: NamespaceScope): boolean {
+  if (scope === null) {
+    return true
+  }
+
+  return row.workloadNamespace !== null && scope.includes(row.workloadNamespace)
 }
 
 function uniqueReportIds(groups: MatchingWorkloadGroupRow[]): string[] {

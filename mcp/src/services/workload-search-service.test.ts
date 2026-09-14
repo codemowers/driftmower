@@ -24,8 +24,8 @@ describe('WorkloadSearchService', () => {
     await service.searchWorkloads({ query: ' api ' })
     await service.searchWorkloads({ query: 'api', limit: 500 })
 
-    expect(repository.searchMatchingGroups).toHaveBeenNthCalledWith(1, 'api', 20)
-    expect(repository.searchMatchingGroups).toHaveBeenNthCalledWith(2, 'api', 100)
+    expect(repository.searchMatchingGroups).toHaveBeenNthCalledWith(1, 'api', 20, null)
+    expect(repository.searchMatchingGroups).toHaveBeenNthCalledWith(2, 'api', 100, null)
   })
 
   it('groups image rows, deduplicates them, and maps persisted fields', async () => {
@@ -83,7 +83,8 @@ describe('WorkloadSearchService', () => {
             createdAt: '2026-07-15T12:00:00.000Z'
           }
         }
-      ]
+      ],
+      scope: { scoped: false, namespaces: null, note: null }
     })
   })
 

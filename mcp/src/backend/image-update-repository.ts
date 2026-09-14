@@ -7,7 +7,9 @@ import {
   type ImageUpdatePlanSummary
 } from '../domain/image-update-plan.js'
 import { parseReleaseInfo } from '../domain/release-info.js'
+import type { NamespaceScope } from '../domain/tenancy.js'
 import { releaseInfoFor, type ImageUsageRow, type ReportRowLoader } from './report-rows.js'
+import { isInScope } from './workload-repository.js'
 
 const IMAGE_TAG_UPDATE_ACTION_TYPE = 'image_tag_update' as const
 const HELM_CHART_UPDATE_ACTION_TYPE = 'helm_chart_update' as const
@@ -17,6 +19,11 @@ export interface ImageUpdateRepositoryFilters {
   reportId: string
   namespace: string | null
   versionStatuses: ActionableVersionStatus[]
+  // The namespaces the caller may see, independent of the `namespace` filter
+  // they asked for. Applying it here covers Helm actions too: those groups are
+  // derived from the same image usage rows, so a release whose workloads all
+  // fall outside the scope disappears rather than leaking its name.
+  allowedNamespaces: NamespaceScope
 }
 
 export interface ListImageUpdateActionGroupsInput extends ImageUpdateRepositoryFilters {
@@ -169,6 +176,10 @@ function isActionable(row: ImageUsageRow, filters: ImageUpdateRepositoryFilters)
   }
 
   if (!filters.versionStatuses.includes(row.versionStatus as ActionableVersionStatus)) {
+    return false
+  }
+
+  if (!isInScope(row, filters.allowedNamespaces)) {
     return false
   }
 

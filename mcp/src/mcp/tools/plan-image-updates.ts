@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { ACTIONABLE_VERSION_STATUSES, MANUAL_REVIEW_REASONS } from '../../domain/image-update-plan.js'
 import type { ImageUpdatePlanningService } from '../../services/image-update-planning-service.js'
+import { callerScope, scopeNoticeSchema } from './caller-scope.js'
 
 export const PLAN_IMAGE_UPDATES_TOOL_NAME = 'plan_image_updates'
 
@@ -89,7 +90,8 @@ export const planImageUpdatesOutputSchema = z.object({
   }),
   actions: z.array(actionSchema),
   nextCursor: z.string().nullable(),
-  warnings: z.array(z.string())
+  warnings: z.array(z.string()),
+  scope: scopeNoticeSchema
 })
 const toolConfiguration = {
   title: 'Plan Driftmower image updates',
@@ -107,8 +109,10 @@ export function registerPlanImageUpdatesTool(
   server: McpServer,
   planningService: Pick<ImageUpdatePlanningService, 'planImageUpdates'>
 ): void {
-  server.registerTool(PLAN_IMAGE_UPDATES_TOOL_NAME, toolConfiguration, async input => {
-    const result = await planningService.planImageUpdates(input)
+  server.registerTool(PLAN_IMAGE_UPDATES_TOOL_NAME, toolConfiguration, async (input, context) => {
+    // The scope comes from the verified token, never from `input`: a tool
+    // argument is caller-controlled and would be a way to widen access.
+    const result = await planningService.planImageUpdates({ ...input, scope: callerScope(context) })
 
     return {
       structuredContent: { ...result },

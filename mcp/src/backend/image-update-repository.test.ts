@@ -45,7 +45,8 @@ function filters(): ImageUpdateRepositoryFilters {
   return {
     reportId: REPORT_ID,
     namespace: null,
-    versionStatuses: ['major_behind', 'minor_behind', 'patch_behind', 'behind']
+    versionStatuses: ['major_behind', 'minor_behind', 'patch_behind', 'behind'],
+    allowedNamespaces: null
   }
 }
 

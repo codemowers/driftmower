@@ -1,10 +1,21 @@
 # Driftmower MCP
 
-MCP server for exposing persisted Driftmower analysis snapshots to coding agents.
+The platform's single MCP gateway. It serves coding agents two things over one
+authenticated endpoint:
 
-The server reads persisted analysis snapshots from the driftmower-be API and
-provides tools for finding workloads and planning image updates. It only ever
-reads: it never writes to the backend or to a target repository.
+- **Drift analysis** — persisted Driftmower snapshots read from the
+  driftmower-be API (`search_workloads`, `plan_image_updates`).
+- **Provisioning capabilities** — what a cluster offers a workload and what will
+  bite you, proxied from driftmower-ui's capability layer
+  (`describe_cluster_capabilities`, `list_offerings`,
+  `describe_namespace_readiness`, `explain_storage_class`).
+
+Everything here is read-only. The server never writes to the backend, the
+cluster, or a target repository; the provisioning tools generate knowledge, not
+manifests, and nothing in this server applies anything.
+
+Published behind passmower OIDC. Results are scoped to the caller's own
+namespaces.
 
 ## Requirements
 
@@ -40,7 +51,27 @@ DRIFTMOWER_MCP_HEALTH_PORT=3001
 DRIFTMOWER_MCP_DEFAULT_LIMIT=20
 DRIFTMOWER_MCP_MAX_LIMIT=100
 DRIFTMOWER_MCP_LOG_LEVEL=info
+
+# Authentication (HTTP transport only; stdio is a local process and is not gated)
+OIDC_ISSUER=https://passmower.example        # matched against the token `iss`
+OIDC_JWKS_URI=                               # defaults to ${OIDC_ISSUER}/jwks
+MCP_AUDIENCE=https://driftmower-mcp          # verified strictly as `aud`
+MCP_PUBLIC_URL=https://driftmower-mcp.ee-lte-1.codemowers.io
+MCP_AUTH_ENABLED=true                        # false only for a server no one can reach
+
+# Provisioning tools; unset means they are not registered at all
+DRIFTMOWER_UI_URL=http://driftmower-ui
+DRIFTMOWER_UI_TIMEOUT_MS=10000
 ```
+
+`MCP_AUDIENCE` must **not** equal driftmower-be's `OIDC_AUDIENCE`
+(`https://driftmower-api`). Strict audience checking is what stops an ordinary
+browser session token from opening this server, so the two are deliberately
+different resource indicators.
+
+With `DRIFTMOWER_MCP_TRANSPORT=http` and `MCP_AUTH_ENABLED` unset (default
+`true`), the server refuses to start without `OIDC_ISSUER`. That is intentional:
+an HTTP server on an ingress should fail loudly rather than serve open.
 
 The backend URL can also be passed with `--backend-url`:
 
@@ -74,9 +105,13 @@ DRIFTMOWER_MCP_TRANSPORT=http DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
 HTTP mode exposes:
 
 - MCP endpoint: `http://127.0.0.1:3000/mcp`
+- Protected-resource metadata (RFC 9728, unauthenticated):
+  `http://127.0.0.1:3000/.well-known/oauth-protected-resource/mcp`
 - Liveness: `http://127.0.0.1:3001/healthz`
 - Readiness: `http://127.0.0.1:3001/readyz`
 - Startup: `http://127.0.0.1:3001/startupz`
+
+Port 3000 is published through the Ingress; port 3001 stays cluster-internal.
 
 ## Local Codex MCP Registration
 
@@ -203,9 +238,9 @@ kubectl -n driftmowers port-forward deploy/driftmower-mcp 3000:3000 3001:3001
 After forwarding, Codex can use `http://127.0.0.1:3000/mcp` and readiness is
 available at `http://127.0.0.1:3001/readyz`.
 
-HTTP mode is intended for internal cluster access only in the MVP. Do not expose
-it through Ingress or the public internet without adding authentication and
-authorization.
+The Ingress, its certificate and the OIDC client are in `manifests/ingress.yaml`,
+`manifests/certificate.yaml` and `manifests/oidcclient.yaml`. See
+**Authentication** below before changing any of them.
 
 ## Skaffold Quickstart
 
@@ -225,7 +260,81 @@ The Skaffold config builds `git.codemowers.io/uq69adc8851/driftmower-mcp`,
 deploys the raw manifests, and port-forwards the MCP endpoint to
 `localhost:3000` and health endpoints to `localhost:3001`.
 
+
+## Authentication
+
+The HTTP transport is a pure OIDC resource server. It verifies RS256 JWT access
+tokens issued by passmower against its JWKS endpoint, checking `iss` and — 
+strictly — `aud`. It never mints tokens.
+
+An MCP client is not a browser, which is why the gate is in-process rather than
+an oauth2-proxy at the ingress: a cookie/redirect flow cannot be completed by a
+headless client, and it would strip the caller identity the tools need to scope
+results.
+
+Every 401 carries the pointer a client needs to discover the flow:
+
+```
+WWW-Authenticate: Bearer error="invalid_token", error_description="...",
+                  resource_metadata="https://driftmower-mcp.ee-lte-1.codemowers.io/.well-known/oauth-protected-resource/mcp"
+```
+
+### Connecting a client
+
+**Quick start — paste a token.** Sign in to driftmower-ui and fetch
+`/api/mcp/token`; it returns a ready-made `claude mcp add` line. Requires
+`MCP_ENABLED=true` on driftmower-ui.
+
+```bash
+claude mcp add --transport http driftmower \
+  https://driftmower-mcp.ee-lte-1.codemowers.io/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+**The token expires in about an hour.** passmower issues no longer-lived access
+token, so this is for trying it out, not for a client you intend to keep.
+
+**Durable — OAuth with PKCE.** `manifests/oidcclient.yaml` registers a public
+`driftmower-mcp` client. A client that lets you supply a client id does PKCE and
+refreshes itself.
+
+**Known limitation.** passmower has **no dynamic client registration**
+(`features.registration` is absent from its `src/configuration.js`), so a strict
+DCR-only client will not connect even with perfect metadata. `features.deviceFlow`
+is enabled as a headless fallback.
+
+Redirect URIs are enumerated in the OIDCClient CR. Because it is registered as
+`applicationType: native`, oidc-provider ignores the **port** of an http
+loopback redirect URI, so a client picking a random port still matches. The
+**hostname** is not normalised, so `localhost`, `127.0.0.1` and `[::1]` are all
+registered; the **path** must match exactly, and a client wanting something
+other than `/callback` needs it added.
+
+### Tenancy
+
+Results are confined to the namespaces in the caller's `codemowers.io/namespaces`
+claim, which the `namespaces` OIDC scope puts into the token.
+
+- `search_workloads` and `plan_image_updates` filter on
+  `image_usages.workload_namespace`. A Helm release whose workloads all fall
+  outside the caller's scope disappears rather than leaking its name.
+- The provisioning tools forward the caller's own token to driftmower-ui, which
+  makes the same decision for its Kubernetes reads. A crafted namespace list
+  cannot read another sandbox's quota.
+
+Every response carries a `scope` notice saying whether tenancy limited it, so an
+empty result is never ambiguous between "nothing is there" and "not yours to
+see". **A token carrying no namespaces claim gets no access, not full access** —
+failing open would mean that dropping the `namespaces` scope from the OIDCClient
+silently hands every caller the whole fleet.
+
+On `stdio` there is no authentication and no scoping: it is a local process
+reading a local database, with no network surface.
+
 ## Tools
+
+All tools are annotated `readOnlyHint: true`, `destructiveHint: false`,
+`idempotentHint: true`, `openWorldHint: false`. Nothing here writes.
 
 ### `search_workloads`
 
@@ -306,6 +415,56 @@ payloads and chart-tag candidate arrays are not exposed. The tool is read-only,
 and its results do not establish compatibility, maintenance approval, or
 deployment safety. Repository discovery, edits, validation, and approval remain
 the caller's responsibility.
+
+
+## Provisioning Tools
+
+These answer "what can I deploy here, and what will bite me". They are a façade
+over driftmower-ui's capability layer (`lib/features/provisioning/`), which owns
+the Kubernetes reads and the RBAC behind them; this server holds no cluster
+credentials of its own. They are registered only when `DRIFTMOWER_UI_URL` is set —
+an unconfigured deployment advertises no provisioning tools rather than tools
+that always fail.
+
+Each returns both markdown, written for a human reading a chat, and
+`structuredContent` an agent can branch on.
+
+### `describe_cluster_capabilities`
+
+Storage classes and what each implies, zones and schedulable nodes, priority
+classes, the network-policy engine, per-operator readiness, the ingress domain
+and TLS advice, and the ValidatingAdmissionPolicies that override RBAC. No
+arguments.
+
+### `list_offerings`
+
+Every offering the platform can provision, with availability and — when it is
+unavailable — why ("the dragonfly-operator is not installed on this cluster").
+Optional `offering` narrows to one.
+
+### `describe_namespace_readiness`
+
+Takes `namespaces` (1–12). Per namespace: quota used/hard/free, LimitRange
+defaults, network posture, Pod Security enforcement, `mayCreate`, the hostnames
+the namespace may claim, and any policy that selects on an **exact instance
+name** — the trap that makes a database named anything unexpected never report
+ready, with no error pointing at the cause.
+
+Namespaces you cannot access come back in `withheld` rather than erroring.
+
+### `explain_storage_class`
+
+Takes `name`. One class in plain language: local to a machine? does a volume pin
+its pod to a node? can it grow? does the data survive deleting the instance? On
+node-local storage it says so plainly, because "3 replicas" there is not the
+high availability the number suggests.
+
+### Facts that could not be read
+
+A fact the capability layer could not read arrives as a `degraded` entry and is
+rendered under "Facts that could not be read", never as an absent or passing
+one. A refused read that looks like an empty result is the single failure mode
+this layer exists to prevent.
 
 ## Development
 
