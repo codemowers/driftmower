@@ -86,8 +86,7 @@ function findRows(path: string, rows: Row[], parameters: URLSearchParams): unkno
   const allowed = QUERY_PROPERTIES[path]
   const filters: Array<[string, string]> = []
   let select: string[] | null = null
-  let sortField: string | null = null
-  let sortDirection = 1
+  const sort: Array<[string, number]> = []
   let limit = DEFAULT_PAGE_SIZE
   let skip = 0
 
@@ -100,8 +99,7 @@ function findRows(path: string, rows: Row[], parameters: URLSearchParams): unkno
       select = [...(select ?? []), value]
     } else if (sortMatch) {
       assertAllowed(path, sortMatch[1], allowed)
-      sortField = sortMatch[1]
-      sortDirection = Number(value) < 0 ? -1 : 1
+      sort.push([sortMatch[1], Number(value) < 0 ? -1 : 1])
     } else if (key === '$limit') {
       limit = Math.min(Number(value), MAXIMUM_PAGE_SIZE)
     } else if (key === '$skip') {
@@ -112,8 +110,8 @@ function findRows(path: string, rows: Row[], parameters: URLSearchParams): unkno
     }
   }
 
-  const matched = rows.filter(row => filters.every(([field, value]) => String(row[field]) === value))
-  const sorted = sortField === null ? matched : [...matched].sort(compareBy(sortField, sortDirection))
+  const matched = rows.filter(row => filters.every(([field, value]) => queryText(row[field]) === value))
+  const sorted = sort.length === 0 ? matched : [...matched].sort(compareBy(sort))
   const page = sorted.slice(skip, skip + limit)
 
   return {
@@ -136,16 +134,25 @@ function assertAllowed(path: string, property: string, allowed: string[] | undef
   }
 }
 
-function compareBy(field: string, direction: number) {
-  return (left: Row, right: Row): number => {
-    const leftValue = String(left[field] ?? '')
-    const rightValue = String(right[field] ?? '')
+// The backend matches a query value against the stored column text. A JSON
+// column such as namespaceScope is stored as its canonical JSON, which is what
+// a client has to send to match it.
+function queryText(value: unknown): string {
+  return value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
 
-    if (leftValue === rightValue) {
-      return 0
+function compareBy(sort: Array<[string, number]>) {
+  return (left: Row, right: Row): number => {
+    for (const [field, direction] of sort) {
+      const leftValue = String(left[field] ?? '')
+      const rightValue = String(right[field] ?? '')
+
+      if (leftValue !== rightValue) {
+        return (leftValue < rightValue ? -1 : 1) * direction
+      }
     }
 
-    return (leftValue < rightValue ? -1 : 1) * direction
+    return 0
   }
 }
 

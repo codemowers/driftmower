@@ -1,8 +1,6 @@
 import config from 'config'
 import { Command } from 'commander'
 
-export const DEFAULT_BACKEND_URL = 'http://driftmower-be:3030'
-
 const TRANSPORTS = ['stdio', 'http'] as const
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 

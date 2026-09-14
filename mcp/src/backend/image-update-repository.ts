@@ -7,7 +7,7 @@ import {
   type ImageUpdatePlanSummary
 } from '../domain/image-update-plan.js'
 import { parseReleaseInfo } from '../domain/release-info.js'
-import type { ImageUsageRow, ReportRows, ReportRowLoader } from './report-rows.js'
+import { releaseInfoFor, type ImageUsageRow, type ReportRowLoader } from './report-rows.js'
 
 const IMAGE_TAG_UPDATE_ACTION_TYPE = 'image_tag_update' as const
 const HELM_CHART_UPDATE_ACTION_TYPE = 'helm_chart_update' as const
@@ -32,8 +32,6 @@ interface ImageUpdateActionGroupBase extends ImageUpdateActionSortKey {
   reportId: string
   versionStatus: ActionableVersionStatus
 }
-
-type ImageUpdateActionGroupCommon = Omit<ImageUpdateActionGroupBase, 'actionType'>
 
 export interface DirectImageUpdateActionGroup extends ImageUpdateActionGroupBase {
   actionType: 'image_tag_update'
@@ -175,14 +173,6 @@ function isActionable(row: ImageUsageRow, filters: ImageUpdateRepositoryFilters)
   }
 
   return filters.namespace === null || row.workloadNamespace === filters.namespace
-}
-
-function releaseInfoFor(rows: ReportRows, releaseGroupKey: string | null): string | null {
-  if (releaseGroupKey === null) {
-    return null
-  }
-
-  return rows.releaseInfoByGroupKey.get(releaseGroupKey) ?? null
 }
 
 // Rows outside a Helm release are grouped per image identity, so one action
@@ -333,7 +323,7 @@ function groupBy<Row>(rows: Row[], toKey: (row: Row) => string): Map<string, Row
 // Riskiest first, and otherwise fully deterministic: the cursor is a position
 // in exactly this order, so two calls must agree on it. Plain comparisons keep
 // that ordering byte-wise rather than locale-dependent.
-function compareActionGroups(left: ImageUpdateActionGroup, right: ImageUpdateActionGroup): number {
+function compareActionGroups(left: ImageUpdateActionSortKey, right: ImageUpdateActionSortKey): number {
   return (
     left.riskRank - right.riskRank ||
     compareText(left.actionType, right.actionType) ||
@@ -347,7 +337,7 @@ function isAfterCursor(group: ImageUpdateActionGroup, after: ImageUpdateActionSo
     return true
   }
 
-  return compareActionGroups(group, { ...after } as ImageUpdateActionGroup) > 0
+  return compareActionGroups(group, after) > 0
 }
 
 function compareDetailRows(left: ActionableRow, right: ActionableRow): number {
@@ -402,5 +392,3 @@ function statusForRiskRank(riskRank: number): ActionableVersionStatus {
 
   return status
 }
-
-export type { ImageUpdateActionGroupCommon }

@@ -1,5 +1,5 @@
 import { parseReleaseInfo } from '../domain/release-info.js'
-import type { ImageUsageRow, ReportRows, ReportRowLoader } from './report-rows.js'
+import { releaseInfoFor, type ImageUsageRow, type ReportRows, type ReportRowLoader } from './report-rows.js'
 import type { ReportSnapshot, ReportSnapshotRepository } from './report-snapshot-repository.js'
 
 interface WorkloadGroupCandidateRow {
@@ -139,28 +139,49 @@ function uniqueReportIds(groups: MatchingWorkloadGroupRow[]): string[] {
   return [...new Set(groups.map(group => group.reportId))]
 }
 
-function releaseInfoFor(rows: ReportRows, releaseGroupKey: string | null): string | null {
-  if (releaseGroupKey === null) {
-    return null
-  }
-
-  return rows.releaseInfoByGroupKey.get(releaseGroupKey) ?? null
-}
-
+// Row ordering is compared byte-wise, as the backend's database orders text:
+// it decides which image row represents a workload group in search, so a
+// locale-aware comparison would change which repository a workload can be
+// found by.
 function compareCandidateRows(left: ImageUsageRow, right: ImageUsageRow): number {
   return (
-    left.workloadGroupKey.localeCompare(right.workloadGroupKey) ||
-    compareNullableStrings(left.workloadName, right.workloadName) ||
-    left.repository.localeCompare(right.repository)
+    compareText(left.workloadGroupKey, right.workloadGroupKey) ||
+    compareNullableText(left.workloadName, right.workloadName) ||
+    compareText(left.repository, right.repository)
   )
 }
 
 function compareDetailRows(left: ImageUsageRow, right: ImageUsageRow): number {
   return (
-    left.workloadGroupKey.localeCompare(right.workloadGroupKey) ||
-    left.repository.localeCompare(right.repository) ||
-    compareNullableStrings(left.containerName, right.containerName)
+    compareText(left.workloadGroupKey, right.workloadGroupKey) ||
+    compareText(left.repository, right.repository) ||
+    compareNullableText(left.containerName, right.containerName)
   )
+}
+
+function compareText(left: string, right: string): number {
+  if (left === right) {
+    return 0
+  }
+
+  return left < right ? -1 : 1
+}
+
+// Nulls sort first, as they do in an ascending SQL order.
+function compareNullableText(left: string | null, right: string | null): number {
+  if (left === right) {
+    return 0
+  }
+
+  if (left === null) {
+    return -1
+  }
+
+  if (right === null) {
+    return 1
+  }
+
+  return compareText(left, right)
 }
 
 function enrichMatchingGroup(

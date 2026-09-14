@@ -5,8 +5,11 @@ export const RELEASE_SCORES_PATH = 'release-scores'
 
 // A ready report never changes: a new analysis writes a new report id. Rows can
 // therefore be cached for the lifetime of the process; only the number of
-// reports held at once needs a bound.
-const MAXIMUM_CACHED_REPORTS = 4
+// reports held at once needs a bound. A workload search reads the latest report
+// of every cluster on each call, so the bound must comfortably exceed the
+// number of clusters or every search re-downloads everything; eviction is
+// least-recently-used so the working set stays resident.
+const MAXIMUM_CACHED_REPORTS = 16
 
 export interface ImageUsageRow {
   reportId: string
@@ -46,19 +49,27 @@ export class ReportRowLoader {
     const cached = this.cache.get(reportId)
 
     if (cached) {
+      // Re-insert so this report becomes the most recently used.
+      this.cache.delete(reportId)
+      this.cache.set(reportId, cached)
+
       return cached
     }
 
     // The promise is cached rather than its result so concurrent tool calls
     // against the same report share one fetch instead of racing.
     const pending = this.fetch(reportId).catch((error: unknown) => {
-      this.cache.delete(reportId)
+      // Only forget this attempt: an evicted-and-reloaded report may already
+      // have a healthy entry under the same id.
+      if (this.cache.get(reportId) === pending) {
+        this.cache.delete(reportId)
+      }
 
       throw error
     })
 
     this.cache.set(reportId, pending)
-    this.evictOldestReports()
+    this.evictLeastRecentlyUsed()
 
     return pending
   }
@@ -77,7 +88,7 @@ export class ReportRowLoader {
     }
   }
 
-  private evictOldestReports(): void {
+  private evictLeastRecentlyUsed(): void {
     while (this.cache.size > MAXIMUM_CACHED_REPORTS) {
       const oldestReportId = this.cache.keys().next().value
 
@@ -88,6 +99,16 @@ export class ReportRowLoader {
       this.cache.delete(oldestReportId)
     }
   }
+}
+
+// The raw release_info text for a Helm release, or null for a row outside any
+// release or whose release has no score — the left join the SQL used to do.
+export function releaseInfoFor(rows: ReportRows, releaseGroupKey: string | null): string | null {
+  if (releaseGroupKey === null) {
+    return null
+  }
+
+  return rows.releaseInfoByGroupKey.get(releaseGroupKey) ?? null
 }
 
 // The backend stores release_info as JSON text and returns it unresolved, but

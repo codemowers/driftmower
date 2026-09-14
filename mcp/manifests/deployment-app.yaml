@@ -58,14 +58,18 @@ spec:
             httpGet:
               path: /healthz
               port: health
+          # Readiness and startup make a live call to driftmower-be, which the
+          # server bounds at 3s; the probe has to outlast that.
           readinessProbe:
             httpGet:
               path: /readyz
               port: health
+            timeoutSeconds: 5
           startupProbe:
             httpGet:
               path: /startupz
               port: health
+            timeoutSeconds: 5
             failureThreshold: 30
             periodSeconds: 2
           resources:

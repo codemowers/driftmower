@@ -6,6 +6,10 @@ export const HEALTH_PATH = '/healthz'
 export const READINESS_PATH = '/readyz'
 export const STARTUP_PATH = '/startupz'
 
+// Shorter than the client's default so a slow backend fails the probe within
+// the kubelet's own timeout instead of being reported as a probe timeout.
+const READINESS_TIMEOUT_MS = 3_000
+
 export interface HealthServerOptions {
   host: string
   port: number
@@ -61,7 +65,7 @@ async function checkReadiness(client: DriftmowerBackendClient): Promise<{
   body: Record<string, unknown>
 }> {
   try {
-    await client.findPage(REPORTS_PATH, { $limit: 1, $select: ['id'] })
+    await client.findPage(REPORTS_PATH, { $limit: 1, $select: ['id'] }, { timeoutMs: READINESS_TIMEOUT_MS })
 
     return {
       ok: true,

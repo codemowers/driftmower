@@ -57,8 +57,33 @@ describe('BackendReportSnapshotRepository', () => {
     expect(request).toContain('sourceType=cluster')
     expect(request).toContain('status=ready')
     expect(request).toContain('clusterContext=prod')
+    // Full-cluster reports are selected server-side, so namespace-scoped
+    // reruns cannot crowd them out of the scan window.
+    expect(request).toContain('namespaceScope={"mode":"all"}')
     // Selecting is what stops the backend assembling every report it returns.
     expect(request).toContain('$select[0]=id')
+    // Ties on createdAt are broken by id so paging and the pick are stable.
+    expect(request).toContain('$sort[createdAt]=-1&$sort[id]=-1')
+    // One cluster needs one row.
+    expect(request).toContain('$limit=1')
+    expect(backend.requests).toHaveLength(1)
+  })
+
+  it('does not let namespace-scoped reports crowd out an older full-cluster report', async () => {
+    const scopedReports = Array.from({ length: 600 }, (_, index) => ({
+      id: `scoped-${String(index).padStart(4, '0')}`,
+      clusterContext: 'prod',
+      createdAt: `2026-02-${String(1 + (index % 28)).padStart(2, '0')}`,
+      namespaceScope: SELECTED_NAMESPACE_SCOPE
+    }))
+    const { repository } = repositoryWith([
+      ...scopedReports,
+      { id: 'prod-full', clusterContext: 'prod', createdAt: '2026-01-01' }
+    ])
+
+    await expect(repository.findLatestReadyFullClusterReports()).resolves.toEqual([
+      { reportId: 'prod-full', clusterContext: 'prod', createdAt: '2026-01-01' }
+    ])
   })
 
   it('filters by exact cluster context', async () => {

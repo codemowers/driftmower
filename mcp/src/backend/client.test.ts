@@ -83,6 +83,24 @@ describe('DriftmowerBackendClient', () => {
     expect(calls).toHaveLength(1)
   })
 
+  it('can stop at a page bound instead of failing', async () => {
+    const rows = Array.from({ length: 1000 }, (_, index) => ({ id: `row-${index}` }))
+    const { client, calls } = createClient(call => {
+      const skip = Number(new URL(call.url).searchParams.get('$skip'))
+
+      return page(rows.slice(skip, skip + 100), rows.length)
+    })
+
+    await expect(client.findAll('reports', {}, { maximumPages: 2 })).rejects.toThrow(/more than 2 pages/)
+
+    calls.length = 0
+
+    const truncated = await client.findAll('reports', {}, { maximumPages: 2, onLimit: 'truncate' })
+
+    expect(truncated).toHaveLength(200)
+    expect(calls).toHaveLength(2)
+  })
+
   it('normalises an unpaginated array response', async () => {
     const { client } = createClient(() => new Response(JSON.stringify([{ id: 'a' }]), { status: 200 }))
 

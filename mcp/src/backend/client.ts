@@ -9,7 +9,7 @@ const DEFAULT_TIMEOUT_MS = 15_000
 // A cluster report holds one row per container, so paging has to cope with
 // thousands of rows while still refusing to loop forever on a backend that
 // reports a total it never reaches.
-const MAXIMUM_PAGES = 200
+const DEFAULT_MAXIMUM_PAGES = 200
 
 export interface BackendClientOptions {
   baseUrl: string
@@ -30,6 +30,18 @@ interface PaginatedResponse<Row> {
   limit: number
   skip: number
   data: Row[]
+}
+
+export interface RequestOptions {
+  // Overrides the client-wide timeout for one call.
+  timeoutMs?: number
+}
+
+export interface FindAllOptions extends RequestOptions {
+  maximumPages?: number
+  // What reaching maximumPages means: an error, because the caller expected
+  // to read everything, or a deliberate bound on how far back to look.
+  onLimit?: 'throw' | 'truncate'
 }
 
 export class BackendRequestError extends Error {
@@ -59,9 +71,13 @@ export class DriftmowerBackendClient {
 
   // Reads one page. Callers that need every row should use findAll instead of
   // raising $limit: the backend caps a page at its own paginate.max.
-  async findPage<Row>(path: string, query: QueryObject = {}): Promise<PaginatedResponse<Row>> {
+  async findPage<Row>(
+    path: string,
+    query: QueryObject = {},
+    options: RequestOptions = {}
+  ): Promise<PaginatedResponse<Row>> {
     const url = `${this.baseUrl}/${path}${buildQueryString(query)}`
-    const response = await this.request(url)
+    const response = await this.request(url, options)
     const body = (await readJson(response, url)) as PaginatedResponse<Row> | Row[]
 
     // `paginate: false` responses are bare arrays; normalise them so callers
@@ -77,17 +93,20 @@ export class DriftmowerBackendClient {
     return body
   }
 
-  async findAll<Row>(path: string, query: QueryObject = {}): Promise<Row[]> {
+  async findAll<Row>(path: string, query: QueryObject = {}, options: FindAllOptions = {}): Promise<Row[]> {
+    const maximumPages = options.maximumPages ?? DEFAULT_MAXIMUM_PAGES
     const rows: Row[] = []
     let skip = 0
 
-    for (let page = 0; page < MAXIMUM_PAGES; page += 1) {
-      const result = await this.findPage<Row>(path, { ...query, $limit: this.pageSize, $skip: skip })
+    for (let page = 0; page < maximumPages; page += 1) {
+      const result = await this.findPage<Row>(path, { ...query, $limit: this.pageSize, $skip: skip }, options)
 
       rows.push(...result.data)
 
       // An empty page ends the scan even when `total` disagrees, so a backend
-      // that miscounts cannot spin this loop.
+      // that miscounts cannot spin this loop. Advancing by what actually came
+      // back, not by the requested page size, keeps this correct if the
+      // backend clamps pages smaller than asked.
       if (result.data.length === 0 || rows.length >= result.total) {
         return rows
       }
@@ -95,10 +114,14 @@ export class DriftmowerBackendClient {
       skip += result.data.length
     }
 
-    throw new BackendRequestError(`Refusing to read more than ${MAXIMUM_PAGES} pages from ${path}`)
+    if (options.onLimit === 'truncate') {
+      return rows
+    }
+
+    throw new BackendRequestError(`Refusing to read more than ${maximumPages} pages from ${path}`)
   }
 
-  private async request(url: string): Promise<Response> {
+  private async request(url: string, options: RequestOptions): Promise<Response> {
     let response: Response
 
     try {
@@ -107,7 +130,7 @@ export class DriftmowerBackendClient {
           accept: 'application/json',
           authorization: `Bearer ${this.serviceToken}`
         },
-        signal: AbortSignal.timeout(this.timeoutMs)
+        signal: AbortSignal.timeout(options.timeoutMs ?? this.timeoutMs)
       })
     } catch (error) {
       throw new BackendRequestError(`Request to ${url} failed: ${errorMessage(error)}`)

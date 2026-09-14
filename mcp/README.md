@@ -166,6 +166,24 @@ The deployment reads from driftmower-be over the cluster network, so it needs
 no volume, no pod affinity and no particular node. The in-cluster HTTP server
 binds to `::` so Kubernetes can probe it in IPv6 or dual-stack clusters.
 
+The pod reads its service token from the Secret `driftmower-mcp-be-auth-token`
+(key `token`), which no manifest creates: a credential does not belong in the
+repository. Mint one and register it with driftmower-be before the first
+apply — the deployment stays in `CreateContainerConfigError` until the Secret
+exists, and the pod never becomes ready until the backend accepts the token.
+
+```bash
+# The raw token is what this server sends; driftmower-be only ever holds its
+# SHA-256, listed in its auth.serviceTokens (AUTH_SERVICE_TOKENS) as
+# {"serviceName":"driftmower-mcp","tokenHash":"<hash>"}.
+DRIFTMOWER_MCP_TOKEN="dm_svc_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+DRIFTMOWER_MCP_TOKEN_HASH="$(printf %s "$DRIFTMOWER_MCP_TOKEN" | sha256sum | awk '{print $1}')"
+
+kubectl create secret generic driftmower-mcp-be-auth-token \
+  -n driftmowers \
+  --from-literal=token="$DRIFTMOWER_MCP_TOKEN"
+```
+
 Apply manually:
 
 ```bash
