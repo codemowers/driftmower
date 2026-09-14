@@ -8,8 +8,21 @@ import type { NamespaceFact } from "@/lib/features/provisioning/types"
 // Pod Security Admission is enforced by the apiserver itself, so it shows up in
 // no policy listing — yet on a restricted namespace it rejects a pod that sets
 // no securityContext at all, which is what a first attempt looks like.
+//
+// runAsUser is in the snippet even though PSA does not require it, because
+// runAsNonRoot has a second enforcement point the requirement list cannot
+// describe: admission passes, and then the KUBELET refuses any image whose
+// USER is a name rather than a uid, because it cannot prove a name is not
+// root. The pod is admitted and never starts, with
+// `CreateContainerConfigError` and "image has non-numeric user". Whether it
+// bites depends on the image, which this page does not know — so the snippet
+// carries the field as a blank to fill in, like the image above it.
 const SNIPPET = `securityContext:
   runAsNonRoot: true
+  # Your image's own uid. Required whenever its USER is a name (\`USER app\`)
+  # rather than a number: the kubelet cannot verify a name is non-root and
+  # refuses to start the container. Read it from the image's Dockerfile.
+  runAsUser: <uid>
   seccompProfile:
     type: RuntimeDefault
 containers:
@@ -76,6 +89,14 @@ export default function PodSecurityCard({ namespaces }: { namespaces: NamespaceF
           <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
             {SNIPPET}
           </pre>
+          <p className="text-xs text-muted-foreground">
+            <code className="font-mono text-xs text-foreground">runAsUser</code> is not one of the four —
+            admission does not ask for it. But with{" "}
+            <code className="font-mono text-xs text-foreground">runAsNonRoot</code> set, the kubelet refuses
+            to start an image whose <code className="font-mono text-xs text-foreground">USER</code> is a name
+            instead of a uid, so the pod is admitted and then sits in{" "}
+            <code className="font-mono text-xs text-foreground">CreateContainerConfigError</code>.
+          </p>
         </>
       )}
     </div>

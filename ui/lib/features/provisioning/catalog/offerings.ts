@@ -173,7 +173,11 @@ export const OFFERINGS: OfferingSpec[] = [
     purpose: "search",
     what: "A search engine and log store you query with full-text queries.",
     goodFor: ["full-text search", "log analytics", "dashboards"],
-    group: "opensearch.opster.io",
+    // opensearch.opster.io is still served for existing objects, but the
+    // operator's webhook refuses to create new ones under it ("API group is
+    // deprecated. Please use opensearch.org/v1 instead"), so discovery has to
+    // anchor on the group you can actually apply to.
+    group: "opensearch.org",
     kind: "OpenSearchCluster",
     versions: ["v1"],
     operator: {
