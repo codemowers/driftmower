@@ -10,7 +10,23 @@ import { DriftmowerBackendClient } from '../src/backend/client.js'
 // reject too, which is the point of testing against it.
 const QUERY_PROPERTIES: Record<string, string[]> = {
   reports: ['id', 'sourceType', 'status', 'clusterContext', 'createdAt', 'reportHash', 'namespaceScope'],
-  'image-usages': ['reportId', 'workloadGroupKey', 'releaseGroupKey', 'status', 'registry', 'repository'],
+  'image-usages': [
+    'id',
+    'reportId',
+    'workloadGroupKey',
+    'workloadKind',
+    'workloadNamespace',
+    'workloadName',
+    'releaseGroupKey',
+    'containerName',
+    'status',
+    'registry',
+    'repository',
+    'deployedTag',
+    'latestTag',
+    'versionStatus',
+    'createdAt'
+  ],
   'release-scores': ['reportId', 'groupKey']
 }
 

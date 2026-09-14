@@ -25,6 +25,24 @@ function usageRequests(requests: string[]): string[] {
 }
 
 describe('ReportRowLoader', () => {
+  it('projects and orders the rows it pages through', async () => {
+    const { client, requests } = createFakeBackend({
+      rows: { 'image-usages': [usage('report-1')], 'release-scores': [] }
+    })
+
+    await new ReportRowLoader(client).load('report-1')
+
+    const [usagesRequest] = usageRequests(requests).map(decodeURIComponent)
+    const [scoresRequest] = requests.filter(request => request.startsWith('/release-scores')).map(decodeURIComponent)
+
+    // Selecting keeps the payload column — most of every row — off the wire.
+    expect(usagesRequest).toContain('$select[0]=id')
+    expect(usagesRequest).not.toContain('payload')
+    // A paged read needs a stable order or a page boundary can skip a row.
+    expect(usagesRequest).toContain('$sort[id]=1')
+    expect(scoresRequest).toContain('$sort[groupKey]=1')
+  })
+
   it('shares one fetch between concurrent loads of the same report', async () => {
     const { client, requests } = createFakeBackend({
       rows: { 'image-usages': [usage('report-1')], 'release-scores': [] }
