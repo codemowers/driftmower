@@ -10,6 +10,7 @@ import {
   formatUnavailable
 } from '../../services/provisioning-format.js'
 import { callerAccessToken, callerSubject, type ToolCallContext } from './caller-scope.js'
+import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
 import {
   describeClusterCapabilitiesOutputShape,
   describeNamespaceReadinessOutputShape,
@@ -33,16 +34,6 @@ const OFFERING_IDS = [
   'emqx',
   'bucket'
 ] as const
-
-// Nothing in this server writes. The planners named in
-// driftmower-ui/provisioning.md would carry the same annotations: they render
-// text for a human to apply, they never apply anything themselves.
-const READ_ONLY_ANNOTATIONS = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false
-} as const
 
 // A stale deep link naming fifty namespaces must not fan out unbounded;
 // driftmower-ui caps this too, and agreeing with it keeps the error honest.

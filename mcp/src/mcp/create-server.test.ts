@@ -36,7 +36,7 @@ describe('createMcpServer', () => {
   })
 
   it('registers search_workloads and returns text plus structured content', async () => {
-    const result = { query: 'api', matches: [] }
+    const result = { query: 'api', matches: [], scope: { scoped: false, namespaces: null, note: null } }
     const searchWorkloads = vi.fn().mockResolvedValue(result)
     const planImageUpdates = vi.fn().mockResolvedValue(NO_READY_REPORT_RESULT)
     const { client } = await connectClient(searchWorkloads, planImageUpdates)
@@ -50,7 +50,7 @@ describe('createMcpServer', () => {
     expect(tools.tools.map(tool => tool.name)).toContain('search_workloads')
     expect(searchWorkloads).toHaveBeenCalledWith({ query: 'api', limit: 3, scope: UNRESTRICTED_SCOPE })
     expect(toolResult.structuredContent).toEqual(result)
-    expect(toolResult.content).toEqual([{ type: 'text', text: JSON.stringify(result) }])
+    expect(toolResult.content).toEqual([{ type: 'text', text: 'No workloads match `api`.' }])
   })
 
   it('rejects an empty query at the MCP input boundary', async () => {
@@ -98,7 +98,9 @@ describe('createMcpServer', () => {
       scope: UNRESTRICTED_SCOPE
     })
     expect(result.structuredContent).toEqual(NO_READY_REPORT_RESULT)
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(NO_READY_REPORT_RESULT) }])
+    expect(result.content).toEqual([
+      { type: 'text', text: 'No ready Driftmower snapshot, so no update plan could be built.' }
+    ])
     expect(planImageUpdatesOutputSchema.parse(result.structuredContent)).toEqual(NO_READY_REPORT_RESULT)
     expect(planTool?.inputSchema.properties).not.toHaveProperty('cluster')
   })
