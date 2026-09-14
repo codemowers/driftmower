@@ -1,6 +1,7 @@
 import "server-only"
 
 import { getSession } from "@/lib/auth/session"
+import { managerNamespace } from "@/lib/features/actions/types"
 import { isInCluster } from "@/lib/server/k8s"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { livePatchUpgradeRequestSchema } from "../schema"
@@ -24,6 +25,19 @@ export async function parseLivePatchUpgradeRequest(req: Request): Promise<Parsed
   const parsed = livePatchUpgradeRequestSchema.safeParse(body)
   if (!parsed.success) {
     return Response.json({ error: "invalid temporary fix request" }, { status: 400 })
+  }
+
+  // Authorization is about to be decided on target.namespace, but the object
+  // this request reaches is named from a hash of facts.manager (see fixKey).
+  // If those disagree, a caller authorized for their own namespace addresses an
+  // object belonging to another one. Refuse the disagreement rather than pick a
+  // winner: every request the UI itself builds has them equal.
+  const claimed = managerNamespace(parsed.data.facts.manager)
+  if (claimed !== null && claimed !== parsed.data.target.namespace) {
+    return Response.json(
+      { error: "manager namespace and target namespace disagree" },
+      { status: 400 },
+    )
   }
 
   const denied = await guardNamespace(parsed.data.target.namespace)

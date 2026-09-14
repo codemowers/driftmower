@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types \"lib/features/provisioning/**/*.test.ts\""
+    "test": "node --test --experimental-strip-types \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",

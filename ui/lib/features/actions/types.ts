@@ -118,6 +118,18 @@ export function managerScope(manager: ManagerFacts): string {
   }
 }
 
+// The namespace a manager names, or null for the one kind that names none.
+// Callers that authorize on a namespace need this: managerScope feeds the hash
+// that becomes a cluster-scoped object name, so a manager pointing at one
+// namespace while the request authorizes against another is how a caller
+// reaches someone else's object.
+// Structural on purpose: the request parser validates against a looser schema
+// than ManagerFacts, and this only needs the two fields.
+export function managerNamespace(manager: { kind: string; namespace?: unknown }): string | null {
+  if (manager.kind === "argo") return null
+  return typeof manager.namespace === "string" ? manager.namespace : null
+}
+
 export function assessKey(facts: ActionFacts): string {
   return `v${PROMPT_VERSION}:${facts.kind}:${facts.repository}|${facts.from}|${facts.to}|${managerScope(facts.manager)}`
 }
