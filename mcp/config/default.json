@@ -6,6 +6,7 @@
     "healthPort": 3001,
     "logLevel": "info",
     "publicUrl": "http://127.0.0.1:3000",
+    "uiPublicUrl": "",
     "authEnabled": true
   },
   "oidc": {

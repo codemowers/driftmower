@@ -77,6 +77,9 @@ spec:
             # the cluster and come back for no reason.
             - name: DRIFTMOWER_UI_URL
               value: 'http://driftmower-ui.driftmowers.svc'
+            # Public URL of the same UI: where a browser that lands on `/` goes.
+            - name: DRIFTMOWER_UI_PUBLIC_URL
+              value: 'https://driftmower-dev.veebkolm.eu'
           volumeMounts:
             - name: data
               mountPath: /data

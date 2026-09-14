@@ -78,6 +78,10 @@ spec:
             # the provisioning tools are not registered at all.
             - name: DRIFTMOWER_UI_URL
               value: 'http://driftmower-ui'
+            # Public URL of driftmower-ui. A person who opens this server's own
+            # hostname in a browser gets bounced there instead of a JSON 404.
+            - name: DRIFTMOWER_UI_PUBLIC_URL
+              value: 'https://driftmower-ui.ee-lte-1.codemowers.io'
           livenessProbe:
             httpGet:
               path: /healthz

@@ -53,6 +53,16 @@ describe('loadAppConfig', () => {
     })
   })
 
+  it('reads the driftmower-ui public URL and defaults it to null', () => {
+    expect(loadAppConfig([], source).uiPublicUrl).toBeNull()
+    expect(
+      loadAppConfig([], sourceWith({ 'mcp.uiPublicUrl': 'https://driftmower-ui.example/' })).uiPublicUrl
+    ).toBe('https://driftmower-ui.example')
+    expect(() => loadAppConfig([], sourceWith({ 'mcp.uiPublicUrl': 'driftmower-ui' }))).toThrow(
+      'uiPublicUrl must be an absolute URL'
+    )
+  })
+
   it('rejects invalid transport and limits', () => {
     expect(() => loadAppConfig([], sourceWith({ 'mcp.transport': 'websocket' }))).toThrow(
       'transport must be one of: stdio, http'

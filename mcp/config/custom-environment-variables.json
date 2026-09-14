@@ -12,6 +12,7 @@
     },
     "logLevel": "DRIFTMOWER_MCP_LOG_LEVEL",
     "publicUrl": "MCP_PUBLIC_URL",
+    "uiPublicUrl": "DRIFTMOWER_UI_PUBLIC_URL",
     "authEnabled": {
       "__name": "MCP_AUTH_ENABLED",
       "__format": "boolean"
