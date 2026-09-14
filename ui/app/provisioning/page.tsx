@@ -50,9 +50,10 @@ export default function ProvisioningPage() {
 }
 
 function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; scoped: boolean }) {
-  const installed = capabilities.offerings.filter(
-    o => o.availability.state === "ready" || o.availability.state === "degraded",
-  )
+  // Only count offerings whose controller is actually running. A served CRD
+  // on its own (or a Deployment with no ready replicas) must not make a
+  // database look available on the provisioning page.
+  const runningOfferings = capabilities.offerings.filter(o => o.availability.state === "ready")
   const zones = capabilities.topology.zones.filter(z => z.zone !== "(no zone label)")
   const enforced = capabilities.admissionPolicies.filter(p => p.enforced)
 
@@ -60,8 +61,8 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
     <>
       <StatGrid>
         <StatCell label="Operators installed">
-          <StatValue>{installed.length}</StatValue>
-          <StatCaption>of {capabilities.offerings.length} known</StatCaption>
+          <StatValue>{runningOfferings.length}</StatValue>
+          <StatCaption>running and ready</StatCaption>
         </StatCell>
         <StatCell label="Storage classes">
           <StatValue>{capabilities.storageClasses.length}</StatValue>
