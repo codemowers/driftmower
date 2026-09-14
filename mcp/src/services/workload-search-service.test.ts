@@ -3,7 +3,7 @@ import type {
   MatchingWorkloadGroupRow,
   WorkloadDetailRow,
   WorkloadRepository
-} from '../db/workload-repository.js'
+} from '../backend/workload-repository.js'
 import { WorkloadSearchService } from './workload-search-service.js'
 
 describe('WorkloadSearchService', () => {

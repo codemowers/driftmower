@@ -6,8 +6,10 @@
     "healthPort": 3001,
     "logLevel": "info"
   },
-  "database": {
-    "path": "/data/driftmower-be.sqlite"
+  "backend": {
+    "url": "http://driftmower-be:3030",
+    "serviceToken": "",
+    "timeoutMs": 15000
   },
   "search": {
     "defaultLimit": 20,

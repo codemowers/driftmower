@@ -1,30 +1,27 @@
-import { fileURLToPath } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { SqliteImageUpdateRepository } from '../db/image-update-repository.js'
-import { SqliteReportSnapshotRepository } from '../db/report-snapshot-repository.js'
-import { checkDatabaseSchema } from '../db/schema-check.js'
-import { openReadOnlyDatabase, type Database } from '../db/sqlite.js'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { BackendImageUpdateRepository } from '../backend/image-update-repository.js'
+import { BackendReportSnapshotRepository } from '../backend/report-snapshot-repository.js'
+import { ReportRowLoader } from '../backend/report-rows.js'
+import { createFakeBackend } from '../../test/fake-backend.js'
 import { ImageUpdatePlanningService } from './image-update-planning-service.js'
 
-const FIXTURE_PATH = fileURLToPath(new URL('../../test/fixtures/driftmower-be.sqlite', import.meta.url))
 const FIXTURE_REPORT_ID = '0b249694-625d-41c8-a788-5b207c9c4d6b'
 
-describe('ImageUpdatePlanningService backend database fixture', () => {
-  let database: Database
+// Drives the service against rows recorded from a real full-cluster analysis,
+// served over the same HTTP path production uses.
+describe('ImageUpdatePlanningService against recorded backend rows', () => {
   let service: ImageUpdatePlanningService
 
-  beforeAll(async () => {
-    database = await openReadOnlyDatabase(FIXTURE_PATH)
-    await checkDatabaseSchema(database)
+  beforeAll(() => {
+    const { client } = createFakeBackend()
+    const rowLoader = new ReportRowLoader(client)
 
-    const snapshotRepository = new SqliteReportSnapshotRepository(database)
-    const imageUpdateRepository = new SqliteImageUpdateRepository(database)
-
-    service = new ImageUpdatePlanningService(imageUpdateRepository, snapshotRepository, 20, 100)
-  })
-
-  afterAll(async () => {
-    await database.destroy()
+    service = new ImageUpdatePlanningService(
+      new BackendImageUpdateRepository(rowLoader),
+      new BackendReportSnapshotRepository(client),
+      20,
+      100
+    )
   })
 
   it('maps real image analysis into direct, Helm, and manual actions', async () => {

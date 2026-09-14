@@ -2,8 +2,6 @@ FROM node:24.12.0-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
-
 COPY package*.json ./
 COPY tsconfig.json ./
 
@@ -17,11 +15,11 @@ FROM node:24.12.0-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init python3 make g++
+RUN apk add --no-cache dumb-init
 
 COPY package*.json ./
 
-RUN npm ci --omit=dev && apk del python3 make g++
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY config ./config

@@ -4,8 +4,8 @@ import type {
   HelmImageUpdateActionGroup,
   ImageUpdateActionDetailRow,
   ImageUpdateRepository
-} from '../db/image-update-repository.js'
-import type { ReportSnapshotRepository } from '../db/report-snapshot-repository.js'
+} from '../backend/image-update-repository.js'
+import type { ReportSnapshotRepository } from '../backend/report-snapshot-repository.js'
 import type { ImageUpdatePlanSummary } from '../domain/image-update-plan.js'
 import { ImageUpdatePlanningService } from './image-update-planning-service.js'
 

@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { checkDatabaseSchema } from '../db/schema-check.js'
-import { openReadOnlyDatabase } from '../db/sqlite.js'
+import { REPORTS_PATH } from '../backend/report-snapshot-repository.js'
+import type { DriftmowerBackendClient } from '../backend/client.js'
 
 export const HEALTH_PATH = '/healthz'
 export const READINESS_PATH = '/readyz'
@@ -9,12 +9,12 @@ export const STARTUP_PATH = '/startupz'
 export interface HealthServerOptions {
   host: string
   port: number
-  databasePath: string
+  client: DriftmowerBackendClient
 }
 
 export async function startHealthServer(options: HealthServerOptions): Promise<Server> {
   const server = createServer((request, response) => {
-    void handleHealthRequest(request, response, options.databasePath)
+    void handleHealthRequest(request, response, options.client)
   })
 
   await listen(server, options.host, options.port)
@@ -25,7 +25,7 @@ export async function startHealthServer(options: HealthServerOptions): Promise<S
 async function handleHealthRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  databasePath: string
+  client: DriftmowerBackendClient
 ): Promise<void> {
   const path = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`).pathname
 
@@ -42,7 +42,7 @@ async function handleHealthRequest(
   }
 
   if (path === READINESS_PATH || path === STARTUP_PATH) {
-    const readiness = await checkReadiness(databasePath)
+    const readiness = await checkReadiness(client)
 
     writeJson(response, readiness.ok ? 200 : 503, readiness.body)
 
@@ -52,36 +52,23 @@ async function handleHealthRequest(
   writeJson(response, 404, { error: 'not_found' })
 }
 
-async function checkReadiness(databasePath: string): Promise<{
+// Readiness is the backend answering an authenticated read. That covers the
+// three ways this server is unusable — backend down, credential rejected,
+// query surface not the one this version speaks — without reporting anything
+// about the data itself.
+async function checkReadiness(client: DriftmowerBackendClient): Promise<{
   ok: boolean
   body: Record<string, unknown>
 }> {
-  let database
-
   try {
-    database = await openReadOnlyDatabase(databasePath)
-  } catch (error) {
-    return {
-      ok: false,
-      body: {
-        status: 'not_ready',
-        checks: {
-          database: { ok: false, message: errorMessage(error) }
-        }
-      }
-    }
-  }
-
-  try {
-    await checkDatabaseSchema(database)
+    await client.findPage(REPORTS_PATH, { $limit: 1, $select: ['id'] })
 
     return {
       ok: true,
       body: {
         status: 'ok',
         checks: {
-          database: { ok: true },
-          schema: { ok: true }
+          backend: { ok: true }
         }
       }
     }
@@ -91,13 +78,10 @@ async function checkReadiness(databasePath: string): Promise<{
       body: {
         status: 'not_ready',
         checks: {
-          database: { ok: true },
-          schema: { ok: false, message: errorMessage(error) }
+          backend: { ok: false, message: errorMessage(error) }
         }
       }
     }
-  } finally {
-    await database.destroy()
   }
 }
 

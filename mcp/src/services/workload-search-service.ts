@@ -8,7 +8,7 @@ import type {
   MatchingWorkloadGroupRow,
   WorkloadDetailRow,
   WorkloadRepository
-} from '../db/workload-repository.js'
+} from '../backend/workload-repository.js'
 import { parseReleaseInfo } from '../domain/release-info.js'
 
 const CURRENT_VERSION_STATUSES = new Set(['up_to_date', 'current'])

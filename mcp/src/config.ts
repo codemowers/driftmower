@@ -1,13 +1,15 @@
 import config from 'config'
 import { Command } from 'commander'
 
-export const DEFAULT_DATABASE_PATH = '/data/driftmower-be.sqlite'
+export const DEFAULT_BACKEND_URL = 'http://driftmower-be:3030'
 
 const TRANSPORTS = ['stdio', 'http'] as const
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 
 export interface AppConfig {
-  databasePath: string
+  backendUrl: string
+  backendServiceToken: string
+  backendTimeoutMs: number
   transport: 'stdio' | 'http'
   host: string
   port: number
@@ -22,7 +24,7 @@ interface ConfigSource {
 }
 
 interface CliOptions {
-  db?: string
+  backendUrl?: string
 }
 
 function parseCliArguments(arguments_: string[]): CliOptions {
@@ -33,7 +35,7 @@ function parseCliArguments(arguments_: string[]): CliOptions {
     .allowExcessArguments(false)
     .exitOverride()
     .configureOutput({ writeErr: () => undefined })
-    .option('--db <path>', 'path to the Driftmower SQLite database')
+    .option('--backend-url <url>', 'base URL of the driftmower-be API')
 
   command.parse(arguments_, { from: 'user' })
 
@@ -46,6 +48,18 @@ function readString(value: unknown, name: string): string {
   }
 
   return value.trim()
+}
+
+function readUrl(value: unknown, name: string): string {
+  const url = readString(value, name)
+
+  try {
+    new URL(url)
+  } catch {
+    throw new Error(`${name} must be an absolute URL`)
+  }
+
+  return url.replace(/\/+$/, '')
 }
 
 function readInteger(value: unknown, name: string, maximum?: number): number {
@@ -79,7 +93,11 @@ export function loadAppConfig(
   const defaultLimit = readInteger(source.get<number>('search.defaultLimit'), 'defaultLimit', maximumLimit)
 
   return {
-    databasePath: readString(cli.db ?? source.get<string>('database.path'), 'databasePath'),
+    backendUrl: readUrl(cli.backendUrl ?? source.get<string>('backend.url'), 'backendUrl'),
+    // The backend rejects an unauthenticated read, so an empty token is a
+    // misconfiguration worth failing on at startup rather than on first tool call.
+    backendServiceToken: readString(source.get<string>('backend.serviceToken'), 'backendServiceToken'),
+    backendTimeoutMs: readInteger(source.get<number>('backend.timeoutMs'), 'backendTimeoutMs'),
     transport: readEnum(source.get<string>('mcp.transport'), 'transport', TRANSPORTS),
     host: readString(source.get<string>('mcp.host'), 'host'),
     port: readInteger(source.get<number>('mcp.port'), 'port', 65_535),

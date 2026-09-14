@@ -6,8 +6,8 @@ import type {
   ImageUpdateActionGroup,
   ImageUpdateRepository,
   ImageUpdateRepositoryFilters
-} from '../db/image-update-repository.js'
-import type { ReportSnapshot, ReportSnapshotRepository } from '../db/report-snapshot-repository.js'
+} from '../backend/image-update-repository.js'
+import type { ReportSnapshot, ReportSnapshotRepository } from '../backend/report-snapshot-repository.js'
 import {
   ACTIONABLE_VERSION_STATUSES,
   VERSION_STATUS_RISK_RANK,
