@@ -7,7 +7,9 @@ const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 export interface OidcConfig {
   issuer: string
   jwksUri: string
-  audience: string
+  // Null means "use the resource this server advertises", which is what a
+  // conformant client asks for. See BearerAuthConfig.audience.
+  audience: string | null
   namespacesClaim: string
 }
 
@@ -173,7 +175,7 @@ function readOidcConfig(source: ConfigSource): OidcConfig {
   return {
     issuer,
     jwksUri: readOptionalString(source.get<string>('oidc.jwksUri')) ?? `${issuer.replace(/\/+$/, '')}/jwks`,
-    audience: readString(source.get<string>('oidc.audience'), 'audience'),
+    audience: readOptionalString(source.get<string>('oidc.audience')),
     namespacesClaim: readString(source.get<string>('oidc.namespacesClaim'), 'namespacesClaim')
   }
 }
