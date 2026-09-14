@@ -5,6 +5,7 @@ import ClusterScopePill from "../components/cluster-scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
 import AdmissionList from "./components/admission-list"
 import HostCard from "./components/host-card"
+import OfferingList from "./components/offering-list"
 import PodSecurityCard from "./components/pod-security-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
@@ -102,6 +103,21 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
             Pick a sandbox in the sidebar to see the hostnames its namespaces may claim.
           </p>
         )}
+      </Section>
+
+      {/* The offerings the stat tile counts, with the manifest each one takes.
+          Same intent as the Ingress snippet above: the answer to "how do I ask
+          for one" should be copyable, not reconstructed from operator docs. */}
+      <Section
+        title="Databases and other operators"
+        count={capabilities.offerings.length}
+        hint="Each sample is the smallest manifest this cluster would accept, at the API version it actually serves. Sized for trying something out — one replica, a small disk."
+      >
+        <OfferingList
+          offerings={capabilities.offerings}
+          storageClasses={capabilities.storageClasses}
+          namespace={capabilities.namespaces[0]?.namespace ?? null}
+        />
       </Section>
 
       <Section title="Storage" count={capabilities.storageClasses.length}>
