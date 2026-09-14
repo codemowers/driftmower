@@ -1,3 +1,8 @@
+// A one-shot query param platform-manager appends when it hands a user over
+// after creating something the newest report cannot possibly contain. Read and
+// stripped by ClusterInit; it is never written back into a URL.
+export const REFRESH_PARAM = "refresh"
+
 export const ANALYZE_CLUSTER_URL = "/api/analyze-cluster"
 export const KUBERNETES_CONTEXTS_URL = "/api/kubernetes-contexts"
 export const REPORTS_URL = "/api/reports"
