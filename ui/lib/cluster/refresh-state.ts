@@ -7,6 +7,7 @@ import { getAnalysisSocket, waitForSocketConnect } from "./analysis-socket"
 export type { ImageUsage } from "./reports"
 
 const REPORT_CREATED_TIMEOUT_MS = 120000
+const SOCKET_CONNECT_TIMEOUT_MS = 10000
 
 export type AnalyzeClusterProgress = {
   stage?: string
@@ -39,15 +40,24 @@ export async function refreshState(): Promise<void> {
   const newReportId = waitForReportCreated(socket)
 
   try {
-    await waitForSocketConnect(socket)
+    await waitForSocketConnect(socket, SOCKET_CONNECT_TIMEOUT_MS)
+    if (!socket.connected) {
+      throw new Error("The analysis stream did not connect. Refresh the page and try again.")
+    }
 
-    void fetch(ANALYZE_CLUSTER_URL, {
+    const response = await fetch(ANALYZE_CLUSTER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
-    }).catch(() => {})
+    })
+    if (!response.ok) {
+      throw new Error(`Starting cluster analysis failed (HTTP ${response.status}).`)
+    }
 
     const reportId = await newReportId
+    if (!reportId) {
+      throw new Error("Cluster analysis did not produce a report. Refresh the page and try again.")
+    }
     useClusterState.setState({ socketProgress: null })
     await fetchDynamicData(reportId)
     useClusterState.setState({ isLoading: false })
@@ -63,8 +73,8 @@ export async function refreshState(): Promise<void> {
   }
 }
 
-function waitForReportCreated(socket: Socket): Promise<string | null> {
-  return new Promise(resolve => {
+function waitForReportCreated(socket: Socket): Promise<string> {
+  return new Promise((resolve, reject) => {
     function cleanup() {
       clearTimeout(timeout)
       socket.off("reports created", onReportCreated)
@@ -72,11 +82,12 @@ function waitForReportCreated(socket: Socket): Promise<string | null> {
     function onReportCreated(data: unknown) {
       const report = data !== null && typeof data === "object" ? (data as { id?: string }) : null
       cleanup()
-      resolve(report?.id ?? null)
+      if (report?.id) resolve(report.id)
+      else reject(new Error("Cluster analysis returned no report id."))
     }
     const timeout = setTimeout(() => {
       cleanup()
-      resolve(null)
+      reject(new Error("Cluster analysis timed out. Refresh the page and try again."))
     }, REPORT_CREATED_TIMEOUT_MS)
     socket.on("reports created", onReportCreated)
   })
