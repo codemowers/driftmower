@@ -90,7 +90,7 @@ MCP server.
 
 | Decision | Choice |
 |---|---|
-| MCP hosting | In this repo, remote Streamable HTTP route handlers, passmower bearer auth |
+| MCP hosting | **Superseded — see the note below.** Originally: in this repo, remote Streamable HTTP route handlers. Now: in `driftmower-mcp`, which is the platform's single MCP gateway. The auth design below carries over unchanged |
 | Write path | **Generate, don't apply.** No write RBAC, no impersonation. Output is annotated manifests + `kubectl` commands + the existing per-tenant kubeconfig |
 | Catalog scope | Catalog-driven across every offering whose operator is discovered |
 
@@ -483,6 +483,63 @@ and deep-compare against the source objects. If a case fails, fix `yaml-lines.ts
 existing YAML pages too) or fall back to `js-yaml` in production for that path.
 
 ## The MCP server
+
+> **SUPERSEDED — MCP hosting moved to the `driftmower-mcp` repo.**
+>
+> The decision recorded in this section — an MCP server inside this repo at
+> `app/api/mcp` — was reversed. `driftmower-mcp` already existed as an MCP
+> server over the Driftmower analysis database, and two MCP servers is one too
+> many, so it became the platform's **single** gateway: one ingress, one OIDC
+> client, one tool list covering both drift analysis and provisioning.
+>
+> **What did not change.** Nearly everything below is still the design, just
+> implemented one repo over: strict audience checking (`https://driftmower-mcp`),
+> RFC 9728 protected-resource metadata with the `resource_metadata` pointer on
+> every 401, the read-only tool annotations, the markdown-plus-structuredContent
+> result shape, the public `driftmower-mcp` OIDCClient for PKCE, and the no-DCR
+> risk. See `driftmower-mcp/src/auth/` and `driftmower-mcp/manifests/`.
+>
+> **One thing below is wrong: the JWKS `kid` gotcha.** The section headed
+> "JWKS verification, the gotcha already paid for once" says passmower's
+> `jwks_uri` returns keys with no `kid`, so `createRemoteJWKSet` never matches
+> and thumbprints must be stamped locally. The *published endpoint* does carry a
+> `kid`: oidc-provider stamps the RFC 7638 thumbprint when it registers a key
+> (`initialize_keystore.js`, `key.kid ??= calculateKid(key)`), so a bare key from
+> `oidc-key-manager` is published with one. Verified against a real
+> oidc-provider 9.12.2 — `createRemoteJWKSet` verifies, including with
+> `algorithms: ["RS256"]` against a published key carrying no `alg`.
+>
+> What is true is passmower's *internal* path: `src/utils/session/bearer-account.js`
+> stamps thumbprints because it reads the raw `OIDC_JWKS` env var — the
+> configured keys, before oidc-provider sees them — and its integration test
+> pins that shape. A resource server reads the endpoint and needs none of it.
+> Both `lib/auth/bearer.ts` here and `driftmower-mcp/src/auth/jwks.ts` use
+> `createRemoteJWKSet`. Check `curl $OIDC_IDP_URI/jwks` before reinstating a
+> workaround.
+>
+> **What changed.**
+>
+> * **The capability layer stays here.** `lib/features/provisioning/` owns the
+>   Kubernetes reads and `k8s/rbac.yaml` owns the RBAC for them. The gateway is
+>   a façade over `GET /api/provisioning/capabilities`, which now accepts a
+>   bearer token as well as the session cookie (`lib/auth/bearer.ts`,
+>   `proxy.ts`). This repo remains the single source of truth for the facts.
+> * **The caller's own token is forwarded**, not a service credential, so the
+>   tenancy decision still happens here, once, against one identity. The bearer
+>   path scopes from the `codemowers.io/namespaces` claim rather than
+>   `fetchSandboxScope()` — the narrowing already documented below — in
+>   `lib/features/provisioning/bearer-scope.ts`, which is pure and tested.
+> * **`/api/mcp/token` stays here** (`app/api/mcp/token/route.ts`), because the
+>   session lives here. It mints an MCP-audience token for pasting into a
+>   client, still gated by `MCP_ENABLED=false`.
+> * **`/api/mcp` was never built here** and should not be. `proxy.ts` exempts
+>   only `/api/provisioning/capabilities`, and only when a bearer is present.
+> * **Phase 9 below** is now "expose the existing capability tools through the
+>   gateway", which is done for the phase-2 facts. The planner tools still wait
+>   on phases 3–5.
+
+The original design follows, kept because the auth reasoning in it is still what
+is implemented.
 
 Add `@modelcontextprotocol/sdk` (1.30.0 verified available) and declare `jose` explicitly (today
 only a transitive dep of `openid-client`).
@@ -976,10 +1033,12 @@ degraded paths are what a developer can actually see.
 7. **Detail page.** Including the `absent → found` polling transition that closes the loop.
 8. **The rest of the catalog.** Dragonfly, Bucket, MongoDB, RabbitMQ, Redpanda, OpenSearch,
    Elastic, EMQX — one recipe at a time, no new machinery.
-9. **MCP.** Transport, auth, the tool set, protected-resource metadata, the `driftmower-mcp`
-   OIDCClient. Last, because it is a façade over work already proven through the UI — with the
-   one caveat that the client-onboarding risk (below) should be probed early with a throwaway
-   endpoint rather than discovered here.
+9. **MCP.** *Partly done, and in the `driftmower-mcp` repo rather than this one — see the
+   note under "The MCP server".* Shipped: transport, bearer auth, protected-resource metadata,
+   the `driftmower-mcp` OIDCClient, and the four read tools over the phase-2 facts
+   (`describe_cluster_capabilities`, `list_offerings`, `describe_namespace_readiness`,
+   `explain_storage_class`). Still outstanding: the planner tools, which need phases 3–5 first.
+   The client-onboarding risk (below) remains unprobed and should be settled next.
 10. **Nav + executive summary.** One `navItems` entry, one `SectionLinkCard`.
 
 ## Verification

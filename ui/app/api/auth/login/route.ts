@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import * as oidc from "openid-client"
 
 import { getOidcConfig, getOidcRuntimeConfig } from "@/lib/auth/oidc"
+import { mcpAudience } from "@/lib/auth/bearer"
 import { getSession } from "@/lib/auth/session"
 import { platformManagerAudience } from "@/lib/auth/tokens"
 
@@ -38,6 +39,17 @@ export async function GET(req: NextRequest) {
 
   if (process.env.PLATFORM_MANAGER_URL) {
     authorizationParams.append("resource", platformManagerAudience())
+  }
+
+  // Third resource: the MCP gateway's audience, so /api/mcp/token can later
+  // mint a token for it from this grant.
+  //
+  // Off by default, and that default is load-bearing. If passmower rejects a
+  // third `resource`, this authorize request fails — which breaks *login for
+  // every user*, not just MCP. Verify on a deployed build before turning it on;
+  // the rollback is unsetting one variable.
+  if (process.env.MCP_ENABLED === "true") {
+    authorizationParams.append("resource", mcpAudience())
   }
 
   if (req.nextUrl.searchParams.get("prompt") === "login") {

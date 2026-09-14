@@ -57,6 +57,39 @@ spec:
             # backend's OIDC_AUDIENCE so the JWT access token validates.
             - name: OIDC_AUDIENCE
               value: "https://driftmower-api"
+            # --- driftmower-mcp, the platform's MCP gateway ---
+            # The gateway is a facade over this app's provisioning capability
+            # layer: it calls GET /api/provisioning/capabilities with the
+            # caller's own bearer token, which this app verifies against the
+            # audience below. Must equal driftmower-mcp's MCP_AUDIENCE.
+            - name: MCP_AUDIENCE
+              value: "https://driftmower-mcp"
+            # Serves /api/mcp/token and appends the MCP resource indicator at
+            # login. OFF by default on purpose: if passmower rejects a third
+            # `resource`, *login breaks for every user*, not just MCP. Turn on
+            # only after verifying on a deployed build; rollback is unsetting it.
+            - name: MCP_ENABLED
+              value: "false"
+            # Printed in the /api/mcp/token quick-start command and in the
+            # provisioning page's connection recipes.
+            - name: MCP_PUBLIC_URL
+              value: "https://driftmower-mcp.ee-lte-1.codemowers.io"
+            # Client id of the public `driftmower-mcp` OIDCClient
+            # (driftmower-mcp/manifests/oidcclient.yaml), shown on the
+            # provisioning page so a client can run the OAuth flow itself.
+            # passmower has no dynamic client registration, so a client cannot
+            # discover this — it has to be displayed.
+            #
+            # A public client's id is not a secret; it travels in every
+            # authorize URL, and the client holds no usable secret. Optional so
+            # this app still starts before the MCP client is deployed — the
+            # page then omits the OAuth flow rather than offering a dead end.
+            - name: MCP_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-mcp-owner-secrets
+                  key: OIDC_CLIENT_ID
+                  optional: true
             # Must be a subset of the OIDCClient's availableScopes (k8s/oidcclient.yaml).
             - name: OIDC_SCOPE
               value: "openid profile email groups applications namespaces offline_access"

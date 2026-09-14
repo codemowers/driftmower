@@ -5,6 +5,7 @@ import ClusterScopePill from "../components/cluster-scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
 import AdmissionList from "./components/admission-list"
 import HostCard from "./components/host-card"
+import McpPanel from "./components/mcp-panel"
 import OfferingList from "./components/offering-list"
 import PodSecurityCard from "./components/pod-security-card"
 import Section from "./components/section"
@@ -91,6 +92,16 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           </div>
         </Section>
       )}
+
+      {/* Everything above is also available to a coding agent, over one
+          authenticated endpoint, alongside the drift analysis. The tool list is
+          the easy part; getting a token into a client is what needs showing. */}
+      <Section
+        title="Connect a coding agent"
+        hint="The MCP gateway answers these same questions, scoped to the namespaces you can access. Read-only — it changes nothing."
+      >
+        <McpPanel />
+      </Section>
 
       <Section
         title="Your hostname"

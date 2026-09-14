@@ -1,4 +1,6 @@
 import { getSession } from "@/lib/auth/session"
+import { hasBearerToken, verifyBearer, type BearerCaller } from "@/lib/auth/bearer"
+import { permittedNamespacesForBearer } from "@/lib/features/provisioning/bearer-scope"
 import { OFFERINGS_BY_ID } from "@/lib/features/provisioning/catalog/offerings"
 import { denialsFor } from "@/lib/features/provisioning/admission-facts"
 import { getAdmissionFacts } from "@/lib/features/provisioning/facts/admission"
@@ -35,7 +37,17 @@ export async function GET(req: Request) {
   const offering = url.searchParams.get("offering") as OfferingId | null
   const spec = offering ? OFFERINGS_BY_ID.get(offering) : undefined
 
-  const [cluster, scope] = await Promise.all([gatherClusterFacts(), fetchSandboxScope()])
+  // Two ways in. A browser arrives with the session cookie; driftmower-mcp
+  // arrives with the caller's own bearer token, because an MCP client has no
+  // cookie. Forwarding the *caller's* token rather than a service credential is
+  // what keeps the tenancy decision here, against one identity, for both.
+  const bearer = hasBearerToken(req) ? await verifyBearer(req) : null
+
+  if (bearer && !bearer.ok) {
+    return Response.json({ error: "invalid_token", detail: bearer.reason }, { status: 401, headers: NO_STORE })
+  }
+
+  const cluster = await gatherClusterFacts()
 
   if (!cluster.inCluster) {
     return Response.json(cluster satisfies CapabilityResponse, { headers: NO_STORE })
@@ -45,21 +57,12 @@ export async function GET(req: Request) {
   // asked for; anyone else is confined to their own namespaces, so a crafted
   // ?ns= cannot read another sandbox's quota.
   const asked = requested(url, "ns")
-  const permitted =
-    scope.state === "ok" && !scope.admin ? asked.filter(n => scope.namespaces.includes(n)) : asked
+  const permitted = bearer?.ok
+    ? permittedForBearer(asked, bearer.caller)
+    : await permittedForSession(asked)
   const targets = permitted.slice(0, MAX_NAMESPACES)
 
-  const session = await getSession()
-  const claims = session.claims
-  const caller = claims
-    ? {
-        sub: claims.sub,
-        groups: claims.groups,
-        // These clusters set no --oidc-username-prefix, so the apiserver's
-        // username is "<issuer>#<sub>". The bare sub is tried too.
-        usernamePrefixes: [`${process.env.OIDC_IDP_URI ?? ""}#`, ""],
-      }
-    : null
+  const caller = bearer?.ok ? callerFor(bearer.caller.sub, bearer.caller.groups) : await sessionCaller()
 
   const namespaces: NamespaceFact[] = []
   const degraded = [...cluster.degraded]
@@ -104,6 +107,46 @@ export async function GET(req: Request) {
     } satisfies CapabilityResponse,
     { headers: NO_STORE },
   )
+}
+
+// A bearer caller's scope comes from the token's tenancy claim, not from
+// platform-manager: this path holds no refresh token, so it cannot mint the
+// platform-manager-audience token fetchSandboxScope needs.
+//
+// Documented narrowing, not an oversight: the claim carries *sandbox*
+// namespaces, while fetchSandboxScope also returns application namespaces, so a
+// `foo-<app>` namespace reports as not permitted here. The fix is one env var
+// in a sibling repo — add the MCP audience to platform-manager's API_AUDIENCES
+// — after which this path can call /api/sandboxes with the token directly.
+//
+// An absent claim yields no access rather than full access. Failing open would
+// mean that dropping the `namespaces` scope from the OIDCClient silently hands
+// every caller every namespace.
+function permittedForBearer(asked: string[], caller: BearerCaller): string[] {
+  return permittedNamespacesForBearer(asked, { claimNamespaces: caller.namespaces })
+}
+
+async function permittedForSession(asked: string[]): Promise<string[]> {
+  const scope = await fetchSandboxScope()
+
+  return scope.state === "ok" && !scope.admin ? asked.filter(n => scope.namespaces.includes(n)) : asked
+}
+
+async function sessionCaller() {
+  const session = await getSession()
+  const claims = session.claims
+
+  return claims ? callerFor(claims.sub, claims.groups) : null
+}
+
+function callerFor(sub: string, groups: string[]) {
+  return {
+    sub,
+    groups,
+    // These clusters set no --oidc-username-prefix, so the apiserver's
+    // username is "<issuer>#<sub>". The bare sub is tried too.
+    usernamePrefixes: [`${process.env.OIDC_IDP_URI ?? ""}#`, ""],
+  }
 }
 
 // The hostname a namespace may claim. A namespace that is not a sandbox is not
