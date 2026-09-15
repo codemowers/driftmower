@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
 import { useTabParam } from "@/lib/hooks/use-tab-param"
 import CopyButton from "@/app/components/copy-button"
 import { StatCell, StatValue } from "@/app/components/stats-card"
@@ -225,6 +226,7 @@ function EvidenceGroup({
 export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResource; workloadUid: string }) {
   const { facts, state, unavailable, rechecking, recheck } = usePodDiagnosis(pod)
   const { linkTo } = useContextHref()
+  const seesClusterWideViews = useSeesClusterWideViews()
   const [, setPodTab] = useTabParam("ptab", POD_TABS)
 
   if (!facts) return null
@@ -237,7 +239,8 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
   function hrefFor(link: Evidence["link"]): string | null {
     if (link === "logs") return linkTo(`/topmost-owners/${workloadUid}/${pod.uid}`, { set: { ptab: "logs" } })
     if (link === "pods") return linkTo(`/topmost-owners/${workloadUid}`)
-    if (link === "node") return linkTo("/cluster")
+    // The Cluster page is hidden from sandbox users, so do not offer the link.
+    if (link === "node") return seesClusterWideViews ? linkTo("/cluster") : null
     if (link === "yaml") return linkTo(`/yaml/${pod.uid}`, { drop: ["ptab", "wtab", "htab"] })
     return null
   }

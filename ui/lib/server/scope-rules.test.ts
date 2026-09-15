@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { namespaceAllowList, writeVerdict, type ScopeLike } from "./scope-rules.ts"
+import { namespaceAllowList, seesClusterWideViews, writeVerdict, type ScopeLike } from "./scope-rules.ts"
 
 const ok = (namespaces: string[], admin = false): ScopeLike => ({ state: "ok", admin, namespaces })
 
@@ -57,4 +57,21 @@ test("a write outside your namespaces is refused, inside is allowed", () => {
 
 test("an admin may write anywhere", () => {
   assert.equal(writeVerdict(ok(["sandbox-a"], true), "kube-system").allow, true)
+})
+
+test("a sandbox user does not see cluster-scoped pages", () => {
+  assert.equal(seesClusterWideViews(ok(["sandbox-a"])), false)
+  assert.equal(seesClusterWideViews(ok([])), false)
+})
+
+test("an admin sees cluster-scoped pages", () => {
+  assert.equal(seesClusterWideViews(ok(["sandbox-a"], true)), true)
+})
+
+// Hiding a page the user had a moment ago is a worse outage symptom than
+// showing it, so this follows the read rule rather than the write rule.
+test("cluster-scoped pages stay visible when scope could not be determined", () => {
+  for (const state of ["not-configured", "unreachable", "unauthenticated"] as const) {
+    assert.equal(seesClusterWideViews({ state }), true, state)
+  }
 })

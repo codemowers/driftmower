@@ -1,7 +1,7 @@
 import "server-only"
 
 import { fetchSandboxScope, type SandboxScope } from "./platform-manager-proxy"
-import { namespaceAllowList, writeVerdict } from "./scope-rules"
+import { namespaceAllowList, seesClusterWideViews, writeVerdict } from "./scope-rules"
 
 // READ path. null means every namespace is readable: without a usable tenancy
 // control plane, nothing narrows.
@@ -22,4 +22,10 @@ export async function guardNamespace(namespace: string): Promise<Response | null
   const verdict = writeVerdict(await fetchSandboxScope(), namespace)
   if (verdict.allow) return null
   return Response.json({ error: verdict.reason }, { status: verdict.status })
+}
+
+// VIEW path: the answer behind hiding the Cluster overview -- both its nav entry
+// and the route itself -- from sandbox users.
+export async function callerSeesClusterWideViews(): Promise<boolean> {
+  return seesClusterWideViews(await fetchSandboxScope())
 }
