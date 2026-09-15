@@ -59,12 +59,13 @@ spec:
             # is how an OAuth-capable MCP client discovers the flow.
             - name: MCP_PUBLIC_URL
               value: 'https://driftmower-mcp.ee-lte-1.codemowers.io'
-            # RFC 8707 resource indicator, verified strictly as `aud` on every
-            # request. Must equal what a client passes as `resource`, and must
-            # NOT equal driftmower-be's OIDC_AUDIENCE: a token for the API is
-            # not a token for this server.
-            - name: MCP_AUDIENCE
-              value: 'https://driftmower-mcp'
+            # MCP_AUDIENCE is deliberately unset. The server then verifies
+            # `aud` against the `resource` it advertises -- MCP_PUBLIC_URL +
+            # /mcp -- which is the only indicator a conformant client can end
+            # up asking for. Set it only to follow something upstream that
+            # mints for a different one, and never to driftmower-be's
+            # OIDC_AUDIENCE: a token for the API is not a token for this
+            # server.
             # passmower's public URL, matched against the token `iss` claim.
             # JWKS is fetched from ${OIDC_ISSUER}/jwks unless OIDC_JWKS_URI is
             # set. Same secret and key driftmower-be reads.

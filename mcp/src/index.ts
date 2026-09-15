@@ -73,7 +73,7 @@ async function main(): Promise<void> {
           {
             issuer: appConfig.oidc.issuer,
             jwksUri: appConfig.oidc.jwksUri,
-            audience: appConfig.oidc.audience,
+            audience: appConfig.oidc.audience ?? undefined,
             publicUrl: appConfig.publicUrl,
             namespacesClaim: appConfig.oidc.namespacesClaim
           },

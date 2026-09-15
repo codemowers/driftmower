@@ -65,8 +65,6 @@ spec:
               value: 'debug'
             - name: MCP_PUBLIC_URL
               value: 'https://driftmower-mcp-dev.veebkolm.eu'
-            - name: MCP_AUDIENCE
-              value: 'https://driftmower-mcp'
             - name: OIDC_ISSUER
               valueFrom:
                 secretKeyRef:

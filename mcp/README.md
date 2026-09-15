@@ -267,6 +267,13 @@ The HTTP transport is a pure OIDC resource server. It verifies RS256 JWT access
 tokens issued by passmower against its JWKS endpoint, checking `iss` and — 
 strictly — `aud`. It never mints tokens.
 
+The `aud` it expects is the `resource` it advertises in its protected-resource
+metadata, `MCP_PUBLIC_URL` + `/mcp`. That is the only indicator a conformant
+client can ask for — it reads the document and passes `resource` verbatim, and
+passmower's `resourceIndicators` feature puts that same string in `aud` — so
+`MCP_AUDIENCE` is left unset. Set it only to follow something upstream minting
+for a different indicator; get it wrong and OAuth completes and every call 401s.
+
 An MCP client is not a browser, which is why the gate is in-process rather than
 an oauth2-proxy at the ingress: a cookie/redirect flow cannot be completed by a
 headless client, and it would strip the caller identity the tools need to scope
@@ -296,7 +303,20 @@ token, so this is for trying it out, not for a client you intend to keep.
 
 **Durable — OAuth with PKCE.** `manifests/oidcclient.yaml` registers a public
 `driftmower-mcp` client. A client that lets you supply a client id does PKCE and
-refreshes itself.
+refreshes itself:
+
+```bash
+claude mcp add --transport http driftmower \
+  https://driftmower-mcp.ee-lte-1.codemowers.io/mcp \
+  --client-id kube-system.driftmower-mcp
+```
+
+**Pass the client id.** Without it a client falls back to whatever it uses when
+dynamic registration is unavailable, and passmower answers `invalid_client`.
+Pointing it at the wrong client — `kube-system.driftmower-ui`, say — gets
+`invalid_redirect_uri` instead: that one is a confidential `web` client whose
+only registered URI is an https callback, so no loopback redirect can match it.
+The two errors are how you tell which mistake you made.
 
 **Known limitation.** passmower has **no dynamic client registration**
 (`features.registration` is absent from its `src/configuration.js`), so a strict
@@ -309,6 +329,10 @@ loopback redirect URI, so a client picking a random port still matches. The
 **hostname** is not normalised, so `localhost`, `127.0.0.1` and `[::1]` are all
 registered; the **path** must match exactly, and a client wanting something
 other than `/callback` needs it added.
+
+`scopes_supported` in the metadata includes `offline_access`, which is what gets
+a client a refresh token — a client requests exactly what is advertised, and
+without it the connection stops working an hour after every sign-in.
 
 ### Tenancy
 

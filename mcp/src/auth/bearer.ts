@@ -10,7 +10,14 @@ export interface BearerAuthConfig {
   // The RFC 8707 resource indicator this server was issued for, matched
   // strictly against `aud`. Strictness is load-bearing: without it the ordinary
   // UI access token that any browser session holds would open this server.
-  audience: string
+  //
+  // Leave it unset unless something upstream mints for a different indicator.
+  // The default is the `resource` this server advertises, and that is the only
+  // value a conformant client can end up asking for: it reads the RFC 9728
+  // metadata below and passes `resource` verbatim, and an authorization server
+  // honouring RFC 8707 puts that same string in `aud`. Anything else here
+  // rejects every token the flow is able to produce.
+  audience?: string
   // Public URL of this server, used to build the resource_metadata pointer on
   // 401s. That header is how an OAuth-capable client discovers the flow at all.
   publicUrl: string
@@ -53,6 +60,7 @@ export function createBearerAuthenticator(
 ): BearerAuthenticator {
   const resource = `${config.publicUrl.replace(/\/+$/, '')}${resourcePath}`
   const metadataUrl = `${config.publicUrl.replace(/\/+$/, '')}${protectedResourceMetadataPath(resourcePath)}`
+  const audience = config.audience ?? resource
 
   return {
     async authenticate(headers) {
@@ -70,7 +78,7 @@ export function createBearerAuthenticator(
       try {
         const { caller, payload } = await verifyAccessToken(token, getKey, {
           issuer: config.issuer,
-          audience: config.audience,
+          audience,
           namespacesClaim: config.namespacesClaim
         })
 
@@ -115,7 +123,12 @@ export function createBearerAuthenticator(
         resource,
         authorization_servers: [config.issuer],
         bearer_methods_supported: ['header'],
-        scopes_supported: ['openid', 'profile', 'email', 'groups', 'namespaces']
+        // A client requests exactly what is listed here, so `offline_access`
+        // has to be among them: without it passmower issues no refresh token
+        // and the connection dies an hour after every sign-in. The OIDCClient
+        // already grants the scope and the `refresh_token` grant; this document
+        // was the only thing withholding it.
+        scopes_supported: ['openid', 'profile', 'email', 'groups', 'namespaces', 'offline_access']
       }
     }
   }

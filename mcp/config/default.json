@@ -11,7 +11,7 @@
   "oidc": {
     "issuer": "",
     "jwksUri": "",
-    "audience": "https://driftmower-mcp",
+    "audience": "",
     "namespacesClaim": "codemowers.io/namespaces"
   },
   "backend": {
