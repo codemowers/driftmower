@@ -23,7 +23,11 @@ describe('HTTP MCP transport', () => {
   })
 
   it('serves search_workloads on /mcp', async () => {
-    const searchWorkloads = vi.fn().mockResolvedValue({ query: 'api', matches: [] })
+    const searchWorkloads = vi.fn().mockResolvedValue({
+      query: 'api',
+      matches: [],
+      scope: { scoped: false, namespaces: null, note: null }
+    })
     const planImageUpdates = vi.fn()
     const serverErrors: unknown[] = []
 
@@ -66,7 +70,11 @@ describe('HTTP MCP transport', () => {
       arguments: { query: 'api' }
     })
 
-    expect(result.structuredContent).toEqual({ query: 'api', matches: [] })
+    expect(result.structuredContent).toEqual({
+      query: 'api',
+      matches: [],
+      scope: { scoped: false, namespaces: null, note: null }
+    })
     expect(searchWorkloads).toHaveBeenCalledWith({
       query: 'api',
       limit: undefined,
@@ -75,7 +83,11 @@ describe('HTTP MCP transport', () => {
   })
 
   it('accepts a second client initialization as a separate HTTP session', async () => {
-    const searchWorkloads = vi.fn().mockResolvedValue({ query: 'llm', matches: [] })
+    const searchWorkloads = vi.fn().mockResolvedValue({
+      query: 'llm',
+      matches: [],
+      scope: { scoped: false, namespaces: null, note: null }
+    })
     const planImageUpdates = vi.fn()
 
     httpServer = await startHttpTransport(
@@ -104,6 +116,10 @@ describe('HTTP MCP transport', () => {
       arguments: { query: 'llm' }
     })
 
-    expect(result.structuredContent).toEqual({ query: 'llm', matches: [] })
+    expect(result.structuredContent).toEqual({
+      query: 'llm',
+      matches: [],
+      scope: { scoped: false, namespaces: null, note: null }
+    })
   })
 })

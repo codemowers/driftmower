@@ -2,7 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { ACTIONABLE_VERSION_STATUSES, MANUAL_REVIEW_REASONS } from '../../domain/image-update-plan.js'
 import type { ImageUpdatePlanningService } from '../../services/image-update-planning-service.js'
-import { callerScope, scopeNoticeSchema } from './caller-scope.js'
+import { callerScope, scopeNoticeSchema, scopeSuffix } from './caller-scope.js'
+import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
 
 export const PLAN_IMAGE_UPDATES_TOOL_NAME = 'plan_image_updates'
 
@@ -93,16 +94,16 @@ export const planImageUpdatesOutputSchema = z.object({
   warnings: z.array(z.string()),
   scope: scopeNoticeSchema
 })
+
+type PlanImageUpdatesResult = z.infer<typeof planImageUpdatesOutputSchema>
+
 const toolConfiguration = {
   title: 'Plan Driftmower image updates',
   description:
     'Plan advisory image and Helm chart updates from the latest ready in-cluster Driftmower snapshot.',
   inputSchema,
   outputSchema: planImageUpdatesOutputSchema.shape,
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: false
-  }
+  annotations: READ_ONLY_ANNOTATIONS
 }
 
 export function registerPlanImageUpdatesTool(
@@ -116,7 +117,33 @@ export function registerPlanImageUpdatesTool(
 
     return {
       structuredContent: { ...result },
-      content: [{ type: 'text', text: JSON.stringify(result) }]
+      content: [{ type: 'text', text: summarize(result) }]
     }
   })
+}
+
+// Leads with the verdict and the counts the plan already computes. The actions
+// themselves stay in `structuredContent`; repeating them here as JSON only
+// spent the reader's context twice.
+function summarize(result: PlanImageUpdatesResult): string {
+  if (result.status === 'no_ready_report') {
+    return 'No ready Driftmower snapshot, so no update plan could be built.'
+  }
+
+  const { summary } = result
+  const parts = [
+    `${summary.totalActions} advisory action(s) from ${summary.uniqueImageCandidates} image candidate(s): ` +
+      `${summary.imageTagUpdates} image tag update(s), ${summary.helmChartUpdates} Helm chart update(s), ` +
+      `${summary.manualReviews} needing manual review.`
+  ]
+
+  if (result.nextCursor) {
+    parts.push('More actions remain; pass `cursor` to continue.')
+  }
+
+  if (result.warnings.length > 0) {
+    parts.push(`${result.warnings.length} warning(s): ${result.warnings.join('; ')}`)
+  }
+
+  return `${parts.join(' ')}${scopeSuffix(result.scope)}`
 }

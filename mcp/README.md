@@ -360,6 +360,12 @@ reading a local database, with no network surface.
 All tools are annotated `readOnlyHint: true`, `destructiveHint: false`,
 `idempotentHint: true`, `openWorldHint: false`. Nothing here writes.
 
+Every tool returns both forms: a short text summary written for a human reading
+a chat, and `structuredContent` an agent can branch on, validated against the
+tool's declared output schema. The text block summarises — it is deliberately
+not a JSON copy of the structured payload, which would spend the reader's
+context twice for the same facts.
+
 ### `search_workloads`
 
 `search_workloads` accepts:
@@ -450,8 +456,8 @@ credentials of its own. They are registered only when `DRIFTMOWER_UI_URL` is set
 an unconfigured deployment advertises no provisioning tools rather than tools
 that always fail.
 
-Each returns both markdown, written for a human reading a chat, and
-`structuredContent` an agent can branch on.
+Each returns prose rather than a one-line summary: these answer questions a
+beginner asks, so the text block is several short paragraphs.
 
 ### `describe_cluster_capabilities`
 

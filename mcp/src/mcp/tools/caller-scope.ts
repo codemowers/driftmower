@@ -1,6 +1,11 @@
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { z } from 'zod'
-import { scopeFromClaim, UNRESTRICTED_SCOPE, type ResolvedScope } from '../../domain/tenancy.js'
+import {
+  scopeFromClaim,
+  UNRESTRICTED_SCOPE,
+  type ResolvedScope,
+  type ScopeNotice
+} from '../../domain/tenancy.js'
 
 // The shape the SDK hands every tool handler as its second argument. Only the
 // pieces this module reads are declared; the SDK's own type carries more.
@@ -54,3 +59,10 @@ export const scopeNoticeSchema = z.object({
   namespaces: z.array(z.string()).nullable(),
   note: z.string().nullable()
 })
+
+// The scope note is the difference between "nothing matched" and "nothing you
+// may see". A text summary that drops it turns a withheld result into an
+// apparently empty one, so every summary appends it when present.
+export function scopeSuffix(scope: ScopeNotice): string {
+  return scope.note ? ` ${scope.note}` : ''
+}
