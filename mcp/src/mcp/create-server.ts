@@ -7,7 +7,9 @@ import { registerProvisioningTools } from './tools/provisioning.js'
 import { registerSearchWorkloadsTool } from './tools/search-workloads.js'
 
 export const SERVER_NAME = 'driftmower-mcp'
-export const SERVER_VERSION = '0.1.0'
+// Advertised to clients in the initialize handshake. Kept in step with
+// package.json, which is also what CI tags the image with.
+export const SERVER_VERSION = '0.3.0'
 
 export interface ServerDependencies {
   workloadSearchService: Pick<WorkloadSearchService, 'searchWorkloads'>
