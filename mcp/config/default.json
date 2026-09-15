@@ -1,7 +1,7 @@
 {
   "mcp": {
     "transport": "stdio",
-    "host": "127.0.0.1",
+    "host": "::",
     "port": 3000,
     "healthPort": 3001,
     "logLevel": "info",

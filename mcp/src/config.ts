@@ -156,6 +156,10 @@ export function loadAppConfig(
     backendServiceToken: readString(source.get<string>('backend.serviceToken'), 'backendServiceToken'),
     backendTimeoutMs: readInteger(source.get<number>('backend.timeoutMs'), 'backendTimeoutMs'),
     transport,
+    // Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
+    // wherever the OS leaves bindv6only off — a client that resolves
+    // `localhost` to `::1` reaches the same server as one that picks
+    // `127.0.0.1`. Narrow it to `::1` or `127.0.0.1` to bind loopback only.
     host: readString(source.get<string>('mcp.host'), 'host'),
     port,
     healthPort: readInteger(source.get<number>('mcp.healthPort'), 'healthPort', 65_535),

@@ -45,7 +45,7 @@ DRIFTMOWER_BE_URL=http://driftmower-be:3030
 DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_...
 DRIFTMOWER_BE_TIMEOUT_MS=15000
 DRIFTMOWER_MCP_TRANSPORT=stdio
-DRIFTMOWER_MCP_HOST=127.0.0.1
+DRIFTMOWER_MCP_HOST=::                       # dual-stack; `::1` or `127.0.0.1` to bind loopback only
 DRIFTMOWER_MCP_PORT=3000
 DRIFTMOWER_MCP_HEALTH_PORT=3001
 DRIFTMOWER_MCP_DEFAULT_LIMIT=20
@@ -188,7 +188,6 @@ docker run --rm \
   -e DRIFTMOWER_MCP_TRANSPORT=http \
   -e DRIFTMOWER_BE_URL=http://driftmower-be:3030 \
   -e DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
-  -e DRIFTMOWER_MCP_HOST=0.0.0.0 \
   -p 3000:3000 \
   -p 3001:3001 \
   driftmower-mcp:local
