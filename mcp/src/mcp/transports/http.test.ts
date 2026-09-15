@@ -122,4 +122,44 @@ describe('HTTP MCP transport', () => {
       scope: { scoped: false, namespaces: null, note: null }
     })
   })
+  it('redirects a browser that lands on / to the driftmower-ui public URL', async () => {
+    httpServer = await startHttpTransport(
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads: vi.fn() },
+          imageUpdatePlanningService: { planImageUpdates: vi.fn() }
+        }),
+      {
+        host: '127.0.0.1',
+        port: 0,
+        landingRedirectUrl: 'https://driftmower-ui.example'
+      }
+    )
+    const address = httpServer.address() as AddressInfo
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/`, { redirect: 'manual' })
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('https://driftmower-ui.example')
+  })
+
+  it('keeps / a 404 when no landing redirect is configured', async () => {
+    httpServer = await startHttpTransport(
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads: vi.fn() },
+          imageUpdatePlanningService: { planImageUpdates: vi.fn() }
+        }),
+      {
+        host: '127.0.0.1',
+        port: 0
+      }
+    )
+    const address = httpServer.address() as AddressInfo
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/`, { redirect: 'manual' })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'not_found' })
+  })
 })

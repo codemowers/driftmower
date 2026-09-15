@@ -45,7 +45,7 @@ DRIFTMOWER_BE_URL=http://driftmower-be:3030
 DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_...
 DRIFTMOWER_BE_TIMEOUT_MS=15000
 DRIFTMOWER_MCP_TRANSPORT=stdio
-DRIFTMOWER_MCP_HOST=127.0.0.1
+DRIFTMOWER_MCP_HOST=::                       # dual-stack; `::1` or `127.0.0.1` to bind loopback only
 DRIFTMOWER_MCP_PORT=3000
 DRIFTMOWER_MCP_HEALTH_PORT=3001
 DRIFTMOWER_MCP_DEFAULT_LIMIT=20
@@ -62,6 +62,9 @@ MCP_AUTH_ENABLED=true                        # false only for a server no one ca
 # Provisioning tools; unset means they are not registered at all
 DRIFTMOWER_UI_URL=http://driftmower-ui
 DRIFTMOWER_UI_TIMEOUT_MS=10000
+
+# Public URL of driftmower-ui; unset means `/` answers 404 instead of redirecting
+DRIFTMOWER_UI_PUBLIC_URL=https://driftmower-ui.ee-lte-1.codemowers.io
 ```
 
 `MCP_AUDIENCE` must **not** equal driftmower-be's `OIDC_AUDIENCE`
@@ -105,6 +108,9 @@ DRIFTMOWER_MCP_TRANSPORT=http DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
 HTTP mode exposes:
 
 - MCP endpoint: `http://127.0.0.1:3000/mcp`
+- Landing redirect: `GET /` answers `302` to `DRIFTMOWER_UI_PUBLIC_URL` when it is
+  set, so a person who opens this server's hostname in a browser lands in
+  driftmower-ui instead of on a JSON 404
 - Protected-resource metadata (RFC 9728, unauthenticated):
   `http://127.0.0.1:3000/.well-known/oauth-protected-resource/mcp`
 - Liveness: `http://127.0.0.1:3001/healthz`
@@ -182,7 +188,6 @@ docker run --rm \
   -e DRIFTMOWER_MCP_TRANSPORT=http \
   -e DRIFTMOWER_BE_URL=http://driftmower-be:3030 \
   -e DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
-  -e DRIFTMOWER_MCP_HOST=0.0.0.0 \
   -p 3000:3000 \
   -p 3001:3001 \
   driftmower-mcp:local

@@ -91,6 +91,7 @@ async function main(): Promise<void> {
       host: appConfig.host,
       port: appConfig.port,
       authenticator,
+      landingRedirectUrl: appConfig.uiPublicUrl ?? undefined,
       onError: error => logger.error(errorMessage(error)),
       onAudit: entry =>
         entry.event === 'rejected'
@@ -104,7 +105,8 @@ async function main(): Promise<void> {
       port: appConfig.port,
       healthPort: appConfig.healthPort,
       authenticated: Boolean(authenticator),
-      provisioning: Boolean(provisioningService)
+      provisioning: Boolean(provisioningService),
+      landingRedirect: appConfig.uiPublicUrl
     })
 
     registerShutdown(async () => {

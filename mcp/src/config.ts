@@ -30,6 +30,11 @@ export interface AppConfig {
   maximumLimit: number
   logLevel: 'debug' | 'info' | 'warn' | 'error'
   publicUrl: string
+  // Public URL of driftmower-ui, used to bounce a browser that lands on `/`
+  // over to the UI. Null means `/` stays a 404. This is deliberately separate
+  // from `provisioning.driftmowerUiUrl`, which is the cluster-internal Service
+  // a browser cannot resolve.
+  uiPublicUrl: string | null
   // Bearer verification on the HTTP transport. Ignored by stdio, which is a
   // local process with no network surface.
   authEnabled: boolean
@@ -83,6 +88,14 @@ function readUrl(value: unknown, name: string): string {
   }
 
   return url.replace(/\/+$/, '')
+}
+
+function readOptionalUrl(value: unknown, name: string): string | null {
+  if (readOptionalString(value) === null) {
+    return null
+  }
+
+  return readUrl(value, name)
 }
 
 function readInteger(value: unknown, name: string, maximum?: number): number {
@@ -145,6 +158,10 @@ export function loadAppConfig(
     backendServiceToken: readString(source.get<string>('backend.serviceToken'), 'backendServiceToken'),
     backendTimeoutMs: readInteger(source.get<number>('backend.timeoutMs'), 'backendTimeoutMs'),
     transport,
+    // Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
+    // wherever the OS leaves bindv6only off — a client that resolves
+    // `localhost` to `::1` reaches the same server as one that picks
+    // `127.0.0.1`. Narrow it to `::1` or `127.0.0.1` to bind loopback only.
     host: readString(source.get<string>('mcp.host'), 'host'),
     port,
     healthPort: readInteger(source.get<number>('mcp.healthPort'), 'healthPort', 65_535),
@@ -152,6 +169,7 @@ export function loadAppConfig(
     maximumLimit,
     logLevel: readEnum(source.get<string>('mcp.logLevel'), 'logLevel', LOG_LEVELS),
     publicUrl: readOptionalString(source.get<string>('mcp.publicUrl')) ?? `http://127.0.0.1:${port}`,
+    uiPublicUrl: readOptionalUrl(source.get<string>('mcp.uiPublicUrl'), 'uiPublicUrl'),
     authEnabled,
     oidc: transport === 'http' && authEnabled ? readOidcConfig(source) : null,
     provisioning: readProvisioningConfig(source)
