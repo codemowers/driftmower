@@ -21,6 +21,13 @@ function pushCommands(host: string): string {
 docker push ${host}/myapp:v1`
 }
 
+// skaffold keys its global config by kube-context, so the registry follows the
+// sandbox context instead of being pinned in a shared skaffold.yaml.
+function skaffoldCommands(host: string): string {
+  return `skaffold config set --kube-context "$(kubectl config current-context)" default-repo ${host}
+skaffold dev`
+}
+
 function podSnippet(namespace: string, host: string): string {
   return `apiVersion: v1
 kind: Pod
@@ -68,6 +75,7 @@ export default function RegistryCard({
         const host = sandboxRegistryHost(entry.sandbox!, ingress.domainSuffix!)
         const login = loginCommand(entry.namespace, host)
         const push = pushCommands(host)
+        const skaffold = skaffoldCommands(host)
         const pod = podSnippet(entry.namespace, host)
 
         return (
@@ -93,6 +101,13 @@ export default function RegistryCard({
 
             <CommandBlock label="Log in from a shell" value={login} />
             <CommandBlock label="Tag and push an image" value={push} />
+            <CommandBlock label="Or point skaffold at it for this context" value={skaffold} />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Run it with the sandbox&rsquo;s kube-context selected. skaffold then prefixes every image in
+              <code className="mx-1 font-mono text-xs text-brand-label">skaffold.yaml</code>
+              with this registry, so keep image names bare (<code className="font-mono text-xs text-brand-label">myapp</code>)
+              and the same config deploys to other contexts with their own registries.
+            </p>
             <CommandBlock label={`Pull it in ${entry.namespace}`} value={pod} />
 
             <p className="mt-3 text-sm text-muted-foreground">
