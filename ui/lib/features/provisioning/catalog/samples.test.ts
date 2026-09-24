@@ -88,6 +88,12 @@ test("samples keep the fields their CRDs require", () => {
     storageClass: null,
   })
   assert.match(bucket.yaml, /^ {2}quota:\n {4}default: /m)
+  // A byte count, never "1Gi": s3-operator v0.12.0 decodes quota as int64 and
+  // one unit string stops it listing Buckets at all (bravo, 2026-09-24).
+  for (const sandboxId of [null, "abc123-demo"]) {
+    const sample = sampleFor("bucket", { apiVersion: "s3.onyxia.sh/v1alpha1", namespace: null, sandboxId, storageClass: null })
+    assert.match(sample.yaml, /^ {4}default: \d+(\s|$)/m, `quota must be bytes (sandboxId=${sandboxId})`)
+  }
 
   // MongoDBCommunity cannot come up without a password Secret to hash, so the
   // sample has to be two documents.
