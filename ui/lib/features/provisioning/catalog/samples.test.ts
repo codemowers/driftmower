@@ -100,7 +100,7 @@ test("samples keep the fields their CRDs require", () => {
   assert.match(mongo.yaml, /^kind: Secret$/m)
 })
 
-// Bucket and S3User names are global on the MinIO, so platform-manager's
+// Bucket and S3User names are global on Silo, so platform-manager's
 // sandbox-s3-guard holds them to the sandbox-id prefix and pins S3Users to the
 // platform-rendered <id>-rw policy. A sample that ignores that is rejected.
 test("in a sandbox the bucket sample carries the prefix the guard enforces", () => {

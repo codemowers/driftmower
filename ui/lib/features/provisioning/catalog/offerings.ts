@@ -124,7 +124,7 @@ export const OFFERINGS: OfferingSpec[] = [
     needs: [
       "The s3-operator",
       "An S3Instance for it to create the bucket in (minio/default on these clusters)",
-      "In a sandbox: bucket names and access keys prefixed with the sandbox id, since both are global on the MinIO",
+      "In a sandbox: bucket names and access keys prefixed with the sandbox id, since both are global on Silo",
     ],
     stateful: false,
   },
