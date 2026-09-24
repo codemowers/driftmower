@@ -19,7 +19,7 @@ export type RawResourceRule = {
 }
 
 export type RawAdmissionPolicy = {
-  metadata?: { name?: string }
+  metadata?: { name?: string; annotations?: Record<string, string> }
   spec?: {
     failurePolicy?: string
     paramKind?: { apiVersion?: string; kind?: string }
@@ -73,7 +73,15 @@ export type AdmissionPolicyFact = {
   exemptGroups: string[]
   // The ConfigMap a parameterised policy reads, so the caller knows to fetch it.
   paramRef: { name: string; namespace: string | null } | null
+  // "constrains" when the policy says so (codemowers.io/admission-effect): it
+  // shapes fields of an object you may create — a name prefix, a size cap —
+  // rather than forbidding the operation. Since we do not evaluate CEL, only
+  // the policy's author can tell us that, and without it a guard like
+  // sandbox-s3-guard reads as "you cannot create Buckets at all".
+  effect: "denies" | "constrains"
 }
+
+const EFFECT_ANNOTATION = "codemowers.io/admission-effect"
 
 function normaliseOperations(rule: RawResourceRule): string[] {
   const ops = rule.operations ?? []
@@ -170,6 +178,7 @@ export function toAdmissionFacts(
       scopedToNamespaceLabelKeys: namespaceLabelKeysOf(policy),
       exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
+      effect: policy.metadata?.annotations?.[EFFECT_ANNOTATION] === "constrains" ? "constrains" : "denies",
     })
   }
 
@@ -231,6 +240,9 @@ export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): De
 
   for (const fact of facts) {
     if (!fact.enforced) continue
+    // It governs what the object looks like, not whether it may exist; the
+    // offering's sample is where those requirements are met.
+    if (fact.effect === "constrains") continue
     if (!scopeApplies(fact, check.namespaceLabels)) continue
     if (!fact.guards.some(guard => guardMatches(guard, check))) continue
     // Identity exemption: the guards let argocd, kube-system and the admin

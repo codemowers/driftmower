@@ -20,12 +20,15 @@ export default function OfferingList({
   offerings,
   storageClasses,
   namespace,
+  sandboxId,
 }: {
   offerings: OfferingCard[]
   storageClasses: StorageClassFact[]
   // The selected sandbox's namespace, or null when none is selected — the
   // sample then carries no namespace line and lands wherever kubectl points.
   namespace: string | null
+  // Its codemowers.io/sandbox id, for samples that name things beyond it.
+  sandboxId: string | null
 }) {
   if (offerings.length === 0) {
     return <p className="text-sm text-muted-foreground">No offerings are known to this build.</p>
@@ -38,6 +41,7 @@ export default function OfferingList({
           key={card.id}
           card={card}
           namespace={namespace}
+          sandboxId={sandboxId}
           storageClass={pickStorageClass(card.id, storageClasses)}
         />
       ))}
@@ -48,16 +52,18 @@ export default function OfferingList({
 function OfferingRow({
   card,
   namespace,
+  sandboxId,
   storageClass,
 }: {
   card: OfferingCard
   namespace: string | null
+  sandboxId: string | null
   storageClass: string | null
 }) {
   const badge = BADGE[card.availability.state]
   // A sample is only honest when the cluster serves the kind: apiVersion is the
   // version discovery negotiated, and it is null exactly when it does not.
-  const sample = card.apiVersion ? sampleFor(card.id, { apiVersion: card.apiVersion, namespace, storageClass }) : null
+  const sample = card.apiVersion ? sampleFor(card.id, { apiVersion: card.apiVersion, namespace, sandboxId, storageClass }) : null
 
   return (
     <div className="rounded-lg border border-border bg-card px-5 py-4">

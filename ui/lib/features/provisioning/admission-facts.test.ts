@@ -331,3 +331,34 @@ test("DELETE is still governed, since validation 1 protects platform-managed nam
     1,
   )
 })
+
+// platform-manager/deploy/sandbox-guard.yaml: it shapes Buckets and S3Users a
+// sandbox may create, so it must not read as a ban on creating them.
+const S3_GUARD: RawAdmissionPolicy = {
+  metadata: { name: "sandbox-s3-guard", annotations: { "codemowers.io/admission-effect": "constrains" } },
+  spec: {
+    matchConstraints: {
+      resourceRules: [
+        { apiGroups: ["s3.onyxia.sh"], apiVersions: ["*"], operations: ["CREATE", "UPDATE"], resources: ["buckets", "s3users"] },
+      ],
+    },
+    variables: [{ name: "prefix", expression: "namespaceObject.metadata.labels['codemowers.io/sandbox'] + '-'" }],
+    validations: [{ message: "only Buckets and S3Users can be created in sandboxes" }],
+  },
+}
+
+test("a policy annotated as constraining fields is not reported as a denial", () => {
+  const facts = toAdmissionFacts([S3_GUARD], [bindingFor("sandbox-s3-guard")])
+  assert.equal(facts[0].effect, "constrains")
+  assert.equal(facts[0].enforced, true)
+  const check = { group: "s3.onyxia.sh", resource: "buckets", operation: "CREATE" as const, namespaceLabels: SANDBOX_SCOPE }
+  assert.deepEqual(denialsFor(facts, check), [])
+})
+
+test("without the annotation a policy still denies, so nothing loosens by default", () => {
+  const unannotated = { ...S3_GUARD, metadata: { name: "sandbox-s3-guard" } }
+  const facts = toAdmissionFacts([unannotated], [bindingFor("sandbox-s3-guard")])
+  assert.equal(facts[0].effect, "denies")
+  const check = { group: "s3.onyxia.sh", resource: "buckets", operation: "CREATE" as const, namespaceLabels: SANDBOX_SCOPE }
+  assert.equal(denialsFor(facts, check).length, 1)
+})

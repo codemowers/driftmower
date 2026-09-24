@@ -158,6 +158,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           offerings={runningOfferings}
           storageClasses={capabilities.storageClasses}
           namespace={capabilities.namespaces[0]?.namespace ?? null}
+          sandboxId={capabilities.namespaces[0]?.sandbox ?? null}
         />
       </Section>
 
