@@ -147,15 +147,19 @@ export async function getNamespaceFacts(input: NamespaceFactsInput): Promise<Nam
   }
 }
 
-// Only the roles the bindings actually reference, and only the three built-ins
-// our RBAC allows by name. Anything else resolves to "unknown", which the
-// heuristic reports honestly rather than guessing at.
+// Only the roles the bindings actually reference, and only the ones our RBAC
+// allows by name: the three built-ins, plus sandbox-s3, which platform-manager
+// binds per sandbox for object storage instead of aggregating into admin.
+// Anything else resolves to "unknown", which the heuristic reports honestly
+// rather than guessing at.
+const READABLE_ROLES = new Set(["admin", "edit", "view", "sandbox-s3"])
+
 async function resolveRoles(bindings: RawRoleBinding[], degraded: DegradedRead[]): Promise<ResolvedRole[]> {
   const wanted = new Set(
     bindings
       .filter(b => b.roleRef?.kind === "ClusterRole")
       .map(b => b.roleRef?.name)
-      .filter((name): name is string => name === "admin" || name === "edit" || name === "view"),
+      .filter((name): name is string => name !== undefined && READABLE_ROLES.has(name)),
   )
 
   const resolved = await Promise.all(

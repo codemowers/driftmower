@@ -121,7 +121,11 @@ export const OFFERINGS: OfferingSpec[] = [
     operatorRef: { namespace: "minio", deployment: "s3-operator" },
     storageClassPreference: [],
     presets: STANDARD_PRESETS("1 bucket", "1 bucket with a scoped user", "1 bucket with a scoped user"),
-    needs: ["The s3-operator", "An S3Instance for it to create the bucket in (minio/default on these clusters)"],
+    needs: [
+      "The s3-operator",
+      "An S3Instance for it to create the bucket in (minio/default on these clusters)",
+      "In a sandbox: bucket names and access keys prefixed with the sandbox id, since both are global on the MinIO",
+    ],
     stateful: false,
   },
   {

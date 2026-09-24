@@ -109,7 +109,8 @@ rules:
   # read arbitrary ClusterRoles.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: ["admin", "edit", "view"]
+    # sandbox-s3: platform-manager's per-sandbox object storage grant.
+    resourceNames: ["admin", "edit", "view", "sandbox-s3"]
     verbs: ["get"]
   # Provisioned resources: existence, name collisions, readiness. Read-only,
   # per operator group, so a new operator needs an explicit rule here.
