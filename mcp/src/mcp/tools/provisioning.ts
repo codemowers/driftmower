@@ -2,26 +2,17 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import type { ProvisioningService } from '../../services/provisioning-service.js'
 import {
-  formatClusterCapabilities,
   formatNamespaceReadiness,
   formatOfferings,
-  formatStorageClassExplanation,
-  formatStorageClassNotFound,
   formatUnavailable
 } from '../../services/provisioning-format.js'
 import { callerAccessToken, callerSubject, type ToolCallContext } from './caller-scope.js'
 import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
-import {
-  describeClusterCapabilitiesOutputShape,
-  describeNamespaceReadinessOutputShape,
-  explainStorageClassOutputShape,
-  listOfferingsOutputShape
-} from './provisioning-schemas.js'
+import { describeNamespaceReadinessOutputShape, listOfferingsOutputShape } from './provisioning-schemas.js'
 
 export const DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME = 'describe_cluster_capabilities'
 export const LIST_OFFERINGS_TOOL_NAME = 'list_offerings'
 export const DESCRIBE_NAMESPACE_READINESS_TOOL_NAME = 'describe_namespace_readiness'
-export const EXPLAIN_STORAGE_CLASS_TOOL_NAME = 'explain_storage_class'
 
 const OFFERING_IDS = [
   'postgres',
@@ -50,29 +41,6 @@ export function registerProvisioningTools(
 ): void {
   const { provisioningService } = dependencies
   const audit = dependencies.audit ?? (() => undefined)
-
-  server.registerTool(
-    DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME,
-    {
-      title: 'Describe cluster provisioning capabilities',
-      description:
-        'What this Kubernetes cluster offers a workload: storage classes and what they imply, ' +
-        'zones and schedulable nodes, priority classes, the network policy engine, ingress domain ' +
-        'and TLS, and the admission policies that override RBAC. Read-only.',
-      inputSchema: {},
-      outputSchema: describeClusterCapabilitiesOutputShape,
-      annotations: READ_ONLY_ANNOTATIONS
-    },
-    async (_input, context) => {
-      const result = await provisioningService.describeClusterCapabilities(callerAccessToken(context))
-
-      audit(auditLine(DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME, context, result.status))
-
-      return result.status === 'ok'
-        ? toolResult(formatClusterCapabilities(result), result)
-        : toolResult(formatUnavailable(result), result)
-    }
-  )
 
   server.registerTool(
     LIST_OFFERINGS_TOOL_NAME,
@@ -123,34 +91,6 @@ export function registerProvisioningTools(
 
       return result.status === 'ok'
         ? toolResult(formatNamespaceReadiness(result), result)
-        : toolResult(formatUnavailable(result), result)
-    }
-  )
-
-  server.registerTool(
-    EXPLAIN_STORAGE_CLASS_TOOL_NAME,
-    {
-      title: 'Explain a storage class',
-      description:
-        'One storage class in plain language: is it local to a machine, does it pin a pod to a ' +
-        'node, can it grow, and does the data survive deleting the instance. Read-only.',
-      inputSchema: {
-        name: z.string().trim().min(1)
-      },
-      outputSchema: explainStorageClassOutputShape,
-      annotations: READ_ONLY_ANNOTATIONS
-    },
-    async ({ name }, context) => {
-      const result = await provisioningService.explainStorageClass(callerAccessToken(context), name)
-
-      audit(auditLine(EXPLAIN_STORAGE_CLASS_TOOL_NAME, context, result.status, name))
-
-      if (result.status === 'ok') {
-        return toolResult(formatStorageClassExplanation(result), result)
-      }
-
-      return result.status === 'not_found'
-        ? toolResult(formatStorageClassNotFound(result), result)
         : toolResult(formatUnavailable(result), result)
     }
   )

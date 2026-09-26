@@ -56,25 +56,6 @@ export interface NamespaceReadiness {
   degraded: DegradedRead[]
 }
 
-export interface StorageClassExplanation {
-  status: 'ok'
-  storageClass: StorageClassFact
-  answers: {
-    nodeLocal: boolean
-    pinnedToOneNode: boolean
-    growable: boolean
-    survivesDeletion: boolean
-    safeForReplicas: boolean
-  }
-  degraded: DegradedRead[]
-}
-
-export interface StorageClassNotFound {
-  status: 'not_found'
-  requested: string
-  available: string[]
-}
-
 export class ProvisioningService {
   constructor(private readonly client: DriftmowerUiClient) {}
 
@@ -146,34 +127,6 @@ export class ProvisioningService {
     }
   }
 
-  async explainStorageClass(
-    accessToken: string | null,
-    name: string
-  ): Promise<StorageClassExplanation | StorageClassNotFound | Unavailable> {
-    const result = await this.load(accessToken)
-
-    if (result.status !== 'ok') {
-      return result
-    }
-
-    const storageClass = result.capabilities.storageClasses.find(candidate => candidate.name === name)
-
-    if (!storageClass) {
-      return {
-        status: 'not_found',
-        requested: name,
-        available: result.capabilities.storageClasses.map(candidate => candidate.name)
-      }
-    }
-
-    return {
-      status: 'ok',
-      storageClass,
-      answers: explainStorageClassFact(storageClass),
-      degraded: result.capabilities.degraded
-    }
-  }
-
   private async load(
     accessToken: string | null,
     query: { namespaces?: string[]; offering?: OfferingId } = {}
@@ -195,22 +148,5 @@ export class ProvisioningService {
     }
 
     return { status: 'ok', capabilities: result.capabilities }
-  }
-}
-
-// Pure, so the plain-language answers are testable without a cluster or an HTTP
-// round trip.
-export function explainStorageClassFact(storageClass: StorageClassFact): StorageClassExplanation['answers'] {
-  return {
-    nodeLocal: storageClass.topology === 'node-local',
-    // Immediate binding on a node-local provisioner is the trap: the volume is
-    // placed before the pod is scheduled, so the pod inherits that node.
-    pinnedToOneNode: storageClass.topology === 'node-local',
-    growable: storageClass.allowExpansion,
-    // Retain keeps the underlying volume after the PVC goes away; Delete does
-    // not. This is the difference between a deleted database being recoverable
-    // and being gone.
-    survivesDeletion: storageClass.reclaimPolicy === 'Retain',
-    safeForReplicas: storageClass.replicaSafe
   }
 }

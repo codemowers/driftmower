@@ -122,28 +122,7 @@ describe('HTTP MCP transport', () => {
       scope: { scoped: false, namespaces: null, note: null }
     })
   })
-  it('redirects a browser that lands on / to the driftmower-ui public URL', async () => {
-    httpServer = await startHttpTransport(
-      () =>
-        createMcpServer({
-          workloadSearchService: { searchWorkloads: vi.fn() },
-          imageUpdatePlanningService: { planImageUpdates: vi.fn() }
-        }),
-      {
-        host: '127.0.0.1',
-        port: 0,
-        landingRedirectUrl: 'https://driftmower-ui.example'
-      }
-    )
-    const address = httpServer.address() as AddressInfo
-
-    const response = await fetch(`http://127.0.0.1:${address.port}/`, { redirect: 'manual' })
-
-    expect(response.status).toBe(302)
-    expect(response.headers.get('location')).toBe('https://driftmower-ui.example')
-  })
-
-  it('keeps / a 404 when no landing redirect is configured', async () => {
+  it('serves the landing page and connection instructions at /', async () => {
     httpServer = await startHttpTransport(
       () =>
         createMcpServer({
@@ -158,6 +137,40 @@ describe('HTTP MCP transport', () => {
     const address = httpServer.address() as AddressInfo
 
     const response = await fetch(`http://127.0.0.1:${address.port}/`, { redirect: 'manual' })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
+    const html = await response.text()
+
+    expect(html).toContain('Zen of Kubernetes')
+    expect(html).toContain('claude mcp add --transport http --scope user')
+    expect(html).toContain(`codex mcp add driftmower-127-0-0-1-${address.port} --url`)
+    expect(html).toContain(`http://127.0.0.1:${address.port}/mcp`)
+    expect(html).toContain('/mcp')
+    expect(html).not.toContain('class="path"')
+
+    const head = await fetch(`http://127.0.0.1:${address.port}/`, { method: 'HEAD' })
+
+    expect(head.status).toBe(200)
+    expect(head.headers.get('content-length')).toBe(response.headers.get('content-length'))
+    expect(await head.text()).toBe('')
+  })
+
+  it('keeps unknown paths a 404', async () => {
+    httpServer = await startHttpTransport(
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads: vi.fn() },
+          imageUpdatePlanningService: { planImageUpdates: vi.fn() }
+        }),
+      {
+        host: '127.0.0.1',
+        port: 0
+      }
+    )
+    const address = httpServer.address() as AddressInfo
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/missing`, { redirect: 'manual' })
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not_found' })

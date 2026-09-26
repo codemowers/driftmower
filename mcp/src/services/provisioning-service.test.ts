@@ -5,15 +5,12 @@ import {
   formatClusterCapabilities,
   formatNamespaceReadiness,
   formatOfferings,
-  formatStorageClassExplanation,
   formatUnavailable
 } from './provisioning-format.js'
 import { ProvisioningService } from './provisioning-service.js'
 
 // A capability payload shaped like driftmower-ui's, trimmed to the fields these
-// tools read. The storage class mirrors the real ZFS classes in
-// codemowers-kube: node-local, Immediate binding, Retain — the combination that
-// makes "3 replicas" mean something other than what a beginner expects.
+// tools read. Storage facts here retain the upstream UI capability format.
 function capabilities(overrides: Partial<CapabilityResponse> = {}): CapabilityResponse {
   return {
     inCluster: true,
@@ -204,37 +201,6 @@ describe('ProvisioningService', () => {
     expect(markdown).toContain('1 of 2 ready')
     expect(markdown).toContain('not installed on this cluster')
     expect(markdown).toContain('the dragonfly-operator to be installed')
-  })
-
-  it('explains a node-local storage class in the terms a beginner gets wrong', async () => {
-    const service = new ProvisioningService(clientReturning({ ok: true, capabilities: capabilities() }))
-
-    const result = await service.explainStorageClass('token', 'postgres')
-
-    expect(result.status).toBe('ok')
-
-    if (result.status !== 'ok') return
-
-    expect(result.answers).toEqual({
-      nodeLocal: true,
-      pinnedToOneNode: true,
-      growable: false,
-      survivesDeletion: true,
-      safeForReplicas: false
-    })
-
-    const markdown = formatStorageClassExplanation(result)
-
-    expect(markdown).toContain('placed *before* the pod is scheduled')
-    expect(markdown).toContain('not the high availability the number suggests')
-  })
-
-  it('lists the available names when the storage class does not exist', async () => {
-    const service = new ProvisioningService(clientReturning({ ok: true, capabilities: capabilities() }))
-
-    const result = await service.explainStorageClass('token', 'mysql')
-
-    expect(result).toMatchObject({ status: 'not_found', requested: 'mysql', available: ['postgres'] })
   })
 
   it('surfaces degraded reads as unknown rather than dropping them', async () => {

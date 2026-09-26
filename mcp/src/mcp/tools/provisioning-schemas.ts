@@ -94,21 +94,3 @@ export const describeNamespaceReadinessOutputShape = {
   withheld: z.array(z.string()).optional(),
   degraded: z.array(degradedSchema).optional()
 }
-
-export const explainStorageClassOutputShape = {
-  status: z.enum(['ok', 'unavailable', 'not_found']),
-  ...unavailableFields,
-  storageClass: storageClassSchema.optional(),
-  answers: z
-    .object({
-      nodeLocal: z.boolean(),
-      pinnedToOneNode: z.boolean(),
-      growable: z.boolean(),
-      survivesDeletion: z.boolean(),
-      safeForReplicas: z.boolean()
-    })
-    .optional(),
-  requested: z.string().optional(),
-  available: z.array(z.string()).optional(),
-  degraded: z.array(degradedSchema).optional()
-}

@@ -3,8 +3,6 @@ import type {
   ClusterCapabilities,
   NamespaceReadiness,
   OfferingsListing,
-  StorageClassExplanation,
-  StorageClassNotFound,
   Unavailable
 } from './provisioning-service.js'
 
@@ -215,44 +213,6 @@ export function formatNamespaceReadiness(result: NamespaceReadiness): string {
   }
 
   return [...lines, ...degradedSection(result.degraded)].join('\n')
-}
-
-export function formatStorageClassExplanation(result: StorageClassExplanation): string {
-  const { storageClass, answers } = result
-  const lines: string[] = [
-    `## Storage class \`${storageClass.name}\`${storageClass.isDefault ? ' (the cluster default)' : ''}`,
-    '',
-    storageClass.implies,
-    '',
-    `- **Local to one machine?** ${answers.nodeLocal ? 'Yes' : 'No'} — provisioner \`${storageClass.provisioner}\`, topology ${storageClass.topology}.`,
-    `- **Does a volume pin its pod to a node?** ${answers.pinnedToOneNode ? 'Yes' : 'No'}` +
-      (answers.pinnedToOneNode && storageClass.bindingMode === 'Immediate'
-        ? ' — and binding is `Immediate`, so the volume is placed *before* the pod is scheduled and the pod has to follow it there.'
-        : ` — binding mode is \`${storageClass.bindingMode}\`.`),
-    `- **Can it grow later?** ${answers.growable ? 'Yes' : 'No, size it correctly up front'}.`,
-    `- **Does the data survive deleting the instance?** ${answers.survivesDeletion ? 'Yes' : 'No'} — reclaim policy \`${storageClass.reclaimPolicy}\`.`,
-    `- **Safe for several replicas the operator may move?** ${answers.safeForReplicas ? 'Yes' : 'No'}.`
-  ]
-
-  if (answers.nodeLocal) {
-    lines.push('')
-    lines.push(
-      'Because this is node-local storage, "3 replicas" means three copies on up to three machines — ' +
-        'it is not the high availability the number suggests if the machine is what fails.'
-    )
-  }
-
-  return [...lines, ...degradedSection(result.degraded)].join('\n')
-}
-
-export function formatStorageClassNotFound(result: StorageClassNotFound): string {
-  return [
-    `## No storage class named \`${result.requested}\` on this cluster`,
-    '',
-    result.available.length > 0
-      ? `Available: ${result.available.map(name => `\`${name}\``).join(', ')}.`
-      : 'This cluster reports no storage classes at all, which usually means the read was refused rather than that none exist.'
-  ].join('\n')
 }
 
 function availabilitySummary(offering: OfferingCard): string {

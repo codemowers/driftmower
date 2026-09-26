@@ -7,28 +7,25 @@ build:
   local:
     useBuildkit: true
   artifacts:
-    - image: git.codemowers.io/uq69adc8851/driftmower-mcp
+    - image: driftmower-mcp
       platforms:
         - linux/amd64
       docker:
         dockerfile: Dockerfile
-      sync:
-        manual:
-          - src: "src/**/*.ts"
-            dest: /app
+      # Runtime executes dist/: rebuild TypeScript changes instead of syncing unused source.
 
 deploy:
-  kubectl:
-    defaultNamespace: driftmowers
+  # Namespace comes from --namespace or the selected kubeconfig context.
+  kubectl: {}
 
 manifests:
-  rawYaml:
-    - manifests/namespace.yaml
-    - manifests/oidcclient.yaml
-    - manifests/deployment-app.yaml
-    - manifests/service.yaml
-    - manifests/certificate.yaml
-    - manifests/ingress.yaml
+  helm:
+    releases:
+      - name: driftmower-mcp
+        chartPath: manifests
+        skipBuildDependencies: true
+        setValueTemplates:
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
 
 portForward:
   - resourceType: deployment
@@ -39,32 +36,3 @@ portForward:
     resourceName: driftmower-mcp
     port: 3001
     localPort: 3001
-
-profiles:
-  # Local minikube: skaffold builds via minikube docker-env straight into the
-  # node's docker daemon; manifests come from the minikube-adapted overlay.
-  # Usage: skaffold run -p minikube
-  - name: minikube
-    patches:
-      # Pinned so this profile cannot deploy into a real cluster if that is what
-      # the active context happens to be. The base config pins nothing.
-      - op: add
-        path: /deploy/kubeContext
-        value: minikube
-      # minikube's docker-env here is podman-backed, which has no BuildKit. The
-      # image still builds with it on, but skaffold cannot then resolve the
-      # built reference and deploys a Deployment with an empty image field.
-      - op: remove
-        path: /build/local/useBuildkit
-      - op: replace
-        path: /build/artifacts/0/image
-        value: localhost/driftmower-mcp
-      - op: replace
-        path: /manifests/rawYaml
-        value:
-          - manifests/namespace.yaml
-          - manifests/minikube/oidcclient.yaml
-          - manifests/minikube/driftmower-mcp.yaml
-    # Port-forwarding is pointless here: the ingress publishes the server
-    # through the Cloudflare tunnel on its real hostname.
-    portForward: []

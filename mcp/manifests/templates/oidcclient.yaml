@@ -42,11 +42,11 @@ apiVersion: codemowers.cloud/v1
 kind: OIDCClient
 metadata:
   name: driftmower-mcp
-  namespace: driftmowers
+  namespace: {{ .Release.Namespace | quote }}
 spec:
   applicationType: native
   displayName: Driftmower MCP
-  uri: https://driftmower-mcp.ee-lte-1.codemowers.io/
+  uri: https://driftmower-mcp/
   # One entry per loopback hostname. The port shown is arbitrary and ignored at
   # match time; the hostname and path are not.
   redirectUris:

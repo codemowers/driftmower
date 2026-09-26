@@ -1,0 +1,66 @@
+x-development: &development
+  build:
+    context: .
+    target: development
+  user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  environment: &environment
+    DRIFTMOWER_MCP_TRANSPORT: http
+    MCP_AUTH_ENABLED: "false"
+    DRIFTMOWER_BE_URL: http://driftmower-be:3030
+    DRIFTMOWER_BE_SERVICE_TOKEN: dm_svc_test
+  volumes:
+    - ./src:/app/src
+    - ./test:/app/test
+    - ./config:/app/config:ro
+    - ./package.json:/app/package.json
+    - ./package-lock.json:/app/package-lock.json
+    - ./tsconfig.json:/app/tsconfig.json:ro
+    - ./tsconfig.build.json:/app/tsconfig.build.json:ro
+    - ./vitest.config.ts:/app/vitest.config.ts:ro
+    - ./eslint.config.cjs:/app/eslint.config.cjs:ro
+    - ./.prettierrc:/app/.prettierrc:ro
+  stop_grace_period: 30s
+
+services:
+  driftmower-be:
+    <<: *development
+    command: [node, --import, tsx, test/fixture-server.ts]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3030/healthz').then(r=>process.exit(r.ok?0:1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  driftmower-mcp:
+    <<: *development
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      driftmower-be:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:3001/readyz').then(r=>process.exit(r.ok?0:1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  test:
+    <<: *development
+    profiles: [test]
+    environment:
+      <<: *environment
+      MCP_TEST_URL: http://driftmower-mcp:3000/mcp
+      MCP_HEALTH_URL: http://driftmower-mcp:3001
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /app/dist:size=64m,mode=1777
+      - /app/node_modules/.vite-temp:size=32m,mode=1777
+      - /app/node_modules/.vite:size=32m,mode=1777
+    command: [sh, -ec, "npm run typecheck && ./node_modules/.bin/eslint 'src/**/*.{ts,tsx}' 'test/**/*.ts' && npm run build && npm test && node --import tsx test/compose-smoke.ts"]
+    depends_on:
+      driftmower-mcp:
+        condition: service_healthy

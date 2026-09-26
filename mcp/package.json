@@ -1,6 +1,5 @@
 {
   "name": "driftmower-mcp",
-  "version": "0.3.0",
   "description": "MCP server for driftmower-be service",
   "keywords": [
     "mcp",
@@ -17,20 +16,22 @@
   },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { cpSync } from 'node:fs'; cpSync('src/advisory/content', 'dist/advisory/content', { recursive: true });\"",
     "start": "node dist/index.js",
     "prettier": "prettier --write --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' 'test/**/*.{ts,tsx}'",
-    "format": "npm run prettier && npm run lint",
-    "lint": "eslint --fix 'src/**/*.{ts,tsx}' 'test/**/*.ts'",
+    "format": "npm run prettier && npm run lint -- --fix",
+    "lint": "eslint 'src/**/*.{ts,tsx}' 'test/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@prometheus-io/client": "^0.16.1",
     "commander": "^15.0.0",
     "config": "^4.0.0",
     "jose": "^6.2.12",
+    "marked": "^18.0.14",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -44,5 +45,6 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "vitest": "^4.0.0"
-  }
+  },
+  "private": true
 }

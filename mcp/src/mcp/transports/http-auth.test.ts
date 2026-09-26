@@ -77,11 +77,27 @@ describe('HTTP transport authentication', () => {
           workloadSearchService: { searchWorkloads },
           imageUpdatePlanningService: { planImageUpdates: vi.fn() }
         }),
-      { host: '127.0.0.1', port: 0, authenticator: authenticatorFor(outcomes) }
+      {
+        host: '127.0.0.1',
+        port: 0,
+        authenticator: authenticatorFor(outcomes),
+        oauthClientId: 'kube-system.driftmower-mcp'
+      }
     )
 
     return `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`
   }
+
+  it('serves the public guidance without bypassing MCP authentication', async () => {
+    const origin = await start(new Map())
+    const page = await fetch(`${origin}/`)
+
+    expect(page.status).toBe(200)
+    expect(await page.text()).toContain('--oauth-client-id &#39;kube-system.driftmower-mcp&#39;')
+    const mcp = await fetch(`${origin}/mcp`)
+
+    expect(mcp.status).toBe(401)
+  })
 
   const initializeBody = JSON.stringify({
     jsonrpc: '2.0',

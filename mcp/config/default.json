@@ -7,7 +7,8 @@
     "logLevel": "info",
     "publicUrl": "http://127.0.0.1:3000",
     "uiPublicUrl": "",
-    "authEnabled": true
+    "authEnabled": true,
+    "oauthClientId": ""
   },
   "oidc": {
     "issuer": "",
@@ -16,6 +17,7 @@
     "namespacesClaim": "codemowers.io/namespaces"
   },
   "backend": {
+    "enabled": true,
     "url": "http://driftmower-be:3030",
     "serviceToken": "",
     "timeoutMs": 15000
@@ -27,5 +29,27 @@
   "search": {
     "defaultLimit": 20,
     "maximumLimit": 100
+  },
+  "observability": {
+    "enabled": false,
+    "prometheusUrl": "",
+    "lokiUrl": "",
+    "requestTimeoutMs": 10000
+  },
+  "kubernetes": {
+    "url": "https://kubernetes.default.svc",
+    "tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+    "caFile": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+    "usernamePrefix": "",
+    "groupsPrefix": "",
+    "namespaceRole": "admin",
+    "requestTimeoutMs": 10000
+  },
+  "cluster": {
+    "id": "",
+    "apiUrl": ""
+  },
+  "advisory": {
+    "overrideDirectory": ""
   }
 }

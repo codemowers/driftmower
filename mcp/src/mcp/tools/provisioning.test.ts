@@ -3,19 +3,9 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProvisioningService } from '../../services/provisioning-service.js'
 import { createMcpServer } from '../create-server.js'
-import {
-  DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME,
-  DESCRIBE_NAMESPACE_READINESS_TOOL_NAME,
-  EXPLAIN_STORAGE_CLASS_TOOL_NAME,
-  LIST_OFFERINGS_TOOL_NAME
-} from './provisioning.js'
+import { DESCRIBE_NAMESPACE_READINESS_TOOL_NAME, LIST_OFFERINGS_TOOL_NAME } from './provisioning.js'
 
-const PROVISIONING_TOOLS = [
-  DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME,
-  LIST_OFFERINGS_TOOL_NAME,
-  DESCRIBE_NAMESPACE_READINESS_TOOL_NAME,
-  EXPLAIN_STORAGE_CLASS_TOOL_NAME
-]
+const PROVISIONING_TOOLS = [LIST_OFFERINGS_TOOL_NAME, DESCRIBE_NAMESPACE_READINESS_TOOL_NAME]
 
 describe('provisioning tools', () => {
   const closeCallbacks: Array<() => Promise<void>> = []
@@ -60,6 +50,8 @@ describe('provisioning tools', () => {
     const client = await connect(stubService())
     const { tools } = await client.listTools()
 
+    expect(tools.map(tool => tool.name)).not.toContain('explain_storage_class')
+
     for (const name of PROVISIONING_TOOLS) {
       const tool = tools.find(candidate => candidate.name === name)
 
@@ -78,28 +70,28 @@ describe('provisioning tools', () => {
     const client = await connect(stubService())
 
     const result = await client.callTool({
-      name: EXPLAIN_STORAGE_CLASS_TOOL_NAME,
-      arguments: { name: 'postgres' }
+      name: LIST_OFFERINGS_TOOL_NAME,
+      arguments: {}
     })
 
     expect(result.structuredContent).toMatchObject({ status: 'ok' })
     expect(Array.isArray(result.content) && result.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('Storage class')
+      text: expect.stringContaining('ready')
     })
   })
 
   it('passes an unavailable answer through as a normal result, not a protocol error', async () => {
     const service = stubService()
 
-    vi.mocked(service.describeClusterCapabilities).mockResolvedValue({
+    vi.mocked(service.listOfferings).mockResolvedValue({
       status: 'unavailable',
       reason: 'unreachable',
       detail: 'driftmower-ui is down'
     })
 
     const client = await connect(service)
-    const result = await client.callTool({ name: DESCRIBE_CLUSTER_CAPABILITIES_TOOL_NAME, arguments: {} })
+    const result = await client.callTool({ name: LIST_OFFERINGS_TOOL_NAME, arguments: {} })
 
     expect(result.isError).toBeFalsy()
     expect(result.structuredContent).toMatchObject({ status: 'unavailable', reason: 'unreachable' })
@@ -149,28 +141,6 @@ function stubService(): ProvisioningService {
       namespaces: [],
       hostRules: [],
       withheld: [],
-      degraded: []
-    }),
-    explainStorageClass: vi.fn().mockResolvedValue({
-      status: 'ok',
-      storageClass: {
-        name: 'postgres',
-        provisioner: 'zfs.csi.openebs.io',
-        isDefault: false,
-        bindingMode: 'Immediate',
-        allowExpansion: false,
-        reclaimPolicy: 'Retain',
-        topology: 'node-local',
-        implies: 'Local to one machine.',
-        replicaSafe: false
-      },
-      answers: {
-        nodeLocal: true,
-        pinnedToOneNode: true,
-        growable: false,
-        survivesDeletion: true,
-        safeForReplicas: false
-      },
       degraded: []
     })
   } as unknown as ProvisioningService

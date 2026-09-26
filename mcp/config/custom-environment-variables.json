@@ -16,7 +16,8 @@
     "authEnabled": {
       "__name": "MCP_AUTH_ENABLED",
       "__format": "boolean"
-    }
+    },
+    "oauthClientId": "MCP_OAUTH_CLIENT_ID"
   },
   "oidc": {
     "issuer": "OIDC_ISSUER",
@@ -25,6 +26,10 @@
     "namespacesClaim": "MCP_NAMESPACES_CLAIM"
   },
   "backend": {
+    "enabled": {
+      "__name": "DRIFTMOWER_BE_ENABLED",
+      "__format": "boolean"
+    },
     "url": "DRIFTMOWER_BE_URL",
     "serviceToken": "DRIFTMOWER_BE_SERVICE_TOKEN",
     "timeoutMs": {
@@ -48,5 +53,36 @@
       "__name": "DRIFTMOWER_MCP_MAX_LIMIT",
       "__format": "number"
     }
+  },
+  "observability": {
+    "enabled": {
+      "__name": "OBSERVABILITY_ENABLED",
+      "__format": "boolean"
+    },
+    "prometheusUrl": "PROMETHEUS_URL",
+    "lokiUrl": "LOKI_URL",
+    "requestTimeoutMs": {
+      "__name": "OBSERVABILITY_TIMEOUT_MS",
+      "__format": "number"
+    }
+  },
+  "kubernetes": {
+    "url": "KUBERNETES_API_URL",
+    "tokenFile": "KUBERNETES_TOKEN_FILE",
+    "caFile": "KUBERNETES_CA_FILE",
+    "usernamePrefix": "KUBERNETES_USERNAME_PREFIX",
+    "groupsPrefix": "KUBERNETES_GROUPS_PREFIX",
+    "namespaceRole": "KUBERNETES_NAMESPACE_ROLE",
+    "requestTimeoutMs": {
+      "__name": "KUBERNETES_TIMEOUT_MS",
+      "__format": "number"
+    }
+  },
+  "cluster": {
+    "id": "DRIFTMOWER_CLUSTER_ID",
+    "apiUrl": "KUBERNETES_PUBLIC_API_URL"
+  },
+  "advisory": {
+    "overrideDirectory": "ENGINEERING_ADVISORY_OVERRIDE_DIR"
   }
 }

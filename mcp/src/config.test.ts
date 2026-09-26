@@ -11,7 +11,11 @@ const SOURCE_VALUES: Record<string, unknown> = {
   'mcp.healthPort': 3001,
   'mcp.logLevel': 'info',
   'search.defaultLimit': 20,
-  'search.maximumLimit': 100
+  'search.maximumLimit': 100,
+  'kubernetes.url': 'https://kubernetes.default.svc',
+  'kubernetes.tokenFile': '/token',
+  'kubernetes.caFile': '/ca',
+  'kubernetes.requestTimeoutMs': 10000
 }
 
 const source = {
@@ -90,10 +94,122 @@ describe('loadAppConfig', () => {
     )
   })
 
+  it('allows explicitly disabling Driftmower without backend credentials', () => {
+    expect(
+      loadAppConfig([], sourceWith({ 'backend.enabled': false, 'backend.serviceToken': '' }))
+    ).toMatchObject({ backendEnabled: false, backendServiceToken: '', observability: null })
+  })
+
+  const observability = {
+    'mcp.transport': 'http',
+    'oidc.issuer': 'https://auth.example/',
+    'oidc.namespacesClaim': 'codemowers.io/namespaces',
+    'observability.prometheusUrl': 'http://prometheus:9090/',
+    'kubernetes.url': 'https://kubernetes.default.svc',
+    'kubernetes.tokenFile': '/token',
+    'kubernetes.caFile': '/ca',
+    'observability.requestTimeoutMs': 10000
+  }
+
+  it('loads standalone observability configuration and default OIDC identity mapping', () => {
+    const result = loadAppConfig(
+      [],
+      sourceWith({ ...observability, 'backend.enabled': false, 'backend.serviceToken': '' })
+    )
+
+    expect(result.observability).toMatchObject({
+      prometheusUrl: 'http://prometheus:9090',
+      lokiUrl: null
+    })
+    expect(result.kubernetes).toMatchObject({
+      usernamePrefix: 'https://auth.example/#',
+      namespaceRole: 'admin',
+      groupsPrefix: ''
+    })
+  })
+
+  it('supports Kubernetes-only logs and explicit prefix overrides', () => {
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          ...observability,
+          'observability.prometheusUrl': '',
+          'observability.enabled': true,
+          'kubernetes.usernamePrefix': '-',
+          'kubernetes.groupsPrefix': 'oidc:'
+        })
+      ).kubernetes
+    ).toMatchObject({ usernamePrefix: '', groupsPrefix: 'oidc:' })
+  })
+
+  it('supports a configured namespace role name', () => {
+    expect(
+      loadAppConfig([], sourceWith({ ...observability, 'kubernetes.namespaceRole': 'developer' })).kubernetes
+        .namespaceRole
+    ).toBe('developer')
+  })
+
+  it('requires authenticated HTTP only when observability is enabled', () => {
+    expect(() => loadAppConfig([], sourceWith({ ...observability, 'mcp.authEnabled': false }))).toThrow(
+      'authenticated HTTP'
+    )
+    expect(() => loadAppConfig([], sourceWith({ ...observability, 'mcp.transport': 'stdio' }))).toThrow(
+      'authenticated HTTP'
+    )
+    expect(loadAppConfig([], source).observability).toBeNull()
+  })
+
+  it.each(['file:///etc/passwd', 'http://user:pass@prometheus', 'http://prometheus?query=x'])(
+    'rejects invalid service URL %s',
+    url => {
+      expect(() =>
+        loadAppConfig([], sourceWith({ ...observability, 'observability.prometheusUrl': url }))
+      ).toThrow('Service URLs')
+    }
+  )
+
   it('rejects unsupported or malformed CLI options', () => {
     expect(() => loadAppConfig(['--transport', 'http'], source)).toThrow("unknown option '--transport'")
     expect(() => loadAppConfig(['--backend-url'], source)).toThrow(
       "option '--backend-url <url>' argument missing"
     )
+  })
+})
+
+describe('multi-cluster configuration', () => {
+  it('uses a provider-qualified name and a separate external API URL', () => {
+    const result = loadAppConfig(
+      [],
+      sourceWith({
+        'cluster.id': 'ee-west-1.codemowers.io',
+        'cluster.apiUrl': 'https://api.example:6443/',
+        'advisory.overrideDirectory': '/etc/advisory',
+        'mcp.oauthClientId': 'other-provider.mcp'
+      })
+    )
+
+    expect(result.cluster).toEqual({
+      id: 'ee-west-1.codemowers.io',
+      apiUrl: 'https://api.example:6443',
+      mcpServerName: 'driftmower-ee-west-1-codemowers-io'
+    })
+    expect(result.kubernetes.url).toBe('https://kubernetes.default.svc')
+    expect(result.advisoryOverrideDirectory).toBe('/etc/advisory')
+    expect(result.oauthClientId).toBe('other-provider.mcp')
+    expect(loadAppConfig([], source).cluster.apiUrl).toBeNull()
+  })
+
+  it('rejects unsafe cluster identities and external URLs', () => {
+    expect(() => loadAppConfig([], sourceWith({ 'cluster.id': 'west; echo nope' }))).toThrow(
+      'DRIFTMOWER_CLUSTER_ID'
+    )
+    for (const url of [
+      'http://api.example',
+      'https://user:pass@api.example',
+      'https://api.example?token=secret'
+    ]) {
+      expect(() => loadAppConfig([], sourceWith({ 'cluster.apiUrl': url }))).toThrow()
+    }
   })
 })

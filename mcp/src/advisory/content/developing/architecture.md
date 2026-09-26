@@ -1,0 +1,35 @@
+# Application architecture and identity
+
+Before implementing authentication or API boundaries, ask the user which architecture to follow: **a backend for frontend (BFF), or direct OIDC/OAuth API access with custom scopes?** Explain the tradeoffs below and record the chosen clients, trust boundaries, token ownership, and authorization model. If the user has already chosen, follow that decision without asking again. Otherwise wait for the choice before implementing the dependent authentication design; continue independent work meanwhile.
+
+Persist the agreed architecture in the user's project `AGENTS.md`, or the existing equivalent agent-instructions file (for example `agent.md`). Preserve unrelated instructions and use the file that governs the affected application; create a project `AGENTS.md` if no equivalent exists. Record the chosen BFF/direct API pattern, rationale, identity provider or access proxy, clients, audiences/scopes, token/session ownership, and direct signed-transfer boundary. Record decisions, not credentials or unconfirmed assumptions. Read and honor these decisions in later work, updating them when the user changes the architecture instead of repeatedly reopening settled choices.
+
+## Choose the authentication boundary
+
+Both options use an external OIDC provider for sign-in. The distinction is where tokens live and which component calls the application API; a BFF can also use scoped access tokens for downstream APIs.
+
+| Pattern | Advantages | Costs and responsibilities |
+| --- | --- | --- |
+| BFF: the browser uses a session cookie; the backend handles OIDC and calls application APIs with server-held tokens. | Keeps OAuth tokens out of browser JavaScript; centralizes session handling and browser-specific API composition; suits a first-party web UI. | Adds a backend hop and session lifecycle management; requires secure, HttpOnly cookies and CSRF protection. XSS can still perform actions through the user's session. |
+| Direct OIDC/OAuth with custom scopes: clients obtain access tokens and call independently protected APIs. | Supports browser, mobile, CLI, and integration clients with a common API contract; allows explicit delegated permissions and independent API deployment. | Browser-held tokens increase exposure to malicious JavaScript; each API must validate tokens and enforce scopes. Requires deliberate audience, token lifecycle, CORS, and scope design. Public clients cannot keep a client secret. |
+
+Use Authorization Code with PKCE for interactive sign-in. The [IETF browser-based applications guidance](https://datatracker.ietf.org/doc/draft-ietf-oauth-browser-based-apps/) describes the BFF and browser-client models and their security tradeoffs.
+
+Recommend a BFF for an application primarily serving its own browser UI. Recommend direct scoped API access when independent clients and delegated API access are actual requirements. Present this recommendation to the user as part of the choice, rather than silently committing to it. Keep business logic and authorization in the application backend, independent of UI composition; split services only where ownership, scaling, or isolation warrants it.
+
+## Delegate identity, retain application authorization
+
+- Do not build local user accounts, password storage, registration, password resets, or a parallel login system. Offload authentication and account lifecycle to the selected external identity provider.
+- Discover the target cluster's advertised capabilities, applicable policy bindings, and supported issuer/client provisioning interfaces before relying on them. Candidate modern identity stacks include Passmower and [authentik](https://docs.goauthentik.io/add-secure-apps/providers/oauth2) as OIDC providers, and [Pomerium](https://www.pomerium.com/docs/capabilities/authentication) as an identity-aware access proxy paired with an OIDC provider. Pomerium fills a different role from the issuer. Treat these as candidates, not installed services; agree on and provision missing prerequisites rather than adding built-in accounts. For a selected Passmower deployment, consult `crds/oidcclient.codemowers.cloud`.
+- Application profile and domain data may refer to the verified `(iss, sub)` identity. Keep tenant membership, object ownership, and business permissions in the application where needed; authentication does not grant access to every record.
+- For direct API access, agree on resource audiences and a minimal scope vocabulary, such as `documents:read` and `documents:write`. Verify how the selected provider configures and grants those scopes before implementation. An application's requested scope or a client configuration entry alone is not proof that a token grants it.
+- APIs must validate access tokens using the issuer's supported mechanism, including issuer, intended audience, expiry, and required scopes, then enforce tenant and object authorization. Do not use ID tokens as API access tokens. A BFF must enforce the same business permissions and must not become an unrestricted proxy using broad service credentials.
+
+## Keep signed data transfers direct
+
+- Do not proxy MinIO/S3 or other components using signature-based request authentication through the BFF or application API. A BFF handles application operations and authorization; it should not relay object bytes or rewrite signed requests to force everything under the application's origin.
+- After authorizing the requested object operation, let the backend issue a short-lived, narrowly scoped presigned URL and let the client upload or download directly from the storage endpoint. Keep long-lived storage credentials on the server. Configure the storage endpoint's CORS for the actual browser origins and required operations.
+- Discover a client-reachable HTTPS endpoint and sign for that exact endpoint. Preserve the signed method, host, path, query parameters, headers, and any signed payload constraints. Do not sign an internal URL and replace its host or path afterward. Signature-aware infrastructure routing must preserve the signed request; this is not a claim that all reverse proxies inherently break signatures. See [S3 Signature Version 4 query authentication](https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sigv4-query-string-auth.html).
+- If no suitable endpoint is available, resolve endpoint provisioning before implementing direct transfers. Do not add an application proxy as a workaround. For other signed-request services, use their supported direct-client authorization mechanism rather than assuming S3 presigning applies universally.
+
+The recommended shape is a browser UI with the user-selected BFF or scoped API boundary, externally managed OIDC identity, backend-enforced business authorization, and direct authorized transfers to signed-request services. Keep HTTP services and background workers independently scalable, with the process and internal health/metrics listener requirements in `deploying/workloads`, `developing/health-checks`, and `developing/metrics`.

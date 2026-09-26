@@ -1,3 +1,5 @@
+import type { ClusterIdentity } from '../../domain/cluster-identity.js'
+import type { EngineeringAdvisory } from '../../advisory/software-engineering.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -6,6 +8,8 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Readable } from 'node:stream'
+import type { ApplicationMetrics } from '../../http/metrics.js'
+import { renderLandingPage } from '../../http/landing.js'
 import {
   protectedResourceMetadataPath,
   type BearerAuthenticator,
@@ -21,15 +25,15 @@ export const PROTECTED_RESOURCE_METADATA_ROOT_PATH = '/.well-known/oauth-protect
 export const LANDING_PATH = '/'
 
 export interface HttpTransportOptions {
+  metrics?: ApplicationMetrics
+  cluster?: ClusterIdentity
+  advisories?: EngineeringAdvisory[]
+  oauthClientId?: string | null
   host: string
   port: number
   // Absent means the transport serves unauthenticated, which is only correct
   // for a server that is not reachable from outside the cluster.
   authenticator?: BearerAuthenticator
-  // Public URL of driftmower-ui. The Ingress publishes this server on a
-  // hostname people will sooner or later open in a browser, and an MCP
-  // endpoint has nothing to show there; absent, `/` stays a 404.
-  landingRedirectUrl?: string
   onError?: (error: unknown) => void
   onAudit?: (entry: AuditEntry) => void
 }
@@ -47,6 +51,7 @@ export async function startHttpTransport(
   const sessions = new Map<string, HttpSession>()
 
   const httpServer = createServer((request, response) => {
+    options.metrics?.observe(request, response)
     const path = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`).pathname
 
     if (
@@ -61,12 +66,22 @@ export async function startHttpTransport(
       return
     }
 
-    if (
-      options.landingRedirectUrl &&
-      (request.method === 'GET' || request.method === 'HEAD') &&
-      path === LANDING_PATH
-    ) {
-      writeRedirect(response, options.landingRedirectUrl)
+    if ((request.method === 'GET' || request.method === 'HEAD') && path === LANDING_PATH) {
+      const resource = options.authenticator?.protectedResourceMetadata().resource
+      const endpoint =
+        typeof resource === 'string'
+          ? resource
+          : new URL(MCP_PATH, `http://${request.headers.host ?? 'localhost'}`).href
+      const landingPage = renderLandingPage(Boolean(options.authenticator), endpoint, options)
+
+      response.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'content-length': Buffer.byteLength(landingPage),
+        'content-security-policy':
+          "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+        'x-content-type-options': 'nosniff'
+      })
+      response.end(request.method === 'HEAD' ? undefined : landingPage)
 
       return
     }
@@ -181,6 +196,7 @@ async function handleMcpRequest(
     sessionIdGenerator: randomUUID,
     onsessioninitialized: initializedSessionId => {
       sessions.set(initializedSessionId, { transport, server, subject })
+      options.metrics?.sessions.inc()
     }
   })
 
@@ -242,13 +258,6 @@ function writeChallenge(
     'www-authenticate': authenticator.challengeHeader(outcome)
   })
   response.end(JSON.stringify({ error: outcome.error, error_description: outcome.description }))
-}
-
-// 302 rather than 301: the landing target is configuration, and a browser that
-// cached a permanent redirect would keep following the old one after it changes.
-function writeRedirect(response: ServerResponse, location: string): void {
-  response.writeHead(302, { location, 'content-type': 'text/plain' })
-  response.end(`Redirecting to ${location}\n`)
 }
 
 function writeJson(response: ServerResponse, statusCode: number, body: unknown): void {

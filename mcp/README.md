@@ -1,32 +1,166 @@
 # Driftmower MCP
 
-The platform's single MCP gateway. It serves coding agents two things over one
+The platform's single MCP gateway. It serves coding agents these tools over one
 authenticated endpoint:
 
 - **Drift analysis** — persisted Driftmower snapshots read from the
   driftmower-be API (`search_workloads`, `plan_image_updates`).
 - **Provisioning capabilities** — what a cluster offers a workload and what will
-  bite you, proxied from driftmower-ui's capability layer
+  bite you, with direct Kubernetes capability discovery and UI-backed offerings
   (`describe_cluster_capabilities`, `list_offerings`,
-  `describe_namespace_readiness`, `explain_storage_class`).
+  `describe_namespace_readiness`).
+- **Metrics and logs** — live Prometheus metrics and Loki or Kubernetes pod logs
+  (`query_metrics`, `query_logs`), authorized through Kubernetes RBAC.
 
-Everything here is read-only. The server never writes to the backend, the
-cluster, or a target repository; the provisioning tools generate knowledge, not
-manifests, and nothing in this server applies anything.
+Everything here is read-only. The server makes non-persistent Kubernetes
+SubjectAccessReview requests to check authorization; it does not change
+workloads, backend data, or repositories.
 
 Published behind passmower OIDC. Results are scoped to the caller's own
 namespaces.
 
+## Software engineering advisory
+
+Engineering advice is bundled with this project and always registered, independent
+of Kubernetes, monitoring, and Driftmower services. No external document is fetched
+at runtime. Unfinished guidance, including Node.js-specific sections, is marked
+`TODO`.
+
+MCP clients can discover Markdown resources through `resources/list` and read them
+through `resources/read`. The index URI is `engineering://advisory/index`; section
+URIs use the same prefix followed by a path below. Clients using tools can call
+`get_engineering_advisory` with `{"path":"developing/logging"}`, or omit `path`
+for the index. The tool returns the same Markdown as the resource.
+
+```text
+developing/
+  general
+  logging
+  metrics
+  health-checks
+  local-development
+  languages/{python,nodejs,go,rust}
+building/
+  general
+  ci
+  languages/{python,nodejs,go,rust}
+deploying/
+  general
+  security
+  networking
+  storage
+  workloads
+  observability
+```
+
+Maintain the Markdown files under `src/advisory/content/`, following the API path tree (for example, `developing/languages/nodejs.md`). CRD-specific provisioning lives in `crds/<lowercase-kind>.<api-group>.md`, for example `crds/cluster.postgresql.cnpg.io.md`; the same path without `.md` is accepted by `get_engineering_advisory`. Shared persistence advice and the technology-to-resource map remain in `deploying/storage.md`. Each file starts with a `# Title`. The server discovers the tree once at startup and generates the index; adding a file adds its resource and tool path after restart. The build copies the content into `dist/advisory/content/` for packaging, including the container image. The advice is
+included in the compiled server and container image. HTTP access uses the
+endpoint's existing authentication; local stdio can also read the advice.
+
+## Multiple clusters and administrator guidance
+
+Give each installation a provider-qualified cluster identity. For example:
+
+```bash
+DRIFTMOWER_CLUSTER_ID=ee-west-1.codemowers.io
+KUBERNETES_PUBLIC_API_URL=https://10.250.10.2:6443
+MCP_OAUTH_CLIENT_ID=kube-system.driftmower-mcp
+```
+
+The landing page generates Claude Code, Codex and JSON setup snippets using
+`driftmower-ee-west-1-codemowers-io`. Another provider's `ee-west-1.example.net`
+becomes `driftmower-ee-west-1-example-net`. Sign in to each connection separately.
+`MCP_OAUTH_CLIENT_ID` is the public client ID registered with that installation's
+identity provider; it is not assumed to be a Codemowers client. Leave it unset
+for providers whose clients can register automatically.
+
+At startup, the server reads `default/kubelogin` Ingress. A single concrete
+hostname identifies the Passmower OIDC API endpoint (`https://<hostname>`);
+removing its leading `kube.` gives the cluster name. The MCP identity and agent
+instructions use this discovered endpoint. If the ingress is absent, unreadable,
+or has no unambiguous hostname, the configured identity and k3s advertised API
+address are retained. Ingress discovery grants `get` only for ingresses named `kubelogin` through
+the existing ClusterRole; the application reads the infra-owned ingress in `default` (included in `manifests/templates/observability-rbac.yaml`).
+
+`KUBERNETES_PUBLIC_API_URL` is the fallback administrator-facing API URL found in
+kubeconfig, including its port and any proxy path. It may require a VPN. It is
+separate from `KUBERNETES_API_URL`, which the MCP server uses internally and
+usually leaves at `https://kubernetes.default.svc`. Never infer cluster identity
+from that shared in-cluster hostname.
+
+The MCP initialization instructions, `get_cluster_identity`,
+and advisory tool responses identify this
+connection's cluster. Agents are instructed to compare the external API URL to
+local kubeconfig server URLs and use explicit `kubectl --context`. Missing
+identity, an unmatched URL (including an alternate endpoint), or ambiguous
+credentials require user clarification; context names are only hints. Each
+namespace the user works with gets a context named `<cluster>/<namespace>` with
+`context.namespace` explicitly set. Agents must use those contexts for kubectl
+and Skaffold `deploy.kubeContext`. Passmower endpoints include OIDC exec-plugin
+setup guidance using `default.kubelogin` and the configured OIDC issuer.
+Without ingress discovery or `DRIFTMOWER_CLUSTER_ID`, setup names fall back to the MCP public URL's
+host, but cluster identity remains explicitly unknown. These instructions guide
+agents; they do not enforce which context a separate local kubectl process uses.
+Drift analysis still uses the configured backend snapshots and their scope,
+which can differ from the live cluster exposed by discovery and observability.
+
+Set `ENGINEERING_ADVISORY_OVERRIDE_DIR=/etc/driftmower/advisory` to load
+administrator Markdown on top of the bundled defaults. Matching paths such as
+`deploying/networking.md` replace the whole bundled document. Other defaults stay
+available; new paths add sections. Each file must start with `# Title`; paths
+use lowercase letters, digits and hyphens separated by `/`. `index` is reserved.
+The index and advisory responses identify bundled versus overridden content.
+The landing page and MCP resources/tools all use the same effective documents.
+
+For example, create a ConfigMap from your own Markdown file:
+
+```bash
+kubectl --context YOUR_CONTEXT -n kube-system create configmap driftmower-advisory \
+  --from-file=networking.md=./networking.md
+```
+
+Merge these fields into the MCP Deployment (the ConfigMap key maps to the
+advisory's directory path):
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: driftmower-mcp
+          env:
+            - name: ENGINEERING_ADVISORY_OVERRIDE_DIR
+              value: /etc/driftmower/advisory
+          volumeMounts:
+            - name: advisory
+              mountPath: /etc/driftmower/advisory
+              readOnly: true
+      volumes:
+        - name: advisory
+          configMap:
+            name: driftmower-advisory
+            items:
+              - key: networking.md
+                path: deploying/networking.md
+```
+
+Mount overrides separately from the bundled content. Files are loaded once at
+startup; restart the Deployment after updating its ConfigMap. A configured but
+missing/unreadable directory, invalid document, or directory cycle fails startup
+rather than silently ignoring administrator policy. Only mount content intended
+for public reading: the root guidance page is unauthenticated.
+
 ## Requirements
 
 - Node.js 24 or compatible current LTS runtime
-- A reachable driftmower-be, and a service token it accepts
+- For drift analysis: a reachable driftmower-be, and a service token it accepts
+- For metrics/logs: Passmower OIDC, Kubernetes API access, and the RBAC below
 
 The backend must be recent enough to allow `id` and `status` in a `/reports`
 query and to allow `$select` of the workload and tag columns on
 `/image-usages` (driftmower-be #59 and #82). An older backend answers 400 to
-these queries; the readiness probe then reports not ready rather than the
-tools failing one call at a time.
+these queries; the affected tools report the backend error. Readiness checks
+only whether the local MCP listener has started, without querying dependencies.
 
 ## Install
 
@@ -35,6 +169,16 @@ npm install
 npm run build
 ```
 
+## Container publishing
+
+CI publishes to `ghcr.io/codemowers/driftmower-mcp` after checks pass.
+Pushes to `main` or `master` publish `:latest`; Git tag pushes publish the exact
+Git tag as the image tag (for example, `v1.2.3` becomes `:v1.2.3`) without
+changing `:latest`. Git tags must be valid Docker tags. Other branches run checks
+without publishing. The image records its Git commit in its OCI revision label
+and MCP handshake. This private application has no npm package version; the
+lockfile pins dependencies for reproducible container builds.
+
 ## Configuration
 
 Default configuration lives in `config/default.json` and can be overridden with
@@ -42,6 +186,7 @@ environment variables:
 
 ```bash
 DRIFTMOWER_BE_URL=http://driftmower-be:3030
+DRIFTMOWER_BE_ENABLED=true                  # false for metrics/logs without Driftmower
 DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_...
 DRIFTMOWER_BE_TIMEOUT_MS=15000
 DRIFTMOWER_MCP_TRANSPORT=stdio
@@ -63,9 +208,175 @@ MCP_AUTH_ENABLED=true                        # false only for a server no one ca
 DRIFTMOWER_UI_URL=http://driftmower-ui
 DRIFTMOWER_UI_TIMEOUT_MS=10000
 
-# Public URL of driftmower-ui; unset means `/` answers 404 instead of redirecting
+# Legacy UI public URL setting; the root now always serves the guidance document
 DRIFTMOWER_UI_PUBLIC_URL=https://driftmower-ui.ee-lte-1.codemowers.io
 ```
+
+## Metrics and logs
+
+`list_accessible_namespaces` discovers namespace names for the authenticated
+caller. It first submits a cluster-scoped SubjectAccessReview for `list` on core
+`namespaces`. If allowed, it lists all namespaces. Otherwise it scans namespaced
+RoleBindings for an exact `roleRef.name` match to `KUBERNETES_NAMESPACE_ROLE`
+(default `admin`) and a matching caller User or Group subject. Both Role and
+ClusterRole references are supported; ClusterRoleBindings are not used by this
+fallback. Subject matching uses the same verified OIDC username/group mapping
+as metrics and logs, not the namespace claim.
+
+The result contains only `namespaces`. This is discovery, not a grant of
+permissions: metrics/logs still check
+the caller's access for every operation. Inconclusive access reviews and API
+errors fail closed; empty matching bindings yield an empty list. The service
+account needs cluster-wide `list` permissions on `namespaces` and `rolebindings`,
+included in the RBAC manifest. Only matching namespace names are exposed.
+The Kubernetes client and this tool are always registered, independently of
+observability configuration or Driftmower services. Calls still require an
+authenticated caller.
+
+`explain_storage_class` has been removed. Use `list_storage_classes` for live
+settings and operator-authored descriptions, and `list_admission_policies` for
+admission behavior. `describe_cluster_capabilities` also reads Kubernetes directly. Only `list_offerings` and `describe_namespace_readiness` still use driftmower-ui.
+
+The same Kubernetes connection also exposes `list_storage_classes` and
+`list_admission_policies`. These tools list live names and the exact
+`metadata.annotations["kubernetes.io/description"]` value (`null` when absent).
+`list_storage_classes` also returns structured storage settings from the live
+StorageClass: `provisioner`, `filesystemType`, `parameters`, `reclaimPolicy`,
+`volumeBindingMode`, `allowVolumeExpansion`, `isDefault`, `mountOptions`, and
+`allowedTopologies`. Driver parameters preserve knobs such as ZFS `recordsize`,
+`compression`, `dedup`, and `poolname`. `filesystemType` is normalized from
+`csi.storage.k8s.io/fstype`, `fsType`, or `fstype`, in that order; it is `null`
+when unspecified. Descriptions are never parsed to infer storage settings or
+replica counts. The default-class flag reads the stable or legacy Kubernetes
+annotation. Expansion is enabled only when the API field is explicitly true.
+Absent parameter maps and option lists are empty, and unspecified provisioner,
+reclaim policy, and binding mode are `null`.
+
+Admission policies are returned as CSV with names, descriptions, kinds, target
+resource rules/selectors, binding restrictions and a conditional flag. Policy
+code, CEL expressions, variables, mutations and parameter objects are never
+returned. Targets identify candidate resources; conditions and parameters are
+not evaluated. Binding discovery distinguishes `none` from `unavailable`.
+Unsupported policy APIs are listed separately; failed reads remain errors.
+
+These catalogs are available to authenticated callers as cluster-wide capability
+metadata, without namespace claims or per-user access reviews. Only metrics and
+logs use the per-user RBAC checks below. The service account needs `list` on
+`storageclasses`, `validatingadmissionpolicies`, `mutatingadmissionpolicies`,
+`validatingadmissionpolicybindings`, and `mutatingadmissionpolicybindings`,
+as granted by the included RBAC manifest. Catalogs are always registered and do not require monitoring URLs or
+`OBSERVABILITY_ENABLED`. Kubernetes configuration lives in its own `kubernetes`
+section; API requests use `KUBERNETES_TIMEOUT_MS` (default 10000), independently
+of `OBSERVABILITY_TIMEOUT_MS`. Credentials are loaded when a tool is called.
+
+These tools require authenticated HTTP with Passmower OIDC. They work without
+driftmower-be, driftmower-ui, or a namespace ownership claim. Set
+`DRIFTMOWER_BE_ENABLED=false` and leave `DRIFTMOWER_UI_URL` and
+`DRIFTMOWER_UI_PUBLIC_URL` unset for an observability-only deployment; no backend
+service token is then required and readiness does not contact Driftmower.
+Existing drift-analysis and provisioning tools retain their existing auth and
+namespace-claim behavior.
+
+```bash
+DRIFTMOWER_MCP_TRANSPORT=http
+OIDC_ISSUER=https://auth.example/
+MCP_PUBLIC_URL=https://mcp.example
+DRIFTMOWER_BE_ENABLED=false
+
+# Service addresses verified in ee-lte-1, monitoring namespace:
+PROMETHEUS_URL=http://prometheus-operated.monitoring.svc.cluster.local:9090
+LOKI_URL=http://loki.monitoring.svc.cluster.local:3100
+
+# Optional; defaults shown:
+KUBERNETES_API_URL=https://kubernetes.default.svc
+KUBERNETES_TOKEN_FILE=/var/run/secrets/kubernetes.io/serviceaccount/token
+KUBERNETES_CA_FILE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+KUBERNETES_NAMESPACE_ROLE=admin
+KUBERNETES_TIMEOUT_MS=10000
+OBSERVABILITY_TIMEOUT_MS=10000
+```
+
+Setting either service URL enables observability. `query_metrics` is registered
+only when `PROMETHEUS_URL` is set. `query_logs` uses Loki when `LOKI_URL` is set;
+when it is unset, it reads pod logs through Kubernetes instead. A configured
+Loki failure is returned to the caller and never switches sources. Set
+`OBSERVABILITY_ENABLED=true` to enable Kubernetes-only logs when both URLs are
+unset. Loki in ee-lte-1 has `auth_enabled: false`, and Alloy supplies the
+`namespace`, `pod`, and `container` labels used by the queries.
+
+Every call requires a named namespace and a successful Kubernetes
+[SubjectAccessReview](https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access):
+
+| Tool | Permission reviewed for the authenticated caller |
+| --- | --- |
+| `query_metrics` | `list` core `pods` in the requested namespace |
+| `query_logs` (either source) | `get` core `pods/log` for the named pod in the requested namespace |
+
+These permissions are the gateway's policy for accessing namespace-labelled
+metrics and pod logs. Kubernetes does not authorize PromQL/LogQL itself.
+Namespace claims do not grant or bypass access to these tools. Users need
+namespace RoleBindings granting the permissions above; cluster-wide readers and
+admins can query any namespace their RBAC permits, but still name one per call.
+Missing identity, denied/inconclusive reviews, and API failures fail closed.
+
+The service account in [observability-rbac.yaml](manifests/templates/observability-rbac.yaml)
+can list capability catalogs, create access reviews and get pod logs. It cannot impersonate users, read
+secrets, or modify workloads. Skaffold renders `manifests/` as a Helm chart and
+applies it with kubectl; it does not install a Helm release. The selected namespace
+(`--namespace` or the kubeconfig context namespace) is used for every app resource
+and the ClusterRoleBinding's service-account subject. No app namespace is baked
+into the templates. The service-account
+log permission enables the Kubernetes source; the caller's access is checked
+before each read. A Loki-only installation can remove that log permission.
+This manifest grants the server its permissions, not users theirs.
+
+Reviews use the verified Passmower `sub` and `groups`, with the default
+Kubernetes OIDC username mapping `${OIDC_ISSUER}#${sub}` and unprefixed groups.
+This matches the ee-lte-1 bootstrap configuration (`oidc-groups-claim=groups`,
+default `sub` username claim). Set `KUBERNETES_USERNAME_PREFIX` and
+`KUBERNETES_GROUPS_PREFIX` to match a cluster with different prefixes;
+`KUBERNETES_USERNAME_PREFIX=-` explicitly disables the username prefix.
+The cluster must use the `sub` username claim. The MCP bearer token is verified
+for the MCP audience; it is never forwarded to the Kubernetes API, Prometheus,
+or Loki. The server uses its own mounted token and CA for reviews and log reads,
+and reloads the token for rotation.
+
+Example tool arguments:
+
+```json
+{
+  "namespace": "my-team",
+  "metric": "container_cpu_usage_seconds_total",
+  "operation": "rate",
+  "windowSeconds": 300,
+  "aggregate": "sum",
+  "groupBy": ["pod"],
+  "start": "2026-09-25T10:00:00Z",
+  "end": "2026-09-25T11:00:00Z",
+  "stepSeconds": 60
+}
+```
+
+```json
+{"namespace":"my-team","pod":"api-7b8c9d","container":"api","contains":"error","limit":100}
+```
+
+Metrics support an exact metric name and exact `labels`, optional `rate` or
+`increase`, and `sum`, `avg`, `min`, `max`, or `count` aggregation. Without
+start/end the query is instantaneous. Every selector includes an immutable
+namespace matcher; aggregates retain that label. Arbitrary PromQL/LogQL is not
+accepted, so expressions cannot introduce an unscoped selector. The underlying
+metrics must have a trustworthy `namespace` label. Results outside the requested
+scope are rejected.
+
+Logs default to the past hour, newest first. The Kubernetes source returns only
+retained logs from the current container instance, capped at the latest requested
+lines and 1 MiB before time/text filtering. Historical queries can be incomplete;
+deleted pods and archived logs require Loki. Specify a container for pods with
+multiple containers. Both tools cap ranges at seven days, limits at 1,000, and
+upstream responses at 4 MiB. Prometheus ranges allow at most 11,000 step intervals.
+
+## Authentication configuration
 
 `MCP_AUDIENCE` must **not** equal driftmower-be's `OIDC_AUDIENCE`
 (`https://driftmower-api`). Strict audience checking is what stops an ordinary
@@ -108,16 +419,33 @@ DRIFTMOWER_MCP_TRANSPORT=http DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
 HTTP mode exposes:
 
 - MCP endpoint: `http://127.0.0.1:3000/mcp`
-- Landing redirect: `GET /` answers `302` to `DRIFTMOWER_UI_PUBLIC_URL` when it is
-  set, so a person who opens this server's hostname in a browser lands in
-  driftmower-ui instead of on a JSON 404
+- Public guidance document: `GET /` renders usage instructions, a Zen of Kubernetes,
+  and all bundled engineering advisory Markdown in one page. Advisory references
+  jump to sections within the document.
+  `HEAD /` returns the same headers without a body. MCP authentication still applies
+  to `/mcp`; viewing the guidance requires no sign-in.
 - Protected-resource metadata (RFC 9728, unauthenticated):
   `http://127.0.0.1:3000/.well-known/oauth-protected-resource/mcp`
 - Liveness: `http://127.0.0.1:3001/healthz`
 - Readiness: `http://127.0.0.1:3001/readyz`
 - Startup: `http://127.0.0.1:3001/startupz`
+- Prometheus metrics: `http://127.0.0.1:3001/metrics`
 
 Port 3000 is published through the Ingress; port 3001 stays cluster-internal.
+Readiness and startup return 503 until the MCP listener has started; they never
+query backing services. Unexpected startup failures close the health listener
+and exit nonzero. SIGTERM marks the application unready, stops new connections,
+drains requests for up to 20 seconds, then closes remaining streams. A 25-second
+process deadline fits within the 30-second container termination grace period.
+
+Metrics report HTTP request counts, open requests/streams, latency (including
+stream lifetime), response bytes, declared request sizes when Content-Length is
+present, and initialized MCP sessions. Route and method labels use bounded
+allowlists; URLs, credentials, namespaces and user identities are not labels.
+The chart creates a PodMonitor when the `monitoring.coreos.com/v1/PodMonitor`
+API is available. Scrape path, interval, timeout and scheme are left to operator
+defaults or cluster admission policies. For offline Helm rendering, pass
+`--api-versions monitoring.coreos.com/v1/PodMonitor` to include it.
 
 ## Local Codex MCP Registration
 
@@ -202,7 +530,13 @@ curl http://127.0.0.1:3001/readyz
 ## Kubernetes Deployment
 
 Kubernetes manifests live in `manifests/`. They deploy the MCP server in HTTP
-mode as an internal `ClusterIP` service in the `driftmowers` namespace.
+mode as an internal `ClusterIP` service in the selected release namespace.
+Namespaces must already exist and remain outside application release ownership.
+The former `manifests/namespace.yaml` was removed after checking ee-west-1's
+`driftmowers` namespace: no Helm, Argo CD, Flux or Skaffold tracking metadata,
+no Helm release in the namespace, and no Argo CD Namespace inventory entry.
+The live namespace was not changed or deleted. For other clusters, inspect
+ownership and release inventories before migrating an existing declaration.
 
 The deployment reads from driftmower-be over the cluster network, so it needs
 no volume, no pod affinity and no particular node. The in-cluster HTTP server
@@ -212,7 +546,7 @@ The pod reads its service token from the Secret `driftmower-mcp-be-auth-token`
 (key `token`), which no manifest creates: a credential does not belong in the
 repository. Mint one and register it with driftmower-be before the first
 apply — the deployment stays in `CreateContainerConfigError` until the Secret
-exists, and the pod never becomes ready until the backend accepts the token.
+exists. Backend authentication errors surface when drift tools are called.
 
 ```bash
 # The raw token is what this server sends; driftmower-be only ever holds its
@@ -226,12 +560,10 @@ kubectl create secret generic driftmower-mcp-be-auth-token \
   --from-literal=token="$DRIFTMOWER_MCP_TOKEN"
 ```
 
-Apply manually:
+Deploy to an existing namespace selected by Skaffold:
 
 ```bash
-kubectl apply -f manifests/namespace.yaml
-kubectl apply -f manifests/deployment-app.yaml
-kubectl apply -f manifests/service.yaml
+skaffold run --namespace kube-system
 ```
 
 Forward the in-cluster MCP and health endpoints to your local machine:
@@ -243,8 +575,8 @@ kubectl -n driftmowers port-forward deploy/driftmower-mcp 3000:3000 3001:3001
 After forwarding, Codex can use `http://127.0.0.1:3000/mcp` and readiness is
 available at `http://127.0.0.1:3001/readyz`.
 
-The Ingress, its certificate and the OIDC client are in `manifests/ingress.yaml`,
-`manifests/certificate.yaml` and `manifests/oidcclient.yaml`. See
+The Ingress, its certificate and the OIDC client are in `manifests/templates/ingress.yaml`,
+`manifests/templates/certificate.yaml` and `manifests/templates/oidcclient.yaml`. See
 **Authentication** below before changing any of them.
 
 ## Skaffold Quickstart
@@ -261,9 +593,42 @@ For iterative development:
 skaffold dev --port-forward
 ```
 
-The Skaffold config builds `git.codemowers.io/uq69adc8851/driftmower-mcp`,
-deploys the raw manifests, and port-forwards the MCP endpoint to
-`localhost:3000` and health endpoints to `localhost:3001`.
+The Skaffold artifact is named `driftmower-mcp`. Configure the registry used
+for each Kubernetes context once:
+
+```bash
+skaffold config set default-repo zot.ee-lte-1.codemowers.io/codemowers \
+  --kube-context admin@ee-lte-1.codemowers.io
+skaffold config set default-repo git.codemowers.io/laurivosandi \
+  --kube-context admin@ee-west-1.codemowers.io
+```
+
+These settings are stored in `~/.skaffold/config` under `kubeContexts`:
+
+```yaml
+kubeContexts:
+  - kube-context: admin@ee-lte-1.codemowers.io
+    default-repo: zot.ee-lte-1.codemowers.io/codemowers
+  - kube-context: admin@ee-west-1.codemowers.io
+    default-repo: git.codemowers.io/laurivosandi
+```
+
+Skaffold uses the selected kubeconfig context, or an explicit `--kube-context`,
+to expand the artifact into that context's repository. It renders the Helm chart
+with the built image reference and port-forwards MCP to `localhost:3000` and
+health endpoints to `localhost:3001`. For example:
+
+```bash
+skaffold dev --kube-context admin@ee-lte-1.codemowers.io --namespace kube-system --port-forward
+```
+
+Direct Helm deployments default to `ghcr.io/codemowers/driftmower-mcp:latest`.
+GitHub Actions publishes that production image after unit and Compose smoke
+tests pass. Skaffold development builds use the configured context repository.
+
+The chart's optional `cluster.id` and `cluster.apiUrl` values supply fallback
+identity when runtime cluster discovery is unavailable; leave them empty to
+rely on discovery.
 
 
 ## Authentication
@@ -306,7 +671,7 @@ claude mcp add --transport http driftmower \
 **The token expires in about an hour.** passmower issues no longer-lived access
 token, so this is for trying it out, not for a client you intend to keep.
 
-**Durable — OAuth with PKCE.** `manifests/oidcclient.yaml` registers a public
+**Durable — OAuth with PKCE.** `manifests/templates/oidcclient.yaml` registers a public
 `driftmower-mcp` client. A client that lets you supply a client id does PKCE and
 refreshes itself:
 
@@ -454,22 +819,33 @@ the caller's responsibility.
 
 ## Provisioning Tools
 
-These answer "what can I deploy here, and what will bite me". They are a façade
-over driftmower-ui's capability layer (`lib/features/provisioning/`), which owns
-the Kubernetes reads and the RBAC behind them; this server holds no cluster
-credentials of its own. They are registered only when `DRIFTMOWER_UI_URL` is set —
-an unconfigured deployment advertises no provisioning tools rather than tools
-that always fail.
-
-Each returns prose rather than a one-line summary: these answer questions a
-beginner asks, so the text block is several short paragraphs.
+`describe_cluster_capabilities` reads Kubernetes directly and is registered independently
+of `DRIFTMOWER_UI_URL` and observability. `list_offerings` and
+`describe_namespace_readiness` still use driftmower-ui and require `DRIFTMOWER_UI_URL`.
 
 ### `describe_cluster_capabilities`
 
-Storage classes and what each implies, zones and schedulable nodes, priority
-classes, the network-policy engine, per-operator readiness, the ingress domain
-and TLS advice, and the ValidatingAdmissionPolicies that override RBAC. No
-arguments.
+No arguments. Requires an authenticated caller, like the shared cluster catalogs.
+Returns CSV catalogs: CRD names and descriptions, issuer names and descriptions,
+ingress classes and priority classes. No schemas, resource status, readiness or
+duplicate API-family inventories are included. Missing optional catalogs are
+marked unavailable, with discovery errors reported separately. CRD read failures
+fail the tool. Use `get_cluster_identity` for connection identity.
+
+Use the live issuer descriptions to choose an issuer. CRD presence does not
+establish operator health or caller permission. These tools read no tenant
+instances or Secrets.
+
+### `describe_custom_resource_definition`
+
+Accepts `name`, the full CRD name from the capability catalog (for example
+`clusters.postgresql.cnpg.io`). Returns structured JSON containing its name,
+description, group, kind, resource, scope and served-version schemas. Status
+properties, status requirements, controller metadata and CEL validation code
+are omitted. This is a provisioning schema, not an unmodified CRD export.
+
+Both tools require an authenticated caller and use the existing CRD list
+permission. The detail query selects only the requested CRD by name.
 
 ### `list_offerings`
 
@@ -487,13 +863,6 @@ ready, with no error pointing at the cause.
 
 Namespaces you cannot access come back in `withheld` rather than erroring.
 
-### `explain_storage_class`
-
-Takes `name`. One class in plain language: local to a machine? does a volume pin
-its pod to a node? can it grow? does the data survive deleting the instance? On
-node-local storage it says so plainly, because "3 replicas" there is not the
-high availability the number suggests.
-
 ### Facts that could not be read
 
 A fact the capability layer could not read arrives as a `degraded` entry and is
@@ -503,11 +872,39 @@ this layer exists to prevent.
 
 ## Development
 
+Prefer Docker Compose or Skaffold for development, builds and tests. Do not
+install host components for a coding agent. Dependency manifests and lockfiles
+can be edited directly, including lockfile-only package-manager commands.
+
 ```bash
-npm run format
-npm run typecheck
-npm run build
-npm test
+docker compose up --build -d
+docker compose run --build --rm test
+docker compose down
+```
+
+Compose runs a hot-reloading MCP service and a separate fixture-backed HTTP
+service named `driftmower-be`. Ports 3000 and 3001 bind only to localhost;
+authentication is disabled only for this local setup. The fixture token is
+public test data. This setup exercises MCP, HTTP backend integration, and metrics;
+it does not simulate production OIDC, Kubernetes authorization, or operators.
+Use real configured dependencies to validate those integrations.
+
+The development image uses the same pinned Node version and lockfile as
+production. Source and test bind mounts enable hot reload and container-based
+checks; dependencies remain in the image. Rebuild after changing the lockfile.
+Set `LOCAL_UID` and `LOCAL_GID` if your host identity differs from 1000.
+The test service runs typecheck, lint, build, all tests, and an MCP smoke test
+against the Compose services. For checks without starting dependencies:
+
+```bash
+docker compose run --build --rm --no-deps test npm test
+```
+
+```bash
+docker compose run --rm --no-deps test npm run format
+docker compose run --rm --no-deps test npm run typecheck
+docker compose run --rm --no-deps test npm run build
+docker compose run --rm --no-deps test npm test
 ```
 
 The test suite includes repository tests, service tests, MCP transport tests, and

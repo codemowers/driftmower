@@ -1,0 +1,7 @@
+# Production image; Skaffold overrides this with its built artifact.
+image: ghcr.io/codemowers/driftmower-mcp:latest
+
+# Optional explicit cluster identity. Leave empty to use runtime discovery.
+cluster:
+  id: ""
+  apiUrl: ""

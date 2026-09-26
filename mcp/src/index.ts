@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { setTimeout, clearTimeout } from 'node:timers'
+
+import { loadEngineeringAdvisories } from './advisory/software-engineering.js'
+
 import { createBearerAuthenticator } from './auth/bearer.js'
 import { DriftmowerBackendClient } from './backend/client.js'
 import { BackendImageUpdateRepository } from './backend/image-update-repository.js'
@@ -7,7 +11,10 @@ import { BackendReportSnapshotRepository } from './backend/report-snapshot-repos
 import { ReportRowLoader } from './backend/report-rows.js'
 import { BackendWorkloadRepository } from './backend/workload-repository.js'
 import { createDriftmowerUiClient } from './clients/driftmower-ui.js'
+import { discoverClusterIdentity } from './services/cluster-identity.js'
 import { loadAppConfig, type AppConfig } from './config.js'
+import { closeHttpServer } from './http/shutdown.js'
+import { ApplicationMetrics } from './http/metrics.js'
 import { startHealthServer } from './http/health.js'
 import { createLogger, type Logger } from './logger.js'
 import { createMcpServer } from './mcp/create-server.js'
@@ -15,47 +22,51 @@ import { MCP_PATH, startHttpTransport } from './mcp/transports/http.js'
 import { startStdioTransport } from './mcp/transports/stdio.js'
 import { ImageUpdatePlanningService } from './services/image-update-planning-service.js'
 import { ProvisioningService } from './services/provisioning-service.js'
+import { createKubernetesServices } from './services/kubernetes-services.js'
 import { WorkloadSearchService } from './services/workload-search-service.js'
 
 async function main(): Promise<void> {
   const appConfig = loadAppConfig()
+  const advisories = loadEngineeringAdvisories(appConfig.advisoryOverrideDirectory)
   const logger = createLogger(appConfig.logLevel)
-  const client = new DriftmowerBackendClient({
-    baseUrl: appConfig.backendUrl,
-    serviceToken: appConfig.backendServiceToken,
-    timeoutMs: appConfig.backendTimeoutMs
-  })
+  const client =
+    appConfig.backendEnabled === false
+      ? undefined
+      : new DriftmowerBackendClient({
+          baseUrl: appConfig.backendUrl,
+          serviceToken: appConfig.backendServiceToken,
+          timeoutMs: appConfig.backendTimeoutMs
+        })
+  let ready = false
+  const metrics = new ApplicationMetrics()
   const healthServer =
     appConfig.transport === 'http'
       ? await startHealthServer({
           host: appConfig.host,
           port: appConfig.healthPort,
-          client
+          isReady: () => ready,
+          metrics
         })
       : undefined
 
   try {
-    const rowLoader = new ReportRowLoader(client)
-    const reportSnapshotRepository = new BackendReportSnapshotRepository(client)
-    const repository = new BackendWorkloadRepository(rowLoader, reportSnapshotRepository)
-    const workloadSearchService = new WorkloadSearchService(
-      repository,
-      appConfig.defaultLimit,
-      appConfig.maximumLimit
-    )
-    const imageUpdateRepository = new BackendImageUpdateRepository(rowLoader)
-    const imageUpdatePlanningService = new ImageUpdatePlanningService(
-      imageUpdateRepository,
-      reportSnapshotRepository,
-      appConfig.defaultLimit,
-      appConfig.maximumLimit
-    )
+    const driftmower = client ? createDriftmowerServices(client, appConfig) : {}
     const provisioningService = createProvisioningService(appConfig, logger)
+    const kubernetesServices = createKubernetesServices(appConfig.kubernetes, appConfig.observability)
+
+    appConfig.cluster = await discoverClusterIdentity(
+      appConfig.cluster,
+      kubernetesServices.kubeloginIngress,
+      message => logger.warn(message),
+      appConfig.oidc?.issuer
+    )
     const createServer = (): ReturnType<typeof createMcpServer> =>
       createMcpServer({
-        workloadSearchService,
-        imageUpdatePlanningService,
+        ...driftmower,
+        cluster: appConfig.cluster,
+        advisories,
         provisioningService,
+        ...kubernetesServices,
         audit: line => logger.info(line)
       })
 
@@ -64,6 +75,7 @@ async function main(): Promise<void> {
 
       await startStdioTransport(mcpServer)
       logger.info('Driftmower MCP server started', { transport: 'stdio' })
+      registerShutdown(() => mcpServer.close())
 
       return
     }
@@ -90,8 +102,11 @@ async function main(): Promise<void> {
     const httpServer = await startHttpTransport(createServer, {
       host: appConfig.host,
       port: appConfig.port,
+      metrics,
       authenticator,
-      landingRedirectUrl: appConfig.uiPublicUrl ?? undefined,
+      cluster: appConfig.cluster,
+      advisories,
+      oauthClientId: appConfig.oauthClientId,
       onError: error => logger.error(errorMessage(error)),
       onAudit: entry =>
         entry.event === 'rejected'
@@ -106,31 +121,47 @@ async function main(): Promise<void> {
       healthPort: appConfig.healthPort,
       authenticated: Boolean(authenticator),
       provisioning: Boolean(provisioningService),
-      landingRedirect: appConfig.uiPublicUrl
+      observability: Boolean(kubernetesServices.observability),
+      landingPath: '/'
     })
 
+    ready = true
     registerShutdown(async () => {
+      ready = false
       await Promise.all([
-        closeServer(httpServer),
-        healthServer ? closeServer(healthServer) : Promise.resolve()
+        closeHttpServer(httpServer),
+        healthServer ? closeHttpServer(healthServer) : Promise.resolve()
       ])
     })
-  } catch (error) {
-    if (!healthServer) {
-      throw error
-    }
+  } finally {
+    // A failed startup must release the probe listener and fail the process.
+    if (!ready && healthServer) await closeHttpServer(healthServer)
+  }
+}
 
-    logger.error(errorMessage(error))
-    logger.warn('Health server remains available while MCP startup is not ready', {
-      healthPort: appConfig.healthPort
-    })
-    registerShutdown(() => closeServer(healthServer))
+function createDriftmowerServices(client: DriftmowerBackendClient, appConfig: AppConfig) {
+  const rowLoader = new ReportRowLoader(client)
+  const reportSnapshotRepository = new BackendReportSnapshotRepository(client)
+  const repository = new BackendWorkloadRepository(rowLoader, reportSnapshotRepository)
+
+  return {
+    workloadSearchService: new WorkloadSearchService(
+      repository,
+      appConfig.defaultLimit,
+      appConfig.maximumLimit
+    ),
+    imageUpdatePlanningService: new ImageUpdatePlanningService(
+      new BackendImageUpdateRepository(rowLoader),
+      reportSnapshotRepository,
+      appConfig.defaultLimit,
+      appConfig.maximumLimit
+    )
   }
 }
 
 main().catch((error: unknown) => {
   createLogger().error(errorMessage(error))
-  process.exitCode = 1
+  process.exit(1)
 })
 
 function createProvisioningService(appConfig: AppConfig, logger: Logger): ProvisioningService | undefined {
@@ -148,12 +179,6 @@ function createProvisioningService(appConfig: AppConfig, logger: Logger): Provis
   )
 }
 
-function closeServer(server: import('node:http').Server): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close(error => (error ? reject(error) : resolve()))
-  })
-}
-
 function registerShutdown(close: () => Promise<void>): void {
   let closing = false
 
@@ -163,7 +188,15 @@ function registerShutdown(close: () => Promise<void>): void {
     }
 
     closing = true
-    void close().catch((error: unknown) => createLogger().error(errorMessage(error)))
+    const deadline = setTimeout(() => {
+      createLogger().error('Shutdown exceeded 25 seconds')
+      process.exit(1)
+    }, 25_000)
+
+    void close().then(() => {
+      clearTimeout(deadline)
+      process.exit(0)
+    })
   }
 
   process.once('SIGINT', handleSignal)

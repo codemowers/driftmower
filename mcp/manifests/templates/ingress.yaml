@@ -5,12 +5,12 @@
 # tools need for tenancy scoping.
 #
 # Port 3000 only. The health port (3001) stays cluster-internal: its readiness
-# probe reports database and schema state, which is nobody's business outside.
+# endpoint exposes process readiness and application metrics.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: driftmower-mcp
-  namespace: driftmowers
+  namespace: {{ .Release.Namespace | quote }}
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
@@ -18,7 +18,7 @@ spec:
   tls:
     - secretName: driftmower-mcp-tls
   rules:
-    - host: driftmower-mcp.ee-lte-1.codemowers.io
+    - host: driftmower-mcp
       http:
         paths:
           # One rule covers both /mcp and the RFC 9728 metadata documents under

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: driftmower-mcp
-  namespace: driftmowers
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     app: driftmower-mcp
 spec:
@@ -15,13 +15,17 @@ spec:
       labels:
         app: driftmower-mcp
     spec:
+      serviceAccountName: driftmower-mcp
+      terminationGracePeriodSeconds: 30
       # No pod affinity and no volume: the analysis is read from driftmower-be
       # over the cluster network, so this pod can run anywhere.
       imagePullSecrets:
         - name: sergii-gitea-registry-secret
       containers:
         - name: driftmower-mcp
-          image: git.codemowers.io/uq69adc8851/driftmower-mcp:latest
+          image: {{ .Values.image | quote }}
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 3000
               name: mcp
@@ -32,10 +36,27 @@ spec:
               value: 'production'
             - name: NODE_CONFIG_ENV
               value: 'default'
+            {{- with .Values.cluster.id }}
+            - name: DRIFTMOWER_CLUSTER_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.cluster.apiUrl }}
+            - name: KUBERNETES_PUBLIC_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MCP_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-mcp-owner-secrets
+                  key: OIDC_CLIENT_ID
             - name: DRIFTMOWER_MCP_TRANSPORT
               value: 'http'
             - name: DRIFTMOWER_BE_URL
               value: 'http://driftmower-be:3030'
+            - name: PROMETHEUS_URL
+              value: 'http://prometheus-operated.monitoring.svc.cluster.local:9090'
+            - name: LOKI_URL
+              value: 'http://loki.monitoring.svc.cluster.local:3100'
             # A token driftmower-be lists in auth.serviceTokens. It
             # authenticates as a service principal, which the backend exempts
             # from its own tenancy scoping; this server scopes what it returns.
@@ -44,21 +65,15 @@ spec:
                 secretKeyRef:
                   name: driftmower-mcp-be-auth-token
                   key: token
-            - name: DRIFTMOWER_MCP_HOST
-              value: '::'
-            - name: DRIFTMOWER_MCP_PORT
-              value: '3000'
-            - name: DRIFTMOWER_MCP_HEALTH_PORT
-              value: '3001'
-            - name: DRIFTMOWER_MCP_DEFAULT_LIMIT
-              value: '20'
-            - name: DRIFTMOWER_MCP_MAX_LIMIT
-              value: '100'
+            # Requires Passmower 2.7.0 or later to export OIDC_CLIENT_ORIGIN.
             # Public URL of this server. Used to build the RFC 9728 resource
             # identifier and the resource_metadata pointer on every 401, which
             # is how an OAuth-capable MCP client discovers the flow.
             - name: MCP_PUBLIC_URL
-              value: 'https://driftmower-mcp.ee-lte-1.codemowers.io'
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-driftmower-mcp-owner-secrets
+                  key: OIDC_CLIENT_ORIGIN
             # MCP_AUDIENCE is deliberately unset. The server then verifies
             # `aud` against the `resource` it advertises -- MCP_PUBLIC_URL +
             # /mcp -- which is the only indicator a conformant client can end
@@ -68,37 +83,29 @@ spec:
             # server.
             # passmower's public URL, matched against the token `iss` claim.
             # JWKS is fetched from ${OIDC_ISSUER}/jwks unless OIDC_JWKS_URI is
-            # set. Same secret and key driftmower-be reads.
+            # set. Read the issuer from this application's owner Secret.
             - name: OIDC_ISSUER
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-driftmower-ui-owner-secrets
+                  name: oidc-client-driftmower-mcp-owner-secrets
                   key: OIDC_IDP_URI
             # Cluster-internal base URL of driftmower-ui, which owns the
-            # provisioning capability layer and the RBAC behind it. Unset means
-            # the provisioning tools are not registered at all.
+            # remaining offering/readiness tools. Cluster capabilities read Kubernetes directly.
             - name: DRIFTMOWER_UI_URL
               value: 'http://driftmower-ui'
             # Public URL of driftmower-ui. A person who opens this server's own
             # hostname in a browser gets bounced there instead of a JSON 404.
             - name: DRIFTMOWER_UI_PUBLIC_URL
-              value: 'https://driftmower-ui.ee-lte-1.codemowers.io'
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: health
-          # Readiness and startup make a live call to driftmower-be, which the
-          # server bounds at 3s; the probe has to outlast that.
+              value: 'https://driftmower-ui.codemowers.io'
+          # Probes report local MCP readiness without contacting dependencies.
           readinessProbe:
             httpGet:
               path: /readyz
               port: health
-            timeoutSeconds: 5
           startupProbe:
             httpGet:
               path: /startupz
               port: health
-            timeoutSeconds: 5
             failureThreshold: 30
             periodSeconds: 2
           resources:
@@ -109,6 +116,8 @@ spec:
               memory: '512Mi'
               cpu: '500m'
       securityContext:
+        seccompProfile:
+          type: RuntimeDefault
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000

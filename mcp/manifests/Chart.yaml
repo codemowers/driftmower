@@ -1,0 +1,5 @@
+apiVersion: v2
+name: driftmower-mcp
+version: 0.1.0
+type: application
+description: Driftmower MCP manifests rendered by Skaffold

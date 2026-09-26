@@ -1,5 +1,6 @@
 import config from 'config'
 import { Command } from 'commander'
+import { clusterIdentity, type ClusterIdentity } from './domain/cluster-identity.js'
 
 const TRANSPORTS = ['stdio', 'http'] as const
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
@@ -19,6 +20,7 @@ export interface ProvisioningConfig {
 }
 
 export interface AppConfig {
+  backendEnabled?: boolean
   backendUrl: string
   backendServiceToken: string
   backendTimeoutMs: number
@@ -30,6 +32,9 @@ export interface AppConfig {
   maximumLimit: number
   logLevel: 'debug' | 'info' | 'warn' | 'error'
   publicUrl: string
+  cluster: ClusterIdentity
+  advisoryOverrideDirectory: string | null
+  oauthClientId: string | null
   // Public URL of driftmower-ui, used to bounce a browser that lands on `/`
   // over to the UI. Null means `/` stays a 404. This is deliberately separate
   // from `provisioning.driftmowerUiUrl`, which is the cluster-internal Service
@@ -45,6 +50,24 @@ export interface AppConfig {
   // provisioning tools are not registered at all, which is a clearer failure
   // than registering tools that always error.
   provisioning: ProvisioningConfig | null
+  kubernetes: KubernetesConfig
+  observability?: ObservabilityConfig | null
+}
+
+export interface ObservabilityConfig {
+  prometheusUrl: string | null
+  lokiUrl: string | null
+  requestTimeoutMs: number
+}
+
+export interface KubernetesConfig {
+  namespaceRole: string
+  url: string
+  tokenFile: string
+  caFile: string
+  usernamePrefix: string
+  groupsPrefix: string
+  requestTimeoutMs: number
 }
 
 interface ConfigSource {
@@ -150,12 +173,37 @@ export function loadAppConfig(
   const transport = readEnum(source.get<string>('mcp.transport'), 'transport', TRANSPORTS)
   const authEnabled = readBoolean(source.get<unknown>('mcp.authEnabled'), true)
   const port = readInteger(source.get<number>('mcp.port'), 'port', 65_535)
+  const backendEnabled = readBoolean(source.get<unknown>('backend.enabled'), true)
+  const publicUrl =
+    readOptionalUrl(source.get<unknown>('mcp.publicUrl'), 'MCP_PUBLIC_URL') ?? `http://127.0.0.1:${port}`
+
+  validateServiceUrl(publicUrl)
+
+  const id = readOptionalString(source.get<unknown>('cluster.id'))
+  const apiUrl = readOptionalUrl(source.get<unknown>('cluster.apiUrl'), 'KUBERNETES_PUBLIC_API_URL')
+
+  if (id && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(id)) {
+    throw new Error(
+      'DRIFTMOWER_CLUSTER_ID must be a lowercase DNS-style cluster identifier, including the provider domain'
+    )
+  }
+
+  if (apiUrl) {
+    validateServiceUrl(apiUrl)
+
+    if (new URL(apiUrl).protocol !== 'https:') throw new Error('KUBERNETES_PUBLIC_API_URL must use HTTPS')
+  }
+
+  const oidc = transport === 'http' && authEnabled ? readOidcConfig(source) : null
 
   return {
+    backendEnabled,
     backendUrl: readUrl(cli.backendUrl ?? source.get<string>('backend.url'), 'backendUrl'),
     // The backend rejects an unauthenticated read, so an empty token is a
     // misconfiguration worth failing on at startup rather than on first tool call.
-    backendServiceToken: readString(source.get<string>('backend.serviceToken'), 'backendServiceToken'),
+    backendServiceToken: backendEnabled
+      ? readString(source.get<string>('backend.serviceToken'), 'backendServiceToken')
+      : '',
     backendTimeoutMs: readInteger(source.get<number>('backend.timeoutMs'), 'backendTimeoutMs'),
     transport,
     // Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
@@ -168,11 +216,73 @@ export function loadAppConfig(
     defaultLimit,
     maximumLimit,
     logLevel: readEnum(source.get<string>('mcp.logLevel'), 'logLevel', LOG_LEVELS),
-    publicUrl: readOptionalString(source.get<string>('mcp.publicUrl')) ?? `http://127.0.0.1:${port}`,
+    publicUrl,
+    cluster: clusterIdentity(id, apiUrl, publicUrl),
+    advisoryOverrideDirectory: readOptionalString(source.get<unknown>('advisory.overrideDirectory')),
+    oauthClientId: readOptionalString(source.get<unknown>('mcp.oauthClientId')),
     uiPublicUrl: readOptionalUrl(source.get<string>('mcp.uiPublicUrl'), 'uiPublicUrl'),
     authEnabled,
-    oidc: transport === 'http' && authEnabled ? readOidcConfig(source) : null,
-    provisioning: readProvisioningConfig(source)
+    oidc,
+    provisioning: readProvisioningConfig(source),
+    kubernetes: readKubernetesConfig(source, oidc),
+    observability: readObservabilityConfig(source, oidc)
+  }
+}
+
+function readObservabilityConfig(source: ConfigSource, oidc: OidcConfig | null): ObservabilityConfig | null {
+  const prometheusUrl = readOptionalUrl(source.get<unknown>('observability.prometheusUrl'), 'PROMETHEUS_URL')
+  const lokiUrl = readOptionalUrl(source.get<unknown>('observability.lokiUrl'), 'LOKI_URL')
+
+  if (!prometheusUrl && !lokiUrl && !readBoolean(source.get<unknown>('observability.enabled'), false))
+    return null
+
+  if (!oidc) throw new Error('Observability tools require authenticated HTTP transport and OIDC_ISSUER')
+
+  for (const url of [prometheusUrl, lokiUrl]) {
+    if (url) validateServiceUrl(url)
+  }
+
+  return {
+    prometheusUrl,
+    lokiUrl,
+    requestTimeoutMs: readInteger(
+      source.get<unknown>('observability.requestTimeoutMs'),
+      'OBSERVABILITY_TIMEOUT_MS'
+    )
+  }
+}
+
+function validateServiceUrl(url: string): void {
+  const parsed = new URL(url)
+
+  if (
+    !['http:', 'https:'].includes(parsed.protocol) ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error('Service URLs must use HTTP(S) without credentials, query strings or fragments')
+  }
+}
+
+function readKubernetesConfig(source: ConfigSource, oidc: OidcConfig | null): KubernetesConfig {
+  const url = readUrl(source.get<unknown>('kubernetes.url'), 'KUBERNETES_API_URL')
+
+  validateServiceUrl(url)
+
+  if (new URL(url).protocol !== 'https:') throw new Error('KUBERNETES_API_URL must use HTTPS')
+
+  const prefix = readOptionalString(source.get<unknown>('kubernetes.usernamePrefix'))
+
+  return {
+    url,
+    tokenFile: readString(source.get<unknown>('kubernetes.tokenFile'), 'KUBERNETES_TOKEN_FILE'),
+    caFile: readString(source.get<unknown>('kubernetes.caFile'), 'KUBERNETES_CA_FILE'),
+    usernamePrefix: prefix === '-' ? '' : (prefix ?? (oidc ? `${oidc.issuer}#` : '')),
+    groupsPrefix: readOptionalString(source.get<unknown>('kubernetes.groupsPrefix')) ?? '',
+    namespaceRole: readOptionalString(source.get<unknown>('kubernetes.namespaceRole')) ?? 'admin',
+    requestTimeoutMs: readInteger(source.get<unknown>('kubernetes.requestTimeoutMs'), 'KUBERNETES_TIMEOUT_MS')
   }
 }
 

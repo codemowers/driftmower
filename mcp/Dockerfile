@@ -1,34 +1,37 @@
-FROM node:24.12.0-alpine AS builder
+FROM node:24.12.0-alpine AS development
 
 WORKDIR /app
 
-COPY package*.json ./
-COPY tsconfig*.json ./
+COPY package.json package-lock.json ./
+COPY tsconfig.json tsconfig.build.json ./
 
 RUN npm ci
 
 COPY src ./src
+COPY config/default.json config/custom-environment-variables.json ./config/
 
+CMD ["node", "--import", "tsx", "--watch", "src/index.ts"]
+
+FROM development AS builder
 RUN npm run build
 
 FROM node:24.12.0-alpine
 
+ARG BUILD_REVISION=dev
+ENV BUILD_REVISION=$BUILD_REVISION
+
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
-
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
-COPY config ./config
+COPY config/default.json config/custom-environment-variables.json ./config/
 
-RUN addgroup -g 1001 nodejs && adduser -S nodejs -u 1001
-
-USER nodejs
+# Build contexts may use a restrictive umask; Kubernetes can override the image UID.
+RUN chmod -R a+rX /app
 
 EXPOSE 3000 3001
 
-ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js"]

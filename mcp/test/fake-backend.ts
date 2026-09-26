@@ -43,6 +43,7 @@ export interface FakeBackendOptions {
 
 export interface FakeBackend {
   client: DriftmowerBackendClient
+  fetch: typeof fetch
   // Every path+query the client asked for, in order.
   requests: string[]
 }
@@ -89,6 +90,7 @@ export function createFakeBackend(options: FakeBackendOptions = {}): FakeBackend
   }) as typeof fetch
 
   return {
+    fetch: fetchImplementation,
     client: new DriftmowerBackendClient({
       baseUrl: 'http://driftmower-be.test',
       serviceToken,
@@ -180,5 +182,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function readFixture(name: string): Row[] {
-  return JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/backend/${name}`, import.meta.url)), 'utf8'))
+  return JSON.parse(
+    readFileSync(fileURLToPath(new URL(`./fixtures/backend/${name}`, import.meta.url)), 'utf8')
+  )
 }
