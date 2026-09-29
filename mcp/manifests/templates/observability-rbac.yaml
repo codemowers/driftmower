@@ -11,13 +11,46 @@ metadata:
 rules:
   - apiGroups: ['']
     resources: [namespaces]
-    verbs: [list]
+    verbs: [get, list, watch]
+  # Caches are invalidated on change by watching RBAC objects and CRDs. Without
+  # `watch` the server falls back to the review-cache TTL and logs a warning.
   - apiGroups: [rbac.authorization.k8s.io]
-    resources: [rolebindings]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [list, watch]
+  # Optional: lets a ServiceAccount token (e.g. Argo CD's) call the cache
+  # invalidation webhook, gated by MCP_INVALIDATE_ALLOWED_SUBJECTS.
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  # Provisioning facts (all read-only): per-namespace budget and network
+  # posture, node topology, operator Deployments, and the parameter ConfigMap an
+  # admission guard names. The guard chooses its ConfigMap's name, so a chart
+  # cannot know it in advance; set rbac.paramConfigMapNames to narrow the grant.
+  - apiGroups: ['']
+    resources: [nodes, resourcequotas, limitranges]
+    verbs: [list]
+  - apiGroups: ['']
+    resources: [configmaps]
+    verbs: [get]
+{{- with .Values.rbac.paramConfigMapNames }}
+    resourceNames:
+{{ toYaml . | indent 6 }}
+{{- end }}
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [list]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [list]
+  - apiGroups: [cilium.io]
+    resources: [ciliumnetworkpolicies]
+    verbs: [list]
+  - apiGroups: [kyverno.io]
+    resources: [clusterpolicies]
     verbs: [list]
   - apiGroups: [apiextensions.k8s.io]
     resources: [customresourcedefinitions]
-    verbs: [list]
+    verbs: [list, watch]
   # Discover the infra-owned API ingress without creating objects in its namespace.
   - apiGroups: [networking.k8s.io]
     resources: [ingresses]
@@ -39,6 +72,9 @@ rules:
   - apiGroups: [admissionregistration.k8s.io]
     resources: [validatingadmissionpolicies, mutatingadmissionpolicies, validatingadmissionpolicybindings, mutatingadmissionpolicybindings]
     verbs: [list]
+  # Every permission answer this server gives is a SubjectAccessReview asked as
+  # the verified caller. This is a permission-probing capability: the server
+  # only ever asks about the identity it just verified from the token.
   - apiGroups: [authorization.k8s.io]
     resources: [subjectaccessreviews]
     verbs: [create]

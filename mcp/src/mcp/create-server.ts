@@ -15,13 +15,15 @@ import type { WorkloadSearchService } from '../services/workload-search-service.
 import { registerPlanImageUpdatesTool } from './tools/plan-image-updates.js'
 import { registerProvisioningTools } from './tools/provisioning.js'
 import { registerSearchWorkloadsTool } from './tools/search-workloads.js'
-import { registerObservabilityTools, type ObservabilityIdentityMapping } from './tools/observability.js'
+import { registerObservabilityTools } from './tools/observability.js'
+import type { KubernetesIdentityMapping } from '../auth/kubernetes-identity.js'
 import type { ObservabilityService } from '../services/observability-service.js'
 import type { ClusterCatalog } from '../clients/cluster-catalog.js'
 import { registerClusterCatalogTools } from './tools/cluster-catalog.js'
-import type { NamespaceAccess } from '../clients/namespace-access.js'
+import type { RbacScopeResolver } from '../clients/rbac-scope.js'
 import { registerAccessibleNamespacesTool } from './tools/accessible-namespaces.js'
 import { registerEngineeringAdvisory } from './resources/engineering-advisory.js'
+import type { ScopeDependencies } from './tools/caller-scope.js'
 
 export const SERVER_NAME = 'driftmower-mcp'
 // Identify the running image in the MCP handshake; local builds report dev.
@@ -30,16 +32,16 @@ export const SERVER_VERSION = process.env.BUILD_REVISION ?? 'dev'
 export interface ServerDependencies {
   cluster?: ClusterIdentity
   advisories?: EngineeringAdvisory[]
-  namespaceAccess?: { service: NamespaceAccess; identityMapping: ObservabilityIdentityMapping }
+  namespaceScope?: { resolver: RbacScopeResolver; identityMapping: KubernetesIdentityMapping }
   clusterCapabilities?: ClusterCapabilitiesDiscovery
   clusterCatalog?: ClusterCatalog
   workloadSearchService?: Pick<WorkloadSearchService, 'searchWorkloads'>
   imageUpdatePlanningService?: Pick<ImageUpdatePlanningService, 'planImageUpdates'>
-  observability?: { service: ObservabilityService; identityMapping: ObservabilityIdentityMapping }
-  // Absent when no driftmower-ui base URL is configured. The provisioning tools
-  // are then not registered at all, which tells a client the truth up front
-  // rather than advertising tools that always fail.
-  provisioningService?: ProvisioningService
+  observability?: { service: ObservabilityService; identityMapping: KubernetesIdentityMapping }
+  provisioning?: { service: ProvisioningService; identityMapping: KubernetesIdentityMapping }
+  // How search_workloads and plan_image_updates confine results. Absent means
+  // the token claim alone.
+  tenancy?: ScopeDependencies
   audit?: (line: string) => void
 }
 
@@ -77,18 +79,22 @@ export function createMcpServer(dependencies: ServerDependencies): McpServer {
 
   if (dependencies.clusterCatalog) registerClusterCatalogTools(server, dependencies.clusterCatalog)
 
-  if (dependencies.namespaceAccess)
+  if (dependencies.namespaceScope)
     registerAccessibleNamespacesTool(
       server,
-      dependencies.namespaceAccess.service,
-      dependencies.namespaceAccess.identityMapping
+      dependencies.namespaceScope.resolver,
+      dependencies.namespaceScope.identityMapping
     )
 
+  const tenancy = dependencies.tenancy
+    ? { ...dependencies.tenancy, audit: dependencies.tenancy.audit ?? dependencies.audit }
+    : undefined
+
   if (dependencies.workloadSearchService)
-    registerSearchWorkloadsTool(server, dependencies.workloadSearchService)
+    registerSearchWorkloadsTool(server, dependencies.workloadSearchService, tenancy)
 
   if (dependencies.imageUpdatePlanningService)
-    registerPlanImageUpdatesTool(server, dependencies.imageUpdatePlanningService)
+    registerPlanImageUpdatesTool(server, dependencies.imageUpdatePlanningService, tenancy)
 
   if (dependencies.observability)
     registerObservabilityTools(
@@ -97,12 +103,12 @@ export function createMcpServer(dependencies: ServerDependencies): McpServer {
       dependencies.observability.identityMapping
     )
 
-  if (dependencies.provisioningService) {
+  if (dependencies.provisioning)
     registerProvisioningTools(server, {
-      provisioningService: dependencies.provisioningService,
+      service: dependencies.provisioning.service,
+      identityMapping: dependencies.provisioning.identityMapping,
       audit: dependencies.audit
     })
-  }
 
   return server
 }

@@ -18,6 +18,7 @@ describe('compact catalog responses', () => {
           description: 'Example policy',
           kind: 'MutatingAdmissionPolicy',
           apiVersion: 'v1',
+          annotations: {},
           spec: {
             matchConstraints: {
               resourceRules: [{ apiGroups: [''], resources: ['pods'] }],

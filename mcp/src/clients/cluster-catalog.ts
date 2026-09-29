@@ -26,6 +26,9 @@ export const admissionBindingSchema = namedDescriptionSchema.extend({
 export const admissionDescriptionSchema = namedDescriptionSchema.extend({
   kind: policyKindSchema,
   apiVersion: z.string(),
+  // A policy author may annotate intent (see EFFECT_ANNOTATION in the
+  // provisioning facts); the raw map is passed on for that.
+  annotations: z.record(z.string(), z.string()),
   spec: admissionSpecSchema,
   // null means the binding API is unavailable, [] means it was read and no
   // bindings reference this policy. Authorization/API errors are never hidden.
@@ -192,6 +195,7 @@ export function createClusterCatalog(read: (path: string) => Promise<string>): C
               ...describeResource(item),
               kind: resource.kind,
               apiVersion: path.split('/').slice(2, 4).join('/'),
+              annotations: item.metadata.annotations ?? {},
               spec: item.spec,
               bindings: bindings?.filter(binding => binding.spec.policyName === item.metadata.name) ?? null
             }

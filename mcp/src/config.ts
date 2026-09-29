@@ -15,8 +15,14 @@ export interface OidcConfig {
 }
 
 export interface ProvisioningConfig {
-  driftmowerUiUrl: string
-  requestTimeoutMs: number
+  // Upper bound on namespaces one readiness call or capabilities request fans out to.
+  maxNamespaces: number
+  // Fallback ingress domain when no admission guard publishes one; reported as
+  // configured, not verified.
+  ingressDomainSuffix: string | null
+  clusterFactTtlMs: number
+  topologyTtlMs: number
+  operatorTtlMs: number
 }
 
 export interface AppConfig {
@@ -35,10 +41,8 @@ export interface AppConfig {
   cluster: ClusterIdentity
   advisoryOverrideDirectory: string | null
   oauthClientId: string | null
-  // Public URL of driftmower-ui, used to bounce a browser that lands on `/`
-  // over to the UI. Null means `/` stays a 404. This is deliberately separate
-  // from `provisioning.driftmowerUiUrl`, which is the cluster-internal Service
-  // a browser cannot resolve.
+  // Public URL of driftmower-ui, kept for the landing page's links. Null means
+  // no link is rendered.
   uiPublicUrl: string | null
   // Bearer verification on the HTTP transport. Ignored by stdio, which is a
   // local process with no network surface.
@@ -46,11 +50,10 @@ export interface AppConfig {
   // Present only when authentication is on; the loader refuses to start an
   // authenticated HTTP server without it rather than silently serving open.
   oidc: OidcConfig | null
-  // Present only when a driftmower-ui base URL is configured. Absent means the
-  // provisioning tools are not registered at all, which is a clearer failure
-  // than registering tools that always error.
-  provisioning: ProvisioningConfig | null
+  provisioning: ProvisioningConfig
   kubernetes: KubernetesConfig
+  invalidate: InvalidateConfig
+  tenancy: TenancyConfig
   observability?: ObservabilityConfig | null
 }
 
@@ -60,14 +63,37 @@ export interface ObservabilityConfig {
   requestTimeoutMs: number
 }
 
+export interface TenancyConfig {
+  // Which sources confine driftmower-be results: the token claim, the cluster
+  // authorizer, or the union of both (default).
+  scopeSource: 'claim' | 'rbac' | 'union'
+  // Upper bound on namespaces the RBAC scope sweep reviews for one caller.
+  maxNamespaces: number
+}
+
 export interface KubernetesConfig {
-  namespaceRole: string
   url: string
   tokenFile: string
   caFile: string
+  // Mirror kube-apiserver's OIDC mapping: --oidc-username-claim,
+  // --oidc-username-prefix, --oidc-groups-claim, --oidc-groups-prefix.
+  usernameClaim: string
+  groupsClaim: string
   usernamePrefix: string
   groupsPrefix: string
   requestTimeoutMs: number
+  // SubjectAccessReview cache TTL in milliseconds; 0 disables the cache.
+  sarCacheTtlMs: number
+  // Watch RBAC objects, namespaces and CRDs to invalidate caches on change.
+  rbacWatchEnabled: boolean
+}
+
+export interface InvalidateConfig {
+  // Shared secret accepted on POST /api/cache/invalidate; null disables it.
+  sharedToken: string | null
+  // Kubernetes usernames (e.g. system:serviceaccount:argocd:argocd-server)
+  // whose ServiceAccount tokens, resolved by TokenReview, may invalidate.
+  allowedSubjects: string[]
 }
 
 interface ConfigSource {
@@ -126,6 +152,16 @@ function readInteger(value: unknown, name: string, maximum?: number): number {
 
   if (!Number.isInteger(parsedValue) || parsedValue < 1 || (maximum && parsedValue > maximum)) {
     throw new Error(`${name} must be an integer between 1 and ${maximum ?? 'the supported maximum'}`)
+  }
+
+  return parsedValue
+}
+
+function readNonNegativeInteger(value: unknown, name: string): number {
+  const parsedValue = typeof value === 'number' ? value : Number(value)
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+    throw new Error(`${name} must be an integer of at least 0`)
   }
 
   return parsedValue
@@ -225,6 +261,8 @@ export function loadAppConfig(
     oidc,
     provisioning: readProvisioningConfig(source),
     kubernetes: readKubernetesConfig(source, oidc),
+    invalidate: readInvalidateConfig(source),
+    tenancy: readTenancyConfig(source),
     observability: readObservabilityConfig(source, oidc)
   }
 }
@@ -274,15 +312,57 @@ function readKubernetesConfig(source: ConfigSource, oidc: OidcConfig | null): Ku
   if (new URL(url).protocol !== 'https:') throw new Error('KUBERNETES_API_URL must use HTTPS')
 
   const prefix = readOptionalString(source.get<unknown>('kubernetes.usernamePrefix'))
+  const usernameClaim = readOptionalString(source.get<unknown>('kubernetes.usernameClaim')) ?? 'sub'
+  // kube-apiserver's own default: `<issuer>#` unless the username claim is
+  // `email`, which it leaves unprefixed. `-` disables the prefix explicitly.
+  const defaultPrefix = oidc && usernameClaim !== 'email' ? `${oidc.issuer}#` : ''
 
   return {
     url,
     tokenFile: readString(source.get<unknown>('kubernetes.tokenFile'), 'KUBERNETES_TOKEN_FILE'),
     caFile: readString(source.get<unknown>('kubernetes.caFile'), 'KUBERNETES_CA_FILE'),
-    usernamePrefix: prefix === '-' ? '' : (prefix ?? (oidc ? `${oidc.issuer}#` : '')),
+    usernameClaim,
+    groupsClaim: readOptionalString(source.get<unknown>('kubernetes.groupsClaim')) ?? 'groups',
+    usernamePrefix: prefix === '-' ? '' : (prefix ?? defaultPrefix),
     groupsPrefix: readOptionalString(source.get<unknown>('kubernetes.groupsPrefix')) ?? '',
-    namespaceRole: readOptionalString(source.get<unknown>('kubernetes.namespaceRole')) ?? 'admin',
-    requestTimeoutMs: readInteger(source.get<unknown>('kubernetes.requestTimeoutMs'), 'KUBERNETES_TIMEOUT_MS')
+    requestTimeoutMs: readInteger(
+      source.get<unknown>('kubernetes.requestTimeoutMs'),
+      'KUBERNETES_TIMEOUT_MS'
+    ),
+    sarCacheTtlMs: readNonNegativeInteger(
+      source.get<unknown>('kubernetes.sarCacheTtlMs'),
+      'MCP_SAR_CACHE_TTL_MS'
+    ),
+    rbacWatchEnabled: readBoolean(source.get<unknown>('kubernetes.rbacWatchEnabled'), true)
+  }
+}
+
+function readInvalidateConfig(source: ConfigSource): InvalidateConfig {
+  const subjects = readOptionalString(source.get<unknown>('mcp.invalidateAllowedSubjects'))
+
+  return {
+    sharedToken: readOptionalString(source.get<unknown>('mcp.invalidateToken')),
+    allowedSubjects: subjects
+      ? subjects
+          .split(',')
+          .map(value => value.trim())
+          .filter(Boolean)
+      : []
+  }
+}
+
+const SCOPE_SOURCES = ['claim', 'rbac', 'union'] as const
+
+function readTenancyConfig(source: ConfigSource): TenancyConfig {
+  const scopeSource = readOptionalString(source.get<unknown>('tenancy.scopeSource')) ?? 'union'
+
+  if (!SCOPE_SOURCES.includes(scopeSource as TenancyConfig['scopeSource'])) {
+    throw new Error(`MCP_SCOPE_SOURCE must be one of: ${SCOPE_SOURCES.join(', ')}`)
+  }
+
+  return {
+    scopeSource: scopeSource as TenancyConfig['scopeSource'],
+    maxNamespaces: readInteger(source.get<unknown>('tenancy.maxNamespaces'), 'MCP_SCOPE_MAX_NAMESPACES')
   }
 }
 
@@ -308,15 +388,27 @@ function readOidcConfig(source: ConfigSource): OidcConfig {
   }
 }
 
-function readProvisioningConfig(source: ConfigSource): ProvisioningConfig | null {
-  const driftmowerUiUrl = readOptionalString(source.get<string>('provisioning.driftmowerUiUrl'))
-
-  if (!driftmowerUiUrl) {
-    return null
-  }
+function readProvisioningConfig(source: ConfigSource): ProvisioningConfig {
+  const suffix = readOptionalString(source.get<unknown>('provisioning.ingressDomainSuffix'))
 
   return {
-    driftmowerUiUrl: driftmowerUiUrl.replace(/\/+$/, ''),
-    requestTimeoutMs: readInteger(source.get<number>('provisioning.requestTimeoutMs'), 'requestTimeoutMs')
+    maxNamespaces: readInteger(
+      source.get<unknown>('provisioning.maxNamespaces'),
+      'PROVISIONING_MAX_NAMESPACES',
+      200
+    ),
+    ingressDomainSuffix: suffix ? suffix.replace(/^\.+/, '') : null,
+    clusterFactTtlMs: readNonNegativeInteger(
+      source.get<unknown>('provisioning.clusterFactTtlMs'),
+      'PROVISIONING_CLUSTER_FACT_TTL_MS'
+    ),
+    topologyTtlMs: readNonNegativeInteger(
+      source.get<unknown>('provisioning.topologyTtlMs'),
+      'PROVISIONING_TOPOLOGY_TTL_MS'
+    ),
+    operatorTtlMs: readNonNegativeInteger(
+      source.get<unknown>('provisioning.operatorTtlMs'),
+      'PROVISIONING_OPERATOR_TTL_MS'
+    )
   }
 }

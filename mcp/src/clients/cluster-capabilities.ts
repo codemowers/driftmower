@@ -52,9 +52,18 @@ export const clusterCapabilitiesShape = {
   relatedTools: z.array(z.string()),
   note: z.string()
 }
+export type PlatformClasses = Pick<
+  z.infer<z.ZodObject<typeof clusterCapabilitiesShape>>,
+  'ingressClasses' | 'priorityClasses' | 'clusterIssuers' | 'degraded'
+>
+
 export interface ClusterCapabilitiesDiscovery {
   describeCrd(name: string): Promise<z.infer<typeof crdDetailsSchema>>
   describe(): Promise<z.infer<z.ZodObject<typeof clusterCapabilitiesShape>>>
+  // Ingress classes, priority classes and (when cert-manager serves the given
+  // version) cluster issuers. Shared with the provisioning facts so each is
+  // read once.
+  listPlatformClasses(issuerVersion: string | null): Promise<PlatformClasses>
 }
 
 // Identify API families, not controller health or permission to provision instances.
@@ -106,7 +115,80 @@ export function createClusterCapabilities(
     throw new Error('Cluster capability discovery exceeded its page limit; incomplete results discarded')
   }
 
+  async function listPlatformClasses(issuerVersion: string | null): Promise<PlatformClasses> {
+    const degraded: { source: string; message: string }[] = []
+
+    async function optional<T>(source: string, load: () => Promise<T>): Promise<T | null> {
+      try {
+        return await load()
+      } catch (error) {
+        degraded.push({ source, message: error instanceof Error ? error.message : 'Read failed' })
+
+        return null
+      }
+    }
+
+    const [ingressClasses, priorityClasses, clusterIssuers] = await Promise.all([
+      optional('ingressclasses', async () =>
+        (
+          await list(
+            '/apis/networking.k8s.io/v1/ingressclasses',
+            z.object({ metadata, spec: z.object({ controller: z.string() }) })
+          )
+        ).map(item => ({
+          name: item.metadata.name,
+          controller: item.spec.controller,
+          isDefault: item.metadata.annotations?.['ingressclass.kubernetes.io/is-default-class'] === 'true'
+        }))
+      ),
+      optional('priorityclasses', async () =>
+        (
+          await list(
+            '/apis/scheduling.k8s.io/v1/priorityclasses',
+            z.object({
+              metadata,
+              value: z.number(),
+              globalDefault: z.boolean().optional(),
+              description: z.string().optional()
+            })
+          )
+        ).map(item => ({
+          name: item.metadata.name,
+          value: item.value,
+          isDefault: item.globalDefault === true,
+          description: item.description ?? null
+        }))
+      ),
+      issuerVersion
+        ? optional('clusterissuers', async () =>
+            (
+              await list(
+                `/apis/cert-manager.io/${encodeURIComponent(issuerVersion)}/clusterissuers`,
+                z.object({ metadata, status: z.object({ conditions }).optional() })
+              )
+            ).map(item => {
+              const ready = item.status?.conditions?.find(c => c.type === 'Ready')?.status
+
+              return {
+                name: item.metadata.name,
+                description: item.metadata.annotations?.['kubernetes.io/description'] ?? null,
+                ready: ready === 'True' ? true : ready === 'False' ? false : null
+              }
+            })
+          )
+        : Promise.resolve([])
+    ])
+
+    return {
+      ingressClasses,
+      priorityClasses,
+      clusterIssuers,
+      degraded: degraded.sort((a, b) => a.source.localeCompare(b.source))
+    }
+  }
+
   return {
+    listPlatformClasses,
     async describeCrd(name) {
       const query = new URLSearchParams({ fieldSelector: `metadata.name=${name}`, limit: '1' })
       const response = z
@@ -133,71 +215,12 @@ export function createClusterCapabilities(
           terminating: Boolean(item.metadata.deletionTimestamp)
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
-      const degraded: { source: string; message: string }[] = []
-
-      async function optional<T>(source: string, load: () => Promise<T>): Promise<T | null> {
-        try {
-          return await load()
-        } catch (error) {
-          degraded.push({ source, message: error instanceof Error ? error.message : 'Read failed' })
-
-          return null
-        }
-      }
-
       const issuer = customResources.find(item => item.name === 'clusterissuers.cert-manager.io')
       const issuerVersion =
         issuer?.versions.find(v => v.served && v.name === 'v1') ?? issuer?.versions.find(v => v.served)
-      const [ingressClasses, priorityClasses, clusterIssuers] = await Promise.all([
-        optional('ingressclasses', async () =>
-          (
-            await list(
-              '/apis/networking.k8s.io/v1/ingressclasses',
-              z.object({ metadata, spec: z.object({ controller: z.string() }) })
-            )
-          ).map(item => ({
-            name: item.metadata.name,
-            controller: item.spec.controller,
-            isDefault: item.metadata.annotations?.['ingressclass.kubernetes.io/is-default-class'] === 'true'
-          }))
-        ),
-        optional('priorityclasses', async () =>
-          (
-            await list(
-              '/apis/scheduling.k8s.io/v1/priorityclasses',
-              z.object({
-                metadata,
-                value: z.number(),
-                globalDefault: z.boolean().optional(),
-                description: z.string().optional()
-              })
-            )
-          ).map(item => ({
-            name: item.metadata.name,
-            value: item.value,
-            isDefault: item.globalDefault === true,
-            description: item.description ?? null
-          }))
-        ),
-        issuerVersion
-          ? optional('clusterissuers', async () =>
-              (
-                await list(
-                  `/apis/cert-manager.io/${encodeURIComponent(issuerVersion.name)}/clusterissuers`,
-                  z.object({ metadata, status: z.object({ conditions }).optional() })
-                )
-              ).map(item => {
-                const ready = item.status?.conditions?.find(c => c.type === 'Ready')?.status
-
-                return {
-                  name: item.metadata.name,
-                  description: item.metadata.annotations?.['kubernetes.io/description'] ?? null,
-                  ready: ready === 'True' ? true : ready === 'False' ? false : null
-                }
-              })
-            )
-          : Promise.resolve([])
-      ])
+      const { ingressClasses, priorityClasses, clusterIssuers, degraded } = await listPlatformClasses(
+        issuerVersion?.name ?? null
+      )
 
       return {
         customResources,
@@ -217,7 +240,7 @@ export function createClusterCapabilities(
         ingressClasses,
         priorityClasses,
         clusterIssuers,
-        degraded: degraded.sort((a, b) => a.source.localeCompare(b.source)),
+        degraded,
         relatedTools: [
           'list_storage_classes',
           'list_admission_policies',

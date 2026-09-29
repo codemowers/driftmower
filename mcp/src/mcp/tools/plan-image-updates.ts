@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { ACTIONABLE_VERSION_STATUSES, MANUAL_REVIEW_REASONS } from '../../domain/image-update-plan.js'
 import type { ImageUpdatePlanningService } from '../../services/image-update-planning-service.js'
-import { callerScope, scopeNoticeSchema, scopeSuffix } from './caller-scope.js'
+import { resolveCallerScope, scopeNoticeSchema, scopeSuffix, type ScopeDependencies } from './caller-scope.js'
 import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
 
 export const PLAN_IMAGE_UPDATES_TOOL_NAME = 'plan_image_updates'
@@ -108,12 +108,16 @@ const toolConfiguration = {
 
 export function registerPlanImageUpdatesTool(
   server: McpServer,
-  planningService: Pick<ImageUpdatePlanningService, 'planImageUpdates'>
+  planningService: Pick<ImageUpdatePlanningService, 'planImageUpdates'>,
+  scopeDependencies?: ScopeDependencies
 ): void {
   server.registerTool(PLAN_IMAGE_UPDATES_TOOL_NAME, toolConfiguration, async (input, context) => {
     // The scope comes from the verified token, never from `input`: a tool
     // argument is caller-controlled and would be a way to widen access.
-    const result = await planningService.planImageUpdates({ ...input, scope: callerScope(context) })
+    const result = await planningService.planImageUpdates({
+      ...input,
+      scope: await resolveCallerScope(context, scopeDependencies)
+    })
 
     return {
       structuredContent: { ...result },

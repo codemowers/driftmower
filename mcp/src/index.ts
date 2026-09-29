@@ -10,18 +10,17 @@ import { BackendImageUpdateRepository } from './backend/image-update-repository.
 import { BackendReportSnapshotRepository } from './backend/report-snapshot-repository.js'
 import { ReportRowLoader } from './backend/report-rows.js'
 import { BackendWorkloadRepository } from './backend/workload-repository.js'
-import { createDriftmowerUiClient } from './clients/driftmower-ui.js'
 import { discoverClusterIdentity } from './services/cluster-identity.js'
+import { checkAuthorizer } from './services/identity-diagnostics.js'
 import { loadAppConfig, type AppConfig } from './config.js'
 import { closeHttpServer } from './http/shutdown.js'
 import { ApplicationMetrics } from './http/metrics.js'
 import { startHealthServer } from './http/health.js'
-import { createLogger, type Logger } from './logger.js'
+import { createLogger } from './logger.js'
 import { createMcpServer } from './mcp/create-server.js'
 import { MCP_PATH, startHttpTransport } from './mcp/transports/http.js'
 import { startStdioTransport } from './mcp/transports/stdio.js'
 import { ImageUpdatePlanningService } from './services/image-update-planning-service.js'
-import { ProvisioningService } from './services/provisioning-service.js'
 import { createKubernetesServices } from './services/kubernetes-services.js'
 import { WorkloadSearchService } from './services/workload-search-service.js'
 
@@ -51,8 +50,12 @@ async function main(): Promise<void> {
 
   try {
     const driftmower = client ? createDriftmowerServices(client, appConfig) : {}
-    const provisioningService = createProvisioningService(appConfig, logger)
-    const kubernetesServices = createKubernetesServices(appConfig.kubernetes, appConfig.observability)
+    const kubernetesServices = createKubernetesServices(
+      appConfig.kubernetes,
+      appConfig.observability,
+      appConfig.tenancy,
+      appConfig.provisioning
+    )
 
     appConfig.cluster = await discoverClusterIdentity(
       appConfig.cluster,
@@ -60,12 +63,22 @@ async function main(): Promise<void> {
       message => logger.warn(message),
       appConfig.oidc?.issuer
     )
+
+    if (appConfig.transport === 'http') {
+      const diagnostics = await checkAuthorizer(
+        kubernetesServices.kubernetes.allowed,
+        appConfig.kubernetes.usernamePrefix
+      )
+
+      if (diagnostics.warning) logger.warn(diagnostics.warning)
+      else logger.info('Kubernetes authorizer answers SubjectAccessReviews')
+    }
+
     const createServer = (): ReturnType<typeof createMcpServer> =>
       createMcpServer({
         ...driftmower,
         cluster: appConfig.cluster,
         advisories,
-        provisioningService,
         ...kubernetesServices,
         audit: line => logger.info(line)
       })
@@ -87,7 +100,11 @@ async function main(): Promise<void> {
             jwksUri: appConfig.oidc.jwksUri,
             audience: appConfig.oidc.audience ?? undefined,
             publicUrl: appConfig.publicUrl,
-            namespacesClaim: appConfig.oidc.namespacesClaim
+            namespacesClaim: appConfig.oidc.namespacesClaim,
+            identityClaims: {
+              username: appConfig.kubernetes.usernameClaim,
+              groups: appConfig.kubernetes.groupsClaim
+            }
           },
           MCP_PATH
         )
@@ -107,6 +124,21 @@ async function main(): Promise<void> {
       cluster: appConfig.cluster,
       advisories,
       oauthClientId: appConfig.oauthClientId,
+      capabilities: {
+        service: kubernetesServices.provisioning.service,
+        identityMapping: kubernetesServices.provisioning.identityMapping,
+        onAudit: line => logger.info(line)
+      },
+      invalidate: {
+        sharedToken: appConfig.invalidate.sharedToken,
+        allowedSubjects: appConfig.invalidate.allowedSubjects,
+        tokenReview: kubernetesServices.tokenReview,
+        ...kubernetesServices.invalidation,
+        onInvalidate: (source, scope, cleared) => {
+          metrics.invalidations.inc({ source })
+          logger.info('Cache invalidated', { source, scope, cleared })
+        }
+      },
       onError: error => logger.error(errorMessage(error)),
       onAudit: entry =>
         entry.event === 'rejected'
@@ -120,17 +152,29 @@ async function main(): Promise<void> {
       port: appConfig.port,
       healthPort: appConfig.healthPort,
       authenticated: Boolean(authenticator),
-      provisioning: Boolean(provisioningService),
       observability: Boolean(kubernetesServices.observability),
       landingPath: '/'
     })
+
+    const watch = appConfig.kubernetes.rbacWatchEnabled
+      ? kubernetesServices.createWatch(
+          (message, metadata) => logger.warn(message, metadata),
+          source => metrics.invalidations.inc({ source })
+        )
+      : null
+
+    watch?.start()
+
+    if (watch) logger.info('Watching RBAC, namespaces and CRDs to invalidate caches on change')
+    else logger.info('RBAC watch disabled; caches expire by TTL only')
 
     ready = true
     registerShutdown(async () => {
       ready = false
       await Promise.all([
         closeHttpServer(httpServer),
-        healthServer ? closeHttpServer(healthServer) : Promise.resolve()
+        healthServer ? closeHttpServer(healthServer) : Promise.resolve(),
+        watch?.stop() ?? Promise.resolve()
       ])
     })
   } finally {
@@ -163,21 +207,6 @@ main().catch((error: unknown) => {
   createLogger().error(errorMessage(error))
   process.exit(1)
 })
-
-function createProvisioningService(appConfig: AppConfig, logger: Logger): ProvisioningService | undefined {
-  if (!appConfig.provisioning) {
-    logger.info('Provisioning tools are not registered: DRIFTMOWER_UI_URL is unset')
-
-    return undefined
-  }
-
-  return new ProvisioningService(
-    createDriftmowerUiClient({
-      baseUrl: appConfig.provisioning.driftmowerUiUrl,
-      requestTimeoutMs: appConfig.provisioning.requestTimeoutMs
-    })
-  )
-}
 
 function registerShutdown(close: () => Promise<void>): void {
   let closing = false

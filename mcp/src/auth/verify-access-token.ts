@@ -33,6 +33,14 @@ export interface AuthenticatedCaller {
   // different from an empty array: the first is "we were not told", the second
   // is "told, and the answer is none". Callers must not collapse the two.
   namespaces?: string[]
+  // The raw values of the claims kube-apiserver maps to a username and to
+  // groups, read under the configured claim names. Kept separate from `sub` and
+  // `groups` above, which are what this server itself audits and scopes by.
+  identityClaims: {
+    username?: string
+    groups?: string[]
+    emailVerified?: boolean
+  }
 }
 
 export interface VerifiedAccessToken {
@@ -44,6 +52,9 @@ export interface AccessTokenVerificationOptions {
   issuer: string
   audience: string
   namespacesClaim?: string
+  // Claim names kube-apiserver uses for username and groups (its
+  // --oidc-username-claim / --oidc-groups-claim). Default sub / groups.
+  identityClaims?: { username: string; groups: string }
 }
 
 export async function verifyAccessToken(
@@ -70,10 +81,29 @@ export async function verifyAccessToken(
       groups: readStringArray((payload as Record<string, unknown>).groups) ?? [],
       namespaces: readStringArray(
         (payload as Record<string, unknown>)[options.namespacesClaim ?? DEFAULT_NAMESPACES_CLAIM]
-      )
+      ),
+      identityClaims: {
+        username: readClaimAsString(payload, options.identityClaims?.username ?? 'sub'),
+        groups: readStringArray(
+          (payload as Record<string, unknown>)[options.identityClaims?.groups ?? 'groups']
+        ),
+        emailVerified: typeof payload.email_verified === 'boolean' ? payload.email_verified : undefined
+      }
     },
     payload
   }
+}
+
+// A username claim may legitimately be a number in some providers' tokens;
+// kube-apiserver stringifies it the same way.
+function readClaimAsString(payload: JWTPayload, claim: string): string | undefined {
+  const value = (payload as Record<string, unknown>)[claim]
+
+  if (typeof value === 'string') return value || undefined
+
+  if (typeof value === 'number') return String(value)
+
+  return undefined
 }
 
 function readString(value: unknown): string | undefined {

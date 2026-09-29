@@ -17,7 +17,9 @@
       "__name": "MCP_AUTH_ENABLED",
       "__format": "boolean"
     },
-    "oauthClientId": "MCP_OAUTH_CLIENT_ID"
+    "oauthClientId": "MCP_OAUTH_CLIENT_ID",
+    "invalidateToken": "MCP_INVALIDATE_TOKEN",
+    "invalidateAllowedSubjects": "MCP_INVALIDATE_ALLOWED_SUBJECTS"
   },
   "oidc": {
     "issuer": "OIDC_ISSUER",
@@ -38,9 +40,21 @@
     }
   },
   "provisioning": {
-    "driftmowerUiUrl": "DRIFTMOWER_UI_URL",
-    "requestTimeoutMs": {
-      "__name": "DRIFTMOWER_UI_TIMEOUT_MS",
+    "maxNamespaces": {
+      "__name": "PROVISIONING_MAX_NAMESPACES",
+      "__format": "number"
+    },
+    "ingressDomainSuffix": "PROVISIONING_INGRESS_DOMAIN_SUFFIX",
+    "clusterFactTtlMs": {
+      "__name": "PROVISIONING_CLUSTER_FACT_TTL_MS",
+      "__format": "number"
+    },
+    "topologyTtlMs": {
+      "__name": "PROVISIONING_TOPOLOGY_TTL_MS",
+      "__format": "number"
+    },
+    "operatorTtlMs": {
+      "__name": "PROVISIONING_OPERATOR_TTL_MS",
       "__format": "number"
     }
   },
@@ -70,11 +84,27 @@
     "url": "KUBERNETES_API_URL",
     "tokenFile": "KUBERNETES_TOKEN_FILE",
     "caFile": "KUBERNETES_CA_FILE",
+    "usernameClaim": "KUBERNETES_USERNAME_CLAIM",
+    "groupsClaim": "KUBERNETES_GROUPS_CLAIM",
     "usernamePrefix": "KUBERNETES_USERNAME_PREFIX",
     "groupsPrefix": "KUBERNETES_GROUPS_PREFIX",
-    "namespaceRole": "KUBERNETES_NAMESPACE_ROLE",
     "requestTimeoutMs": {
       "__name": "KUBERNETES_TIMEOUT_MS",
+      "__format": "number"
+    },
+    "sarCacheTtlMs": {
+      "__name": "MCP_SAR_CACHE_TTL_MS",
+      "__format": "number"
+    },
+    "rbacWatchEnabled": {
+      "__name": "MCP_RBAC_WATCH_ENABLED",
+      "__format": "boolean"
+    }
+  },
+  "tenancy": {
+    "scopeSource": "MCP_SCOPE_SOURCE",
+    "maxNamespaces": {
+      "__name": "MCP_SCOPE_MAX_NAMESPACES",
       "__format": "number"
     }
   },

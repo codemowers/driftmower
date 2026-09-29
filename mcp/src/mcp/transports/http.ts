@@ -10,11 +10,17 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Readable } from 'node:stream'
 import type { ApplicationMetrics } from '../../http/metrics.js'
 import { renderLandingPage } from '../../http/landing.js'
+import { protectedResourceMetadataPath, writeChallenge, type BearerAuthenticator } from '../../auth/bearer.js'
 import {
-  protectedResourceMetadataPath,
-  type BearerAuthenticator,
-  type RejectedCall
-} from '../../auth/bearer.js'
+  CAPABILITIES_PATH,
+  handleCapabilitiesRequest,
+  type CapabilitiesRouteDependencies
+} from '../../http/capabilities-route.js'
+import {
+  handleInvalidateRequest,
+  INVALIDATE_PATH,
+  type InvalidateRouteDependencies
+} from '../../http/invalidate-route.js'
 
 export const HTTP_TRANSPORT_NAME = 'http'
 export const MCP_PATH = '/mcp'
@@ -36,6 +42,11 @@ export interface HttpTransportOptions {
   authenticator?: BearerAuthenticator
   onError?: (error: unknown) => void
   onAudit?: (entry: AuditEntry) => void
+  // The plain JSON capabilities route, served beside /mcp with the same
+  // authenticator. Absent means a 404 there.
+  capabilities?: Omit<CapabilitiesRouteDependencies, 'authenticator'>
+  // The cache invalidation webhook; its own credentials, not the MCP bearer.
+  invalidate?: InvalidateRouteDependencies
 }
 
 export interface AuditEntry {
@@ -82,6 +93,33 @@ export async function startHttpTransport(
         'x-content-type-options': 'nosniff'
       })
       response.end(request.method === 'HEAD' ? undefined : landingPage)
+
+      return
+    }
+
+    if (path === CAPABILITIES_PATH && options.capabilities) {
+      void handleCapabilitiesRequest(request, response, {
+        ...options.capabilities,
+        authenticator: options.authenticator
+      }).catch((error: unknown) => {
+        options.onError?.(error)
+
+        if (!response.headersSent) response.writeHead(500, { 'content-type': 'application/json' })
+
+        response.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+      })
+
+      return
+    }
+
+    if (path === INVALIDATE_PATH && options.invalidate) {
+      void handleInvalidateRequest(request, response, options.invalidate).catch((error: unknown) => {
+        options.onError?.(error)
+
+        if (!response.headersSent) response.writeHead(500, { 'content-type': 'application/json' })
+
+        response.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+      })
 
       return
     }
@@ -246,18 +284,6 @@ async function readJsonBody(request: Readable): Promise<unknown> {
   }
 
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
-function writeChallenge(
-  response: ServerResponse,
-  authenticator: BearerAuthenticator,
-  outcome: RejectedCall
-): void {
-  response.writeHead(outcome.status, {
-    'content-type': 'application/json',
-    'www-authenticate': authenticator.challengeHeader(outcome)
-  })
-  response.end(JSON.stringify({ error: outcome.error, error_description: outcome.description }))
 }
 
 function writeJson(response: ServerResponse, statusCode: number, body: unknown): void {

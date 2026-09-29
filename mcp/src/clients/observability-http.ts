@@ -1,6 +1,7 @@
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { Buffer } from 'node:buffer'
+import { clearTimeout, setTimeout } from 'node:timers'
 
 export interface HttpRequest {
   url: URL
@@ -56,4 +57,86 @@ export function createHttpRequester(timeoutMs: number): HttpRequester {
       req.on('error', reject)
       req.end(options.body)
     })
+}
+
+export interface HttpStream {
+  status: number
+  // Newline-delimited body, one string per line, as the server sends them.
+  lines: AsyncIterable<string>
+  abort(): void
+}
+
+export type HttpStreamer = (request: HttpRequest) => Promise<HttpStream>
+
+// A long-lived response read line by line, for Kubernetes watches. The
+// connect phase has the deadline; the body deliberately has none, because a
+// watch that receives no events for an hour is healthy. The caller owns the
+// lifetime through `abort()`.
+export function createHttpStreamer(connectTimeoutMs: number): HttpStreamer {
+  return options =>
+    new Promise((resolve, reject) => {
+      const request = options.url.protocol === 'https:' ? httpsRequest : httpRequest
+      const controller = new AbortController()
+      let aborted = false
+      const connectTimer = setTimeout(() => controller.abort(new Error('Connect timeout')), connectTimeoutMs)
+      const req = request(
+        options.url,
+        {
+          method: options.method ?? 'GET',
+          headers: options.headers,
+          ca: options.ca,
+          signal: controller.signal
+        },
+        response => {
+          clearTimeout(connectTimer)
+          resolve({
+            status: response.statusCode ?? 502,
+            lines: readLines(response, () => aborted),
+            abort: () => {
+              aborted = true
+              controller.abort(new Error('Stream aborted'))
+            }
+          })
+        }
+      )
+
+      req.on('error', error => {
+        clearTimeout(connectTimer)
+        reject(error)
+      })
+      req.end(options.body)
+    })
+}
+
+async function* readLines(
+  source: AsyncIterable<Buffer | string>,
+  wasAborted: () => boolean
+): AsyncIterable<string> {
+  let pending = ''
+
+  try {
+    for await (const chunk of source) {
+      pending += typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+      let index = pending.indexOf('\n')
+
+      while (index >= 0) {
+        const line = pending.slice(0, index).trim()
+
+        pending = pending.slice(index + 1)
+
+        if (line) yield line
+
+        if (wasAborted()) return
+
+        index = pending.indexOf('\n')
+      }
+    }
+  } catch (error) {
+    // The caller ended it; that is not a failure of the stream.
+    if (wasAborted()) return
+
+    throw error
+  }
+
+  if (pending.trim()) yield pending.trim()
 }

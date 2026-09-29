@@ -1,4 +1,11 @@
-import type { CapabilitiesResult, DriftmowerUiClient } from '../clients/driftmower-ui.js'
+import type { AccessChecker } from '../clients/access-check.js'
+import type { KubernetesIdentity } from '../clients/observability-kubernetes.js'
+import type { ClusterFacts, ProvisioningFacts } from '../clients/provisioning-facts/index.js'
+import { mapWithConcurrency } from '../clients/concurrency.js'
+import { composeCreateVerdict, type Verdict } from '../domain/provisioning/access-facts.js'
+import { denialsFor, type Denial } from '../domain/provisioning/admission-facts.js'
+import { OFFERINGS_BY_ID } from '../domain/provisioning/catalog/offerings.js'
+import { hostRuleFor } from '../domain/provisioning/ingress-facts.js'
 import type {
   CapabilityResponse,
   DegradedRead,
@@ -7,15 +14,17 @@ import type {
   OfferingCard,
   OfferingId,
   StorageClassFact
-} from '../domain/provisioning.js'
+} from '../domain/provisioning/types.js'
 
-// Read-only views over driftmower-ui's provisioning capability layer.
+// The provisioning capability layer: cluster facts read natively, per-namespace
+// facts confined to what the caller may see, and every permission answer
+// asked of the cluster authorizer as the verified caller.
 //
 // Every result is either `ok` or a named unavailability. The `degraded` list
 // travels with the ok results untouched: a fact that could not be read must
 // never arrive looking like a fact that was read and came back empty.
 
-export type UnavailableReason = 'unauthorized' | 'unreachable' | 'bad_response' | 'not_in_cluster'
+export type UnavailableReason = 'kubernetes_unreachable'
 
 export interface Unavailable {
   status: 'unavailable'
@@ -23,16 +32,17 @@ export interface Unavailable {
   detail: string
 }
 
-export interface ClusterCapabilities {
+export interface ProvisioningPlatform {
   status: 'ok'
   storageClasses: StorageClassFact[]
   topology: CapabilityResponse['topology']
   priorityClasses: CapabilityResponse['priorityClasses']
   networkPolicyEngine: CapabilityResponse['networkPolicyEngine']
   monitoringOperator: boolean
-  ingress: CapabilityResponse['ingress']
+  ingress: Omit<CapabilityResponse['ingress'], 'hostRules'>
   policies: CapabilityResponse['policies']
   admissionPolicies: CapabilityResponse['admissionPolicies']
+  tenantLabelKey: string | null
   offeringsReady: number
   offeringsTotal: number
   degraded: DegradedRead[]
@@ -41,6 +51,8 @@ export interface ClusterCapabilities {
 export interface OfferingsListing {
   status: 'ok'
   offerings: OfferingCard[]
+  // Set when a namespace was asked about and the caller may not see it.
+  withheld: string[]
   degraded: DegradedRead[]
 }
 
@@ -49,104 +61,369 @@ export interface NamespaceReadiness {
   requested: string[]
   namespaces: NamespaceFact[]
   hostRules: HostRule[]
-  // Namespaces the caller asked about that came back with no facts. Almost
-  // always tenancy: driftmower-ui drops namespaces outside the caller's scope
-  // rather than erroring, so silence here means "not yours", not "not there".
+  // Requested namespaces whose facts were not returned because the cluster
+  // authorizer does not let the caller list pods there (or could not say).
   withheld: string[]
   degraded: DegradedRead[]
 }
 
+export interface AccessCheckInput {
+  namespace?: string
+  verb: string
+  group: string
+  resource: string
+  subresource?: string
+  name?: string
+}
+
+export interface AccessCheck {
+  status: 'ok'
+  verdict: Verdict
+  reason: string
+  rbac: { verdict: Verdict; reason: string | null }
+  admission: Denial[]
+  identity: KubernetesIdentity | null
+}
+
+export interface ProvisioningServiceDependencies {
+  facts: ProvisioningFacts
+  checker: AccessChecker
+  maxNamespaces: number
+  // How many namespaces' facts are gathered at once.
+  concurrency?: number
+}
+
 export class ProvisioningService {
-  constructor(private readonly client: DriftmowerUiClient) {}
+  readonly maxNamespaces: number
 
-  async describeClusterCapabilities(accessToken: string | null): Promise<ClusterCapabilities | Unavailable> {
-    const result = await this.load(accessToken)
+  constructor(private readonly deps: ProvisioningServiceDependencies) {
+    this.maxNamespaces = deps.maxNamespaces
+  }
 
-    if (result.status !== 'ok') {
-      return result
+  // The one code path behind the JSON route and every tool.
+  async capabilities(
+    identity: KubernetesIdentity | null,
+    query: { namespaces?: string[]; offering?: OfferingId } = {}
+  ): Promise<CapabilityResponse & { withheld: string[] }> {
+    const cluster = await this.deps.facts.cluster()
+    const requested = normalise(query.namespaces ?? [])
+
+    if (requested.length > this.maxNamespaces) {
+      throw new Error(`At most ${this.maxNamespaces} namespaces per call (PROVISIONING_MAX_NAMESPACES)`)
     }
 
-    const { capabilities } = result
+    const spec = query.offering ? OFFERINGS_BY_ID.get(query.offering) : undefined
+    const target = spec ? (cluster.targets.find(entry => entry.id === spec.id) ?? null) : null
+    const results = await mapWithConcurrency(requested, this.deps.concurrency ?? 4, namespace =>
+      this.deps.facts.namespace({
+        namespace,
+        identity,
+        offeringLabelKey: spec?.instanceLabelKey ?? null,
+        target
+      })
+    )
+    const degraded = [...cluster.degraded]
+    const namespaces: NamespaceFact[] = []
+    const hostRules: HostRule[] = []
+    const withheld: string[] = []
+
+    for (const result of results) {
+      const view = result.fact.access?.view ?? 'yes'
+
+      // Facts about a namespace the caller may not see are withheld rather than
+      // returned, and the reason travels in `degraded` when it was inconclusive.
+      if (identity && view !== 'yes') {
+        withheld.push(result.fact.namespace)
+
+        if (view === 'unknown')
+          record(degraded, {
+            source: 'subjectaccessreviews',
+            status: 0,
+            message: `Access to ${result.fact.namespace} could not be evaluated by the cluster authorizer; its facts are withheld, not absent.`
+          })
+
+        continue
+      }
+
+      namespaces.push(result.fact)
+      for (const entry of result.degraded) record(degraded, entry)
+      hostRules.push(hostRuleFrom(cluster, result.fact, result.labels, identity))
+    }
 
     return {
-      status: 'ok',
-      storageClasses: capabilities.storageClasses,
-      topology: capabilities.topology,
-      priorityClasses: capabilities.priorityClasses,
-      networkPolicyEngine: capabilities.networkPolicyEngine,
-      monitoringOperator: capabilities.monitoringOperator,
-      ingress: capabilities.ingress,
-      policies: capabilities.policies,
-      admissionPolicies: capabilities.admissionPolicies,
-      offeringsReady: capabilities.offerings.filter(offering => offering.availability.state === 'ready')
-        .length,
-      offeringsTotal: capabilities.offerings.length,
-      degraded: capabilities.degraded
+      inCluster: true,
+      offerings: cluster.offerings,
+      storageClasses: cluster.storageClasses,
+      topology: cluster.topology,
+      namespaces,
+      policies: cluster.policies,
+      admissionPolicies: cluster.admissionPolicies,
+      ingress: {
+        domainSuffix: cluster.ingress.domainSuffix?.value ?? null,
+        domainSuffixSource: cluster.ingress.domainSuffix?.source ?? null,
+        classes: cluster.ingress.classes,
+        clusterIssuers: cluster.ingress.clusterIssuers,
+        tlsAdvice: cluster.ingress.tlsAdvice,
+        hostRules
+      },
+      priorityClasses: cluster.priorityClasses,
+      networkPolicyEngine: cluster.networkPolicyEngine,
+      monitoringOperator: cluster.monitoringOperator,
+      degraded,
+      withheld
     }
+  }
+
+  async describeProvisioningPlatform(): Promise<ProvisioningPlatform | Unavailable> {
+    return this.guard(async () => {
+      const cluster = await this.deps.facts.cluster()
+
+      return {
+        status: 'ok',
+        storageClasses: cluster.storageClasses,
+        topology: cluster.topology,
+        priorityClasses: cluster.priorityClasses,
+        networkPolicyEngine: cluster.networkPolicyEngine,
+        monitoringOperator: cluster.monitoringOperator,
+        ingress: {
+          domainSuffix: cluster.ingress.domainSuffix?.value ?? null,
+          domainSuffixSource: cluster.ingress.domainSuffix?.source ?? null,
+          classes: cluster.ingress.classes,
+          clusterIssuers: cluster.ingress.clusterIssuers,
+          tlsAdvice: cluster.ingress.tlsAdvice
+        },
+        policies: cluster.policies,
+        admissionPolicies: cluster.admissionPolicies,
+        tenantLabelKey: cluster.tenantLabelKey,
+        offeringsReady: cluster.offerings.filter(offering => offering.availability.state === 'ready').length,
+        offeringsTotal: cluster.offerings.length,
+        degraded: cluster.degraded
+      }
+    })
   }
 
   async listOfferings(
-    accessToken: string | null,
-    offering?: OfferingId
+    identity: KubernetesIdentity | null,
+    offering?: OfferingId,
+    namespace?: string
   ): Promise<OfferingsListing | Unavailable> {
-    const result = await this.load(accessToken, { offering })
+    return this.guard(async () => {
+      const response = await this.capabilities(identity, namespace ? { namespaces: [namespace] } : {})
+      const cards = offering ? response.offerings.filter(card => card.id === offering) : response.offerings
+      const fact = response.namespaces[0]
 
-    if (result.status !== 'ok') {
-      return result
-    }
-
-    return {
-      status: 'ok',
-      offerings: offering
-        ? result.capabilities.offerings.filter(card => card.id === offering)
-        : result.capabilities.offerings,
-      degraded: result.capabilities.degraded
-    }
+      return {
+        status: 'ok',
+        offerings: fact ? cards.map(card => withVerdict(card, fact, response)) : cards,
+        withheld: response.withheld,
+        degraded: response.degraded
+      }
+    })
   }
 
   async describeNamespaceReadiness(
-    accessToken: string | null,
-    namespaces: string[]
+    identity: KubernetesIdentity | null,
+    namespaces: string[],
+    offering?: OfferingId
   ): Promise<NamespaceReadiness | Unavailable> {
-    const requested = [...new Set(namespaces.map(namespace => namespace.trim()).filter(Boolean))]
-    const result = await this.load(accessToken, { namespaces: requested })
+    return this.guard(async () => {
+      const requested = normalise(namespaces)
+      const response = await this.capabilities(identity, { namespaces: requested, offering })
 
-    if (result.status !== 'ok') {
-      return result
+      return {
+        status: 'ok',
+        requested,
+        namespaces: response.namespaces,
+        hostRules: response.ingress.hostRules,
+        withheld: response.withheld,
+        degraded: response.degraded
+      }
+    })
+  }
+
+  // The exact question for anything the matrix does not cover: cluster-scoped
+  // resources, subresources, named objects, `proxy`.
+  async checkAccess(
+    identity: KubernetesIdentity | null,
+    input: AccessCheckInput
+  ): Promise<AccessCheck | Unavailable> {
+    return this.guard(async () => {
+      const cluster = await this.deps.facts.cluster()
+      const what = `${input.resource}${input.subresource ? `/${input.subresource}` : ''}.${input.group || 'core'}`
+      const operation = input.verb.toUpperCase()
+      const labels =
+        input.namespace && (operation === 'CREATE' || operation === 'UPDATE' || operation === 'DELETE')
+          ? (
+              await this.deps.facts.namespace({
+                namespace: input.namespace,
+                identity: null,
+                offeringLabelKey: null,
+                target: null
+              })
+            ).labels
+          : {}
+      const admission =
+        operation === 'CREATE' || operation === 'UPDATE' || operation === 'DELETE'
+          ? denialsFor(cluster.admission, {
+              group: input.group,
+              resource: input.resource,
+              operation,
+              namespaceLabels: labels,
+              callerGroups: identity?.groups
+            })
+          : []
+
+      if (!identity) {
+        return {
+          status: 'ok',
+          verdict: 'unknown',
+          reason: `The call carried no verified caller, so permission was not checked. Run \`kubectl auth can-i ${input.verb} ${what}\`.`,
+          rbac: { verdict: 'unknown', reason: 'no verified caller' },
+          admission,
+          identity: null
+        }
+      }
+
+      const rbac = await this.deps.checker.mayPerform(identity, {
+        namespace: input.namespace,
+        verb: input.verb,
+        group: input.group,
+        resource: input.resource,
+        subresource: input.subresource,
+        name: input.name
+      })
+      const composed =
+        operation === 'CREATE'
+          ? composeCreateVerdict(rbac, admission, what)
+          : admission.length > 0
+            ? {
+                verdict: 'no' as const,
+                reason: `An enforced admission policy (${admission[0].policy}) governs ${input.verb} on ${what}: ${admission[0].messages.join('. ')}`
+              }
+            : rbac.verdict === 'yes'
+              ? { verdict: 'yes' as const, reason: `Kubernetes RBAC allows ${input.verb} on ${what}.` }
+              : { verdict: rbac.verdict, reason: rbac.reason ?? 'The access review could not be evaluated' }
+
+      return { status: 'ok', verdict: composed.verdict, reason: composed.reason, rbac, admission, identity }
+    })
+  }
+
+  private async guard<T>(load: () => Promise<T>): Promise<T | Unavailable> {
+    try {
+      return await load()
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+
+      return {
+        status: 'unavailable',
+        reason: 'kubernetes_unreachable',
+        detail: `The Kubernetes API could not be read: ${detail}`
+      }
     }
+  }
+}
 
-    const returned = new Set(result.capabilities.namespaces.map(fact => fact.namespace))
+function normalise(namespaces: string[]): string[] {
+  return [...new Set(namespaces.map(namespace => namespace.trim()).filter(Boolean))]
+}
 
+function record(degraded: DegradedRead[], entry: DegradedRead): void {
+  // One row per fact family, not per namespace: the fix is the same rule.
+  if (!degraded.some(existing => existing.source === entry.source)) degraded.push(entry)
+}
+
+function withVerdict(card: OfferingCard, fact: NamespaceFact, response: CapabilityResponse): OfferingCard {
+  const verdict = fact.access?.provision[card.id]
+  const detail = fact.access?.provisionDetail[card.id] ?? []
+
+  if (!fact.access || verdict === undefined) {
     return {
-      status: 'ok',
-      requested,
-      namespaces: result.capabilities.namespaces,
-      hostRules: result.capabilities.ingress.hostRules,
-      withheld: requested.filter(namespace => !returned.has(namespace)),
-      degraded: result.capabilities.degraded
+      ...card,
+      mayCreate: 'unknown',
+      mayCreateReason: fact.access
+        ? 'This offering is not served by the cluster, so nothing could be checked.'
+        : 'The call carried no verified caller, so permission was not checked.'
     }
   }
 
-  private async load(
-    accessToken: string | null,
-    query: { namespaces?: string[]; offering?: OfferingId } = {}
-  ): Promise<{ status: 'ok'; capabilities: CapabilityResponse } | Unavailable> {
-    const result: CapabilitiesResult = await this.client.fetchCapabilities(accessToken, query)
+  const blocking = detail.filter(row => row.verdict !== 'yes')
+  const guard = response.admissionPolicies.find(
+    policy =>
+      policy.enforced &&
+      policy.guards.some(g => g.resource === card.resource?.split('.')[0] && g.operations.includes('CREATE'))
+  )
 
-    if (!result.ok) {
-      return { status: 'unavailable', reason: result.reason, detail: result.detail }
+  return {
+    ...card,
+    mayCreate: verdict,
+    mayCreateReason:
+      verdict === 'yes'
+        ? `Kubernetes RBAC allows creating every resource this offering needs in ${fact.namespace}${guard ? `; note the enforced ${guard.name} admission policy governs ${card.resource}` : ''}.`
+        : `${blocking.map(row => `${row.resource}: ${row.reason ?? row.verdict}`).join('; ')}.`
+  }
+}
+
+// The hostname a namespace may claim. Only an enforced ingress guard that
+// scopes on a tenant label yields a pattern; anything else gets an honest
+// note rather than a fabricated rule.
+function hostRuleFrom(
+  cluster: ClusterFacts,
+  fact: NamespaceFact,
+  labels: Record<string, string>,
+  identity: KubernetesIdentity | null
+): HostRule {
+  const suffix = cluster.ingress.domainSuffix
+  const guard = denialsFor(cluster.admission, {
+    group: 'networking.k8s.io',
+    resource: 'ingresses',
+    operation: 'CREATE',
+    namespaceLabels: labels,
+    callerGroups: identity?.groups
+  })[0]
+  // The message about hosts, not one about some other resource the guard
+  // also covers.
+  const hostMessage = guard?.messages.find(m => /host/i.test(m)) ?? guard?.messages[0] ?? null
+  const tenantId = fact.tenant?.id ?? null
+  const base = {
+    namespace: fact.namespace,
+    tenantId,
+    sandboxId: tenantId,
+    enforcedBy: guard?.policy ?? null,
+    enforcedMessage: hostMessage
+  }
+
+  if (!suffix) {
+    return {
+      ...base,
+      exactHost: null,
+      labelledPattern: null,
+      note: 'This cluster publishes no ingress domain, so ask the platform team which hostnames you may use.'
     }
+  }
 
-    if (!result.capabilities.inCluster) {
-      return {
-        status: 'unavailable',
-        reason: 'not_in_cluster',
-        detail:
-          'driftmower-ui is not running inside a Kubernetes cluster, so it can report no cluster facts. ' +
-          'These tools only answer against an in-cluster deployment.'
-      }
+  if (!guard || !tenantId) {
+    return {
+      ...base,
+      exactHost: null,
+      labelledPattern: null,
+      note: guard
+        ? `The ${guard.policy} admission policy governs Ingress creation here, but this namespace carries no tenant label it scopes on; its message is reported as-is.`
+        : `No admission policy enforces a hostname pattern on this namespace; hostnames under ${suffix.value} are a convention, not a rule.`
     }
+  }
 
-    return { status: 'ok', capabilities: result.capabilities }
+  const rule = hostRuleFor(suffix.value, tenantId, guard.policy)
+  const provenance =
+    suffix.source === 'config'
+      ? " The domain comes from this server's configuration rather than from the guard's own parameters, so confirm it before relying on it."
+      : ''
+
+  return {
+    ...base,
+    exactHost: rule.exactHost,
+    labelledPattern: rule.labelledPattern,
+    note:
+      `Only these hostnames are accepted here, and the ${guard.policy} admission policy enforces it: the ingress controller is shared, and the tenant-id prefix is what keeps one tenant from claiming another's traffic.` +
+      provenance
   }
 }

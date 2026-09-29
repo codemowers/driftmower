@@ -1,10 +1,18 @@
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { z } from 'zod'
 import {
+  describeIdentity,
+  kubernetesIdentityFor,
+  type KubernetesIdentityMapping
+} from '../../auth/kubernetes-identity.js'
+import type { RbacScopeResolver } from '../../clients/rbac-scope.js'
+import {
+  mergeScopes,
   scopeFromClaim,
   UNRESTRICTED_SCOPE,
   type ResolvedScope,
-  type ScopeNotice
+  type ScopeNotice,
+  type ScopePolicy
 } from '../../domain/tenancy.js'
 
 // The shape the SDK hands every tool handler as its second argument. Only the
@@ -13,29 +21,67 @@ export interface ToolCallContext {
   authInfo?: AuthInfo
 }
 
+export interface ScopeDependencies {
+  policy: ScopePolicy
+  resolver?: RbacScopeResolver
+  identityMapping?: KubernetesIdentityMapping
+  audit?: (line: string) => void
+}
+
+// The policy used when a tool is registered without scope dependencies:
+// today's behaviour, the token claim alone.
+export const CLAIM_ONLY: ScopeDependencies = { policy: 'claim' }
+
 // Resolves the caller's tenancy from the verified token the transport attached.
 //
 // No `authInfo` means the transport did not authenticate this call, which
 // happens on stdio and when MCP_AUTH_ENABLED is off. Both are local or
 // in-cluster-only deployments where the operator has already decided the
-// process is trusted, so the scope is unrestricted. Once a token is present its
-// claim is authoritative — including when the claim is absent, which
-// `scopeFromClaim` resolves to no access rather than full access.
-export function callerScope(context: ToolCallContext | undefined): ResolvedScope {
+// process is trusted, so the scope is unrestricted. Once a token is present
+// the answer comes from the configured sources: the claim alone, the cluster
+// authorizer alone, or (the default) the union of both. An absent claim under
+// the claim-only policy resolves to no access rather than full access.
+export async function resolveCallerScope(
+  context: ToolCallContext | undefined,
+  dependencies: ScopeDependencies = CLAIM_ONLY
+): Promise<ResolvedScope> {
   const authInfo = context?.authInfo
 
   if (!authInfo) {
     return UNRESTRICTED_SCOPE
   }
 
-  return scopeFromClaim(readNamespaces(authInfo))
-}
+  const claim = readNamespaces(authInfo)
 
-// The caller's raw token, forwarded to driftmower-ui so its provisioning route
-// decides tenancy against the same identity this server verified. `null` on an
-// unauthenticated transport, where driftmower-ui applies its own session gate.
-export function callerAccessToken(context: ToolCallContext | undefined): string | null {
-  return context?.authInfo?.token ?? null
+  if (dependencies.policy === 'claim' || !dependencies.resolver || !dependencies.identityMapping) {
+    return scopeFromClaim(claim)
+  }
+
+  const resolved = kubernetesIdentityFor(authInfo, dependencies.identityMapping)
+
+  if (!resolved.ok) {
+    return mergeScopes(claim, { error: resolved.detail }, dependencies.policy)
+  }
+
+  const identity = describeIdentity(resolved.identity)
+
+  try {
+    const rbac = await dependencies.resolver.resolve(resolved.identity, { preferred: claim })
+
+    dependencies.audit?.(
+      `[mcp] scope sub=${callerSubject(context)} user=${resolved.identity.user} namespaces=${rbac.namespaces.length} clusterWide=${rbac.clusterWide} unknown=${rbac.unknown.length} truncated=${rbac.truncated} policy=${dependencies.policy}`
+    )
+
+    return mergeScopes(claim, rbac, dependencies.policy, identity)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    dependencies.audit?.(
+      `[mcp] scope sub=${callerSubject(context)} user=${resolved.identity.user} error=${message}`
+    )
+
+    return mergeScopes(claim, { error: message }, dependencies.policy, identity)
+  }
 }
 
 export function callerSubject(context: ToolCallContext | undefined): string {

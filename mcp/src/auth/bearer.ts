@@ -1,6 +1,6 @@
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import type { JWTVerifyGetKey } from 'jose'
-import type { IncomingHttpHeaders } from 'node:http'
+import type { IncomingHttpHeaders, ServerResponse } from 'node:http'
 import { createJwksResolver } from './jwks.js'
 import { verifyAccessToken, type AuthenticatedCaller } from './verify-access-token.js'
 
@@ -22,6 +22,8 @@ export interface BearerAuthConfig {
   // 401s. That header is how an OAuth-capable client discovers the flow at all.
   publicUrl: string
   namespacesClaim?: string
+  // See AccessTokenVerificationOptions.identityClaims.
+  identityClaims?: { username: string; groups: string }
 }
 
 export interface AuthorizedCall {
@@ -79,7 +81,8 @@ export function createBearerAuthenticator(
         const { caller, payload } = await verifyAccessToken(token, getKey, {
           issuer: config.issuer,
           audience,
-          namespacesClaim: config.namespacesClaim
+          namespacesClaim: config.namespacesClaim,
+          identityClaims: config.identityClaims
         })
 
         return {
@@ -100,7 +103,8 @@ export function createBearerAuthenticator(
               email: caller.email,
               name: caller.name,
               groups: caller.groups,
-              namespaces: caller.namespaces
+              namespaces: caller.namespaces,
+              identityClaims: caller.identityClaims
             }
           }
         }
@@ -132,6 +136,20 @@ export function createBearerAuthenticator(
       }
     }
   }
+}
+
+// The RFC 6750 rejection: a JSON body plus the WWW-Authenticate challenge that
+// points an OAuth-capable client at the resource metadata.
+export function writeChallenge(
+  response: ServerResponse,
+  authenticator: BearerAuthenticator,
+  outcome: RejectedCall
+): void {
+  response.writeHead(outcome.status, {
+    'content-type': 'application/json',
+    'www-authenticate': authenticator.challengeHeader(outcome)
+  })
+  response.end(JSON.stringify({ error: outcome.error, error_description: outcome.description }))
 }
 
 export function readBearerToken(headerValue: string | string[] | undefined): string | null {

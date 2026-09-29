@@ -5,10 +5,15 @@ import { createMcpServer } from '../create-server.js'
 import { ObservabilityService } from '../../services/observability-service.js'
 import { observabilityCaller } from './observability.js'
 
-const mapping = { usernamePrefix: 'https://auth.example/#', groupsPrefix: '' }
+const mapping = {
+  usernameClaim: 'sub',
+  groupsClaim: 'groups',
+  usernamePrefix: 'https://auth.example/#',
+  groupsPrefix: ''
+}
 
 describe('observability MCP tools', () => {
-  it('maps verified sub/groups without a namespace claim or a hardcoded admin exception', () => {
+  it('maps the verified caller through the Kubernetes identity mapping', () => {
     expect(
       observabilityCaller(
         {
@@ -28,22 +33,6 @@ describe('observability MCP tools', () => {
       }
     })
     expect(observabilityCaller({}, mapping)).toBeUndefined()
-  })
-
-  it('supports an explicitly configured Kubernetes identity prefix', () => {
-    expect(
-      observabilityCaller(
-        {
-          authInfo: {
-            token: 'verified',
-            clientId: 'mcp',
-            scopes: [],
-            extra: { sub: 'alice', groups: ['devs'] }
-          }
-        },
-        { usernamePrefix: '', groupsPrefix: 'oidc:' }
-      )
-    ).toEqual({ identity: { user: 'alice', groups: ['system:authenticated', 'oidc:devs'] } })
   })
 
   it.each([true, false])(

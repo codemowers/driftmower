@@ -6,9 +6,11 @@ authenticated endpoint:
 - **Drift analysis** — persisted Driftmower snapshots read from the
   driftmower-be API (`search_workloads`, `plan_image_updates`).
 - **Provisioning capabilities** — what a cluster offers a workload and what will
-  bite you, with direct Kubernetes capability discovery and UI-backed offerings
-  (`describe_cluster_capabilities`, `list_offerings`,
-  `describe_namespace_readiness`).
+  bite you, discovered from Kubernetes directly, with every permission answer
+  asked of the cluster authorizer as the caller (`describe_cluster_capabilities`,
+  `describe_provisioning_platform`, `list_offerings`,
+  `describe_namespace_readiness`, `check_access`), also served as JSON at
+  `/api/provisioning/capabilities`.
 - **Metrics and logs** — live Prometheus metrics and Loki or Kubernetes pod logs
   (`query_metrics`, `query_logs`), authorized through Kubernetes RBAC.
 
@@ -204,9 +206,12 @@ MCP_AUDIENCE=https://driftmower-mcp          # verified strictly as `aud`
 MCP_PUBLIC_URL=https://driftmower-mcp.ee-lte-1.codemowers.io
 MCP_AUTH_ENABLED=true                        # false only for a server no one can reach
 
-# Provisioning tools; unset means they are not registered at all
-DRIFTMOWER_UI_URL=http://driftmower-ui
-DRIFTMOWER_UI_TIMEOUT_MS=10000
+# Provisioning facts are read from Kubernetes directly; optional knobs:
+PROVISIONING_MAX_NAMESPACES=20               # namespaces per readiness call or capabilities request (1-200)
+PROVISIONING_INGRESS_DOMAIN_SUFFIX=          # fallback when no admission guard publishes one; reported as configured
+PROVISIONING_CLUSTER_FACT_TTL_MS=300000
+PROVISIONING_TOPOLOGY_TTL_MS=60000
+PROVISIONING_OPERATOR_TTL_MS=30000
 
 # Legacy UI public URL setting; the root now always serves the guidance document
 DRIFTMOWER_UI_PUBLIC_URL=https://driftmower-ui.ee-lte-1.codemowers.io
@@ -214,28 +219,63 @@ DRIFTMOWER_UI_PUBLIC_URL=https://driftmower-ui.ee-lte-1.codemowers.io
 
 ## Metrics and logs
 
-`list_accessible_namespaces` discovers namespace names for the authenticated
-caller. It first submits a cluster-scoped SubjectAccessReview for `list` on core
-`namespaces`. If allowed, it lists all namespaces. Otherwise it scans namespaced
-RoleBindings for an exact `roleRef.name` match to `KUBERNETES_NAMESPACE_ROLE`
-(default `admin`) and a matching caller User or Group subject. Both Role and
-ClusterRole references are supported; ClusterRoleBindings are not used by this
-fallback. Subject matching uses the same verified OIDC username/group mapping
-as metrics and logs, not the namespace claim.
+`list_accessible_namespaces` discovers the namespaces where the cluster's own
+authorizer lets the caller `list` pods. It first submits one SubjectAccessReview
+with no namespace, which Kubernetes reads as "in all namespaces" and which only
+a ClusterRoleBinding satisfies; when that is allowed, every namespace is listed.
+Otherwise it lists namespaces with the service account and submits one review
+per namespace, sixteen at a time, bounded by `MCP_SCOPE_MAX_NAMESPACES`
+(default 2000, preferred namespaces first, then alphabetical; the result says
+when it was truncated). No RoleBinding is ever read or interpreted, so the
+answer is exact for any authorizer, including aggregated ClusterRoles, custom
+role names, ClusterRoleBindings and webhook authorizers. Reviews use the same
+verified identity mapping as metrics and logs, never the namespace claim.
 
-The result contains only `namespaces`. This is discovery, not a grant of
-permissions: metrics/logs still check
-the caller's access for every operation. Inconclusive access reviews and API
-errors fail closed; empty matching bindings yield an empty list. The service
-account needs cluster-wide `list` permissions on `namespaces` and `rolebindings`,
-included in the RBAC manifest. Only matching namespace names are exposed.
-The Kubernetes client and this tool are always registered, independently of
-observability configuration or Driftmower services. Calls still require an
-authenticated caller.
+The result carries `namespaces`, `clusterWide`, `unknown` (reviews the
+authorizer could not evaluate; excluded, not denied), `truncated`, the mapped
+`identity` and a `note`. This is visibility, not a grant of permissions:
+being listed says nothing about creating or changing anything, and every
+operation still checks its own verb. An empty result names the mapped identity
+and points at `KUBERNETES_USERNAME_CLAIM` / `KUBERNETES_USERNAME_PREFIX`, since
+a wrong mapping and a user with no access look the same to the apiserver. The
+service account needs cluster-wide `list` on `namespaces` and `create` on
+`subjectaccessreviews`, included in the RBAC manifest. The tool is always
+registered, independently of observability configuration or Driftmower
+services; calls still require an authenticated caller.
+
+Every SubjectAccessReview this server sends passes through one cache keyed by
+the mapped identity and the exact verb, resource, subresource, name and
+namespace. Only conclusive answers are stored; an inconclusive review is
+retried on the next call. `MCP_SAR_CACHE_TTL_MS` (default 3600000, one hour)
+bounds staleness; `0` disables the cache. This server never applies anything,
+so a permission revoked inside the window costs at most a 403 the caller's own
+kubectl reports and this server did not predict. Freshness comes from
+invalidation, and the TTL is the safety net:
+
+- **Watch (default, `MCP_RBAC_WATCH_ENABLED=true`).** The server watches
+  Roles, RoleBindings, ClusterRoles, ClusterRoleBindings, Namespaces and
+  CRDs. A Role or RoleBinding event flushes the reviews for that namespace, a
+  cluster-scoped RBAC event flushes them all, a Namespace event refreshes the
+  namespace listing, a CRD event refreshes discovery and the cluster facts. It
+  catches every change source (Argo CD, Helm, kubectl, platform-manager) within
+  seconds, needs `watch` on those resources (in the RBAC manifest), and falls
+  back to the TTL with a warning when the stream cannot be opened.
+- **Webhook.** `POST /api/cache/invalidate` with `{"scope":"all"}`,
+  `{"scope":"namespace","namespace":"..."}` or `{"scope":"identity","sub":"..."}`
+  flushes on demand, for what a watch cannot see (a webhook authorizer whose
+  policy changed) or an Argo CD PostSync hook. It is accepted with the
+  `MCP_INVALIDATE_TOKEN` shared secret, or with a Kubernetes ServiceAccount
+  token that a TokenReview resolves to one of `MCP_INVALIDATE_ALLOWED_SUBJECTS`
+  (comma separated, e.g. `system:serviceaccount:argocd:argocd-server`; needs
+  `create tokenreviews`). It is a 404 when neither is configured.
+
+`driftmower_mcp_sar_cache_invalidations_total{source}` counts both. On a
+cluster with a webhook authorizer and no cooperating webhook call, the TTL is
+the real staleness bound.
 
 `explain_storage_class` has been removed. Use `list_storage_classes` for live
 settings and operator-authored descriptions, and `list_admission_policies` for
-admission behavior. `describe_cluster_capabilities` also reads Kubernetes directly. Only `list_offerings` and `describe_namespace_readiness` still use driftmower-ui.
+admission behavior. Every provisioning tool reads Kubernetes directly; see [Provisioning Tools](#provisioning-tools).
 
 The same Kubernetes connection also exposes `list_storage_classes` and
 `list_admission_policies`. These tools list live names and the exact
@@ -269,13 +309,12 @@ as granted by the included RBAC manifest. Catalogs are always registered and do 
 section; API requests use `KUBERNETES_TIMEOUT_MS` (default 10000), independently
 of `OBSERVABILITY_TIMEOUT_MS`. Credentials are loaded when a tool is called.
 
-These tools require authenticated HTTP with Passmower OIDC. They work without
+These tools require authenticated HTTP with OIDC. They work without
 driftmower-be, driftmower-ui, or a namespace ownership claim. Set
-`DRIFTMOWER_BE_ENABLED=false` and leave `DRIFTMOWER_UI_URL` and
-`DRIFTMOWER_UI_PUBLIC_URL` unset for an observability-only deployment; no backend
-service token is then required and readiness does not contact Driftmower.
-Existing drift-analysis and provisioning tools retain their existing auth and
-namespace-claim behavior.
+`DRIFTMOWER_BE_ENABLED=false` and leave `DRIFTMOWER_UI_PUBLIC_URL` unset for a
+Kubernetes-only deployment; no backend service token is then required and
+readiness does not contact Driftmower. The drift-analysis tools keep their
+namespace scoping (see [Tenancy](#tenancy)).
 
 ```bash
 DRIFTMOWER_MCP_TRANSPORT=http
@@ -291,7 +330,16 @@ LOKI_URL=http://loki.monitoring.svc.cluster.local:3100
 KUBERNETES_API_URL=https://kubernetes.default.svc
 KUBERNETES_TOKEN_FILE=/var/run/secrets/kubernetes.io/serviceaccount/token
 KUBERNETES_CA_FILE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-KUBERNETES_NAMESPACE_ROLE=admin
+MCP_SCOPE_SOURCE=union
+MCP_SCOPE_MAX_NAMESPACES=2000
+MCP_SAR_CACHE_TTL_MS=3600000
+MCP_RBAC_WATCH_ENABLED=true
+MCP_INVALIDATE_TOKEN=                        # enables POST /api/cache/invalidate with this bearer secret
+MCP_INVALIDATE_ALLOWED_SUBJECTS=             # ServiceAccount usernames accepted via TokenReview
+KUBERNETES_USERNAME_CLAIM=sub
+KUBERNETES_GROUPS_CLAIM=groups
+KUBERNETES_USERNAME_PREFIX=${OIDC_ISSUER}#   # '' when the username claim is email; '-' disables
+KUBERNETES_GROUPS_PREFIX=
 KUBERNETES_TIMEOUT_MS=10000
 OBSERVABILITY_TIMEOUT_MS=10000
 ```
@@ -330,13 +378,18 @@ log permission enables the Kubernetes source; the caller's access is checked
 before each read. A Loki-only installation can remove that log permission.
 This manifest grants the server its permissions, not users theirs.
 
-Reviews use the verified Passmower `sub` and `groups`, with the default
-Kubernetes OIDC username mapping `${OIDC_ISSUER}#${sub}` and unprefixed groups.
-This matches the ee-lte-1 bootstrap configuration (`oidc-groups-claim=groups`,
-default `sub` username claim). Set `KUBERNETES_USERNAME_PREFIX` and
-`KUBERNETES_GROUPS_PREFIX` to match a cluster with different prefixes;
-`KUBERNETES_USERNAME_PREFIX=-` explicitly disables the username prefix.
-The cluster must use the `sub` username claim. The MCP bearer token is verified
+Reviews are sent as the Kubernetes subject the cluster's own OIDC
+authenticator would derive from the verified token. The mapping mirrors the
+kube-apiserver flags and must match them: `KUBERNETES_USERNAME_CLAIM`
+(`--oidc-username-claim`, default `sub`), `KUBERNETES_USERNAME_PREFIX`
+(`--oidc-username-prefix`, default `${OIDC_ISSUER}#`, or empty when the
+username claim is `email`, exactly as the apiserver defaults; `-` disables it),
+`KUBERNETES_GROUPS_CLAIM` (`--oidc-groups-claim`, default `groups`) and
+`KUBERNETES_GROUPS_PREFIX` (`--oidc-groups-prefix`, default empty). The
+defaults match the ee-lte-1 bootstrap configuration. A cluster using structured
+`AuthenticationConfiguration` with CEL expressions must express its effective
+mapping as claim plus prefix here. An unverified `email` username is refused,
+as the apiserver refuses it. The MCP bearer token is verified
 for the MCP audience; it is never forwarded to the Kubernetes API, Prometheus,
 or Loki. The server uses its own mounted token and CA for reviews and log reads,
 and reloads the token for rotation.
@@ -706,21 +759,43 @@ without it the connection stops working an hour after every sign-in.
 
 ### Tenancy
 
-Results are confined to the namespaces in the caller's `codemowers.io/namespaces`
-claim, which the `namespaces` OIDC scope puts into the token.
+Results are confined to the namespaces a caller may see, decided by
+`MCP_SCOPE_SOURCE`:
 
-- `search_workloads` and `plan_image_updates` filter on
-  `image_usages.workload_namespace`. A Helm release whose workloads all fall
-  outside the caller's scope disappears rather than leaking its name.
-- The provisioning tools forward the caller's own token to driftmower-ui, which
-  makes the same decision for its Kubernetes reads. A crafted namespace list
-  cannot read another sandbox's quota.
+- `union` (default): the namespaces in the token's `codemowers.io/namespaces`
+  claim (put there by the `namespaces` OIDC scope on clusters running
+  platform-manager) plus every namespace where the cluster authorizer lets the
+  caller `list` pods, discovered with the same SubjectAccessReview sweep as
+  `list_accessible_namespaces`. An absent claim contributes nothing; an
+  authorizer that cannot be asked contributes nothing and the response says so.
+  On a cluster without platform-manager the claim is simply absent and RBAC
+  alone decides. The two are grants: neither removes what the other allows, and
+  every read still asks the cluster.
+- `claim`: the token claim alone, today's behaviour before RBAC discovery. A
+  token carrying no claim gets no access, not full access. This also skips the
+  sweep entirely, which is the setting for a very large cluster where the sweep
+  shows up in `subjectaccessreviews` metrics.
+- `rbac`: the authorizer alone; the claim is ignored.
+
+`search_workloads` and `plan_image_updates` filter on
+`image_usages.workload_namespace`. A Helm release whose workloads all fall
+outside the caller's scope disappears rather than leaking its name. The
+provisioning tools ask the cluster authorizer per namespace instead: a
+namespace where the caller may not list pods is withheld, and every
+permission verdict is a SubjectAccessReview as the verified caller.
 
 Every response carries a `scope` notice saying whether tenancy limited it, so an
 empty result is never ambiguous between "nothing is there" and "not yours to
-see". **A token carrying no namespaces claim gets no access, not full access** —
-failing open would mean that dropping the `namespaces` scope from the OIDCClient
-silently hands every caller the whole fleet.
+see". The notice distinguishes a claim-less token, an authorizer that granted
+nothing (naming the mapped Kubernetes identity, since a wrong
+`KUBERNETES_USERNAME_CLAIM`/`KUBERNETES_USERNAME_PREFIX` looks the same to the
+apiserver as a user with no access), and an authorizer that could not be
+evaluated. A caller who may list pods cluster-wide is unscoped.
+
+At startup on the HTTP transport the server sends one SubjectAccessReview for
+a synthetic user and logs whether the authorizer answers; a warning here means
+every RBAC-derived answer will be `unknown` until the service account may
+create `subjectaccessreviews`.
 
 On `stdio` there is no authentication and no scoping: it is a local process
 reading a local database, with no network surface.
@@ -819,9 +894,15 @@ the caller's responsibility.
 
 ## Provisioning Tools
 
-`describe_cluster_capabilities` reads Kubernetes directly and is registered independently
-of `DRIFTMOWER_UI_URL` and observability. `list_offerings` and
-`describe_namespace_readiness` still use driftmower-ui and require `DRIFTMOWER_UI_URL`.
+All provisioning tools read Kubernetes directly with the server's own service
+account and are always registered. Every fact is discovered from the cluster:
+an optional component that is absent (an admission guard, cert-manager,
+Cilium, Kyverno, an operator) degrades one fact rather than the answer, and
+nothing assumes a particular platform is installed. Every permission answer is
+a SubjectAccessReview sent as the verified caller; no Role or RoleBinding is
+ever read or interpreted, so the answer is exact for any authorizer. An
+unauthenticated call (stdio, `MCP_AUTH_ENABLED=false`) still gets every fact,
+with permission verdicts reported as `unknown` rather than refused.
 
 ### `describe_cluster_capabilities`
 
@@ -832,10 +913,6 @@ duplicate API-family inventories are included. Missing optional catalogs are
 marked unavailable, with discovery errors reported separately. CRD read failures
 fail the tool. Use `get_cluster_identity` for connection identity.
 
-Use the live issuer descriptions to choose an issuer. CRD presence does not
-establish operator health or caller permission. These tools read no tenant
-instances or Secrets.
-
 ### `describe_custom_resource_definition`
 
 Accepts `name`, the full CRD name from the capability catalog (for example
@@ -844,31 +921,75 @@ description, group, kind, resource, scope and served-version schemas. Status
 properties, status requirements, controller metadata and CEL validation code
 are omitted. This is a provisioning schema, not an unmodified CRD export.
 
-Both tools require an authenticated caller and use the existing CRD list
-permission. The detail query selects only the requested CRD by name.
+### `describe_provisioning_platform`
+
+No arguments. The interpreted counterpart of `describe_cluster_capabilities`:
+storage classes with what each implies for data (node-local, zonal,
+cluster-wide; expandable; retained), zones and schedulable nodes, priority
+classes, the published ingress domain and where it came from (an enforced
+ingress guard's own parameter ConfigMap, or `PROVISIONING_INGRESS_DOMAIN_SUFFIX`),
+TLS advice, enforced ValidatingAdmissionPolicies and the namespace label they
+scope tenancy on, Kyverno policies, the network policy engine and whether the
+Prometheus operator is present.
 
 ### `list_offerings`
 
-Every offering the platform can provision, with availability and — when it is
-unavailable — why ("the dragonfly-operator is not installed on this cluster").
-Optional `offering` narrows to one.
+Every offering the platform can provision, with availability and, when it is
+unavailable, why. Optional `offering` narrows to one. Optional `namespace`
+adds `mayCreate` per offering: whether the caller may create every resource
+the offering's sample manifest creates there, with enforced admission
+policies considered.
 
 ### `describe_namespace_readiness`
 
-Takes `namespaces` (1–12). Per namespace: quota used/hard/free, LimitRange
-defaults, network posture, Pod Security enforcement, `mayCreate`, the hostnames
-the namespace may claim, and any policy that selects on an **exact instance
-name** — the trap that makes a database named anything unexpected never report
-ready, with no error pointing at the cause.
+Takes `namespaces` (1 to `PROVISIONING_MAX_NAMESPACES`) and an optional
+`offering`. Per namespace: quota used/hard/free, LimitRange defaults, network
+posture, Pod Security enforcement, the tenant label and id an enforced guard
+scopes on, the hostnames the namespace may claim (only when a guard enforces
+a pattern; otherwise an honest note), any policy that selects on an **exact
+instance name**, and the caller's access there.
 
-Namespaces you cannot access come back in `withheld` rather than erroring.
+Access is an **access matrix**: one SubjectAccessReview per namespaced
+resource type the cluster serves (kube primitives and every CRD) for each of
+the eight standard verbs, built lazily on first request and served from the
+review cache afterwards. The prose summarises it (counts per verb; view, edit
+and admin; a verdict per offering naming the blocking resource); the full
+matrix is in the structured content. A cold build is roughly eight reviews
+per resource type, well under a second in-cluster.
+
+Namespaces where the caller may not list pods come back in `withheld`, and
+an inconclusive review is reported under `degraded`; neither reads as empty.
+
+### `check_access`
+
+Takes `verb`, `resource`, optional `group`, `namespace`, `subresource` and
+`name`. One exact review as the verified caller, for anything the matrix does
+not cover: cluster-scoped resources, subresources such as `pods/log`, named
+objects, `proxy`, and any resource outside the offering catalog (Strimzi,
+Crunchy, whatever the cluster serves). Enforced admission policies that
+govern create, update or delete on the resource are reported alongside and
+outrank an RBAC yes.
+
+### `GET /api/provisioning/capabilities`
+
+The same capability layer as plain JSON, on the MCP port beside `/mcp`, for
+driftmower-ui and any consumer that is not an MCP client. Query `ns` (comma
+separated, at most `PROVISIONING_MAX_NAMESPACES`) and `offering`. It is
+verified by the same bearer authenticator and audience as `/mcp`, so the UI
+mints a token for this server (its `/api/mcp/token` route) rather than
+forwarding a session token. Responses are `Cache-Control: no-store`; errors
+are JSON with an RFC 6750 challenge on 401.
 
 ### Facts that could not be read
 
 A fact the capability layer could not read arrives as a `degraded` entry and is
 rendered under "Facts that could not be read", never as an absent or passing
 one. A refused read that looks like an empty result is the single failure mode
-this layer exists to prevent.
+this layer exists to prevent. The service account needs the read-only rules in
+[observability-rbac.yaml](manifests/templates/observability-rbac.yaml): nodes,
+deployments, resourcequotas, limitranges, networkpolicies, ciliumnetworkpolicies,
+kyverno clusterpolicies and `get` on ConfigMaps (narrow it with the Helm value
+`rbac.paramConfigMapNames`), on top of the catalogs and `subjectaccessreviews`.
 
 ## Development
 

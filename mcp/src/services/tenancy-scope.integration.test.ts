@@ -3,7 +3,7 @@ import { BackendImageUpdateRepository } from '../backend/image-update-repository
 import { BackendReportSnapshotRepository } from '../backend/report-snapshot-repository.js'
 import { ReportRowLoader } from '../backend/report-rows.js'
 import { BackendWorkloadRepository } from '../backend/workload-repository.js'
-import { UNRESTRICTED_SCOPE, type ResolvedScope } from '../domain/tenancy.js'
+import { mergeScopes, UNRESTRICTED_SCOPE, type ResolvedScope } from '../domain/tenancy.js'
 import { createFakeBackend } from '../../test/fake-backend.js'
 import { ImageUpdatePlanningService } from './image-update-planning-service.js'
 import { WorkloadSearchService } from './workload-search-service.js'
@@ -15,6 +15,8 @@ import { WorkloadSearchService } from './workload-search-service.js'
 
 const claimScope = (namespaces: string[]): ResolvedScope => ({ scope: namespaces, source: 'claim' })
 const missingClaimScope: ResolvedScope = { scope: [], source: 'claim-missing' }
+const unionScope = (claim: string[], rbac: string[]): ResolvedScope =>
+  mergeScopes(claim, { namespaces: rbac, unknown: [], clusterWide: false, truncated: false }, 'union')
 
 describe('tenancy scoping against recorded backend rows', () => {
   let searchService: WorkloadSearchService
@@ -47,6 +49,17 @@ describe('tenancy scoping against recorded backend rows', () => {
 
       expect(result.matches.length).toBeGreaterThan(0)
       expect(result.scope).toEqual({ scoped: false, namespaces: null, note: null })
+    })
+
+    it('returns a workload the authorizer grants even when the claim does not name it', async () => {
+      const result = await searchService.searchWorkloads({
+        query: 'cert-manager',
+        scope: unionScope([], ['cert-manager'])
+      })
+
+      expect(result.matches.length).toBeGreaterThan(0)
+      expect(result.matches.every(match => match.namespace === 'cert-manager')).toBe(true)
+      expect(result.scope).toMatchObject({ scoped: true, namespaces: ['cert-manager'] })
     })
 
     it('withholds a workload outside the caller namespaces, and says so', async () => {

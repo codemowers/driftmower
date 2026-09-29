@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import type { SearchWorkloadsResult } from '../../domain/workload-result.js'
 import type { WorkloadSearchService } from '../../services/workload-search-service.js'
-import { callerScope, scopeNoticeSchema, scopeSuffix } from './caller-scope.js'
+import { resolveCallerScope, scopeNoticeSchema, scopeSuffix, type ScopeDependencies } from './caller-scope.js'
 import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
 
 export const SEARCH_WORKLOADS_TOOL_NAME = 'search_workloads'
@@ -55,7 +55,8 @@ const outputSchema = {
 
 export function registerSearchWorkloadsTool(
   server: McpServer,
-  workloadSearchService: Pick<WorkloadSearchService, 'searchWorkloads'>
+  workloadSearchService: Pick<WorkloadSearchService, 'searchWorkloads'>,
+  scopeDependencies?: ScopeDependencies
 ): void {
   server.registerTool(
     SEARCH_WORKLOADS_TOOL_NAME,
@@ -73,7 +74,7 @@ export function registerSearchWorkloadsTool(
       const result = await workloadSearchService.searchWorkloads({
         query,
         limit,
-        scope: callerScope(context)
+        scope: await resolveCallerScope(context, scopeDependencies)
       })
 
       return {

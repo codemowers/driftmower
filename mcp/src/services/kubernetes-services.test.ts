@@ -11,10 +11,13 @@ describe('independent Kubernetes services', () => {
         url: 'https://kubernetes.default.svc',
         tokenFile: '/does-not-exist/token',
         caFile: '/does-not-exist/ca',
-        namespaceRole: 'admin',
+        usernameClaim: 'sub',
+        groupsClaim: 'groups',
         usernamePrefix: 'issuer#',
         groupsPrefix: '',
-        requestTimeoutMs: 10000
+        requestTimeoutMs: 10000,
+        sarCacheTtlMs: 0,
+        rbacWatchEnabled: false
       },
       null
     )
@@ -30,16 +33,29 @@ describe('independent Kubernetes services', () => {
       const { tools } = await client.listTools()
 
       expect(tools.map(tool => tool.name).sort()).toEqual([
+        'check_access',
         'describe_cluster_capabilities',
         'describe_custom_resource_definition',
+        'describe_namespace_readiness',
+        'describe_provisioning_platform',
         'get_cluster_identity',
         'get_engineering_advisory',
         'list_accessible_namespaces',
         'list_admission_policies',
+        'list_offerings',
         'list_storage_classes'
       ])
+      // The provisioning tools answer unauthenticated callers with unknown
+      // verdicts rather than refusing, so they are exercised separately.
+      const provisioning = [
+        'check_access',
+        'describe_namespace_readiness',
+        'describe_provisioning_platform',
+        'list_offerings'
+      ]
+
       for (const tool of tools.filter(
-        tool => !['get_engineering_advisory', 'get_cluster_identity'].includes(tool.name)
+        tool => !['get_engineering_advisory', 'get_cluster_identity', ...provisioning].includes(tool.name)
       )) {
         const result = await client.callTool({
           name: tool.name,

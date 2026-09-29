@@ -42,7 +42,7 @@ function authenticatorFor(outcomes: Map<string, AuthOutcome>): BearerAuthenticat
 function authorized(sub: string, namespaces: string[]): AuthOutcome {
   return {
     ok: true,
-    caller: { sub, groups: [], namespaces },
+    caller: { sub, groups: [], namespaces, identityClaims: { username: sub, groups: [] } },
     authInfo: {
       token: `token-${sub}`,
       clientId: 'test-client',

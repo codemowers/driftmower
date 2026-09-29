@@ -1,16 +1,18 @@
-import type { Availability, DegradedRead, NamespaceFact, OfferingCard } from '../domain/provisioning.js'
+import { VERBS } from '../domain/provisioning/access-facts.js'
+import type { Availability, DegradedRead, NamespaceFact, OfferingCard } from '../domain/provisioning/types.js'
 import type {
-  ClusterCapabilities,
+  AccessCheck,
   NamespaceReadiness,
   OfferingsListing,
+  ProvisioningPlatform,
   Unavailable
 } from './provisioning-service.js'
 
 // Prose for an agent that is relaying to a beginner.
 //
-// Rules, from driftmower-ui/provisioning.md: lead with the verdict and a count;
-// one short paragraph per thing; name real objects so a sentence is greppable;
-// and never let an unreadable fact read as a passing one.
+// Rules: lead with the verdict and a count; one short paragraph per thing;
+// name real objects so a sentence is greppable; and never let an unreadable
+// fact read as a passing one.
 
 export function formatUnavailable(result: Unavailable): string {
   return [`## Provisioning facts unavailable — ${result.reason.replace(/_/g, ' ')}`, '', result.detail].join(
@@ -18,9 +20,9 @@ export function formatUnavailable(result: Unavailable): string {
   )
 }
 
-export function formatClusterCapabilities(result: ClusterCapabilities): string {
+export function formatProvisioningPlatform(result: ProvisioningPlatform): string {
   const lines: string[] = [
-    `## Cluster capabilities — ${result.offeringsReady} of ${result.offeringsTotal} offerings ready, ` +
+    `## Provisioning platform — ${result.offeringsReady} of ${result.offeringsTotal} offerings ready, ` +
       `${result.storageClasses.length} storage classes`,
     ''
   ]
@@ -68,11 +70,18 @@ export function formatClusterCapabilities(result: ClusterCapabilities): string {
   lines.push(
     result.ingress.domainSuffix
       ? `Published hostnames end in \`${result.ingress.domainSuffix}\`` +
-          (result.ingress.domainSuffixSource === 'app-base-url'
-            ? " — derived from driftmower-ui's own address because the admission guard's configured domain could not be read, so confirm it before relying on it."
+          (result.ingress.domainSuffixSource === 'config'
+            ? ' (configured on this server rather than read from an admission guard, so it is not verified against any policy).'
             : " (read from the admission guard's own parameters).")
       : 'This cluster publishes no ingress domain, so ask the platform team which hostnames you may use.'
   )
+
+  if (result.ingress.classes.length > 0) {
+    lines.push('')
+    lines.push(
+      `Ingress classes: ${result.ingress.classes.map(c => `\`${c.name}\`${c.isDefault ? ' (default)' : ''}`).join(', ')}.`
+    )
+  }
 
   if (result.ingress.tlsAdvice) {
     lines.push('')
@@ -94,9 +103,39 @@ export function formatClusterCapabilities(result: ClusterCapabilities): string {
           `guards ${policy.guards.map(guard => `${guard.resource}.${guard.group || 'core'}`).join(', ') || 'nothing listed'}.`
       )
     }
+
+    if (result.tenantLabelKey) {
+      lines.push('')
+      lines.push(`Enforced policies scope tenancy on the namespace label \`${result.tenantLabelKey}\`.`)
+    }
+  }
+
+  if (result.policies.length > 0) {
+    lines.push('')
+    lines.push('### Kyverno policies')
+    lines.push('')
+
+    for (const policy of result.policies) {
+      lines.push(
+        `- **${policy.name}** — ${policy.mode}; touches ${policy.touches.join(', ') || 'unspecified kinds'}. ${policy.meaning}`
+      )
+    }
   }
 
   return [...lines, ...degradedSection(result.degraded)].join('\n')
+}
+
+export function formatAccessCheck(
+  result: AccessCheck,
+  input: { verb: string; group: string; resource: string; namespace?: string }
+): string {
+  const what = `${input.verb} ${input.resource}.${input.group || 'core'}${input.namespace ? ` in namespace ${input.namespace}` : ' cluster-wide'}`
+  const lines = [`## ${what} — ${result.verdict}`, '', result.reason]
+
+  if (result.identity)
+    lines.push('', `Asked of the cluster authorizer as Kubernetes user \`${result.identity.user}\`.`)
+
+  return lines.join('\n')
 }
 
 export function formatOfferings(result: OfferingsListing): string {
@@ -124,11 +163,25 @@ export function formatOfferings(result: OfferingsListing): string {
     if (offering.resource) {
       lines.push('')
       lines.push(
-        `Resource: \`${offering.resource}\`${offering.apiVersion ? ` (${offering.apiVersion})` : ''}. ` +
-          `${offering.instanceCount} instance(s) visible to you.`
+        `Resource: \`${offering.resource}\`${offering.apiVersion ? ` (${offering.apiVersion})` : ''}.`
       )
     }
 
+    if (offering.mayCreate) {
+      lines.push('')
+      lines.push(
+        `May you create it there: **${offering.mayCreate}**. ${offering.mayCreateReason ?? ''}`.trim()
+      )
+    }
+
+    lines.push('')
+  }
+
+  if (result.withheld.length > 0) {
+    lines.push(
+      `No per-namespace verdict for ${result.withheld.map(name => `\`${name}\``).join(', ')}: ` +
+        'the cluster authorizer does not let you list pods there, or could not say.'
+    )
     lines.push('')
   }
 
@@ -143,16 +196,22 @@ export function formatNamespaceReadiness(result: NamespaceReadiness): string {
 
   if (result.withheld.length > 0) {
     lines.push(
-      `No facts were returned for ${result.withheld.map(name => `\`${name}\``).join(', ')}. ` +
-        'That normally means the namespace is outside your access rather than that it does not exist.'
+      `No facts were returned for ${result.withheld.map(name => `\`${name}\``).join(', ')}: ` +
+        'the cluster authorizer does not let you list pods there, or could not say. That is about your access, not about whether the namespace exists.'
     )
     lines.push('')
   }
 
   for (const fact of result.namespaces) {
-    lines.push(`### ${fact.namespace}${fact.sandbox ? ` (sandbox \`${fact.sandbox}\`)` : ''}`)
+    lines.push(
+      `### ${fact.namespace}${fact.tenant ? ` (\`${fact.tenant.labelKey}=${fact.tenant.id}\`)` : ''}`
+    )
     lines.push('')
-    lines.push(`Permission to create here: **${fact.mayCreate}** — ${fact.mayCreateReason}`)
+    lines.push(accessSentence(fact))
+    lines.push('')
+    lines.push(
+      `Permission to create the requested offering here: **${fact.mayCreate}** — ${fact.mayCreateReason}`
+    )
     lines.push('')
     lines.push(quotaSentence(fact))
 
@@ -228,6 +287,50 @@ function availabilitySummary(offering: OfferingCard): string {
     case 'not-installed':
       return `not installed on this cluster${offering.operator ? ` (${offering.operator.name} is absent)` : ''}`
   }
+}
+
+// Never the whole matrix: counts and the derived tiers, plus the per-offering
+// verdicts. The full matrix travels in structuredContent for anything that
+// wants a specific cell.
+function accessSentence(fact: NamespaceFact): string {
+  const access = fact.access
+
+  if (!access) {
+    return (
+      'Access: not checked, because the call carried no verified caller. Run `kubectl auth can-i --list -n ' +
+      fact.namespace +
+      '` yourself.'
+    )
+  }
+
+  const { byVerb, resourceTypes, unknown } = access.summary
+  const reads = Math.max(byVerb.get, byVerb.list, byVerb.watch)
+  const provision = Object.entries(access.provision)
+    .map(([id, verdict]) => {
+      const blocked = (access.provisionDetail[id as keyof typeof access.provisionDetail] ?? []).filter(
+        row => row.verdict !== 'yes'
+      )
+
+      return `${id} ${verdict}${verdict !== 'yes' && blocked.length > 0 ? ` (${blocked.map(row => row.resource).join(', ')})` : ''}`
+    })
+    .join(', ')
+  const oddities = Object.entries(access.matrix)
+    .filter(([, row]) => row.create === 'yes' && row.delete === 'no')
+    .map(([key]) => key.replace(/^\//, ''))
+  const caveat =
+    unknown > 0
+      ? ` ${unknown} of ${resourceTypes * VERBS.length} reviews could not be evaluated and read as unknown.`
+      : ''
+
+  return (
+    `Access (from the cluster authorizer): may create ${byVerb.create} of ${resourceTypes} resource types, ` +
+    `read ${reads}, update ${byVerb.update}, delete ${byVerb.delete}; view ${access.view}, edit ${access.edit}, admin ${access.admin}. ` +
+    `Provision: ${provision || 'no offerings served'}.` +
+    (oddities.length > 0
+      ? ` Create without delete on ${oddities.slice(0, 5).join(', ')}${oddities.length > 5 ? ' and more' : ''}.`
+      : '') +
+    caveat
+  )
 }
 
 function quotaSentence(fact: NamespaceFact): string {

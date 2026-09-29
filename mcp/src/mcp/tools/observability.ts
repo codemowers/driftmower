@@ -5,42 +5,25 @@ import {
   type ObservabilityService,
   type ObservabilityCaller
 } from '../../services/observability-service.js'
+import { kubernetesIdentityFor, type KubernetesIdentityMapping } from '../../auth/kubernetes-identity.js'
 import type { ToolCallContext } from './caller-scope.js'
 import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
 
-export interface ObservabilityIdentityMapping {
-  usernamePrefix: string
-  groupsPrefix: string
-}
-
 // Identity comes only from the verified transport context, never tool arguments
-// or caller-supplied namespace claims. The mapping must match kube-apiserver.
+// or caller-supplied namespace claims. See kubernetesIdentityFor.
 export function observabilityCaller(
   context: ToolCallContext,
-  mapping: ObservabilityIdentityMapping
+  mapping: KubernetesIdentityMapping
 ): ObservabilityCaller | undefined {
-  const extra = context.authInfo?.extra
+  const resolved = kubernetesIdentityFor(context.authInfo, mapping)
 
-  if (typeof extra?.sub !== 'string' || !extra.sub) return undefined
-
-  const groups = Array.isArray(extra.groups)
-    ? extra.groups.filter((group): group is string => typeof group === 'string')
-    : []
-
-  return {
-    identity: {
-      user: `${mapping.usernamePrefix}${extra.sub}`,
-      groups: [
-        ...new Set(['system:authenticated', ...groups.map(group => `${mapping.groupsPrefix}${group}`)])
-      ]
-    }
-  }
+  return resolved.ok ? { identity: resolved.identity } : undefined
 }
 
 export function registerObservabilityTools(
   server: McpServer,
   service: ObservabilityService,
-  mapping: ObservabilityIdentityMapping
+  mapping: KubernetesIdentityMapping
 ): void {
   if (service.metricsEnabled) {
     server.registerTool(

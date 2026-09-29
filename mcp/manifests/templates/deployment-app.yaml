@@ -89,10 +89,8 @@ spec:
                 secretKeyRef:
                   name: oidc-client-driftmower-mcp-owner-secrets
                   key: OIDC_IDP_URI
-            # Cluster-internal base URL of driftmower-ui, which owns the
-            # remaining offering/readiness tools. Cluster capabilities read Kubernetes directly.
-            - name: DRIFTMOWER_UI_URL
-              value: 'http://driftmower-ui'
+            # Provisioning facts are read from Kubernetes directly; see the
+            # PROVISIONING_* settings in the README for the optional knobs.
             # Public URL of driftmower-ui. A person who opens this server's own
             # hostname in a browser gets bounced there instead of a JSON 404.
             - name: DRIFTMOWER_UI_PUBLIC_URL

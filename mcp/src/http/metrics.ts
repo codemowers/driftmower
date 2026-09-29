@@ -7,7 +7,9 @@ const routes = new Set([
   '/',
   '/mcp',
   '/.well-known/oauth-protected-resource',
-  '/.well-known/oauth-protected-resource/mcp'
+  '/.well-known/oauth-protected-resource/mcp',
+  '/api/provisioning/capabilities',
+  '/api/cache/invalidate'
 ])
 const methods = new Set(['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'])
 
@@ -16,6 +18,12 @@ export class ApplicationMetrics {
   readonly sessions = new Counter({
     name: 'driftmower_mcp_sessions_total',
     help: 'MCP sessions initialized.',
+    registers: [this.registry]
+  })
+  readonly invalidations = new Counter({
+    name: 'driftmower_mcp_sar_cache_invalidations_total',
+    help: 'SubjectAccessReview cache invalidations by source.',
+    labelNames: ['source'] as const,
     registers: [this.registry]
   })
   private readonly requests = new Counter({

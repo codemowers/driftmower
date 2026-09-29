@@ -5,3 +5,9 @@ image: ghcr.io/codemowers/driftmower-mcp:latest
 cluster:
   id: ""
   apiUrl: ""
+
+rbac:
+  # Names of the ConfigMaps admission guards read their parameters from. Empty
+  # grants `get` on every ConfigMap (needed because a guard names its own);
+  # set it to narrow the grant to those names.
+  paramConfigMapNames: []

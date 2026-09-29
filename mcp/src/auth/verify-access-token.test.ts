@@ -46,8 +46,43 @@ describe('verifyAccessToken', () => {
       email: 'someone@example.com',
       name: 'Someone',
       groups: ['platform'],
-      namespaces: ['sandbox-foo']
+      namespaces: ['sandbox-foo'],
+      identityClaims: { username: 'user-1', groups: ['platform'], emailVerified: undefined }
     })
+  })
+
+  it('captures the claims kube-apiserver maps under their configured names', async () => {
+    const token = await mintToken({
+      email: 'someone@example.com',
+      email_verified: true,
+      roles: ['team-a', 7]
+    })
+
+    const { caller } = await verifyAccessToken(token, createLocalJWKSet(keySet), {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      identityClaims: { username: 'email', groups: 'roles' }
+    })
+
+    expect(caller.identityClaims).toEqual({
+      username: 'someone@example.com',
+      groups: ['team-a'],
+      emailVerified: true
+    })
+    // The server's own audit identity is still `sub`.
+    expect(caller.sub).toBe('user-1')
+  })
+
+  it('leaves the identity username undefined when the configured claim is absent', async () => {
+    const token = await mintToken()
+
+    const { caller } = await verifyAccessToken(token, createLocalJWKSet(keySet), {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      identityClaims: { username: 'preferred_username', groups: 'groups' }
+    })
+
+    expect(caller.identityClaims.username).toBeUndefined()
   })
 
   it('rejects a token minted for another audience', async () => {

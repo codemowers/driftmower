@@ -15,7 +15,18 @@ const SOURCE_VALUES: Record<string, unknown> = {
   'kubernetes.url': 'https://kubernetes.default.svc',
   'kubernetes.tokenFile': '/token',
   'kubernetes.caFile': '/ca',
-  'kubernetes.requestTimeoutMs': 10000
+  'kubernetes.requestTimeoutMs': 10000,
+  'kubernetes.sarCacheTtlMs': 3600000,
+  'kubernetes.rbacWatchEnabled': true,
+  'mcp.invalidateToken': '',
+  'mcp.invalidateAllowedSubjects': '',
+  'tenancy.scopeSource': 'union',
+  'tenancy.maxNamespaces': 2000,
+  'provisioning.maxNamespaces': 20,
+  'provisioning.ingressDomainSuffix': '',
+  'provisioning.clusterFactTtlMs': 300000,
+  'provisioning.topologyTtlMs': 60000,
+  'provisioning.operatorTtlMs': 30000
 }
 
 const source = {
@@ -122,10 +133,41 @@ describe('loadAppConfig', () => {
       lokiUrl: null
     })
     expect(result.kubernetes).toMatchObject({
+      usernameClaim: 'sub',
+      groupsClaim: 'groups',
       usernamePrefix: 'https://auth.example/#',
-      namespaceRole: 'admin',
-      groupsPrefix: ''
+      groupsPrefix: '',
+      sarCacheTtlMs: 3600000,
+      rbacWatchEnabled: true
     })
+    expect(result.invalidate).toEqual({ sharedToken: null, allowedSubjects: [] })
+    expect(result.tenancy).toEqual({ scopeSource: 'union', maxNamespaces: 2000 })
+  })
+
+  it('leaves the username unprefixed by default when the cluster maps the email claim', () => {
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          ...observability,
+          'kubernetes.usernameClaim': 'email',
+          'kubernetes.groupsClaim': 'roles'
+        })
+      ).kubernetes
+    ).toMatchObject({ usernameClaim: 'email', groupsClaim: 'roles', usernamePrefix: '' })
+  })
+
+  it('keeps an explicit prefix even for the email claim', () => {
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          ...observability,
+          'kubernetes.usernameClaim': 'email',
+          'kubernetes.usernamePrefix': 'oidc:'
+        })
+      ).kubernetes.usernamePrefix
+    ).toBe('oidc:')
   })
 
   it('supports Kubernetes-only logs and explicit prefix overrides', () => {
@@ -143,11 +185,61 @@ describe('loadAppConfig', () => {
     ).toMatchObject({ usernamePrefix: '', groupsPrefix: 'oidc:' })
   })
 
-  it('supports a configured namespace role name', () => {
+  it('reads provisioning knobs and strips a leading dot from the configured suffix', () => {
     expect(
-      loadAppConfig([], sourceWith({ ...observability, 'kubernetes.namespaceRole': 'developer' })).kubernetes
-        .namespaceRole
-    ).toBe('developer')
+      loadAppConfig(
+        [],
+        sourceWith({ 'provisioning.ingressDomainSuffix': '.example.io', 'provisioning.maxNamespaces': 50 })
+      ).provisioning
+    ).toEqual({
+      maxNamespaces: 50,
+      ingressDomainSuffix: 'example.io',
+      clusterFactTtlMs: 300000,
+      topologyTtlMs: 60000,
+      operatorTtlMs: 30000
+    })
+    expect(() => loadAppConfig([], sourceWith({ 'provisioning.maxNamespaces': 500 }))).toThrow(
+      'PROVISIONING_MAX_NAMESPACES must be an integer between 1 and 200'
+    )
+  })
+
+  it('reads the invalidation webhook credentials and the watch switch', () => {
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          'mcp.invalidateToken': 'secret',
+          'mcp.invalidateAllowedSubjects':
+            ' system:serviceaccount:argocd:argocd-server, system:serviceaccount:ci:deployer ,',
+          'kubernetes.rbacWatchEnabled': false
+        })
+      )
+    ).toMatchObject({
+      invalidate: {
+        sharedToken: 'secret',
+        allowedSubjects: ['system:serviceaccount:argocd:argocd-server', 'system:serviceaccount:ci:deployer']
+      },
+      kubernetes: { rbacWatchEnabled: false }
+    })
+  })
+
+  it('allows disabling the access review cache and bounds the scope sweep', () => {
+    expect(
+      loadAppConfig([], sourceWith({ ...observability, 'kubernetes.sarCacheTtlMs': 0 })).kubernetes
+        .sarCacheTtlMs
+    ).toBe(0)
+    expect(() => loadAppConfig([], sourceWith({ 'kubernetes.sarCacheTtlMs': -1 }))).toThrow(
+      'MCP_SAR_CACHE_TTL_MS must be an integer of at least 0'
+    )
+    expect(() => loadAppConfig([], sourceWith({ 'tenancy.maxNamespaces': 0 }))).toThrow(
+      'MCP_SCOPE_MAX_NAMESPACES must be an integer'
+    )
+    expect(loadAppConfig([], sourceWith({ 'tenancy.scopeSource': 'claim' })).tenancy.scopeSource).toBe(
+      'claim'
+    )
+    expect(() => loadAppConfig([], sourceWith({ 'tenancy.scopeSource': 'labels' }))).toThrow(
+      'MCP_SCOPE_SOURCE must be one of: claim, rbac, union'
+    )
   })
 
   it('requires authenticated HTTP only when observability is enabled', () => {
