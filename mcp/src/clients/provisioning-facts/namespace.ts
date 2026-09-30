@@ -110,23 +110,33 @@ export async function loadNamespaceFacts(
 
   const tenantId = input.tenantLabelKey ? (labels[input.tenantLabelKey] ?? null) : null
   const access = matrix ? summariseMatrix(matrix, input.targets) : null
-  const primary = input.target?.resources[0]
-  const what = primary?.resource
-    ? `${primary.resource}.${primary.group}`
-    : input.target
-      ? `the ${input.target.id} resource`
-      : 'this'
-  const denials =
-    input.target && primary?.resource
-      ? denialsFor(input.admissionFacts, {
-          group: primary.group,
-          resource: primary.resource,
-          operation: 'CREATE',
-          namespaceLabels: labels,
-          callerGroups: input.identity?.groups
-        })
-      : []
-  const permission = mayCreateVerdict(access, input.target, denials, what)
+  // RBAC across every resource the offering creates, then any enforced
+  // admission policy governing its primary kind, which outranks RBAC.
+  const verdictFor = (target: ProvisionTarget | null) => {
+    const primary = target?.resources[0]
+    const what = primary?.resource
+      ? `${primary.resource}.${primary.group}`
+      : target
+        ? `the ${target.id} resource`
+        : 'this'
+    const denials =
+      target && primary?.resource
+        ? denialsFor(input.admissionFacts, {
+            group: primary.group,
+            resource: primary.resource,
+            operation: 'CREATE',
+            namespaceLabels: labels,
+            callerGroups: input.identity?.groups
+          })
+        : []
+
+    return mayCreateVerdict(access, target, denials, what)
+  }
+
+  const permission = verdictFor(input.target)
+  const offerings: NamespaceFact['offerings'] = Object.fromEntries(
+    input.targets.map(target => [target.id, verdictFor(target)])
+  )
 
   if (
     access &&
@@ -163,6 +173,7 @@ export async function loadNamespaceFacts(
       access,
       mayCreate: permission.verdict,
       mayCreateReason: permission.reason,
+      offerings,
       podSecurity: podSecurityFor(labels)
     },
     labels,

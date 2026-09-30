@@ -106,6 +106,7 @@ export const namespaceFactSchema = z.object({
   access: accessProfileSchema.nullable(),
   mayCreate: verdictSchema,
   mayCreateReason: z.string(),
+  offerings: z.record(z.string(), z.object({ verdict: verdictSchema, reason: z.string() })),
   podSecurity: z
     .object({
       enforce: z.enum(['privileged', 'baseline', 'restricted']),

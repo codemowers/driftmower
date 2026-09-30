@@ -305,13 +305,20 @@ function accessSentence(fact: NamespaceFact): string {
 
   const { byVerb, resourceTypes, unknown } = access.summary
   const reads = Math.max(byVerb.get, byVerb.list, byVerb.watch)
-  const provision = Object.entries(access.provision)
-    .map(([id, verdict]) => {
+  // The composed verdict (RBAC across everything the offering creates, then
+  // enforced admission), naming what blocks it: the resources RBAC refuses,
+  // or the admission policy when RBAC alone would have allowed it.
+  const provision = Object.entries(fact.offerings)
+    .map(([id, entry]) => {
+      if (!entry || entry.verdict === 'yes') return `${id} ${entry?.verdict ?? 'unknown'}`
+
+      const policy = /admission policy \(([^)]+)\)/.exec(entry.reason)?.[1]
       const blocked = (access.provisionDetail[id as keyof typeof access.provisionDetail] ?? []).filter(
         row => row.verdict !== 'yes'
       )
+      const why = policy ? `admission policy ${policy}` : blocked.map(row => row.resource).join(', ')
 
-      return `${id} ${verdict}${verdict !== 'yes' && blocked.length > 0 ? ` (${blocked.map(row => row.resource).join(', ')})` : ''}`
+      return `${id} ${entry.verdict}${why ? ` (${why})` : ''}`
     })
     .join(', ')
   const oddities = Object.entries(access.matrix)

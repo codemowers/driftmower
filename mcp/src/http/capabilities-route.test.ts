@@ -120,6 +120,29 @@ describe('GET /api/provisioning/capabilities', () => {
     )
   })
 
+  it('drops the raw matrix on request and keeps every derived verdict', async () => {
+    const fact = {
+      namespace: 'a',
+      access: { matrix: { '/pods': { list: 'yes' } }, view: 'yes', summary: { resourceTypes: 1 } },
+      offerings: { postgres: { verdict: 'yes', reason: 'ok' } }
+    }
+    const { base } = await start({ capabilities: vi.fn().mockResolvedValue(body({ namespaces: [fact] })) })
+    const headers = { authorization: 'Bearer token-alice' }
+    const summary = (await (
+      await fetch(`${base}${CAPABILITIES_PATH}?ns=a&access=summary`, { headers })
+    ).json()) as {
+      namespaces: { access: Record<string, unknown>; offerings: unknown }[]
+    }
+    const full = (await (
+      await fetch(`${base}${CAPABILITIES_PATH}?ns=a`, { headers })
+    ).json()) as typeof summary
+
+    expect(summary.namespaces[0].access).toEqual({ view: 'yes', summary: { resourceTypes: 1 } })
+    expect(summary.namespaces[0].offerings).toEqual({ postgres: { verdict: 'yes', reason: 'ok' } })
+    expect(full.namespaces[0].access.matrix).toEqual({ '/pods': { list: 'yes' } })
+    expect((await fetch(`${base}${CAPABILITIES_PATH}?access=some`, { headers })).status).toBe(400)
+  })
+
   it('rejects too many namespaces, an unknown offering and other methods', async () => {
     const { base } = await start()
     const headers = { authorization: 'Bearer token-alice' }

@@ -165,6 +165,18 @@ export function mayCreateVerdict(
     }
   }
 
+  // Not served: there is nothing to create, which is not a permission question.
+  const primary = target.resources[0]
+
+  if (primary && primary.resource === null) {
+    return {
+      verdict: 'unknown',
+      reason:
+        primary.reason ??
+        `The cluster does not serve this ${primary.group} resource, so there is nothing to create yet.`
+    }
+  }
+
   const rows = profile.provisionDetail[target.id] ?? []
   const blocking = rows.filter(row => row.verdict === 'no')
   const uncertain = rows.filter(row => row.verdict === 'unknown')

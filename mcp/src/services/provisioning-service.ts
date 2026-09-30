@@ -214,7 +214,7 @@ export class ProvisioningService {
 
       return {
         status: 'ok',
-        offerings: fact ? cards.map(card => withVerdict(card, fact, response)) : cards,
+        offerings: fact ? cards.map(card => withVerdict(card, fact)) : cards,
         withheld: response.withheld,
         degraded: response.degraded
       }
@@ -332,35 +332,14 @@ function record(degraded: DegradedRead[], entry: DegradedRead): void {
   if (!degraded.some(existing => existing.source === entry.source)) degraded.push(entry)
 }
 
-function withVerdict(card: OfferingCard, fact: NamespaceFact, response: CapabilityResponse): OfferingCard {
-  const verdict = fact.access?.provision[card.id]
-  const detail = fact.access?.provisionDetail[card.id] ?? []
+// The namespace's composed verdict for this offering: RBAC across everything
+// the offering creates, with enforced admission policies applied.
+function withVerdict(card: OfferingCard, fact: NamespaceFact): OfferingCard {
+  const verdict = fact.offerings[card.id]
 
-  if (!fact.access || verdict === undefined) {
-    return {
-      ...card,
-      mayCreate: 'unknown',
-      mayCreateReason: fact.access
-        ? 'This offering is not served by the cluster, so nothing could be checked.'
-        : 'The call carried no verified caller, so permission was not checked.'
-    }
-  }
-
-  const blocking = detail.filter(row => row.verdict !== 'yes')
-  const guard = response.admissionPolicies.find(
-    policy =>
-      policy.enforced &&
-      policy.guards.some(g => g.resource === card.resource?.split('.')[0] && g.operations.includes('CREATE'))
-  )
-
-  return {
-    ...card,
-    mayCreate: verdict,
-    mayCreateReason:
-      verdict === 'yes'
-        ? `Kubernetes RBAC allows creating every resource this offering needs in ${fact.namespace}${guard ? `; note the enforced ${guard.name} admission policy governs ${card.resource}` : ''}.`
-        : `${blocking.map(row => `${row.resource}: ${row.reason ?? row.verdict}`).join('; ')}.`
-  }
+  return verdict
+    ? { ...card, mayCreate: verdict.verdict, mayCreateReason: verdict.reason }
+    : { ...card, mayCreate: 'unknown', mayCreateReason: 'This offering was not checked here.' }
 }
 
 // The hostname a namespace may claim. Only an enforced ingress guard that

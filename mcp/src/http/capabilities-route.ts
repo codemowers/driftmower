@@ -77,6 +77,20 @@ export async function handleCapabilitiesRequest(
     return
   }
 
+  // `summary` drops the raw per-resource matrix (hundreds of cells per
+  // namespace) and keeps its counts and every derived verdict. The matrix is
+  // still built either way; only its transfer is skipped.
+  const accessDetail = url.searchParams.get('access') ?? 'full'
+
+  if (accessDetail !== 'full' && accessDetail !== 'summary') {
+    writeJson(response, 400, {
+      error: 'unknown_access_detail',
+      error_description: "access must be 'full' or 'summary'"
+    })
+
+    return
+  }
+
   if (offering !== null && !OFFERINGS_BY_ID.has(offering as OfferingId)) {
     writeJson(response, 400, {
       error: 'unknown_offering',
@@ -95,7 +109,18 @@ export async function handleCapabilitiesRequest(
     dependencies.onAudit?.(
       `[http] capabilities sub=${subject} ns=${namespaces.join(',') || '-'} offering=${offering ?? '-'} withheld=${body.withheld.length}`
     )
-    writeJson(response, 200, body)
+    writeJson(
+      response,
+      200,
+      accessDetail === 'summary'
+        ? {
+            ...body,
+            namespaces: body.namespaces.map(fact =>
+              fact.access ? { ...fact, access: withoutMatrix(fact.access) } : fact
+            )
+          }
+        : body
+    )
   } catch (error) {
     dependencies.onAudit?.(
       `[http] capabilities sub=${subject} error=${error instanceof Error ? error.message : String(error)}`
@@ -120,4 +145,12 @@ function writeJson(
     ...headers
   })
   response.end(JSON.stringify(body))
+}
+
+function withoutMatrix<T extends { matrix: unknown }>(access: T): Omit<T, 'matrix'> {
+  const { matrix, ...rest } = access
+
+  void matrix
+
+  return rest
 }

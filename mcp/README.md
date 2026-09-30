@@ -959,6 +959,12 @@ and admin; a verdict per offering naming the blocking resource); the full
 matrix is in the structured content. A cold build is roughly eight reviews
 per resource type, well under a second in-cluster.
 
+Each namespace also carries `offerings`: for every offering in the catalog,
+whether the caller may create it there and why. That verdict covers every
+resource the offering's sample creates and applies enforced admission policies
+on top, so it is the one to show a user; `access.provision` is the RBAC-only
+input to it.
+
 Namespaces where the caller may not list pods come back in `withheld`, and
 an inconclusive review is reported under `degraded`; neither reads as empty.
 
@@ -976,7 +982,10 @@ outrank an RBAC yes.
 
 The same capability layer as plain JSON, on the MCP port beside `/mcp`, for
 driftmower-ui and any consumer that is not an MCP client. Query `ns` (comma
-separated, at most `PROVISIONING_MAX_NAMESPACES`) and `offering`. It is
+separated, at most `PROVISIONING_MAX_NAMESPACES`), `offering`, and `access`:
+`full` (default) or `summary`, which omits each namespace's raw
+per-resource matrix (hundreds of cells) and keeps its counts and every
+derived verdict. The matrix is built either way; only its transfer is saved. It is
 verified by the same bearer authenticator and audience as `/mcp`, so the UI
 mints a token for this server (its `/api/mcp/token` route) rather than
 forwarding a session token. Responses are `Cache-Control: no-store`; errors

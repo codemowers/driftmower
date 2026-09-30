@@ -129,6 +129,10 @@ export type NamespaceFact = {
   // For the offering that was asked about; admission denials first, then RBAC.
   mayCreate: Verdict
   mayCreateReason: string
+  // The same verdict for every offering the catalog knows, so a caller that
+  // shows them all need not ask once per offering. Enforced admission policies
+  // are applied here, unlike access.provision, which is RBAC alone.
+  offerings: Partial<Record<OfferingId, { verdict: Verdict; reason: string }>>
   // Pod Security Admission is a built-in controller, so it appears in no
   // ValidatingAdmissionPolicy or Kyverno listing.
   podSecurity: {
