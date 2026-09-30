@@ -79,7 +79,8 @@ export type Verb = "get" | "list" | "watch" | "create" | "update" | "patch" | "d
 
 export type AccessProfile = {
   // "group/resource" (core group is "", so pods are "/pods") -> verdict per verb.
-  matrix: Record<string, Record<Verb, Verdict>>
+  // Absent when requested with access=summary, which this page does.
+  matrix?: Record<string, Record<Verb, Verdict>>
   view: Verdict
   edit: Verdict
   admin: Verdict
@@ -141,6 +142,10 @@ export type NamespaceFact = {
   // For the offering asked about; enforced admission policies first, then RBAC.
   mayCreate: Verdict
   mayCreateReason: string
+  // The same composed verdict for every offering in the catalog: RBAC across
+  // everything its sample creates, then enforced admission policies. This, not
+  // access.provision (RBAC alone), is what to show a user.
+  offerings: Partial<Record<OfferingId, { verdict: Verdict; reason: string }>>
   // Pod Security Admission is a built-in controller, so it appears in no
   // ValidatingAdmissionPolicy or Kyverno listing — and on these clusters it is
   // the constraint most likely to stop a first pod.

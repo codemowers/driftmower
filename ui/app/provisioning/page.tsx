@@ -3,6 +3,7 @@
 import PageHeader from "../components/page-header"
 import ClusterScopePill from "../components/cluster-scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
+import AccessCard from "./components/access-card"
 import AdmissionList from "./components/admission-list"
 import HostCard from "./components/host-card"
 import McpPanel from "./components/mcp-panel"
@@ -73,6 +74,7 @@ function Ready({
   // that is not on the page.
   const toc: TocEntry[] = [
     ...(capabilities.degraded.length > 0 ? [{ id: "not-checked", title: "Not checked" }] : []),
+    ...(scoped ? [{ id: "access", title: "Your access" }] : []),
     { id: "coding-agent", title: "Connect a coding agent" },
     { id: "hostname", title: "Your hostname" },
     ...(scoped ? [{ id: "registry", title: "Container registry" }] : []),
@@ -135,6 +137,16 @@ function Ready({
         </Section>
       )}
 
+      {scoped && (
+        <Section
+          id="access"
+          title="Your access"
+          hint="Asked of the cluster as you, for every resource type it serves. Admission policies can still reject an apply these permissions allow."
+        >
+          <AccessCard namespaces={capabilities.namespaces} />
+        </Section>
+      )}
+
       {/* Everything above is also available to a coding agent, over one
           authenticated endpoint, alongside the drift analysis. The tool list is
           the easy part; getting a token into a client is what needs showing. */}
@@ -184,6 +196,7 @@ function Ready({
           storageClasses={capabilities.storageClasses}
           namespace={capabilities.namespaces[0]?.namespace ?? null}
           sandboxId={capabilities.namespaces[0]?.tenant?.id ?? capabilities.namespaces[0]?.sandbox ?? null}
+          verdicts={capabilities.namespaces[0]?.offerings ?? null}
         />
       </Section>
 
