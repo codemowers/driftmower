@@ -66,6 +66,10 @@ export type AdmissionPolicyFact = {
   // Every namespace label key the denying binding's selector mentions, whether
   // by value (matchLabels) or by expression (Exists, In, ...).
   bindingLabelKeys: string[]
+  // The namespaceSelector of every denying binding, as written ({} when a
+  // binding has none, which selects every namespace). The policy governs a
+  // namespace when any of them selects it.
+  bindingSelectors: LabelSelector[]
   // Namespace label keys the policy's own CEL reads. Observed on real clusters:
   // bindings may carry no namespaceSelector at all and the tenant scoping lives
   // in the expressions, so without this a guard reads as governing every
@@ -199,6 +203,7 @@ export function toAdmissionFacts(
       messages: messagesOf(policy),
       scopedToNamespaceLabels: scoping && Object.keys(scoping).length > 0 ? scoping : null,
       bindingLabelKeys,
+      bindingSelectors: denying.map(binding => binding.spec?.matchResources?.namespaceSelector ?? {}),
       scopedToNamespaceLabelKeys: namespaceLabelKeysOf(policy),
       exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
@@ -230,14 +235,49 @@ export type Denial = {
   messages: string[]
 }
 
-function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string, string>): boolean {
-  // A binding selector is the explicit, authoritative scope.
-  if (fact.scopedToNamespaceLabels) {
-    const matches = Object.entries(fact.scopedToNamespaceLabels).every(
-      ([key, value]) => namespaceLabels[key] === value
-    )
+export type LabelSelector = {
+  matchLabels?: Record<string, string>
+  matchExpressions?: { key?: string; operator?: string; values?: string[] }[]
+}
 
-    if (!matches) return false
+// Kubernetes label-selector semantics: every matchLabels pair and every
+// expression must hold. An unknown operator selects nothing, which errs
+// towards "this policy does not apply" only for selectors the API itself
+// would have rejected.
+export function selectorMatches(selector: LabelSelector, labels: Record<string, string>): boolean {
+  const pairs = Object.entries(selector.matchLabels ?? {}).every(([key, value]) => labels[key] === value)
+
+  return (
+    pairs &&
+    (selector.matchExpressions ?? []).every(expression => {
+      const key = expression.key ?? ''
+      const present = Object.prototype.hasOwnProperty.call(labels, key)
+      const values = expression.values ?? []
+
+      switch (expression.operator) {
+        case 'Exists':
+          return present
+        case 'DoesNotExist':
+          return !present
+        case 'In':
+          return present && values.includes(labels[key])
+        case 'NotIn':
+          return !present || !values.includes(labels[key])
+        default:
+          return false
+      }
+    })
+  )
+}
+
+function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string, string>): boolean {
+  // A binding selector is the explicit, authoritative scope: the policy
+  // governs the namespace when any denying binding selects it.
+  if (
+    fact.bindingSelectors.length > 0 &&
+    !fact.bindingSelectors.some(s => selectorMatches(s, namespaceLabels))
+  ) {
+    return false
   }
 
   // Failing that, a policy whose CEL reads a namespace label only governs

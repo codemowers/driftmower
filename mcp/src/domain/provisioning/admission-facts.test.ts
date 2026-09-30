@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 
 import {
   denialsFor,
+  selectorMatches,
   tenantLabelKeyFor,
   toAdmissionFact,
   toAdmissionFacts,
@@ -476,4 +477,56 @@ it('projects the client-facing fact without the server-side pointers', () => {
     'name',
     'scopedToNamespaceLabels'
   ])
+})
+
+it('a binding that selects by expression does not govern a namespace outside it', () => {
+  // Observed on a live cluster: the egress guard's binding selects
+  // `codemowers.io/sandbox Exists` and its CEL reads no namespace label, so
+  // only the binding selector keeps it out of ordinary namespaces.
+  const guard: RawAdmissionPolicy = {
+    metadata: { name: 'sandbox-egress-guard' },
+    spec: {
+      matchConstraints: {
+        resourceRules: [
+          { apiGroups: ['networking.k8s.io'], operations: ['CREATE'], resources: ['networkpolicies'] }
+        ]
+      },
+      validations: [{ message: 'no' }]
+    }
+  }
+  const binding: RawAdmissionBinding = {
+    spec: {
+      policyName: 'sandbox-egress-guard',
+      validationActions: ['Deny'],
+      matchResources: {
+        namespaceSelector: { matchExpressions: [{ key: 'codemowers.io/sandbox', operator: 'Exists' }] }
+      }
+    }
+  }
+  const facts = toAdmissionFacts([guard], [binding])
+  const check = { group: 'networking.k8s.io', resource: 'networkpolicies', operation: 'CREATE' as const }
+
+  expect(denialsFor(facts, { ...check, namespaceLabels: { 'codemowers.io/tenant': 'foo' } })).toEqual([])
+  expect(denialsFor(facts, { ...check, namespaceLabels: { 'codemowers.io/sandbox': 'x' } })).toHaveLength(1)
+})
+
+it('selector semantics follow Kubernetes', () => {
+  const labels = { tier: 'web', env: 'prod' }
+
+  expect(selectorMatches({}, labels)).toBe(true)
+  expect(selectorMatches({ matchLabels: { tier: 'web' } }, labels)).toBe(true)
+  expect(selectorMatches({ matchLabels: { tier: 'db' } }, labels)).toBe(false)
+  expect(
+    selectorMatches({ matchExpressions: [{ key: 'env', operator: 'In', values: ['prod', 'stage'] }] }, labels)
+  ).toBe(true)
+  expect(
+    selectorMatches({ matchExpressions: [{ key: 'env', operator: 'NotIn', values: ['prod'] }] }, labels)
+  ).toBe(false)
+  expect(
+    selectorMatches({ matchExpressions: [{ key: 'team', operator: 'NotIn', values: ['a'] }] }, labels)
+  ).toBe(true)
+  expect(selectorMatches({ matchExpressions: [{ key: 'team', operator: 'DoesNotExist' }] }, labels)).toBe(
+    true
+  )
+  expect(selectorMatches({ matchExpressions: [{ key: 'tier', operator: 'Bogus' }] }, labels)).toBe(false)
 })

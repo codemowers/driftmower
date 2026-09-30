@@ -16,6 +16,8 @@ const groups = [
 function cluster(overrides: Record<string, unknown> = {}) {
   const { read, calls } = fakeReader({
     '/apis': { groups },
+    '/api': { versions: ['v1'] },
+    '/api/v1': { resources: [{ name: 'pods', kind: 'Pod', namespaced: true }] },
     '/apis/postgresql.cnpg.io/v1': { resources: [{ name: 'clusters', kind: 'Cluster', namespaced: true }] },
     '/apis/apps/v1': { resources: [{ name: 'deployments', kind: 'Deployment', namespaced: true }] },
     '/apis/networking.k8s.io/v1': {

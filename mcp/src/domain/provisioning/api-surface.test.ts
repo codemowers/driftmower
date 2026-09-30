@@ -6,6 +6,7 @@ import {
   fromResourceLists,
   groupVersionsOf,
   isAggregated,
+  mergeSurfaces,
   negotiateVersion,
   servesGroup,
   type AggregatedList,
@@ -117,4 +118,17 @@ it('version negotiation returns null when the cluster serves only unknown versio
 
   // This is the fail-safe: the planner must block, not emit a rejected manifest.
   expect(negotiateVersion(surface, 'apps.emqx.io', 'EMQX', ['v2beta1', 'v2alpha1'])).toBe(null)
+})
+
+it('merging keeps every kind and unions versions, and is aggregated only if all parts were', () => {
+  const core = fromResourceLists([
+    { group: '', version: 'v1', list: { resources: [{ name: 'pods', kind: 'Pod', namespaced: true }] } }
+  ])
+  const named = fromAggregated(aggregated)
+  const merged = mergeSurfaces(core, named)
+
+  expect(merged.byKind.get('v1/Pod')?.plural).toBe('pods')
+  expect(merged.byKind.get('apps/v1/Deployment')?.plural).toBe('deployments')
+  expect(merged.aggregated).toBe(false)
+  expect(mergeSurfaces(named, named).versionsByGroup.get('apps')).toEqual(named.versionsByGroup.get('apps'))
 })

@@ -160,3 +160,23 @@ export function negotiateVersion(
 export function servesGroup(surface: ApiSurface, group: string): boolean {
   return surface.versionsByGroup.has(group)
 }
+
+// The core group is served at /api, every named group at /apis, and neither
+// endpoint lists the other. A surface built from one alone silently lacks
+// pods, secrets, services and every other core resource.
+export function mergeSurfaces(...surfaces: ApiSurface[]): ApiSurface {
+  const byKind = new Map<string, ServedResource>()
+  const versionsByGroup = new Map<string, string[]>()
+
+  for (const surface of surfaces) {
+    for (const [key, resource] of surface.byKind) byKind.set(key, resource)
+
+    for (const [group, versions] of surface.versionsByGroup) {
+      const seen = versionsByGroup.get(group) ?? []
+
+      versionsByGroup.set(group, [...seen, ...versions.filter(version => !seen.includes(version))])
+    }
+  }
+
+  return { byKind, versionsByGroup, aggregated: surfaces.every(surface => surface.aggregated) }
+}

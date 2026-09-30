@@ -10,18 +10,53 @@ const aggregated = JSON.parse(
   )
 ) as unknown
 
+const aggregatedCore = {
+  kind: 'APIGroupDiscoveryList',
+  items: [
+    {
+      metadata: { name: '' },
+      versions: [
+        {
+          version: 'v1',
+          resources: [
+            { resource: 'pods', responseKind: { kind: 'Pod' }, scope: 'Namespaced' },
+            { resource: 'nodes', responseKind: { kind: 'Node' }, scope: 'Cluster' }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
 describe('loadApiSurface', () => {
-  it('asks for aggregated discovery and parses it in one request', async () => {
-    const { read, calls } = fakeReader({ '/apis': aggregated })
+  it('reads aggregated discovery for the core and the named groups and merges them', async () => {
+    const { read, calls } = fakeReader({ '/apis': aggregated, '/api': aggregatedCore })
     const surface = await loadApiSurface(read)
 
-    expect(calls).toEqual([{ path: '/apis', accept: AGGREGATED_ACCEPT }])
+    expect(calls.map(call => call.path).sort()).toEqual(['/api', '/apis'])
+    expect(calls.every(call => call.accept === AGGREGATED_ACCEPT)).toBe(true)
     expect(surface.aggregated).toBe(true)
     expect(surface.byKind.get('apps/v1/Deployment')?.plural).toBe('deployments')
+    // The regression this guards: /apis alone carries no core resources.
+    expect(surface.byKind.get('v1/Pod')).toEqual({
+      group: '',
+      version: 'v1',
+      kind: 'Pod',
+      plural: 'pods',
+      namespaced: true
+    })
+    expect(surface.versionsByGroup.get('')).toEqual(['v1'])
   })
 
   it('falls back to one read per group version on an older apiserver, tolerating a vanished group', async () => {
     const { read, calls } = fakeReader({
+      '/api': { kind: 'APIVersions', versions: ['v1'] },
+      '/api/v1': {
+        resources: [
+          { name: 'pods', kind: 'Pod', namespaced: true },
+          { name: 'pods/log', kind: 'Pod', namespaced: true }
+        ]
+      },
       '/apis': {
         groups: [
           { name: 'apps.emqx.io', versions: [{ version: 'v2beta1' }] },
@@ -33,8 +68,15 @@ describe('loadApiSurface', () => {
     })
     const surface = await loadApiSurface(read)
 
-    expect(calls.map(call => call.path)).toEqual(['/apis', '/apis/apps.emqx.io/v2beta1', '/apis/gone.io/v1'])
+    expect(calls.map(call => call.path).sort()).toEqual([
+      '/api',
+      '/api/v1',
+      '/apis',
+      '/apis/apps.emqx.io/v2beta1',
+      '/apis/gone.io/v1'
+    ])
     expect(surface.aggregated).toBe(false)
+    expect(surface.byKind.get('v1/Pod')?.plural).toBe('pods')
     expect(surface.byKind.get('apps.emqx.io/v2beta1/EMQX')?.plural).toBe('emqxes')
     expect(surface.versionsByGroup.get('gone.io')).toEqual(['v1'])
   })
