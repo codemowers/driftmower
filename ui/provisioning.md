@@ -1,8 +1,28 @@
 # Self-service provisioning in driftmower-ui
 
+> **The capability layer now lives in driftmower-mcp (2026-09-30).** The
+> Kubernetes reads, the permission answers and the RBAC for them moved to
+> `driftmower-mcp`: `src/domain/provisioning/` (the pure fact modules, ported
+> from here), `src/clients/provisioning-facts/` (the loaders) and
+> `manifests/templates/observability-rbac.yaml`. Every permission verdict there
+> is a SubjectAccessReview asked as the signed-in user, over every namespaced
+> resource type and verb, instead of the RoleBinding heuristic described below;
+> tenancy comes from the same authorizer, with the namespaces claim as an
+> optional extra source. This app keeps the views and relays:
+> `GET /api/provisioning/capabilities` mints an MCP-audience token from the
+> session (`lib/server/mcp-token.ts`) and forwards the query to driftmower-mcp's
+> own `/api/provisioning/capabilities` (`DRIFTMOWER_MCP_URL`,
+> `lib/features/provisioning/mcp-capabilities.ts`). It therefore needs
+> `MCP_ENABLED=true`; while that is off the page says so. What stays here is
+> only what other features import: `api-surface.ts` and `facts/discovery.ts`
+> (live-patch-upgrade), `ingress-facts.ts` (applications), the samples, the
+> registry host helper and the MCP quick starts. The fact, discovery, authz and
+> RBAC sections below are history kept for their reasoning; driftmower-mcp's
+> README is the current reference.
+>
 > **Status:** design doc plus live phase tracker. Phases 1–2 are implemented
-> (`lib/features/provisioning/`, `GET /api/provisioning/capabilities`,
-> `k8s/rbac.yaml`); phases 3–10 are not started. See **Sequencing** below for
+> (now in driftmower-mcp, see above; this app serves the page and the relay);
+> phases 3–10 are not started. See **Sequencing** below for
 > the phase list, and the tracking issue for current state.
 >
 > Paths beginning `codemowers-kube/`, `platform-manager/` or `passmower/` refer
@@ -120,6 +140,11 @@ confirm-and-mutate path to secure, and the honest limit of the feature is that i
   and whether real MCP clients can connect to passmower without dynamic client registration.
 
 ## Architecture: one capability layer, two façades
+
+> **Now in driftmower-mcp.** The one capability layer below is driftmower-mcp's
+> `src/domain/provisioning/` and `src/clients/provisioning-facts/`; its two
+> façades are the MCP tools and its JSON route, and this app's route is a relay
+> in front of the second. See the note at the top.
 
 ```
 lib/features/provisioning/       ← the only place the knowledge lives
@@ -517,7 +542,14 @@ existing YAML pages too) or fall back to `js-yaml` in production for that path.
 > `createRemoteJWKSet`. Check `curl $OIDC_IDP_URI/jwks` before reinstating a
 > workaround.
 >
-> **What changed.**
+> **Superseded again (2026-09-30).** The bullets below describe the interim
+> design, in which driftmower-mcp forwarded the caller's token to this app. The
+> direction is now the reverse: driftmower-mcp owns the facts and this app
+> relays to it with an MCP-audience token minted from the session. The bearer
+> path, `lib/auth/bearer.ts`, `bearer-scope.ts` and the `proxy.ts` exemption are
+> gone; `/api/mcp/token` stays, now on the shared `lib/server/mcp-token.ts`.
+>
+> **What changed (interim).**
 >
 > * **The capability layer stays here.** `lib/features/provisioning/` owns the
 >   Kubernetes reads and `k8s/rbac.yaml` owns the RBAC for them. The gateway is
@@ -879,6 +911,9 @@ fourth. Extract once, reuse in all four.
 | Operator `crds-only`/`degraded` | Warning on review: "applies, then nothing happens" |
 
 ## Files
+
+> **Plan-time list.** The facts, authz and RBAC entries below now live in
+> driftmower-mcp; see the note at the top for what remains here.
 
 **New — server (`import "server-only"` where it touches the API)**
 ```

@@ -57,30 +57,11 @@ export function hostRejectionReason(host: string, rule: IngressHostRule): string
   )
 }
 
-// The guard reads its suffix from a ConfigMap it names via paramRef. Reading
-// the key rather than inferring the domain from existing Ingresses matters:
-// inference would happily return the platform's own domain, which no sandbox
-// may claim.
-export const INGRESS_SUFFIX_KEY = "ingressDomainSuffix"
-
-// Where the suffix came from, because the two sources do not carry the same
-// authority. The guard's own parameter is what admission enforces; anything
-// else is an inference that could disagree with it.
-export type SuffixSource = "guard-params" | "app-base-url"
-
-export type DomainSuffix = { value: string; source: SuffixSource }
-
-export function suffixFromParams(data: Record<string, string> | undefined): string | null {
-  const value = data?.[INGRESS_SUFFIX_KEY]?.trim()
-  return value ? value.replace(/^\.+/, "") : null
-}
-
 // The app is itself deployed at <name>.<suffix>, so its own public URL carries
-// the answer — no cluster read and no RBAC, since APP_BASE_URL is required
-// config. Verified to agree with the guard's parameter on every cluster we can
-// check, but it is still a derivation: a deployment that does not follow the
-// one-label convention would produce the wrong suffix, which is why callers
-// are told which source they got.
+// the answer — no cluster read and no RBAC. It is still a derivation: a
+// deployment that does not follow the one-label convention would produce the
+// wrong suffix. The provisioning page uses driftmower-mcp's domainSuffix,
+// which reads the guard's own parameter; this serves the applications list.
 export function suffixFromAppBaseUrl(appBaseUrl: string | undefined): string | null {
   if (!appBaseUrl) return null
 
@@ -96,55 +77,4 @@ export function suffixFromAppBaseUrl(appBaseUrl: string | undefined): string | n
   // deployment (example.com) or a bare host has no suffix to offer.
   if (labels.length < 3) return null
   return labels.slice(1).join(".")
-}
-
-// The guard's parameter wins wherever it is readable: it is the value the
-// admission policy actually compares against.
-export function resolveDomainSuffix(
-  fromParams: string | null,
-  appBaseUrl: string | undefined,
-): DomainSuffix | null {
-  if (fromParams) return { value: fromParams, source: "guard-params" }
-  const derived = suffixFromAppBaseUrl(appBaseUrl)
-  return derived ? { value: derived, source: "app-base-url" } : null
-}
-
-export type IngressClassFact = { name: string; controller: string; isDefault: boolean }
-
-export type RawIngressClass = {
-  metadata?: { name?: string; annotations?: Record<string, string> }
-  spec?: { controller?: string }
-}
-
-const DEFAULT_CLASS_ANNOTATION = "ingressclass.kubernetes.io/is-default-class"
-
-export function toIngressClassFact(raw: RawIngressClass): IngressClassFact | null {
-  const name = raw.metadata?.name
-  if (!name) return null
-  return {
-    name,
-    controller: raw.spec?.controller ?? "(unknown)",
-    isDefault: raw.metadata?.annotations?.[DEFAULT_CLASS_ANNOTATION] === "true",
-  }
-}
-
-// TLS on these clusters comes from cert-manager plus a ClusterIssuer, so a user
-// needs the issuer name for their Certificate — or to know that a shared
-// wildcard already terminates TLS and they need nothing.
-export type TlsFact = {
-  clusterIssuers: string[]
-  // True when some existing Ingress on this suffix already serves TLS without
-  // naming a per-host secret, i.e. a shared wildcard is doing the work.
-  sharedWildcard: boolean
-  advice: string
-}
-
-export function tlsAdvice(clusterIssuers: string[], sharedWildcard: boolean): string {
-  if (sharedWildcard) {
-    return "A shared wildcard certificate already terminates TLS for this domain, so your Ingress needs no tls block of its own."
-  }
-  if (clusterIssuers.length > 0) {
-    return `Request a certificate from the ${clusterIssuers[0]} ClusterIssuer and name its secret in your Ingress tls block.`
-  }
-  return "No ClusterIssuer was found, so TLS is not automatic here — ask the platform team how certificates are issued."
 }

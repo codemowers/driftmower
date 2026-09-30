@@ -1,16 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import {
-  hostIsAllowed,
-  hostRejectionReason,
-  hostRuleFor,
-  resolveDomainSuffix,
-  suffixFromAppBaseUrl,
-  suffixFromParams,
-  tlsAdvice,
-  toIngressClassFact,
-} from "./ingress-facts.ts"
+import { hostIsAllowed, hostRejectionReason, hostRuleFor, suffixFromAppBaseUrl } from "./ingress-facts.ts"
 
 // A real sandbox id: the hash prefix is assigned at creation, so a user cannot
 // guess it and therefore cannot guess their own hostname.
@@ -59,30 +50,6 @@ test("an allowed host has no rejection reason", () => {
   assert.equal(hostRejectionReason("a1b2c3-demo-api.ee-lte-1.codemowers.io", RULE), null)
 })
 
-test("the suffix comes from the guard's own ConfigMap key", () => {
-  assert.equal(suffixFromParams({ ingressDomainSuffix: "ee-lte-1.codemowers.io" }), "ee-lte-1.codemowers.io")
-  // A leading dot is tolerated, since the guard prepends one itself.
-  assert.equal(suffixFromParams({ ingressDomainSuffix: ".ee-lte-1.codemowers.io" }), "ee-lte-1.codemowers.io")
-  assert.equal(suffixFromParams({}), null)
-  assert.equal(suffixFromParams(undefined), null)
-  assert.equal(suffixFromParams({ ingressDomainSuffix: "  " }), null)
-})
-
-test("ingress classes report their controller and default flag", () => {
-  const fact = toIngressClassFact({
-    metadata: { name: "traefik", annotations: { "ingressclass.kubernetes.io/is-default-class": "true" } },
-    spec: { controller: "traefik.io/ingress-controller" },
-  })
-  assert.deepEqual(fact, { name: "traefik", controller: "traefik.io/ingress-controller", isDefault: true })
-  assert.equal(toIngressClassFact({ spec: { controller: "x" } }), null)
-})
-
-test("TLS advice distinguishes a shared wildcard from a per-host certificate", () => {
-  assert.match(tlsAdvice(["letsencrypt"], true), /needs no tls block/)
-  assert.match(tlsAdvice(["letsencrypt"], false), /letsencrypt ClusterIssuer/)
-  assert.match(tlsAdvice([], false), /not automatic/)
-})
-
 test("the suffix derives from the app's own URL, matching the guard on real clusters", () => {
   // Both verified against the live sandbox-guard-params ConfigMap.
   assert.equal(
@@ -106,24 +73,6 @@ test("derivation refuses when dropping a label would leave no domain", () => {
   assert.equal(suffixFromAppBaseUrl("not a url"), null)
   assert.equal(suffixFromAppBaseUrl(undefined), null)
   assert.equal(suffixFromAppBaseUrl(""), null)
-})
-
-test("the guard's parameter wins, because it is what admission compares against", () => {
-  const resolved = resolveDomainSuffix("guard.example.com", "https://app.other.example.com")
-  assert.deepEqual(resolved, { value: "guard.example.com", source: "guard-params" })
-})
-
-test("without the parameter the derivation is used, and says so", () => {
-  const resolved = resolveDomainSuffix(null, "https://driftmower.aws-us-west-2-bravo.codemowers.io")
-  assert.deepEqual(resolved, {
-    value: "aws-us-west-2-bravo.codemowers.io",
-    source: "app-base-url",
-  })
-})
-
-test("neither source available is null, not a guess", () => {
-  assert.equal(resolveDomainSuffix(null, undefined), null)
-  assert.equal(resolveDomainSuffix(null, "https://example.com"), null)
 })
 
 // Parity with the apiserver, not just with my reading of the CEL. Each case

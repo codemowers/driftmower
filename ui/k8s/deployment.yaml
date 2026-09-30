@@ -58,16 +58,23 @@ spec:
             - name: OIDC_AUDIENCE
               value: "https://driftmower-api"
             # --- driftmower-mcp, the platform's MCP gateway ---
-            # The gateway is a facade over this app's provisioning capability
-            # layer: it calls GET /api/provisioning/capabilities with the
-            # caller's own bearer token, which this app verifies against the
-            # audience below. Must equal driftmower-mcp's MCP_AUDIENCE.
+            # driftmower-mcp owns the provisioning capability layer. The
+            # Provisioning page reads it through this app's
+            # /api/provisioning/capabilities, which mints an MCP-audience token
+            # from the user's session and forwards the query here. Same-namespace
+            # Service name; qualify it when the two run in different namespaces.
+            - name: DRIFTMOWER_MCP_URL
+              value: "http://driftmower-mcp:3000"
+            # Resource indicator requested for those tokens. Must equal the
+            # audience driftmower-mcp verifies (its MCP_AUDIENCE).
             - name: MCP_AUDIENCE
               value: "https://driftmower-mcp"
-            # Serves /api/mcp/token and appends the MCP resource indicator at
-            # login. OFF by default on purpose: if passmower rejects a third
-            # `resource`, *login breaks for every user*, not just MCP. Turn on
-            # only after verifying on a deployed build; rollback is unsetting it.
+            # Appends the MCP resource indicator at login, which both the
+            # Provisioning page and /api/mcp/token need: while it is off the page
+            # explains that MCP is disabled instead of showing cluster facts.
+            # OFF by default on purpose: if passmower rejects a third `resource`,
+            # *login breaks for every user*, not just MCP. Turn on only after
+            # verifying on a deployed build; rollback is unsetting it.
             - name: MCP_ENABLED
               value: "false"
             # Printed in the /api/mcp/token quick-start command and in the

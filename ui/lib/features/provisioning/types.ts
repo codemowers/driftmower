@@ -1,6 +1,7 @@
-// Wire types shared by the provisioning API routes, the MCP tools and the
-// client hooks. Kept free of server imports so the pure catalog/plan layers can
-// use them without dragging the Kubernetes client into a unit test.
+// Wire types for the provisioning page. CapabilityResponse and the facts in it
+// are what driftmower-mcp's GET /api/provisioning/capabilities returns
+// (driftmower-mcp/src/domain/provisioning/types.ts); this app relays it. Kept
+// free of server imports so the pure catalog layer can use them in unit tests.
 
 export type OfferingId =
   | "postgres"
@@ -64,7 +65,27 @@ export type OfferingCard = {
   // What the offering would need before it could be installed here. Rendered for
   // not-installed offerings so the card is never a dead end.
   needs: string[]
-  instanceCount: number
+  // Present only when a namespace was asked about: may the caller create this
+  // offering there, from the access matrix and admission policies.
+  mayCreate?: Verdict
+  mayCreateReason?: string
+}
+
+// The cluster authorizer's own answer, never inferred from role names.
+// "unknown" is a real outcome (the review could not be evaluated), not "no".
+export type Verdict = "yes" | "no" | "unknown"
+
+export type Verb = "get" | "list" | "watch" | "create" | "update" | "patch" | "delete" | "deletecollection"
+
+export type AccessProfile = {
+  // "group/resource" (core group is "", so pods are "/pods") -> verdict per verb.
+  matrix: Record<string, Record<Verb, Verdict>>
+  view: Verdict
+  edit: Verdict
+  admin: Verdict
+  provision: Partial<Record<OfferingId, Verdict>>
+  provisionDetail: Partial<Record<OfferingId, { resource: string; verdict: Verdict; reason: string | null }[]>>
+  summary: { resourceTypes: number; byVerb: Record<Verb, number>; unknown: number }
 }
 
 // How a volume behaves, which is the difference between "3 replicas" meaning
@@ -91,11 +112,11 @@ export type NetworkPosture = "default-deny" | "open" | "unknown"
 
 export type NamespaceFact = {
   namespace: string
+  // The namespace label an enforced admission guard scopes tenancy on, and its
+  // value here; discovered by driftmower-mcp from the cluster's policies.
+  tenant: { labelKey: string; id: string } | null
+  // Equals tenant.id; kept by driftmower-mcp for one release.
   sandbox: string | null
-  // platform-manager enables the sandbox's Zot instance with this namespace
-  // annotation. The UI derives its public host from the sandbox id and the
-  // same ingress domain used by the sandbox-stack chart.
-  registryEnabled: boolean
   quota: { name: string; used: QuotaAmounts; hard: QuotaAmounts } | null
   // Pre-computed so the planner never re-parses Kubernetes quantity strings.
   headroom: {
@@ -115,9 +136,10 @@ export type NamespaceFact = {
     selectors: PolicySelector[]
     ciliumAvailable: boolean
   }
-  // "likely" | "likely-not" | "unknown" only. Approximate by construction
-  // (aggregated roles, wildcards), so it must never produce a blocker.
-  mayCreate: "likely" | "likely-not" | "unknown"
+  // Exact, from SubjectAccessReviews asked as the user. Null when unauthenticated.
+  access: AccessProfile | null
+  // For the offering asked about; enforced admission policies first, then RBAC.
+  mayCreate: Verdict
   mayCreateReason: string
   // Pod Security Admission is a built-in controller, so it appears in no
   // ValidatingAdmissionPolicy or Kyverno listing — and on these clusters it is
@@ -168,16 +190,17 @@ export type PolicyFact = {
 // is enforced by admission rather than convention.
 export type IngressFact = {
   domainSuffix: string | null
-  // "guard-params" is what admission compares against; "app-base-url" is
-  // derived from this app's own hostname and could differ from the guard.
-  domainSuffixSource: "guard-params" | "app-base-url" | null
+  // "guard-params" is what admission compares against; "config" was set on
+  // driftmower-mcp and is not verified against any policy.
+  domainSuffixSource: "guard-params" | "config" | null
   classes: { name: string; controller: string; isDefault: boolean }[]
   clusterIssuers: string[]
-  sharedWildcard: boolean
   tlsAdvice: string
   // Per requested namespace, the two hostnames its sandbox may claim.
   hostRules: {
     namespace: string
+    tenantId: string | null
+    // Equals tenantId; kept by driftmower-mcp for one release.
     sandboxId: string | null
     exactHost: string | null
     labelledPattern: string | null
@@ -213,6 +236,9 @@ export type CapabilityResponse = {
   networkPolicyEngine: "cilium" | "native" | "none" | "unknown"
   monitoringOperator: boolean
   degraded: DegradedRead[]
+  // Requested namespaces the user may not list pods in (or whose review could
+  // not be evaluated). Their facts are withheld, not absent.
+  withheld: string[]
 }
 
 export type FindingSeverity = "blocker" | "warning" | "note"
