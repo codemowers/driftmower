@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Must stay the first import: it corrects the environment before the config
+// library reads it.
+import './service-links.js'
+
 import { setTimeout, clearTimeout } from 'node:timers'
 
 import { loadEngineeringAdvisories } from './advisory/software-engineering.js'

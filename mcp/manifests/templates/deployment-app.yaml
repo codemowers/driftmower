@@ -16,10 +16,6 @@ spec:
         app: driftmower-mcp
     spec:
       serviceAccountName: driftmower-mcp
-      # The Service shares this app's name, so service links would inject
-      # DRIFTMOWER_MCP_PORT=tcp://... and override the server's own port
-      # setting, which fails configuration loading at startup.
-      enableServiceLinks: false
       terminationGracePeriodSeconds: 30
       # No pod affinity and no volume: the analysis is read from driftmower-be
       # over the cluster network, so this pod can run anywhere.
