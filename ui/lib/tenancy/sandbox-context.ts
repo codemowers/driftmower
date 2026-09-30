@@ -15,6 +15,9 @@ export type SandboxInfo = {
   owners: string[]
   creator?: string
   stackChannel: string
+  // Whether the sandbox's Zot registry is enabled (platform-manager's
+  // codemowers.io/feature-registry annotation, as its /api/sandboxes reports).
+  registryEnabled?: boolean
 }
 
 export type SandboxUnavailableReason =

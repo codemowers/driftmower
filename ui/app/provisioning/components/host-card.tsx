@@ -50,9 +50,9 @@ export default function HostCard({ ingress }: { ingress: IngressFact }) {
                 namespace name — sandbox abc123-demo lives in namespace
                 sb-abc123-demo. Without saying so, the prefix below looks like
                 a typo. */}
-            {rule.sandboxId && rule.sandboxId !== rule.namespace && (
+            {(rule.tenantId ?? rule.sandboxId) && (rule.tenantId ?? rule.sandboxId) !== rule.namespace && (
               <span className="text-xs text-muted-foreground">
-                sandbox <code className="font-mono text-brand-label">{rule.sandboxId}</code>
+                sandbox <code className="font-mono text-brand-label">{rule.tenantId ?? rule.sandboxId}</code>
               </span>
             )}
           </div>

@@ -37,8 +37,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Design docs
 
-- [`provisioning.md`](provisioning.md) — self-service provisioning: the
-  operators-and-constraints capability layer, the MCP server and the UI views, plus the
+- [`provisioning.md`](provisioning.md) — self-service provisioning: the design of
+  the capability layer (now served by driftmower-mcp, which this app relays), the MCP server and the UI views, plus the
   phase sequencing. Phases 1–2 are implemented.
 
 ## Environment variables
@@ -73,6 +73,7 @@ What you gain by setting each one, and exactly what you miss by leaving it out.
 
 | Feature | Set | Without it |
 |---|---|---|
+| **Provisioning page** | `DRIFTMOWER_MCP_URL`, `MCP_ENABLED=true` and a matching `MCP_AUDIENCE` | The page's facts come from driftmower-mcp, read as the signed-in user with an MCP-audience token minted from the session. Without these the page explains which one is missing instead of showing cluster facts |
 | **Sandboxes page and sandbox scoping** | `PLATFORM_MANAGER_URL` | The Sandboxes page shows a "not configured" state and the sidebar sandbox picker stays hidden. Pointing it at an unreachable host produces a 502 instead, so leave it unset unless platform-manager is actually deployed. Requires a platform-manager serving `/api/sandboxes`; the older `/api/tenants` was renamed upstream |
 | **AI workload and pod summaries** | `LLM_BASE_URL` and `OPENAI_API_KEY` (any OpenAI-compatible endpoint) | The summary panels are unavailable and `/api/llm` answers 503. There is deliberately no default endpoint, so an unconfigured deployment never calls someone else's host |
 | **Release notes in the Actions card** | `GITHUB_TOKEN` (a token with no scopes is enough) | Changelogs for images are fetched from the GitHub Releases API anonymously, which allows 60 requests per hour per egress IP; a busy cluster hits that and the affected rows fall back to a verdict from version distance and the CVE scan only |

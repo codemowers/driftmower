@@ -1,4 +1,4 @@
-import { mcpAudience } from "@/lib/auth/bearer"
+import { mcpAudience } from "@/lib/auth/mcp-audience"
 
 // What the provisioning page needs to render the MCP connection recipes.
 //

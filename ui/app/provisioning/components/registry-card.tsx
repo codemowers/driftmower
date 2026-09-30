@@ -4,7 +4,8 @@ import { Package } from "lucide-react"
 
 import CopyButton from "@/app/components/copy-button"
 import { sandboxRegistryHost } from "@/lib/features/provisioning/registry-facts"
-import type { IngressFact, NamespaceFact } from "@/lib/features/provisioning/types"
+import type { IngressFact } from "@/lib/features/provisioning/types"
+import type { SandboxInfo } from "@/lib/tenancy/sandbox-context"
 
 const ROBOT_SECRET = "registry-robot"
 const PULL_SECRET = "registry-pull"
@@ -42,14 +43,16 @@ spec:
       image: ${host}/myapp:v1`
 }
 
+// Whether a sandbox has its registry is platform-manager's setting, so it comes
+// from the sandbox list (/api/sandboxes) rather than from the cluster facts.
 export default function RegistryCard({
-  namespaces,
+  sandboxes,
   ingress,
 }: {
-  namespaces: NamespaceFact[]
+  sandboxes: SandboxInfo[]
   ingress: IngressFact
 }) {
-  const enabled = namespaces.filter(entry => entry.registryEnabled && entry.sandbox)
+  const enabled = sandboxes.filter(entry => entry.registryEnabled)
 
   if (enabled.length === 0) {
     return (
@@ -72,7 +75,7 @@ export default function RegistryCard({
   return (
     <div className="flex flex-col gap-4">
       {enabled.map(entry => {
-        const host = sandboxRegistryHost(entry.sandbox!, ingress.domainSuffix!)
+        const host = sandboxRegistryHost(entry.sandbox, ingress.domainSuffix!)
         const login = loginCommand(entry.namespace, host)
         const push = pushCommands(host)
         const skaffold = skaffoldCommands(host)

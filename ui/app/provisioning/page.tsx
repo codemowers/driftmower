@@ -13,17 +13,19 @@ import Section from "./components/section"
 import StorageList from "./components/storage-list"
 import TableOfContents, { type TocEntry } from "./components/table-of-contents"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
-import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
+import { useSandboxContext, useSandboxScope, type SandboxInfo } from "@/lib/tenancy/sandbox-context"
 import type { CapabilityResponse } from "@/lib/features/provisioning/types"
 
 const SUBTITLE =
   "What this cluster will let you deploy, and the rules it enforces. Nothing here changes anything."
 
 const NOT_IN_CLUSTER =
-  "Provisioning reads what this cluster supports from the Kubernetes API, which is unavailable when not running in-cluster."
+  "Provisioning reads what this cluster supports through driftmower-mcp, which reported that it is not running in a cluster."
 
 export default function ProvisioningPage() {
   const { namespaces } = useSandboxScope()
+  const allSandboxes = useSandboxContext(s => s.sandboxes)
+  const inScope = allSandboxes.filter(s => (namespaces ?? []).includes(s.namespace))
   // Namespace-scoped facts are only read for the selected sandbox's namespaces;
   // unscoped, the page still shows everything cluster-wide.
   const state = useCapabilities(namespaces ?? [])
@@ -44,14 +46,22 @@ export default function ProvisioningPage() {
         {state.status === "error" && <p className="text-status-major">{state.message}</p>}
 
         {state.status === "ready" && (
-          <Ready capabilities={state.capabilities} scoped={(namespaces ?? []).length > 0} />
+          <Ready capabilities={state.capabilities} scoped={(namespaces ?? []).length > 0} sandboxes={inScope} />
         )}
       </main>
     </div>
   )
 }
 
-function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; scoped: boolean }) {
+function Ready({
+  capabilities,
+  scoped,
+  sandboxes,
+}: {
+  capabilities: CapabilityResponse
+  scoped: boolean
+  sandboxes: SandboxInfo[]
+}) {
   // Only count offerings whose controller is actually running. A served CRD
   // on its own (or a Deployment with no ready replicas) must not make a
   // database look available on the provisioning page.
@@ -96,8 +106,23 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
         </StatCell>
       </StatGrid>
 
-      {/* Degraded reads name the rule to add, following the habit in
-          lib/cluster-resources/nodes.ts. */}
+      {/* The cluster authorizer, asked as you, does not let you see these, so
+          nothing about them is shown; that is about your access, not whether
+          they exist. */}
+      {capabilities.withheld.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Not shown, because Kubernetes does not let you list pods there:{" "}
+          {capabilities.withheld.map((name, index) => (
+            <span key={name}>
+              {index > 0 && ", "}
+              <code className="font-mono text-xs text-brand-label">{name}</code>
+            </span>
+          ))}
+          .
+        </p>
+      )}
+
+      {/* Degraded reads name the rule to add. */}
       {capabilities.degraded.length > 0 && (
         <Section id="not-checked" title="Not checked" count={capabilities.degraded.length}>
           <div className="flex flex-col gap-2">
@@ -141,7 +166,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           title="Container registry"
           hint="Your sandbox's private Zot registry, with commands for pushing and pulling images."
         >
-          <RegistryCard namespaces={capabilities.namespaces} ingress={capabilities.ingress} />
+          <RegistryCard sandboxes={sandboxes} ingress={capabilities.ingress} />
         </Section>
       )}
 
@@ -158,7 +183,7 @@ function Ready({ capabilities, scoped }: { capabilities: CapabilityResponse; sco
           offerings={runningOfferings}
           storageClasses={capabilities.storageClasses}
           namespace={capabilities.namespaces[0]?.namespace ?? null}
-          sandboxId={capabilities.namespaces[0]?.sandbox ?? null}
+          sandboxId={capabilities.namespaces[0]?.tenant?.id ?? capabilities.namespaces[0]?.sandbox ?? null}
         />
       </Section>
 

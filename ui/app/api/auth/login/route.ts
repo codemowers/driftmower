@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import * as oidc from "openid-client"
 
 import { getOidcConfig, getOidcRuntimeConfig } from "@/lib/auth/oidc"
-import { mcpAudience } from "@/lib/auth/bearer"
+import { mcpAudience } from "@/lib/auth/mcp-audience"
 import { getSession } from "@/lib/auth/session"
 import { platformManagerAudience } from "@/lib/auth/tokens"
 

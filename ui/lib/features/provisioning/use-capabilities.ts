@@ -32,7 +32,9 @@ export function useCapabilities(namespaces: string[]): CapabilityState {
         }
         const body = await res.json()
         if (!res.ok) {
-          setState({ status: "error", message: body.error ?? `Request failed with status ${res.status}` })
+          // The detail names the cause (driftmower-mcp unreachable, MCP not
+          // enabled, ...); the code alone is for machines.
+          setState({ status: "error", message: body.detail ?? body.error ?? `Request failed with status ${res.status}` })
           return
         }
         const capabilities = body as CapabilityResponse
