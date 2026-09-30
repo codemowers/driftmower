@@ -75,6 +75,10 @@ spec:
             # environment where the login-breaking risk is safe to find out
             # about: a resource indicator passmower rejects fails the authorize
             # request for every user, so it gets proven here first.
+            # driftmower-mcp serves the Provisioning page's facts; this app
+            # relays to it (driftmower-ui#51). Ignored by builds before that.
+            - name: DRIFTMOWER_MCP_URL
+              value: "http://driftmower-mcp:3000"
             - name: MCP_ENABLED
               value: "true"
             - name: MCP_AUDIENCE
