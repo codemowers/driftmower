@@ -21,7 +21,9 @@ export function useCapabilities(namespaces: string[]): CapabilityState {
 
   useEffect(() => {
     let cancelled = false
-    const query = key ? `?ns=${encodeURIComponent(key)}` : ""
+    // summary: the page shows the verdicts and counts, never the raw
+    // per-resource matrix, so it need not travel.
+    const query = key ? `?ns=${encodeURIComponent(key)}&access=summary` : "?access=summary"
 
     fetch(`${CAPABILITIES_URL}${query}`, { cache: "no-store" })
       .then(async res => {

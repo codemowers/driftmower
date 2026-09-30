@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import { pickStorageClass, sampleFor } from "@/lib/features/provisioning/catalog/samples"
 import { cn } from "@/lib/utils/cn"
-import type { Availability, OfferingCard, StorageClassFact } from "@/lib/features/provisioning/types"
+import type { Availability, NamespaceFact, OfferingCard, StorageClassFact, Verdict } from "@/lib/features/provisioning/types"
 
 const BADGE: Record<Availability["state"], { label: string; className: string }> = {
   ready: { label: "Ready", className: "bg-status-ok-bg text-status-ok-label" },
@@ -16,14 +16,26 @@ const BADGE: Record<Availability["state"], { label: string; className: string }>
   "not-installed": { label: "Not installed", className: "bg-status-neutral-bg text-status-neutral-label" },
 }
 
+// Asked of the cluster authorizer as you, with enforced admission policies
+// applied, by driftmower-mcp. "Not checked" is not "no": the review could not
+// be evaluated, or the cluster does not serve the kind yet.
+const VERDICT: Record<Verdict, { label: string; className: string }> = {
+  yes: { label: "You can create this", className: "text-status-ok-label" },
+  no: { label: "You cannot create this", className: "text-status-major-label" },
+  unknown: { label: "Permission not checked", className: "text-muted-foreground" },
+}
+
 export default function OfferingList({
   offerings,
   storageClasses,
   namespace,
   sandboxId,
+  verdicts,
 }: {
   offerings: OfferingCard[]
   storageClasses: StorageClassFact[]
+  // The selected namespace's per-offering verdicts; null when none is selected.
+  verdicts: NamespaceFact["offerings"] | null
   // The selected sandbox's namespace, or null when none is selected — the
   // sample then carries no namespace line and lands wherever kubectl points.
   namespace: string | null
@@ -43,6 +55,7 @@ export default function OfferingList({
           namespace={namespace}
           sandboxId={sandboxId}
           storageClass={pickStorageClass(card.id, storageClasses)}
+          verdict={verdicts?.[card.id] ?? null}
         />
       ))}
     </div>
@@ -54,11 +67,13 @@ function OfferingRow({
   namespace,
   sandboxId,
   storageClass,
+  verdict,
 }: {
   card: OfferingCard
   namespace: string | null
   sandboxId: string | null
   storageClass: string | null
+  verdict: { verdict: Verdict; reason: string } | null
 }) {
   const badge = BADGE[card.availability.state]
   // A sample is only honest when the cluster serves the kind: apiVersion is the
@@ -90,6 +105,15 @@ function OfferingRow({
       </div>
 
       <p className="mt-2 text-sm text-muted-foreground">{card.what}</p>
+
+      {verdict && namespace && (
+        <p className="mt-2 text-sm">
+          <span className={cn("font-medium", VERDICT[verdict.verdict].className)}>
+            {VERDICT[verdict.verdict].label} in {namespace}.
+          </span>{" "}
+          <span className="text-muted-foreground">{verdict.reason}</span>
+        </p>
+      )}
 
       {sample ? (
         <div className="mt-4 flex flex-col gap-2">
