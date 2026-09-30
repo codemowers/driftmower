@@ -103,3 +103,12 @@ it("folds an offering's rows and admission into one verdict, and is honest witho
   })
   expect(mayCreateVerdict(profile, null, [], 'x').verdict).toBe('unknown')
 })
+
+it('an offering the cluster does not serve is unknown for that reason, not for a failed review', () => {
+  const profile = summariseMatrix(MATRIX, TARGETS)
+
+  expect(mayCreateVerdict(profile, TARGETS[3], [], 'emqxes.apps.emqx.io')).toEqual({
+    verdict: 'unknown',
+    reason: 'not served'
+  })
+})

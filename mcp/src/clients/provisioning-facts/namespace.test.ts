@@ -107,12 +107,20 @@ describe('loadNamespaceFacts', () => {
 
     expect(blocked.fact.mayCreate).toBe('no')
     expect(blocked.fact.mayCreateReason).toContain('guard')
+    // Every offering gets the composed verdict, not just the one asked about.
+    expect(blocked.fact.offerings.postgres).toMatchObject({
+      verdict: 'no',
+      reason: expect.stringContaining('guard')
+    })
+    // RBAC alone says yes; the composed verdict is what callers should show.
+    expect(blocked.fact.access?.provision.postgres).toBe('yes')
     const admin = await loadNamespaceFacts(
       { read: fakeReader(routes()).read, matrix: builder() },
       { ...input, identity: { ...identity, groups: ['admins'] } }
     )
 
     expect(admin.fact.mayCreate).toBe('yes')
+    expect(admin.fact.offerings.postgres?.verdict).toBe('yes')
   })
 
   it('is honest without a caller, and reports refused reads and unknown reviews as degraded', async () => {

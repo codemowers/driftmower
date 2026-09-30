@@ -156,6 +156,17 @@ function namespaceFact(
     mayCreate: 'yes',
     mayCreateReason:
       'Kubernetes RBAC allows creating clusters.postgresql.cnpg.io, and no enforced admission policy governs it.',
+    offerings: {
+      postgres: {
+        verdict: 'yes',
+        reason:
+          'Kubernetes RBAC allows creating clusters.postgresql.cnpg.io, and no enforced admission policy governs it.'
+      },
+      dragonfly: {
+        verdict: 'unknown',
+        reason: 'The cluster does not serve Dragonfly.dragonflydb.io, so there is nothing to create yet'
+      }
+    },
     podSecurity: {
       enforce: 'restricted',
       requires: ['runAsNonRoot'],
@@ -188,12 +199,10 @@ function service(
     invalidate: vi.fn()
   }
   const checker = {
-    mayPerform: vi
-      .fn()
-      .mockResolvedValue({
-        verdict: options.verdict ?? 'yes',
-        reason: options.verdict === 'no' ? 'Kubernetes RBAC denies it' : null
-      })
+    mayPerform: vi.fn().mockResolvedValue({
+      verdict: options.verdict ?? 'yes',
+      reason: options.verdict === 'no' ? 'Kubernetes RBAC denies it' : null
+    })
   } as unknown as AccessChecker
 
   return { service: new ProvisioningService({ facts, checker, maxNamespaces: 3 }), facts, checker }
@@ -289,10 +298,35 @@ describe('ProvisioningService', () => {
       ['postgres', 'yes'],
       ['dragonfly', 'unknown']
     ])
-    expect(scoped.offerings[0].mayCreateReason).toContain('mine')
+    expect(scoped.offerings[0].mayCreateReason).toContain('no enforced admission policy')
+    expect(scoped.offerings[1].mayCreateReason).toContain('nothing to create yet')
     expect(formatOfferings(scoped)).toContain('May you create it there: **yes**')
     expect(formatOfferings(plain)).toContain('1 of 2 ready')
     expect(formatOfferings(plain)).toContain('Before it could be used here: The Dragonfly operator')
+  })
+
+  it('names the admission policy when it, not RBAC, is what blocks an offering', async () => {
+    const guarded = namespaceFact('mine', 'yes')
+
+    guarded.fact.offerings.postgres = {
+      verdict: 'no',
+      reason:
+        'An enforced admission policy (db-guard) governs creating clusters.postgresql.cnpg.io: no databases here.'
+    }
+    const { service: subject } = service({ namespaces: { mine: guarded } })
+    const result = await subject.describeNamespaceReadiness(identity, ['mine'])
+
+    if (result.status !== 'ok') throw new Error(result.detail)
+
+    expect(formatNamespaceReadiness(result)).toContain('Provision: postgres no (admission policy db-guard)')
+    const listing = await subject.listOfferings(identity, 'postgres', 'mine')
+
+    if (listing.status !== 'ok') throw new Error('unexpected')
+
+    expect(listing.offerings[0]).toMatchObject({
+      mayCreate: 'no',
+      mayCreateReason: expect.stringContaining('db-guard')
+    })
   })
 
   it('reports an unreadable Kubernetes API as a named failure, not a crash', async () => {
