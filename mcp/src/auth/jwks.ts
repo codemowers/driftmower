@@ -1,4 +1,5 @@
-import { createRemoteJWKSet, type JWTVerifyGetKey } from 'jose'
+import { readFile } from 'node:fs/promises'
+import { createRemoteJWKSet, customFetch, type JWTVerifyGetKey } from 'jose'
 
 // Resolves passmower's signing keys.
 //
@@ -39,6 +40,32 @@ export function deriveJwksUri(issuer: string, jwksUri?: string): string {
   return `${issuer.replace(/\/+$/, '')}/jwks`
 }
 
-export function createJwksResolver(jwksUri: string): JWTVerifyGetKey {
-  return createRemoteJWKSet(new URL(jwksUri), { timeoutDuration: FETCH_TIMEOUT_MS })
+export interface JwksResolverOptions {
+  // Present the token in this file as a bearer credential when fetching the
+  // key set. Needed when the issuer is a Kubernetes apiserver running with
+  // --anonymous-auth=false (Talos, CIS-hardened clusters): its
+  // /openid/v1/jwks then answers only authenticated requests, and a
+  // ServiceAccount may read it through system:service-account-issuer-discovery.
+  // The file is re-read on every fetch so projected-token rotation works.
+  bearerTokenFile?: string | null
+}
+
+export function createJwksResolver(jwksUri: string, options: JwksResolverOptions = {}): JWTVerifyGetKey {
+  const tokenFile = options.bearerTokenFile
+
+  return createRemoteJWKSet(new URL(jwksUri), {
+    timeoutDuration: FETCH_TIMEOUT_MS,
+    ...(tokenFile
+      ? {
+          [customFetch]: async (url: string, init: RequestInit) => {
+            const token = (await readFile(tokenFile, 'utf8')).trim()
+            const headers = new Headers(init.headers)
+
+            headers.set('authorization', `Bearer ${token}`)
+
+            return fetch(url, { ...init, headers })
+          }
+        }
+      : {})
+  })
 }

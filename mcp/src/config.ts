@@ -12,6 +12,8 @@ export interface OidcConfig {
   // conformant client asks for. See BearerAuthConfig.audience.
   audience: string | null
   namespacesClaim: string
+  // Bearer token file for fetching the key set; null fetches anonymously.
+  jwksBearerTokenFile: string | null
 }
 
 export interface ProvisioningConfig {
@@ -384,7 +386,8 @@ function readOidcConfig(source: ConfigSource): OidcConfig {
     issuer,
     jwksUri: readOptionalString(source.get<string>('oidc.jwksUri')) ?? `${issuer.replace(/\/+$/, '')}/jwks`,
     audience: readOptionalString(source.get<string>('oidc.audience')),
-    namespacesClaim: readString(source.get<string>('oidc.namespacesClaim'), 'namespacesClaim')
+    namespacesClaim: readString(source.get<string>('oidc.namespacesClaim'), 'namespacesClaim'),
+    jwksBearerTokenFile: readOptionalString(source.get<unknown>('oidc.jwksBearerTokenFile'))
   }
 }
 

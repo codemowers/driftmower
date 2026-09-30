@@ -202,6 +202,8 @@ DRIFTMOWER_MCP_LOG_LEVEL=info
 # Authentication (HTTP transport only; stdio is a local process and is not gated)
 OIDC_ISSUER=https://passmower.example        # matched against the token `iss`
 OIDC_JWKS_URI=                               # defaults to ${OIDC_ISSUER}/jwks
+OIDC_JWKS_BEARER_TOKEN_FILE=                 # bearer token for the key set, e.g. the mounted SA token when the
+                                             # issuer is a kube-apiserver with --anonymous-auth=false
 MCP_AUDIENCE=https://driftmower-mcp          # verified strictly as `aud`
 MCP_PUBLIC_URL=https://driftmower-mcp.ee-lte-1.codemowers.io
 MCP_AUTH_ENABLED=true                        # false only for a server no one can reach

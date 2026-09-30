@@ -22,6 +22,8 @@ export interface BearerAuthConfig {
   // 401s. That header is how an OAuth-capable client discovers the flow at all.
   publicUrl: string
   namespacesClaim?: string
+  // See JwksResolverOptions.bearerTokenFile.
+  jwksBearerTokenFile?: string | null
   // See AccessTokenVerificationOptions.identityClaims.
   identityClaims?: { username: string; groups: string }
 }
@@ -58,7 +60,9 @@ export function protectedResourceMetadataPath(resourcePath: string): string {
 export function createBearerAuthenticator(
   config: BearerAuthConfig,
   resourcePath: string,
-  getKey: JWTVerifyGetKey = createJwksResolver(config.jwksUri)
+  getKey: JWTVerifyGetKey = createJwksResolver(config.jwksUri, {
+    bearerTokenFile: config.jwksBearerTokenFile
+  })
 ): BearerAuthenticator {
   const resource = `${config.publicUrl.replace(/\/+$/, '')}${resourcePath}`
   const metadataUrl = `${config.publicUrl.replace(/\/+$/, '')}${protectedResourceMetadataPath(resourcePath)}`

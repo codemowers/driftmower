@@ -25,7 +25,8 @@
     "issuer": "OIDC_ISSUER",
     "jwksUri": "OIDC_JWKS_URI",
     "audience": "MCP_AUDIENCE",
-    "namespacesClaim": "MCP_NAMESPACES_CLAIM"
+    "namespacesClaim": "MCP_NAMESPACES_CLAIM",
+    "jwksBearerTokenFile": "OIDC_JWKS_BEARER_TOKEN_FILE"
   },
   "backend": {
     "enabled": {
