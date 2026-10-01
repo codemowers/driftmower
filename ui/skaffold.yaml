@@ -5,11 +5,10 @@ metadata:
 
 deploy:
   kubectl: {}
-  kubeContext: ee-lte-1.codemowers.io
 
 build:
   artifacts:
-    - image: zot.registry.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
+    - image: driftmower-ui
       platforms:
         - linux/amd64
       docker:

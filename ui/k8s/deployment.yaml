@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: driftmower-ui
-  namespace: driftmowers
 spec:
   # The netstatd fan-in hub is per-process; a second replica would double the upstream sockets.
   replicas: 1
@@ -21,7 +20,7 @@ spec:
         - name: driftmower-ui-registry
       containers:
         - name: app
-          image: zot.registry.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
+          image: driftmower-ui
           ports:
             - containerPort: 8080
           env:

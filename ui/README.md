@@ -6,8 +6,8 @@ reports from driftmower-be.
 
 ## Deploy
 
-The manifests are in [k8s/](k8s/). They are written for Codemowers' ee-lte-1 cluster, so step 2 points them at
-yours. Run everything from the repo root.
+The manifests are in [k8s/](k8s/) and [skaffold](https://skaffold.dev) deploys them. Which cluster, namespace and
+registry to use lives in your own config, not in the repo. Run everything from the repo root.
 
 ### Before you start
 
@@ -20,54 +20,53 @@ The cluster needs:
 differently, edit [k8s/certificate.yaml](k8s/certificate.yaml) and [k8s/ingress.yaml](k8s/ingress.yaml).
 - A container registry the cluster can pull from.
 
-### 1. Build and push the image
+### 1. Choose the cluster, namespace and registry
 
 ```bash
-export IMAGE=registry.example.com/driftmower-ui:$(git rev-parse --short HEAD)
-docker build -t "$IMAGE" . && docker push "$IMAGE"
+cp skaffold.env.example skaffold.env
+skaffold config set default-repo zot.registry.ee-lte-1.codemowers.io/<your user> --kube-context ee-lte-1.codemowers.io
 ```
 
-On Codemowers' ee-lte-1, `skaffold run` builds, pushes and applies in one go, so skip this step and the `image:`
-line of step 2.
+`skaffold.env` tells skaffold which kubeconfig context and namespace to deploy to; edit it if you deploy
+elsewhere. The second command saves the registry the image is pushed to for that context, in
+`~/.skaffold/config`. Both stay on your machine.
 
-### 2. Point the manifests at your cluster
+### 2. Point the manifests at your host
 
 ```bash
 export HOST=driftmower.example.com
-export NS=driftmowers
 sed -i "s#driftmower.ee#$HOST#g" k8s/deployment.yaml k8s/oidcclient.yaml k8s/ingress.yaml k8s/certificate.yaml
-sed -i "s#namespace: driftmowers#namespace: $NS#" k8s/*.yaml
-sed -i "s#image: .*#image: $IMAGE#" k8s/deployment.yaml
 ```
 
-If your registry is public, also delete the two `imagePullSecrets` lines from
-[k8s/deployment.yaml](k8s/deployment.yaml).
+Outside the `driftmowers` namespace, also fix the two ClusterRoleBinding subjects, which skaffold cannot set:
 
-`[.env.example](.env.example)` lists the same variables with comments, for local `npm run dev`; the cluster reads
-them from the Deployment only.
+```bash
+sed -i "s#namespace: driftmowers#namespace: <your namespace>#" k8s/rbac.yaml
+```
+
+If your registry is public, delete the two `imagePullSecrets` lines from [k8s/deployment.yaml](k8s/deployment.yaml).
 
 ### 3. Create the namespace and secrets
 
 ```bash
+export NS=driftmowers
 kubectl create namespace "$NS"
 kubectl -n "$NS" create secret generic driftmower-ui-session --from-literal=SESSION_SECRET=$(openssl rand -hex 32)
-```
-
-For a private registry, also create the pull secret the Deployment names:
-
-```bash
 kubectl -n "$NS" create secret docker-registry driftmower-ui-registry \
-  --docker-server=registry.example.com --docker-username=<user> --docker-password=<token>
+  --docker-server=zot.registry.ee-lte-1.codemowers.io --docker-username=<user> --docker-password=<token>
 ```
 
-passmower creates one more Secret, `oidc-client-driftmower-ui-owner-secrets`, by itself once the OIDCClient is
-applied in step 4. The Secrets for optional features are created under [Optional features](#optional-features).
+The last one is the pull secret for a private registry. passmower creates one more Secret,
+`oidc-client-driftmower-ui-owner-secrets`, by itself once the OIDCClient is applied in step 4. The Secrets for
+optional features are created under [Optional features](#optional-features).
 
-### 4. Apply
+### 4. Deploy
 
 ```bash
-kubectl apply -f k8s/oidcclient.yaml -f k8s/rbac.yaml -f k8s/deployment.yaml -f k8s/service.yaml -f k8s/ingress.yaml -f k8s/certificate.yaml
+skaffold run
 ```
+
+This builds the image, pushes it to your registry and applies the manifests into your namespace.
 
 ### 5. Check it is up
 
@@ -84,7 +83,8 @@ Then open `https://$HOST` and sign in.
 ### Required settings
 
 [k8s/deployment.yaml](k8s/deployment.yaml) already sets everything the app needs to run, and steps 2 to 4 fill in
-the values. What each one does is under [Required](#required) below.
+the values. What each one does is under [Required](#required) below. [`.env.example`](.env.example) lists the same
+variables with comments, for local `npm run dev`; the cluster reads them from the Deployment only.
 
 
 | Variable                                               | Value                        | Where it comes from                                                                 |
@@ -258,7 +258,7 @@ phase sequencing. Phases 1–2 are implemented.
 ## Environment variables
 
 Everything is read at runtime by the Next.js server (no `NEXT_PUBLIC_` build-time values), so one image
-works in any cluster. `[.env.example](.env.example)` is the same list in copy-to-`.env.local` form.
+works in any cluster. [`.env.example`](.env.example) is the same list in copy-to-`.env.local` form.
 
 Three tiers: **required** (the app is unusable without them), **optional integrations** (each unlocks one
 feature, and skipping it costs you only that feature), and **rarely set** (working defaults that only

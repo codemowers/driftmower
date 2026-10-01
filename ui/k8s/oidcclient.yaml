@@ -8,7 +8,6 @@ apiVersion: codemowers.cloud/v1
 kind: OIDCClient
 metadata:
   name: driftmower-ui
-  namespace: driftmowers
 spec:
   applicationType: web
   displayName: Driftmower
