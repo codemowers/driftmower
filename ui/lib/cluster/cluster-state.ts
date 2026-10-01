@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { AnalyzeClusterProgress } from "./refresh-state"
+import type { AnalysisProgress } from "./refresh-state"
 import type { Report } from "./reports"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
@@ -56,9 +56,9 @@ export type ClusterState = {
   isConnected: boolean
   connectionError: string | null
   error: string | null
+  errorSource: "analysis" | "report" | null
   lastRefreshed: Date | null
-  socketProgress: AnalyzeClusterProgress | null
-  containerCount: number | null
+  analysis: AnalysisProgress | null
   clusterResources: ClusterResource[] | null
   clusterResourcesError: string | null
   livePatchUpgrades: LivePatchUpgradeListResponse | null
@@ -81,9 +81,9 @@ export const useClusterState = create<ClusterState>(() => ({
   isConnected: false,
   connectionError: null,
   error: null,
+  errorSource: null,
   lastRefreshed: null,
-  socketProgress: null,
-  containerCount: null,
+  analysis: null,
   clusterResources: null,
   clusterResourcesError: null,
   livePatchUpgrades: null,

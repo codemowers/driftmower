@@ -186,7 +186,7 @@ function normalizeReport(report: Report): void {
 }
 
 async function loadReport(getReport: () => Promise<Report>): Promise<void> {
-  useClusterState.setState({ isFetchingReport: true, error: null })
+  useClusterState.setState({ isFetchingReport: true, error: null, errorSource: null })
   try {
     const report = await getReport()
     normalizeReport(report)
@@ -197,7 +197,11 @@ async function loadReport(getReport: () => Promise<Report>): Promise<void> {
       isFetchingReport: false,
     })
   } catch (e) {
-    useClusterState.setState({ error: `Could not load the report: ${(e as Error).message}`, isFetchingReport: false })
+    useClusterState.setState({
+      error: `Could not load the report: ${(e as Error).message}`,
+      errorSource: "report",
+      isFetchingReport: false,
+    })
   }
 }
 
