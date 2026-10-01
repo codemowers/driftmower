@@ -1,4 +1,5 @@
-import { pairVolumes, queryScalar, queryVector, type PodVolume, type ResourceTriplet } from "./query"
+import { fetchJson } from "@/lib/utils/fetch-json"
+import { pairVolumes, type PodVolume, type PromQuery, type ResourceTriplet } from "./query"
 
 export type { PodVolume, ResourceTriplet } from "./query"
 
@@ -25,18 +26,23 @@ export function podMetricQueries(namespace: string, pod: string) {
   }
 }
 
-export async function fetchPodMetrics(namespace: string, pod: string): Promise<PodMetrics | null> {
+export function fetchPodMetrics(namespace: string, pod: string): Promise<PodMetrics | null> {
+  const params = new URLSearchParams({ namespace, pod })
+  return fetchJson<PodMetrics | null>(`/api/prometheus/pod-metrics?${params}`)
+}
+
+export async function loadPodMetrics(prom: PromQuery, namespace: string, pod: string): Promise<PodMetrics | null> {
   const q = podMetricQueries(namespace, pod)
   const [memUsage, memLimit, memRequest, cpuUsage, cpuLimit, cpuRequest, usedRows, capacityRows, qosRows] = await Promise.all([
-    queryScalar(q.memUsage),
-    queryScalar(q.memLimit),
-    queryScalar(q.memRequest),
-    queryScalar(q.cpuUsage),
-    queryScalar(q.cpuLimit),
-    queryScalar(q.cpuRequest),
-    queryVector(q.volUsed),
-    queryVector(q.volCapacity),
-    queryVector(q.qos),
+    prom.scalar(q.memUsage),
+    prom.scalar(q.memLimit),
+    prom.scalar(q.memRequest),
+    prom.scalar(q.cpuUsage),
+    prom.scalar(q.cpuLimit),
+    prom.scalar(q.cpuRequest),
+    prom.vector(q.volUsed),
+    prom.vector(q.volCapacity),
+    prom.vector(q.qos),
   ])
 
   const volumes = pairVolumes(usedRows, capacityRows)

@@ -1,55 +1,40 @@
-// PURE. The tenancy decision itself, with no imports, so it can be tested
-// directly -- sandbox-scope-filter.ts is the thin adapter that fetches a scope
-// and turns a verdict into a Response.
-
-export type ScopeState = "ok" | "not-configured" | "unreachable" | "unauthenticated"
+export type ScopeState = "ok" | "not-configured" | "unreachable" | "no-session" | "rejected"
 export type ScopeLike = { state: ScopeState; admin?: boolean; namespaces?: string[] }
 
-export type WriteVerdict = { allow: true } | { allow: false; status: 403 | 503; reason: string }
+export type Denial = { allow: false; status: 401 | 403 | 503; reason: string }
+export type ReadVerdict = { allow: true; namespaces: Set<string> | null } | Denial
+export type WriteVerdict = { allow: true } | Denial
 
-// READ path. null means "do not narrow".
-export function namespaceAllowList(scope: ScopeLike): Set<string> | null {
-  if (scope.state !== "ok" || scope.admin) return null
-  return new Set(scope.namespaces ?? [])
+function denialFor(state: ScopeState): Denial | null {
+  switch (state) {
+    case "no-session":
+      return { allow: false, status: 401, reason: "not authenticated" }
+    case "rejected":
+      return { allow: false, status: 403, reason: "platform-manager did not accept your sign-in, sign out and in again" }
+    case "unreachable":
+      return { allow: false, status: 503, reason: "tenancy could not be determined" }
+    default:
+      return null
+  }
 }
 
-// WRITE path. The three non-ok states are not equivalent, and collapsing them is
-// what made this fail open:
-//
-//   not-configured  No tenancy control plane is deployed here and never was, so
-//                   the cluster is single-tenant by construction (ee-lte-1 and
-//                   ee-west-1 are exactly this). Allowing is the intended
-//                   answer, not a degraded one.
-//   unreachable     A control plane exists but did not answer. We do not know
-//                   what this caller owns, so we must not let them write. The
-//                   scope cache holds failures for a while, so answering
-//                   "allowed" here would outlast the outage.
-//   unauthenticated No usable token. The middleware rejects these before a route
-//                   runs, so this is belt and braces.
-export function writeVerdict(scope: ScopeLike, namespace: string): WriteVerdict {
-  if (scope.state === "unreachable" || scope.state === "unauthenticated") {
-    return {
-      allow: false,
-      status: 503,
-      reason: "tenancy could not be determined, so this change was not attempted",
-    }
-  }
+export function readVerdict(scope: ScopeLike): ReadVerdict {
+  const denied = denialFor(scope.state)
+  if (denied) return denied
+  if (scope.state !== "ok" || scope.admin) return { allow: true, namespaces: null }
+  return { allow: true, namespaces: new Set(scope.namespaces ?? []) }
+}
 
-  const permitted = namespaceAllowList(scope)
-  if (permitted && !permitted.has(namespace)) {
+export function writeVerdict(scope: ScopeLike, namespace: string): WriteVerdict {
+  const verdict = readVerdict(scope)
+  if (!verdict.allow) return { ...verdict, reason: `${verdict.reason}, so this change was not attempted` }
+  if (verdict.namespaces && !verdict.namespaces.has(namespace)) {
     return { allow: false, status: 403, reason: `namespace ${namespace} is out of scope` }
   }
-
   return { allow: true }
 }
 
-// VIEW path: may this caller see cluster-scoped pages at all? The Cluster
-// overview (nodes, control-plane lifecycle, cluster-wide Prometheus) is not a
-// sandbox user's business and there is nothing to narrow it to -- an empty
-// version of it would only be confusing. Mirrors the READ rule on purpose:
-// whoever nothing narrows is a cluster-wide caller, so a control plane that did
-// not answer leaves the page where it was rather than making it vanish
-// mid-outage.
 export function seesClusterWideViews(scope: ScopeLike): boolean {
-  return namespaceAllowList(scope) === null
+  const verdict = readVerdict(scope)
+  return verdict.allow && verdict.namespaces === null
 }

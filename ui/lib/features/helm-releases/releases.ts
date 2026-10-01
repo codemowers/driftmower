@@ -11,6 +11,10 @@ const SOURCE_COMMENT = /^# Source:\s*(\S+)/m
 const DOCUMENT_KIND = /^kind:[ \t]*(\S+)/m
 const DOCUMENT_NAME = /^metadata:\n(?:[ \t]+.*\n)*?[ \t]+name:[ \t]*(\S+)/m
 
+const REDACTED = "[redacted]"
+const SENSITIVE_KEY = /(password|passwd|secret|token|apikey|privatekey|credentials?|auth)$/
+const REFERENCE_KEY = /^existing/
+
 type StoredRelease = {
   name: string
   namespace: string
@@ -114,9 +118,26 @@ export async function getReleaseValues(namespace: string, name: string): Promise
 
   return {
     ...identity(release),
-    overrides: release.config ?? {},
-    defaults: release.chart?.values ?? {},
+    overrides: redactSecretValues(release.config ?? {}),
+    defaults: redactSecretValues(release.chart?.values ?? {}),
   }
+}
+
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[-_.]/g, "")
+  return SENSITIVE_KEY.test(normalized) && !REFERENCE_KEY.test(normalized)
+}
+
+function isSecretScalar(value: unknown): boolean {
+  return (typeof value === "string" && value !== "") || typeof value === "number"
+}
+
+function redactSecretValues<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(redactSecretValues) as T
+  if (!value || typeof value !== "object") return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, isSensitiveKey(key) && isSecretScalar(entry) ? REDACTED : redactSecretValues(entry)]),
+  ) as T
 }
 
 const DATA_BLOCK_START = /^(data|stringData):/
@@ -136,7 +157,7 @@ function redactSecretData(text: string): string {
       if (!inDataBlock) return line
 
       const entry = DATA_ENTRY.exec(line)
-      return entry ? `${entry[1]}${entry[2]}: [redacted]` : line
+      return entry ? `${entry[1]}${entry[2]}: ${REDACTED}` : line
     })
     .join("\n")
 }

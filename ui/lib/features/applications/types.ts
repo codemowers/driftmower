@@ -11,7 +11,7 @@ export type HostEntry = {
 }
 
 // Anything but "ok" means the inventory is incomplete rather than absent.
-export type TenancyState = "ok" | "not-configured" | "unauthenticated" | "unreachable"
+export type TenancyState = "ok" | "not-configured" | "no-session" | "rejected" | "unreachable"
 
 export type HostsResponse = { hosts: HostEntry[]; tenancy: TenancyState }
 

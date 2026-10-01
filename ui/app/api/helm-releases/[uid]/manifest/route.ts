@@ -1,6 +1,6 @@
 import { getReleaseManifest, getReleaseManifestDocument, getReleaseManifestText } from "@/lib/features/helm-releases/releases"
 import { isInCluster } from "@/lib/server/k8s"
-import { hasSession } from "@/lib/auth/session"
+import { guardRead } from "@/lib/server/sandbox-scope-filter"
 import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
@@ -14,9 +14,8 @@ export async function GET(req: Request) {
   if (!namespace || !name) {
     return Response.json({ error: "namespace and name query params are required" }, { status: 400 })
   }
-  if (!(await hasSession())) {
-    return Response.json({ error: "not authenticated" }, { status: 401 })
-  }
+  const denied = await guardRead(namespace)
+  if (denied) return denied
   if (!isInCluster()) {
     return Response.json({ error: "Kubernetes API not reachable outside the cluster" }, { status: 503 })
   }

@@ -3,7 +3,7 @@ import type { AnalyzeClusterProgress } from "./refresh-state"
 import type { Report } from "./reports"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
-import type { AlertsResult } from "@/lib/features/prometheus/alerts"
+import type { AlertGroup } from "@/lib/features/prometheus/types"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
 import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upgrade/types"
@@ -63,7 +63,8 @@ export type ClusterState = {
   nodeDriftError: string | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: string | null
-  prometheusAlerts: AlertsResult | null
+  prometheusAlerts: AlertGroup[] | null
+  prometheusUrl: string | null
   clusterMetrics: ClusterMetrics | null
   nodeStorage: NodeStorageMap | null
 }
@@ -88,6 +89,7 @@ export const useClusterState = create<ClusterState>(() => ({
   vulnerabilityReports: null,
   vulnerabilityReportsError: null,
   prometheusAlerts: null,
+  prometheusUrl: null,
   clusterMetrics: null,
   nodeStorage: null,
 }))

@@ -1,3 +1,4 @@
+import { fetchJson } from "@/lib/utils/fetch-json"
 import type { AlertGroup, AlertSeverity, PrometheusAlert } from "./types"
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = {
@@ -12,24 +13,16 @@ function resolveSeverity(severity: string): AlertSeverity {
   return "other"
 }
 
-export type AlertsResult = {
-  groups: AlertGroup[]
-  prometheusUrl: string
+export async function fetchPrometheusUrl(): Promise<string> {
+  const { url } = await fetchJson<{ url?: string }>("/api/prometheus/config")
+  return url ?? ""
 }
 
-export async function fetchClusterAlerts(): Promise<AlertsResult> {
-  const [alertsRes, configRes] = await Promise.all([
-    fetch("/api/prometheus/alerts", { cache: "no-store" }),
-    fetch("/api/prometheus/config", { cache: "no-store" }),
-  ])
+export async function fetchClusterAlerts(): Promise<AlertGroup[]> {
+  const res = await fetch("/api/prometheus/alerts", { cache: "no-store" })
+  if (!res.ok) return []
 
-  const prometheusUrl = configRes.ok
-    ? ((await configRes.json()) as { url?: string }).url ?? ""
-    : ""
-
-  if (!alertsRes.ok) return { groups: [], prometheusUrl }
-
-  const json = await alertsRes.json() as { data?: { alerts?: PrometheusAlert[] } }
+  const json = await res.json() as { data?: { alerts?: PrometheusAlert[] } }
   const alerts = json.data?.alerts ?? []
 
   const firing = alerts.filter(a => a.state === "firing")
@@ -50,12 +43,10 @@ export async function fetchClusterAlerts(): Promise<AlertsResult> {
     }
   }
 
-  const groups = Array.from(map.entries())
+  return Array.from(map.entries())
     .map(([alertname, { severity, count, generatorURL }]) => ({ alertname, severity, count, generatorURL }))
     .sort((a, b) => {
       const sevDiff = SEVERITY_ORDER[b.severity] - SEVERITY_ORDER[a.severity]
       return sevDiff !== 0 ? sevDiff : b.count - a.count
     })
-
-  return { groups, prometheusUrl }
 }

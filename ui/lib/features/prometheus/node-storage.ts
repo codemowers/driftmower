@@ -1,13 +1,7 @@
+import { fetchJson } from "@/lib/utils/fetch-json"
+import type { PromQuery, VectorRow } from "./query"
+
 export type NodeStorageMap = Record<string, { used: number; total: number }>
-
-type VectorRow = { metric: Record<string, string>; value: [number, string] }
-
-async function queryVector(promql: string): Promise<VectorRow[]> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return []
-  const json = await res.json() as { data?: { result?: VectorRow[] } }
-  return json.data?.result ?? []
-}
 
 function sumByNode(rows: VectorRow[]): Record<string, number> {
   const map: Record<string, number> = {}
@@ -20,10 +14,14 @@ function sumByNode(rows: VectorRow[]): Record<string, number> {
   return map
 }
 
-export async function fetchNodeStorage(): Promise<NodeStorageMap> {
+export function fetchNodeStorage(): Promise<NodeStorageMap> {
+  return fetchJson<NodeStorageMap>("/api/prometheus/node-storage")
+}
+
+export async function loadNodeStorage(prom: PromQuery): Promise<NodeStorageMap> {
   const [sizeRows, availRows] = await Promise.all([
-    queryVector("topolvm_volumegroup_size_bytes"),
-    queryVector("topolvm_volumegroup_available_bytes"),
+    prom.vector("topolvm_volumegroup_size_bytes"),
+    prom.vector("topolvm_volumegroup_available_bytes"),
   ])
 
   const sizeByNode = sumByNode(sizeRows)

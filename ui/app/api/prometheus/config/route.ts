@@ -1,3 +1,4 @@
+import { hasSession } from "@/lib/auth/session"
 import { isInCluster, kubeApiGet } from "@/lib/server/k8s"
 import { createTtlCache } from "@/lib/utils/ttl-cache"
 import { errorResponse } from "@/lib/server/error-response"
@@ -36,6 +37,10 @@ async function discover(): Promise<string> {
 const getPrometheusUrl = createTtlCache(CACHE_TTL_MS, discover)
 
 export async function GET() {
+  if (!(await hasSession())) {
+    return Response.json({ error: "not authenticated" }, { status: 401 })
+  }
+
   try {
     const url = await getPrometheusUrl()
     return Response.json({ url }, { headers: { "Cache-Control": "no-store" } })

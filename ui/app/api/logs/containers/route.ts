@@ -1,5 +1,5 @@
 import { listContainers } from "@/lib/features/logs/pod"
-import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
+import { guardRead } from "@/lib/server/sandbox-scope-filter"
 import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     return Response.json({ error: "ns, pod required" }, { status: 400 })
   }
 
-  const denied = await guardNamespace(ns)
+  const denied = await guardRead(ns)
   if (denied) return denied
 
   const key = `${ns}/${pod}`

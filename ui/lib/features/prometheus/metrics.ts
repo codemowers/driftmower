@@ -1,4 +1,5 @@
-import { queryScalar } from "./query"
+import { fetchJson } from "@/lib/utils/fetch-json"
+import type { PromQuery } from "./query"
 
 export type ClusterMetrics = {
   storage: { used: number; total: number } | null
@@ -6,15 +7,19 @@ export type ClusterMetrics = {
   cpuLoad: number | null
 }
 
-export async function fetchClusterMetrics(): Promise<ClusterMetrics> {
+export function fetchClusterMetrics(): Promise<ClusterMetrics> {
+  return fetchJson<ClusterMetrics>("/api/prometheus/cluster-metrics")
+}
+
+export async function loadClusterMetrics(prom: PromQuery): Promise<ClusterMetrics> {
   const [storageTotal, storageUsed, memTotal, memFree, memBuffers, memCached, cpuLoad] = await Promise.all([
-    queryScalar("sum(topolvm_volumegroup_size_bytes)"),
-    queryScalar("sum(topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)"),
-    queryScalar("sum(node_memory_MemTotal_bytes)"),
-    queryScalar("sum(node_memory_MemFree_bytes)"),
-    queryScalar("sum(node_memory_Buffers_bytes)"),
-    queryScalar("sum(node_memory_Cached_bytes)"),
-    queryScalar("sum(node_load1) / count(count by (cpu, instance)(node_cpu_seconds_total))"),
+    prom.scalar("sum(topolvm_volumegroup_size_bytes)"),
+    prom.scalar("sum(topolvm_volumegroup_size_bytes - topolvm_volumegroup_available_bytes)"),
+    prom.scalar("sum(node_memory_MemTotal_bytes)"),
+    prom.scalar("sum(node_memory_MemFree_bytes)"),
+    prom.scalar("sum(node_memory_Buffers_bytes)"),
+    prom.scalar("sum(node_memory_Cached_bytes)"),
+    prom.scalar("sum(node_load1) / count(count by (cpu, instance)(node_cpu_seconds_total))"),
   ])
 
   return {

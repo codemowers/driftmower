@@ -1,5 +1,7 @@
 import { promises as dns } from "node:dns"
 
+import { hasSession } from "@/lib/auth/session"
+
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
@@ -10,6 +12,10 @@ const POSITIVE_TTL_MS = 10 * 60 * 1000
 const NEGATIVE_TTL_MS = 60 * 1000
 
 export async function GET(req: Request) {
+  if (!(await hasSession())) {
+    return Response.json({ error: "not authenticated" }, { status: 401 })
+  }
+
   const url = new URL(req.url)
   const ip = url.searchParams.get("ip")
   if (!ip) return Response.json({ hostname: null }, { status: 400 })

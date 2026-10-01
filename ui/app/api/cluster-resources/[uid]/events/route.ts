@@ -1,5 +1,5 @@
 import { isInCluster } from "@/lib/server/k8s"
-import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
+import { guardRead } from "@/lib/server/sandbox-scope-filter"
 import { getPodEvents } from "@/lib/cluster-resources/events"
 import { errorResponse } from "@/lib/server/error-response"
 
@@ -13,7 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
     return Response.json({ error: "namespace query param is required" }, { status: 400 })
   }
 
-  const denied = await guardNamespace(namespace)
+  const denied = await guardRead(namespace)
   if (denied) return denied
 
   if (!isInCluster()) {

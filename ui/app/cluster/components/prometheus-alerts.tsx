@@ -27,7 +27,8 @@ const SEVERITY_STYLE: Record<AlertSeverity, { border: string; bg: string; text: 
 }
 
 export default function PrometheusAlerts({ onCollapsedHeight }: { onCollapsedHeight?: (height: number) => void }) {
-  const result = useClusterState(s => s.prometheusAlerts)
+  const groups = useClusterState(s => s.prometheusAlerts)
+  const prometheusUrl = useClusterState(s => s.prometheusUrl)
   const [expanded, setExpanded] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -40,11 +41,10 @@ export default function PrometheusAlerts({ onCollapsedHeight }: { onCollapsedHei
     const observer = new ResizeObserver(update)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [expanded, result, onCollapsedHeight])
+  }, [expanded, groups, onCollapsedHeight])
 
-  if (!result || result.groups.length === 0) return null
+  if (!groups || groups.length === 0) return null
 
-  const { groups, prometheusUrl } = result
   const visible = expanded ? groups : groups.slice(0, MAX_VISIBLE)
   const hidden = groups.length - MAX_VISIBLE
 
@@ -97,7 +97,7 @@ export default function PrometheusAlerts({ onCollapsedHeight }: { onCollapsedHei
   )
 }
 
-function AlertRow({ group, prometheusUrl }: { group: AlertGroup; prometheusUrl: string }) {
+function AlertRow({ group, prometheusUrl }: { group: AlertGroup; prometheusUrl: string | null }) {
   const style = SEVERITY_STYLE[group.severity]
   const href = group.generatorURL
     ?? (prometheusUrl ? `${prometheusUrl}/alerts?state=firing&search=${encodeURIComponent(group.alertname)}` : undefined)

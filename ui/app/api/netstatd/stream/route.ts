@@ -40,6 +40,7 @@ export async function GET(req: Request) {
     console.error("[netstatd-stream] cannot resolve cluster state:", e)
     return Response.json({ error: "cluster state unavailable" }, { status: 503 })
   }
+  if (viewer instanceof Response) return viewer
   const scope = findDescendantPodUids(index.resources, workloadUid)
 
   const encoder = new TextEncoder()

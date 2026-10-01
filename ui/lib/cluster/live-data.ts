@@ -4,9 +4,10 @@ import { CLUSTER_RESOURCES_URL, CLUSTER_NODES_URL, LIVE_PATCH_UPGRADE_URL } from
 import { fetchJson } from "@/lib/utils/fetch-json"
 import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
 import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upgrade/types"
-import { fetchClusterAlerts } from "@/lib/features/prometheus/alerts"
+import { fetchClusterAlerts, fetchPrometheusUrl } from "@/lib/features/prometheus/alerts"
 import { fetchClusterMetrics } from "@/lib/features/prometheus/metrics"
 import { fetchNodeStorage } from "@/lib/features/prometheus/node-storage"
+import { seesClusterWideViewsIn, useSandboxContext } from "@/lib/tenancy/sandbox-context"
 
 const CONNECTED_FETCH_INTERVAL = 30000
 const DISCONNECTED_FETCH_INTERVAL = 5000
@@ -21,21 +22,29 @@ export function startLiveDataFetching(): () => void {
         await checkConnection()
       } catch {}
 
-      const { isConnected } = useClusterState.getState()
+      const { isConnected, prometheusUrl } = useClusterState.getState()
+      const clusterWide = seesClusterWideViewsIn(useSandboxContext.getState())
 
       const shouldFetchResources = Date.now() - lastResourcesFetch >= CONNECTED_FETCH_INTERVAL
       if (shouldFetchResources) lastResourcesFetch = Date.now()
 
       await Promise.all([
-        fetchClusterAlerts()
-          .then(data => { if (!cancelled) useClusterState.setState({ prometheusAlerts: data }) })
-          .catch(() => {}),
-        fetchClusterMetrics()
-          .then(data => { if (!cancelled) useClusterState.setState({ clusterMetrics: data }) })
-          .catch(() => {}),
-        fetchNodeStorage()
-          .then(data => { if (!cancelled) useClusterState.setState({ nodeStorage: data }) })
-          .catch(() => {}),
+        ...(prometheusUrl === null ? [
+          fetchPrometheusUrl()
+            .then(url => { if (!cancelled) useClusterState.setState({ prometheusUrl: url }) })
+            .catch(() => {}),
+        ] : []),
+        ...(clusterWide ? [
+          fetchClusterAlerts()
+            .then(data => { if (!cancelled) useClusterState.setState({ prometheusAlerts: data }) })
+            .catch(() => {}),
+          fetchClusterMetrics()
+            .then(data => { if (!cancelled) useClusterState.setState({ clusterMetrics: data }) })
+            .catch(() => {}),
+          fetchNodeStorage()
+            .then(data => { if (!cancelled) useClusterState.setState({ nodeStorage: data }) })
+            .catch(() => {}),
+        ] : []),
         ...(shouldFetchResources ? [
           fetchJson<ClusterResource[]>(CLUSTER_RESOURCES_URL)
             .then(data => { if (!cancelled) useClusterState.setState({ clusterResources: data, clusterResourcesError: null }) })
@@ -47,7 +56,7 @@ export function startLiveDataFetching(): () => void {
             .then(data => { if (!cancelled) useClusterState.setState({ livePatchUpgrades: data }) })
             .catch((e: Error) => console.warn(`[live-data] temporary fixes: ${e.message}`)),
         ] : []),
-        ...(isConnected ? [
+        ...(isConnected && clusterWide ? [
           fetchJson<ClusterNodesResponse>(CLUSTER_NODES_URL)
             .then(data => { if (!cancelled) useClusterState.setState({ nodeDrift: data, nodeDriftError: null }) })
             .catch((e: Error) => {

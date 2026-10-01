@@ -1,47 +1,52 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { namespaceAllowList, seesClusterWideViews, writeVerdict, type ScopeLike } from "./scope-rules.ts"
+import { readVerdict, seesClusterWideViews, writeVerdict, type ScopeLike } from "./scope-rules.ts"
 
 const ok = (namespaces: string[], admin = false): ScopeLike => ({ state: "ok", admin, namespaces })
 
+function readable(scope: ScopeLike): Set<string> | null {
+  const verdict = readVerdict(scope)
+  assert.ok(verdict.allow)
+  return verdict.namespaces
+}
+
 test("a scoped user is confined to their own namespaces", () => {
-  const permitted = namespaceAllowList(ok(["sandbox-a"]))
+  const permitted = readable(ok(["sandbox-a"]))
   assert.ok(permitted)
   assert.equal(permitted.has("sandbox-a"), true)
   assert.equal(permitted.has("sandbox-b"), false)
 })
 
 test("an admin is not narrowed", () => {
-  assert.equal(namespaceAllowList(ok(["sandbox-a"], true)), null)
+  assert.equal(readable(ok(["sandbox-a"], true)), null)
 })
 
-// Reads stay deliberately open when scope is indeterminate: a listing that
-// hides rows is worse than one that shows them.
-test("the read list does not narrow when scope could not be determined", () => {
-  for (const state of ["not-configured", "unreachable", "unauthenticated"] as const) {
-    assert.equal(namespaceAllowList({ state }), null, state)
-  }
+test("a cluster without a tenancy control plane is not narrowed", () => {
+  assert.equal(readable({ state: "not-configured" }), null)
 })
 
 test("a scoped user with no namespaces is permitted nothing, not everything", () => {
-  const permitted = namespaceAllowList(ok([]))
+  const permitted = readable(ok([]))
   assert.ok(permitted)
   assert.equal(permitted.has("sandbox-a"), false)
 })
 
-// This is the finding: writes used to reuse the read rule, so an unreachable
-// control plane let any signed-in user patch any namespace.
-test("a write is refused when the control plane did not answer", () => {
-  for (const state of ["unreachable", "unauthenticated"] as const) {
-    const verdict = writeVerdict({ state }, "kube-system")
+test("reads are refused when scope could not be determined", () => {
+  const expected = { unreachable: 503, "no-session": 401, rejected: 403 } as const
+  for (const [state, status] of Object.entries(expected) as [keyof typeof expected, number][]) {
+    const verdict = readVerdict({ state })
     assert.equal(verdict.allow, false, state)
-    assert.equal(verdict.allow === false && verdict.status, 503)
+    assert.equal(verdict.allow === false && verdict.status, status, state)
   }
 })
 
-// ...but a cluster that runs no tenancy at all is single-tenant on purpose, and
-// must keep working.
+test("writes are refused when scope could not be determined", () => {
+  for (const state of ["unreachable", "no-session", "rejected"] as const) {
+    assert.equal(writeVerdict({ state }, "kube-system").allow, false, state)
+  }
+})
+
 test("a write is allowed where no tenancy control plane is deployed", () => {
   assert.equal(writeVerdict({ state: "not-configured" }, "kube-system").allow, true)
 })
@@ -64,14 +69,13 @@ test("a sandbox user does not see cluster-scoped pages", () => {
   assert.equal(seesClusterWideViews(ok([])), false)
 })
 
-test("an admin sees cluster-scoped pages", () => {
+test("an admin and a single-tenant cluster see cluster-scoped pages", () => {
   assert.equal(seesClusterWideViews(ok(["sandbox-a"], true)), true)
+  assert.equal(seesClusterWideViews({ state: "not-configured" }), true)
 })
 
-// Hiding a page the user had a moment ago is a worse outage symptom than
-// showing it, so this follows the read rule rather than the write rule.
-test("cluster-scoped pages stay visible when scope could not be determined", () => {
-  for (const state of ["not-configured", "unreachable", "unauthenticated"] as const) {
-    assert.equal(seesClusterWideViews({ state }), true, state)
+test("cluster-scoped pages are hidden when scope could not be determined", () => {
+  for (const state of ["unreachable", "no-session", "rejected"] as const) {
+    assert.equal(seesClusterWideViews({ state }), false, state)
   }
 })

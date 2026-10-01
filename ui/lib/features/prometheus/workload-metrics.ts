@@ -1,4 +1,5 @@
-import { pairVolumes, queryVector, type PodVolume, type ResourceTriplet, type VectorRow } from "./query"
+import { fetchJson } from "@/lib/utils/fetch-json"
+import { pairVolumes, type PodVolume, type PromQuery, type ResourceTriplet, type VectorRow } from "./query"
 
 export type PerPodMetrics = {
   podName: string
@@ -79,18 +80,24 @@ function pressure(metrics: PerPodMetrics): number {
 
 export async function fetchWorkloadMetrics(namespace: string, podNames: string[]): Promise<WorkloadMetrics | null> {
   if (podNames.length === 0) return null
+  const params = new URLSearchParams({ namespace, pods: podNames.join(",") })
+  return fetchJson<WorkloadMetrics | null>(`/api/prometheus/workload-metrics?${params}`)
+}
+
+export async function loadWorkloadMetrics(prom: PromQuery, namespace: string, podNames: string[]): Promise<WorkloadMetrics | null> {
+  if (podNames.length === 0) return null
 
   const q = workloadMetricQueries(namespace, podNames)
   const [memUsage, memLimit, memRequest, cpuUsage, cpuLimit, cpuRequest, usedRows, capacityRows, qosRows] = await Promise.all([
-    queryVector(q.memUsage),
-    queryVector(q.memLimit),
-    queryVector(q.memRequest),
-    queryVector(q.cpuUsage),
-    queryVector(q.cpuLimit),
-    queryVector(q.cpuRequest),
-    queryVector(q.volUsed),
-    queryVector(q.volCapacity),
-    queryVector(q.qos),
+    prom.vector(q.memUsage),
+    prom.vector(q.memLimit),
+    prom.vector(q.memRequest),
+    prom.vector(q.cpuUsage),
+    prom.vector(q.cpuLimit),
+    prom.vector(q.cpuRequest),
+    prom.vector(q.volUsed),
+    prom.vector(q.volCapacity),
+    prom.vector(q.qos),
   ])
 
   const memUsageByPod = byPod(memUsage)

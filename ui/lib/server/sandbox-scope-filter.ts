@@ -1,31 +1,44 @@
 import "server-only"
 
-import { fetchSandboxScope, type SandboxScope } from "./platform-manager-proxy"
-import { namespaceAllowList, seesClusterWideViews, writeVerdict } from "./scope-rules"
+import { fetchSandboxScope } from "./platform-manager-proxy"
+import { readVerdict, seesClusterWideViews, writeVerdict, type Denial } from "./scope-rules"
 
-// READ path. null means every namespace is readable: without a usable tenancy
-// control plane, nothing narrows.
-//
-// Deliberately not reused for writes. Widening a listing when scope is
-// indeterminate shows a user rows they may not be entitled to; doing the same on
-// a write lets them change another sandbox's workloads, which is a different
-// kind of mistake. guardNamespace draws that line -- see scope-rules.ts for
-// which states mean what.
-export function namespaceFilter(scope: SandboxScope): ((namespace: string) => boolean) | null {
-  const permitted = namespaceAllowList(scope)
-  return permitted && (namespace => permitted.has(namespace))
+export type NamespaceFilter = ((namespace: string) => boolean) | null
+
+function deny(denial: Denial): Response {
+  return Response.json({ error: denial.reason }, { status: denial.status })
 }
 
-// WRITE path: may this caller act on this namespace? Returns a Response to send
-// back, or null to proceed.
+export async function readScope(): Promise<NamespaceFilter | Response> {
+  const verdict = readVerdict(await fetchSandboxScope())
+  if (!verdict.allow) return deny(verdict)
+  const { namespaces } = verdict
+  return namespaces && (namespace => namespaces.has(namespace))
+}
+
+export async function guardRead(namespace: string): Promise<Response | null> {
+  const allows = await readScope()
+  if (allows instanceof Response) return allows
+  if (allows && !allows(namespace)) {
+    return Response.json({ error: `namespace ${namespace} is out of scope` }, { status: 403 })
+  }
+  return null
+}
+
 export async function guardNamespace(namespace: string): Promise<Response | null> {
   const verdict = writeVerdict(await fetchSandboxScope(), namespace)
-  if (verdict.allow) return null
-  return Response.json({ error: verdict.reason }, { status: verdict.status })
+  return verdict.allow ? null : deny(verdict)
 }
 
-// VIEW path: the answer behind hiding the Cluster overview -- both its nav entry
-// and the route itself -- from sandbox users.
+export async function guardClusterWide(): Promise<Response | null> {
+  const verdict = readVerdict(await fetchSandboxScope())
+  if (!verdict.allow) return deny(verdict)
+  if (verdict.namespaces) {
+    return Response.json({ error: "cluster-wide data is not available to sandbox users" }, { status: 403 })
+  }
+  return null
+}
+
 export async function callerSeesClusterWideViews(): Promise<boolean> {
   return seesClusterWideViews(await fetchSandboxScope())
 }

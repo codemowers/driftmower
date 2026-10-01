@@ -136,9 +136,9 @@ export default function ApplicationsPage() {
               </p>
             )}
 
-            {inventory.status === "ready" && inventory.tenancy === "unauthenticated" && (
+            {inventory.status === "ready" && inventory.tenancy === "rejected" && (
               <p className="text-sm text-muted-foreground">
-                Your session expired. Log out and back in to load the rest of the hosts.
+                platform-manager did not accept your sign-in. Log out and back in to load the rest of the hosts.
               </p>
             )}
 

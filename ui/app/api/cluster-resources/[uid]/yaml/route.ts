@@ -1,5 +1,5 @@
 import { isInCluster } from "@/lib/server/k8s"
-import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
+import { guardRead } from "@/lib/server/sandbox-scope-filter"
 import { getResourceObject } from "@/lib/cluster-resources/resource-object"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import { errorResponse } from "@/lib/server/error-response"
@@ -20,7 +20,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
     return Response.json({ error: `YAML view is not available for kind ${kind}` }, { status: 400 })
   }
 
-  const denied = await guardNamespace(namespace)
+  const denied = await guardRead(namespace)
   if (denied) return denied
 
   if (!isInCluster()) {

@@ -12,21 +12,9 @@ export type PodVolume = {
 
 export type VectorRow = { metric: Record<string, string>; value: [number, string] }
 
-export async function queryScalar(promql: string): Promise<number | null> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return null
-  const json = await res.json() as { data?: { result?: { value?: [number, string] }[] } }
-  const raw = json.data?.result?.[0]?.value?.[1]
-  if (raw === undefined) return null
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : null
-}
-
-export async function queryVector(promql: string): Promise<VectorRow[]> {
-  const res = await fetch(`/api/prometheus/query?query=${encodeURIComponent(promql)}`, { cache: "no-store" })
-  if (!res.ok) return []
-  const json = await res.json() as { data?: { result?: VectorRow[] } }
-  return json.data?.result ?? []
+export type PromQuery = {
+  scalar: (promql: string) => Promise<number | null>
+  vector: (promql: string) => Promise<VectorRow[]>
 }
 
 export function pairVolumes(usedRows: VectorRow[], capacityRows: VectorRow[]): PodVolume[] {

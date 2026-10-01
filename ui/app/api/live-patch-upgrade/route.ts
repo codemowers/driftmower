@@ -1,6 +1,6 @@
 import { isInCluster } from "@/lib/server/k8s"
 import { listLivePatchUpgrades } from "@/lib/features/live-patch-upgrade/server/list"
-import { errorResponse } from "@/lib/server/error-response"
+import { livePatchUpgradeErrorResponse } from "@/lib/features/live-patch-upgrade/server/route-helpers"
 
 export const dynamic = "force-dynamic"
 
@@ -12,6 +12,6 @@ export async function GET() {
   try {
     return Response.json(await listLivePatchUpgrades(), { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return errorResponse(e, "live-patch-upgrade", "list")
+    return livePatchUpgradeErrorResponse(e, "list")
   }
 }

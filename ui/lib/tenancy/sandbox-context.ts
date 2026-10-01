@@ -182,9 +182,11 @@ export function useSandboxScope(): SandboxScope {
 // Deliberately not derived from useSandboxScope(): picking a sandbox narrows an
 // admin's scope for the page they are on, but it does not stop them being an
 // admin, and the Cluster page must stay reachable from that view.
-export function useSeesClusterWideViews(): boolean {
-  const available = useSandboxContext(s => s.available)
-  const admin = useSandboxContext(s => s.admin)
+export function seesClusterWideViewsIn(state: Pick<SandboxContextState, "available" | "admin" | "unavailableReason">): boolean {
+  if (state.available) return state.admin
+  return state.unavailableReason === null || state.unavailableReason === "not-configured"
+}
 
-  return !available || admin
+export function useSeesClusterWideViews(): boolean {
+  return useSandboxContext(seesClusterWideViewsIn)
 }

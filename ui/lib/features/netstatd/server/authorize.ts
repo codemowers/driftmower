@@ -1,7 +1,6 @@
 import "server-only"
 
-import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
-import { namespaceFilter } from "@/lib/server/sandbox-scope-filter"
+import { readScope } from "@/lib/server/sandbox-scope-filter"
 import type { PeerRef } from "../types"
 
 export type Viewer = {
@@ -9,9 +8,11 @@ export type Viewer = {
   selected: Set<string> | null
 }
 
-export async function resolveViewer(selectedNamespaces: string[] | null): Promise<Viewer> {
+export async function resolveViewer(selectedNamespaces: string[] | null): Promise<Viewer | Response> {
+  const permitted = await readScope()
+  if (permitted instanceof Response) return permitted
   return {
-    permitted: namespaceFilter(await fetchSandboxScope()),
+    permitted,
     selected: selectedNamespaces === null ? null : new Set(selectedNamespaces),
   }
 }

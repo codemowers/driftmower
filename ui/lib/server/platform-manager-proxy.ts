@@ -11,7 +11,7 @@ export function platformManagerUrl(): string | null {
 
 export type SandboxScope =
   | { state: "ok"; admin: boolean; namespaces: string[] }
-  | { state: "not-configured" | "unauthenticated" | "unreachable" }
+  | { state: "not-configured" | "no-session" | "rejected" | "unreachable" }
 
 // platform-manager's shape. A sandbox is exactly one namespace: the older model
 // of a tenant namespace plus 0..n application namespaces is gone, and the
@@ -48,17 +48,17 @@ function rememberScope(key: string, scope: SandboxScope, now: number): SandboxSc
 
 // Server-to-server read: callers scope their own response, so they need the values not a body.
 export async function fetchSandboxScope(): Promise<SandboxScope> {
-  const baseUrl = platformManagerUrl()
-
-  if (!baseUrl) {
-    return { state: "not-configured" }
-  }
-
   const session = await getSession()
   const key = session.refreshToken ?? session.accessToken
 
   if (!key) {
-    return { state: "unauthenticated" }
+    return { state: "no-session" }
+  }
+
+  const baseUrl = platformManagerUrl()
+
+  if (!baseUrl) {
+    return { state: "not-configured" }
   }
 
   const now = Date.now()
@@ -70,7 +70,7 @@ export async function fetchSandboxScope(): Promise<SandboxScope> {
   const accessToken = await getPlatformManagerToken(session)
 
   if (!accessToken) {
-    return rememberScope(key, { state: "unauthenticated" }, now)
+    return rememberScope(key, { state: "rejected" }, now)
   }
 
   let response: Response
@@ -86,8 +86,8 @@ export async function fetchSandboxScope(): Promise<SandboxScope> {
   }
 
   if (response.status === 401 || response.status === 403) {
-    console.warn(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status}: treating the caller as unauthenticated`)
-    return rememberScope(key, { state: "unauthenticated" }, now)
+    console.warn(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status}: treating the caller as rejected`)
+    return rememberScope(key, { state: "rejected" }, now)
   }
 
   if (!response.ok) {

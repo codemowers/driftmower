@@ -2,10 +2,11 @@ import "server-only"
 
 import { KubeApiError, kubeApiGet } from "@/lib/server/k8s"
 import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
-import { namespaceFilter } from "@/lib/server/sandbox-scope-filter"
+import { readVerdict } from "@/lib/server/scope-rules"
 import { ACTION_KEY_ANNOTATION, NAMESPACE_ANNOTATION } from "../manifest"
 import type { LivePatchUpgradeListResponse, LivePatchUpgradeRecord } from "../types"
 import { getLivePatchUpgradeAvailability, kubeDenial } from "./availability"
+import { LivePatchUpgradeError } from "./error"
 import { bindingPath, LABEL_SELECTOR, policyPath } from "./paths"
 
 type LabelledObject = { metadata: { annotations?: Record<string, string> } }
@@ -33,7 +34,9 @@ function toRecords(objects: LabelledObject[]): LivePatchUpgradeRecord[] {
 }
 
 export async function listLivePatchUpgrades(): Promise<LivePatchUpgradeListResponse> {
-  const [availability, scope] = await Promise.all([getLivePatchUpgradeAvailability(), fetchSandboxScope()])
+  const scope = readVerdict(await fetchSandboxScope())
+  if (!scope.allow) throw new LivePatchUpgradeError(scope.reason, scope.status)
+  const availability = await getLivePatchUpgradeAvailability()
   if (!availability.version) {
     return { available: false, canWrite: false, fixes: [], blockedReason: "This cluster does not serve MutatingAdmissionPolicy" }
   }
@@ -41,12 +44,12 @@ export async function listLivePatchUpgrades(): Promise<LivePatchUpgradeListRespo
   const copyOnly = (denied: string) => ({ available: true, canWrite: false, fixes: [], blockedReason: `Can't read existing temporary fixes: ${denied}` })
   if ("denied" in policies) return copyOnly(policies.denied)
   if ("denied" in bindings) return copyOnly(bindings.denied)
-  const allows = namespaceFilter(scope)
+  const permitted = scope.namespaces
   const records = toRecords([...policies.items, ...bindings.items])
   return {
     available: true,
     canWrite: availability.canWrite,
-    fixes: allows ? records.filter(r => allows(r.namespace)) : records,
+    fixes: permitted ? records.filter(r => permitted.has(r.namespace)) : records,
     blockedReason: availability.writeBlocked,
   }
 }
