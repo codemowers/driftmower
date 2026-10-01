@@ -112,16 +112,20 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
                     </span>
                   )}
                 </div>
-                <PrefetchLink
-                  href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
-                  className="group flex min-w-0 flex-col font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5">
-                    <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
-                    <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
-                  </span>
-                  <span className="truncate">{digestCrumb(u.imageInfo.digest)}</span>
-                </PrefetchLink>
+                {u.imageInfo.digest ? (
+                  <PrefetchLink
+                    href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
+                    className="group flex min-w-0 flex-col font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
+                  >
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                      <span className="truncate">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
+                      <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
+                    </span>
+                    <span className="truncate">{digestCrumb(u.imageInfo.digest)}</span>
+                  </PrefetchLink>
+                ) : (
+                  <span className="truncate font-mono text-xs text-muted-foreground">{u.imageInfo.registry}/{u.imageInfo.repository}</span>
+                )}
                 <TagCell tag={resolvedVersion(u) ?? vs.deployedTag} builtAt={vs.deployedBuiltAt} />
                 <TagCell tag={vs.latestTag} builtAt={vs.latestBuiltAt} />
                 <div>

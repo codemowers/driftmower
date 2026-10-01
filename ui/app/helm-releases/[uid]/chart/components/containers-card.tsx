@@ -67,7 +67,7 @@ function ContainerRow({ entry, reportId, first }: { entry: ContainerEntry; repor
     !first && "border-t border-gray-100",
   )
 
-  if (!workloadUid) {
+  if (!workloadUid || !usage.imageInfo.digest) {
     return <div className={rowClass}>{inner}</div>
   }
 

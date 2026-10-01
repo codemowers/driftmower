@@ -177,6 +177,7 @@ function normalizeReport(report: Report): void {
   ]
   for (const usages of usageLists) {
     for (const usage of usages) {
+      usage.imageInfo.digest ||= ""
       const vs = usage.versionStatus
       vs.deployedBuiltAt = normalizeBuiltAt(vs.deployedBuiltAt)
       vs.latestBuiltAt = normalizeBuiltAt(vs.latestBuiltAt)
