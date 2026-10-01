@@ -12,30 +12,20 @@ export const WORKLOAD_NAME_ANNOTATION = "driftmower.io/workload-name"
 
 export const ADMISSION_GROUP = "admissionregistration.k8s.io"
 
-function celString(value: string): string {
-  return JSON.stringify(value)
-}
+const SOURCE_IMAGE_PRESENT =
+  "params != null && 'sourceImage' in params.data && " +
+  "(object.spec.containers.exists(container, container.image == params.data.sourceImage) || " +
+  "(has(object.spec.initContainers) && object.spec.initContainers.exists(container, container.image == params.data.sourceImage)))"
 
-export function sourceImagePresentExpression(sourceImage: string): string {
-  const source = celString(sourceImage)
-  return (
-    `object.spec.containers.exists(container, container.image == ${source}) || ` +
-    `(has(object.spec.initContainers) && object.spec.initContainers.exists(container, container.image == ${source}))`
-  )
-}
+const TARGET_IMAGE_CONFIGURED = "params != null && 'targetImage' in params.data && params.data.targetImage != ''"
 
-export function rewriteImageExpression(sourceImage: string, targetImage: string): string {
-  const source = celString(sourceImage)
-  const target = celString(targetImage)
-  return (
-    "Object{ spec: Object.spec{ " +
-    `containers: object.spec.containers.filter(container, container.image == ${source})` +
-    `.map(container, Object.spec.containers{ name: container.name, image: ${target} }), ` +
-    `initContainers: has(object.spec.initContainers) ? object.spec.initContainers.filter(container, container.image == ${source})` +
-    `.map(container, Object.spec.initContainers{ name: container.name, image: ${target} }) : [] ` +
-    "} }"
-  )
-}
+const REWRITE_IMAGE =
+  "Object{ spec: Object.spec{ " +
+  "containers: object.spec.containers.filter(container, container.image == params.data.sourceImage)" +
+  ".map(container, Object.spec.containers{ name: container.name, image: params.data.targetImage }), " +
+  "initContainers: has(object.spec.initContainers) ? object.spec.initContainers.filter(container, container.image == params.data.sourceImage)" +
+  ".map(container, Object.spec.initContainers{ name: container.name, image: params.data.targetImage }) : [] " +
+  "} }"
 
 export type ManifestInput = {
   key: string
@@ -51,13 +41,15 @@ export type ManifestInput = {
 export type KubeObject = Record<string, unknown>
 
 export type LivePatchUpgradeObjects = {
+  params: KubeObject
   policy: KubeObject
   binding: KubeObject
 }
 
-function metadata(input: ManifestInput): KubeObject {
+function metadata(input: ManifestInput, namespace?: string): KubeObject {
   return {
     name: objectName(input.hash),
+    ...(namespace ? { namespace } : {}),
     labels: {
       [LIVE_PATCH_UPGRADE_LABEL]: "true",
       [ACTION_HASH_LABEL]: input.hash,
@@ -75,6 +67,12 @@ function metadata(input: ManifestInput): KubeObject {
 export function buildLivePatchUpgradeObjects(input: ManifestInput): LivePatchUpgradeObjects {
   const name = objectName(input.hash)
   const apiVersion = `${ADMISSION_GROUP}/${input.policyVersion}`
+  const params: KubeObject = {
+    apiVersion: "v1",
+    kind: "ConfigMap",
+    metadata: metadata(input, input.namespace),
+    data: { sourceImage: input.sourceImage, targetImage: input.targetImage },
+  }
   const policy: KubeObject = {
     apiVersion,
     kind: "MutatingAdmissionPolicy",
@@ -82,12 +80,16 @@ export function buildLivePatchUpgradeObjects(input: ManifestInput): LivePatchUpg
     spec: {
       failurePolicy: "Fail",
       reinvocationPolicy: "Never",
+      paramKind: { apiVersion: "v1", kind: "ConfigMap" },
       matchConstraints: {
         resourceRules: [{ apiGroups: [""], apiVersions: ["v1"], operations: ["CREATE"], resources: ["pods"], scope: "Namespaced" }],
         ...(input.podSelector ? { objectSelector: { matchLabels: input.podSelector } } : {}),
       },
-      matchConditions: [{ name: "exact-source-image-is-present", expression: sourceImagePresentExpression(input.sourceImage) }],
-      mutations: [{ patchType: "ApplyConfiguration", applyConfiguration: { expression: rewriteImageExpression(input.sourceImage, input.targetImage) } }],
+      matchConditions: [
+        { name: "exact-source-image-is-present", expression: SOURCE_IMAGE_PRESENT },
+        { name: "target-image-is-configured", expression: TARGET_IMAGE_CONFIGURED },
+      ],
+      mutations: [{ patchType: "ApplyConfiguration", applyConfiguration: { expression: REWRITE_IMAGE } }],
     },
   }
   const binding: KubeObject = {
@@ -96,14 +98,15 @@ export function buildLivePatchUpgradeObjects(input: ManifestInput): LivePatchUpg
     metadata: metadata(input),
     spec: {
       policyName: name,
+      paramRef: { name, namespace: input.namespace, parameterNotFoundAction: "Deny" },
       matchResources: {
         namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": input.namespace } },
       },
     },
   }
-  return { policy, binding }
+  return { params, policy, binding }
 }
 
 export function livePatchUpgradeYaml(objects: LivePatchUpgradeObjects): string {
-  return [objects.policy, objects.binding].map(object => yamlText(emitYamlLines(object))).join("---\n")
+  return [objects.params, objects.policy, objects.binding].map(object => yamlText(emitYamlLines(object))).join("---\n")
 }

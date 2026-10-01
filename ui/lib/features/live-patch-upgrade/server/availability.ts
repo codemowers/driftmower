@@ -7,7 +7,7 @@ import { getApiSurface } from "@/lib/features/provisioning/facts/discovery"
 import { negotiateVersion } from "@/lib/features/provisioning/api-surface"
 import { ADMISSION_GROUP, buildLivePatchUpgradeObjects } from "../manifest"
 import type { PolicyVersion } from "../types"
-import { DRY_RUN, policyPath } from "./paths"
+import { configMapPath, DRY_RUN, policyPath } from "./paths"
 
 export type LivePatchUpgradeAvailability = {
   available: boolean
@@ -30,7 +30,7 @@ export function kubeDenial(e: KubeApiError): string {
 }
 
 async function probeWrite(version: PolicyVersion): Promise<string | null> {
-  const { policy } = buildLivePatchUpgradeObjects({
+  const { params, policy } = buildLivePatchUpgradeObjects({
     key: "probe",
     hash: "probe",
     namespace: "default",
@@ -41,6 +41,7 @@ async function probeWrite(version: PolicyVersion): Promise<string | null> {
     podSelector: null,
   })
   try {
+    await kubeApiRequest("POST", `${configMapPath("default")}${DRY_RUN}`, { body: params })
     await kubeApiRequest("POST", `${policyPath(version)}${DRY_RUN}`, { body: policy })
     return null
   } catch (e) {

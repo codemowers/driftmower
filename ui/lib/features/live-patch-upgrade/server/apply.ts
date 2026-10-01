@@ -9,7 +9,7 @@ import { getLivePatchUpgradeAvailability } from "./availability"
 import { waitUntilEffective } from "./effective"
 import { LivePatchUpgradeError } from "./error"
 import { listLivePatchUpgrades } from "./list"
-import { bindingPath, DRY_RUN, policyPath } from "./paths"
+import { bindingPath, configMapPath, DRY_RUN, policyPath } from "./paths"
 import { resolveInput } from "./resolve"
 import { ignoreNotFound, restartWorkload } from "./restart"
 
@@ -18,9 +18,10 @@ const ALREADY_EXISTS = 409
 type Step = { kind: string; collection: string; item: string; body: KubeObject }
 
 function steps(input: ManifestInput, version: PolicyVersion): Step[] {
-  const { policy, binding } = buildLivePatchUpgradeObjects(input)
+  const { params, policy, binding } = buildLivePatchUpgradeObjects(input)
   const name = objectName(input.hash)
   return [
+    { kind: "ConfigMap", collection: configMapPath(input.namespace), item: configMapPath(input.namespace, name), body: params },
     { kind: "MutatingAdmissionPolicy", collection: policyPath(version), item: policyPath(version, name), body: policy },
     { kind: "MutatingAdmissionPolicyBinding", collection: bindingPath(version), item: bindingPath(version, name), body: binding },
   ]
@@ -119,7 +120,7 @@ export async function removeLivePatchUpgrade(req: LivePatchUpgradeRequest, actor
 
   console.info(`[live-patch-upgrade] remove by ${actor} key=${key} ns=${req.target.namespace}`)
 
-  for (const path of [bindingPath(version, name), policyPath(version, name)]) {
+  for (const path of [bindingPath(version, name), policyPath(version, name), configMapPath(req.target.namespace, name)]) {
     // Before the delete, not after: the name came from facts the caller sent,
     // and only the object itself says which namespace it belongs to.
     await assertOwned(path, req.target.namespace)

@@ -132,7 +132,7 @@ export default function LivePatchUpgradeBlock({ row, target, state }: Props) {
         </div>
         {!active && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-200 px-4 py-2 text-xs text-muted-foreground">
-            <span>Creates <span className="font-medium text-foreground">MutatingAdmissionPolicy</span> and <span className="font-medium text-foreground">Binding</span> scoped to {target.namespace}</span>
+            <span>Creates <span className="font-medium text-foreground">ConfigMap</span>, <span className="font-medium text-foreground">MutatingAdmissionPolicy</span> and <span className="font-medium text-foreground">Binding</span> scoped to {target.namespace}</span>
             <span className="first-letter:uppercase">{restartLabel(target)}</span>
           </div>
         )}

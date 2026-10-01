@@ -20,6 +20,10 @@ export function bindingPath(version: PolicyVersion, name?: string): string {
   return `/apis/${ADMISSION_GROUP}/${version}/mutatingadmissionpolicybindings${name ? `/${name}` : ""}`
 }
 
+export function configMapPath(namespace: string, name?: string): string {
+  return `/api/v1/namespaces/${encodeURIComponent(namespace)}/configmaps${name ? `/${name}` : ""}`
+}
+
 export function workloadPath(kind: string, namespace: string, name: string): string | null {
   const plural = WORKLOAD_PLURALS[kind]
   if (!plural) return null
