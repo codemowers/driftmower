@@ -168,6 +168,7 @@ function normalizeBuiltAt(value?: string): string | undefined {
 }
 
 function normalizeReport(report: Report): void {
+  report.issues ??= []
   const r = report.report
   const usageLists: ImageUsage[][] = [
     r.imageUsages,

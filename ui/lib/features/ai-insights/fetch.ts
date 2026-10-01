@@ -1,4 +1,5 @@
 import { WORKLOADS_URL } from "@/lib/cluster/constants"
+import { normalizeAiInsights } from "./parse"
 import type { AiInsights, WorkloadsResponse } from "./types"
 
 const cache = new Map<string, AiInsights | null>()
@@ -15,7 +16,7 @@ export async function fetchAiInsights(
   if (!res.ok) throw new Error(`Failed to fetch workload insights: ${res.status}`)
   const json: WorkloadsResponse = await res.json()
   const raw = json.data[0]?.aiInsights
-  const insights = raw ? (JSON.parse(raw) as AiInsights) : null
+  const insights = raw ? normalizeAiInsights(JSON.parse(raw)) : null
 
   cache.set(cacheKey, insights)
   return insights

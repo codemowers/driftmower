@@ -30,3 +30,20 @@ export function buildInsightDetails(insights: AiInsights): InsightDetails {
     signals,
   }
 }
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+export function normalizeAiInsights(raw: unknown): AiInsights | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null
+  const fields = raw as Record<string, unknown>
+  const refs = Array.isArray(fields.evidenceRefs) ? fields.evidenceRefs : []
+  return {
+    role: text(fields.role),
+    importance: text(fields.importance),
+    confidence: text(fields.confidence),
+    explanation: text(fields.explanation),
+    evidenceRefs: refs.filter((ref): ref is string => typeof ref === "string"),
+  }
+}
