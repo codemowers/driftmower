@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
+import PrefetchLink, { usePagePrefetch } from "@/app/components/prefetch-link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, ExternalLink, Layers } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
@@ -45,15 +45,24 @@ function WorkloadRow({
   repoHint: string[]
 }) {
   const router = useRouter()
+  const prefetchPage = usePagePrefetch()
   const { uid, kind, name, namespace, manager, issueCount } = entry
 
   const managerLinkable = (manager.kind === "helm" && !!manager.uid) || (manager.kind === "argo" && !!manager.url)
 
+  const releaseHref = manager.kind === "helm" && manager.uid
+    ? (reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
+    : null
+
+  function prefetchManager() {
+    if (releaseHref) prefetchPage(releaseHref)
+  }
+
   function openManager(e: React.MouseEvent | React.KeyboardEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (manager.kind === "helm" && manager.uid) {
-      router.push(reportId ? `/helm-releases/${manager.uid}?report=${reportId}` : `/helm-releases/${manager.uid}`)
+    if (releaseHref) {
+      router.push(releaseHref)
     } else if (manager.kind === "argo" && manager.url) {
       window.open(manager.url, "_blank", "noopener")
     }
@@ -102,6 +111,8 @@ function WorkloadRow({
             role="link"
             tabIndex={0}
             onClick={openManager}
+            onMouseEnter={prefetchManager}
+            onFocus={prefetchManager}
             onKeyDown={(e) => { if (e.key === "Enter") openManager(e) }}
             className="group inline-flex items-center gap-1.5 max-w-full text-sm text-foreground hover:text-brand-text hover:underline cursor-pointer"
           >
@@ -118,12 +129,12 @@ function WorkloadRow({
   )
 
   return (
-    <Link
+    <PrefetchLink
       href={href}
       className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", focus.gridCols)}
     >
       {cells}
-    </Link>
+    </PrefetchLink>
   )
 }
 

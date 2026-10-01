@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
@@ -106,7 +106,7 @@ function ImageRow({
   const path = imagePath(entry.key)
 
   return (
-    <Link
+    <PrefetchLink
       href={linkTo(`/container-images/${path}`, { drop: ["focus"] })}
       className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}
     >
@@ -155,7 +155,7 @@ function ImageRow({
       <div>
         <WorstCveCell digests={digests} reports={reports} />
       </div>
-    </Link>
+    </PrefetchLink>
   )
 }
 

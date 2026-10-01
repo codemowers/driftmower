@@ -1,7 +1,7 @@
 "use client"
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { Issue } from "@/lib/cluster/reports"
@@ -100,13 +100,13 @@ export default function ScraperIssues({ issues, clusterWide, onCollapsedHeight }
               ? `/topmost-owners/${target.uid}/images/${encodeURIComponent(target.digest)}${reportQuery}`
               : `/topmost-owners/${target.uid}${reportQuery}`
             return (
-              <Link
+              <PrefetchLink
                 key={i}
                 href={href}
                 className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-brand-bg/30"
               >
                 {content}
-              </Link>
+              </PrefetchLink>
             )
           })}
         </div>

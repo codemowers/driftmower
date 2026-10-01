@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -18,6 +18,7 @@ import {
   useSandboxContext,
   type SandboxInfo,
 } from "@/lib/tenancy/sandbox-context"
+import LoadingLine from "@/app/components/loading-line"
 
 const UNAVAILABLE_COPY = {
   "not-configured":
@@ -86,7 +87,7 @@ export default function SandboxesPage() {
           accessory={adminPill}
         />
 
-        {!hydrated && <p className="text-sm text-muted-foreground">Loading sandboxes…</p>}
+        {!hydrated && <LoadingLine loading="sandboxes" />}
 
         {hydrated && !available && (
           <p className="text-sm text-muted-foreground">
@@ -155,7 +156,7 @@ export default function SandboxesPage() {
               filtered.map(sandbox => {
                 const isSelected = selectedSandboxes.includes(sandbox.sandbox)
                 return (
-                  <Link
+                  <PrefetchLink
                     key={sandbox.sandbox}
                     href={linkTo(`/sandboxes/${encodeURIComponent(sandbox.sandbox)}`, { drop: ["focus"] })}
                     className={cn(
@@ -200,7 +201,7 @@ export default function SandboxesPage() {
                       {isSelected ? <Check aria-hidden /> : <Package aria-hidden />}
                       {isSelected ? "Selected" : "Select"}
                     </Button>
-                  </Link>
+                  </PrefetchLink>
                 )
               })
             )}

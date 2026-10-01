@@ -1,7 +1,6 @@
 "use client"
 
 import type { ReactNode } from "react"
-import Link from "next/link"
 import { ExternalLink, GitGraph } from "lucide-react"
 import { OCI_DOCUMENTATION, OCI_REVISION, sourceRepoUrl } from "@/lib/utils/oci-labels"
 import type { ImageUsage } from "@/lib/cluster/reports"
@@ -21,7 +20,7 @@ function FooterLink({ label, href, children }: { label: string; href: string; ch
   return (
     <div className="flex items-start gap-4 py-2 text-sm">
       <span className="w-14 shrink-0 text-gray-600">{label}</span>
-      <Link
+      <a
         href={href}
         target="_blank"
         rel="noreferrer"
@@ -29,7 +28,7 @@ function FooterLink({ label, href, children }: { label: string; href: string; ch
       >
         {children}
         <ExternalLink className="ml-1.5 inline size-3.5 align-[-2px] text-muted-foreground group-hover:text-brand-text" />
-      </Link>
+      </a>
     </div>
   )
 }
@@ -55,7 +54,7 @@ export default function SourceCard({
         Source
       </p>
 
-      <Link
+      <a
         href={repoUrl}
         target="_blank"
         rel="noreferrer"
@@ -68,7 +67,7 @@ export default function SourceCard({
           {repoDisplayPath(repoUrl)}
         </p>
         <ExternalLink className="size-4 shrink-0 text-muted-foreground group-hover:text-brand-text" />
-      </Link>
+      </a>
 
       {(revision || docsUrl) && (
         <div className="mt-3 border-t border-gray-200 pt-1">

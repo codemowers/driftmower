@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { reasonLine, VALUE_LEAD } from "@/lib/features/actions/verdict"
@@ -38,7 +38,7 @@ function TopActionRow({ item, reportId }: { item: EnrichedRow<ClusterActionRow>;
   const livePatchUpgrade = useLivePatchUpgrade(row.facts)
   const showPill = livePatchUpgrade.active !== null && chip !== "assessing"
   return (
-    <Link
+    <PrefetchLink
       href={rowHref(row, reportId)}
       className="flex cursor-pointer items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg"
     >
@@ -60,7 +60,7 @@ function TopActionRow({ item, reportId }: { item: EnrichedRow<ClusterActionRow>;
         {showPill && <LivePatchUpgradePill />}
         <span>{row.displayFrom}<span className="px-1 text-muted-foreground">→</span><span className="font-semibold">{row.facts.to}</span></span>
       </span>
-    </Link>
+    </PrefetchLink>
   )
 }
 

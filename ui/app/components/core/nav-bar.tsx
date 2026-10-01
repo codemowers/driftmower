@@ -133,6 +133,7 @@ export default function NavBar({
               const link = (
                 <Link
                   href={href}
+                  prefetch
                   title={isExpanded ? item.name : undefined}
                   aria-label={item.name}
                   aria-current={active ? "page" : undefined}

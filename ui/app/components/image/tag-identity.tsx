@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import Link from "next/link"
 import { ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -66,7 +65,7 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
 
         <Row label="Registry">
           {repositoryUrl ? (
-            <Link
+            <a
               href={repositoryUrl}
               target="_blank"
               rel="noreferrer"
@@ -74,7 +73,7 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
             >
               <span>{registry}</span>
               <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
-            </Link>
+            </a>
           ) : (
             registry
           )}

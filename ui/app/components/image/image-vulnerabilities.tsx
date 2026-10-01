@@ -7,6 +7,7 @@ import { compactRelativeTimeFromNow } from "@/lib/utils/format-time"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { ImageUsage } from "@/lib/cluster/reports"
 import type { VulnerabilitySeverity, Vulnerability } from "@/lib/features/vulnerability"
+import LoadingLine from "@/app/components/loading-line"
 
 const SEVERITY_STYLE: Record<VulnerabilitySeverity, { bg: string; text: string; label: string }> = {
   CRITICAL: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "Critical" },
@@ -141,7 +142,7 @@ export default function ImageVulnerabilities({ usage }: { usage: ImageUsage }) {
       )}
 
       {!vulnError && vulnReports === null && (
-        <p className="text-sm text-muted-foreground">Loading scan…</p>
+        <LoadingLine loading="scan" />
       )}
 
       {!vulnError && vulnReports !== null && vuln === null && (

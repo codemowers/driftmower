@@ -11,6 +11,7 @@ import { useSandboxContext, useSandboxScope, useSeesClusterWideViews } from "@/l
 import { resolveManagerLink } from "@/lib/features/applications/manager-link"
 import { ownApps } from "@/lib/features/applications/ownership"
 import type { ApplicationEntry } from "@/lib/features/applications/types"
+import LoadingLine from "@/app/components/loading-line"
 
 function matches(entry: ApplicationEntry, query: string): boolean {
   if (!query) return true
@@ -72,7 +73,7 @@ export default function ApplicationsPage() {
         />
 
         {(launcher.status === "loading" || (launcher.status === "ready" && !tenancyKnown)) && (
-          <p className="text-sm text-muted-foreground">Loading applications…</p>
+          <LoadingLine loading="applications" />
         )}
 
         {launcher.status === "stale-session" && (

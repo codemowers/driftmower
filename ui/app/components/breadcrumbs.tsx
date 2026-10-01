@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { ChevronRight } from "lucide-react"
 
 export type BreadcrumbItem = {
@@ -19,12 +19,12 @@ export default function Breadcrumbs({ items }: Props) {
           return (
             <li key={i} className="flex min-w-0 items-center gap-1">
               {item.href && !isLast ? (
-                <Link
+                <PrefetchLink
                   href={item.href}
                   className="rounded px-1.5 py-0.5 font-medium break-all text-muted-foreground transition-colors hover:bg-brand-bg hover:text-brand"
                 >
                   {item.label}
-                </Link>
+                </PrefetchLink>
               ) : (
                 <span
                   className={`px-1 py-0.5 font-medium break-all ${isLast ? "text-foreground" : "text-muted-foreground/60"}`}

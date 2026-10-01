@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 
@@ -23,7 +23,7 @@ export default function SectionLinkCard({
   countText,
 }: SectionLinkCardProps) {
   return (
-    <Link
+    <PrefetchLink
       href={href}
       className={cn(
         "group block min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-7 shadow-xs",
@@ -48,6 +48,6 @@ export default function SectionLinkCard({
           →
         </span>
       </div>
-    </Link>
+    </PrefetchLink>
   )
 }

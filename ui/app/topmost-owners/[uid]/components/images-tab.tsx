@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { relativeTimeFromNow } from "@/lib/utils/format-time"
@@ -112,7 +112,7 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
                     </span>
                   )}
                 </div>
-                <Link
+                <PrefetchLink
                   href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
                   className="group flex min-w-0 flex-col font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
                 >
@@ -121,7 +121,7 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
                     <ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover:text-brand-text" />
                   </span>
                   <span className="truncate">{digestCrumb(u.imageInfo.digest)}</span>
-                </Link>
+                </PrefetchLink>
                 <TagCell tag={resolvedVersion(u) ?? vs.deployedTag} builtAt={vs.deployedBuiltAt} />
                 <TagCell tag={vs.latestTag} builtAt={vs.latestBuiltAt} />
                 <div>

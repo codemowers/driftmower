@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/refresh-state"
 import type { StatusType } from "@/lib/cluster/reports"
@@ -62,7 +62,7 @@ export default function MostOutdatedWorkloads({ entries, reportId, matchHeight, 
               ? `/topmost-owners/${e.uid}?report=${reportId}`
               : `/topmost-owners/${e.uid}`
             return (
-              <Link
+              <PrefetchLink
                 key={e.key}
                 href={href}
                 className="flex items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg/30"
@@ -89,7 +89,7 @@ export default function MostOutdatedWorkloads({ entries, reportId, matchHeight, 
                     no data
                   </span>
                 )}
-              </Link>
+              </PrefetchLink>
             )
           })}
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
 import type { ImageWorkloadRow } from "../../utils/image-entries"
@@ -54,7 +54,7 @@ export default function DeployedByCard({
         <div className="divide-y divide-gray-100">
           {rows.length > 0 ? (
             rows.map(row => (
-              <Link
+              <PrefetchLink
                 key={row.uid}
                 href={linkTo(`/topmost-owners/${row.uid}`, { drop: ["wtab"] })}
                 className={cn("grid items-center gap-4 px-5 py-3 transition-colors hover:bg-brand-bg/40", grid)}
@@ -70,7 +70,7 @@ export default function DeployedByCard({
                 {showVersions && (
                   <span className="truncate font-mono text-xs text-foreground">{versionLabel(row)}</span>
                 )}
-              </Link>
+              </PrefetchLink>
             ))
           ) : (
             <p className="px-5 py-6 text-sm text-muted-foreground">

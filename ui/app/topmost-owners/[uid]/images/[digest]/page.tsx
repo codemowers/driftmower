@@ -14,6 +14,7 @@ import SourceCard from "@/app/components/image/source-card"
 import ImageIssues from "@/app/components/image/image-issues"
 import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
 import { artifactTitle, digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
+import PageLoading from "@/app/components/page-loading"
 
 const STATUS_LABEL: Record<StatusType, string> = {
   major_behind: "Major",
@@ -44,6 +45,8 @@ export default function ImageTagDetailPage() {
     : undefined
 
   const usage = workloadMatch?.[1].find(u => u.imageInfo.digest === digest) ?? null
+
+  if (!data) return <PageLoading loading="image" />
 
   if (!data || !workloadMatch || !usage) {
     return (

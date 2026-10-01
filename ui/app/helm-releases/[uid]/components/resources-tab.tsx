@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
@@ -45,7 +45,7 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
         return (
           <div key={w.uid} className="overflow-hidden rounded-xl border border-gray-200">
             <div className="flex items-center border-b border-gray-200 bg-gray-50 transition-colors hover:bg-brand-bg/30">
-              <Link
+              <PrefetchLink
                 href={workloadHref}
                 className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5"
               >
@@ -54,7 +54,7 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
                 </span>
                 <span className="text-sm font-semibold text-foreground">{w.name}</span>
                 <span className="font-mono text-xs text-muted-foreground">{w.namespace}</span>
-              </Link>
+              </PrefetchLink>
               {liveRoot && supportsYamlView(liveRoot.kind) && (
                 <YamlLink uid={liveRoot.uid} className="px-4 py-2.5" />
               )}
@@ -73,7 +73,7 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
                       idx > 0 && "border-t border-gray-100",
                     )}
                   >
-                    <Link
+                    <PrefetchLink
                       href={podHref}
                       className="grid min-w-0 flex-1 grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3"
                     >
@@ -81,7 +81,7 @@ export default function ResourcesTab({ usages, clusterResources, reportId }: Pro
                       <span className="truncate font-mono text-sm text-foreground">{pod.name}</span>
                       <span className="font-mono text-xs text-muted-foreground">{pod.nodeName ?? "—"}</span>
                       <span className="font-mono text-xs text-muted-foreground">{pod.ips?.[0] ?? "—"}</span>
-                    </Link>
+                    </PrefetchLink>
                     <YamlLink uid={pod.uid} className="px-4 py-3" />
                   </div>
                 )

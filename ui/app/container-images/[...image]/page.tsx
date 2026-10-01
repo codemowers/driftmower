@@ -26,6 +26,7 @@ import TagHistoryCard from "./components/tag-history-card"
 import VersionsTable from "./components/versions-table"
 import HistoryCard from "./components/history-card"
 import { imageDetail, imageUsagesForKey, tagResolution, type ImageDetail, type ImageVersion } from "../utils/image-entries"
+import PageLoading from "@/app/components/page-loading"
 
 const PAIR_GRID = "grid gap-6 items-start xl:grid-cols-[1fr_340px]"
 
@@ -115,6 +116,8 @@ function ContainerImageDetailContent() {
   const assessments = useActionAssessments(actionRows, currentCharts)
 
   const detail = imageDetail(data, key, scope)
+
+  if (!data) return <PageLoading loading="image" />
 
   if (!data || !detail) {
     return (

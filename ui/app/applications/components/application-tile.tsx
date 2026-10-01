@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { usePagePrefetch } from "@/app/components/prefetch-link"
 import { Anchor, ExternalLink, ShipWheel, Users } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -62,16 +63,23 @@ function ArgoIcon({ manager }: { manager: Extract<ManagerLink, { kind: "argo" }>
 
 function HelmIcon({ manager }: { manager: Extract<ManagerLink, { kind: "helm" }> }) {
   const router = useRouter()
+  const prefetchPage = usePagePrefetch()
   const { linkTo } = useContextHref()
 
   const deployed = manager.chartVersion
   const drift = chartDrift(deployed, manager.latestChartTag)
   const behind = !isNoData(drift) && drift !== "up_to_date" && drift !== "ahead"
 
+  const releaseHref = manager.uid ? linkTo(`/helm-releases/${manager.uid}`, { drop: ["htab", "focus"] }) : null
+
+  function prefetchRelease() {
+    if (releaseHref) prefetchPage(releaseHref)
+  }
+
   function openRelease(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (manager.uid) router.push(linkTo(`/helm-releases/${manager.uid}`, { drop: ["htab", "focus"] }))
+    if (releaseHref) router.push(releaseHref)
   }
 
   return (
@@ -80,6 +88,8 @@ function HelmIcon({ manager }: { manager: Extract<ManagerLink, { kind: "helm" }>
         <button
           type="button"
           onClick={openRelease}
+          onMouseEnter={prefetchRelease}
+          onFocus={prefetchRelease}
           disabled={!manager.uid}
           aria-label={`Helm release ${manager.release}`}
           className={`${ICON_BUTTON} disabled:opacity-45 disabled:hover:text-muted-foreground`}

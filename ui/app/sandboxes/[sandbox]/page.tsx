@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { useParams } from "next/navigation"
 import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import KubeconfigPanel from "../kubeconfig-panel"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { cn } from "@/lib/utils/cn"
 import { hydrateSandboxContext, toggleSandbox, useSandboxContext } from "@/lib/tenancy/sandbox-context"
+import LoadingLine from "@/app/components/loading-line"
 
 export default function SandboxDetailPage() {
   const params = useParams<{ sandbox: string }>()
@@ -32,7 +33,7 @@ export default function SandboxDetailPage() {
     return (
       <div className="min-h-full flex flex-col items-center">
         <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-          <p className="text-sm text-muted-foreground">Loading sandbox…</p>
+          <LoadingLine loading="sandbox" />
         </main>
       </div>
     )
@@ -132,12 +133,12 @@ export default function SandboxDetailPage() {
             user to pick it again. */}
         <p className="text-sm text-muted-foreground">
           Deploying into this sandbox?{" "}
-          <Link
+          <PrefetchLink
             href={linkTo("/provisioning", { drop: ["focus"] })}
             className="text-brand-label underline decoration-dotted underline-offset-2 hover:text-brand"
           >
             Provisioning
-          </Link>{" "}
+          </PrefetchLink>{" "}
           shows the hostname it may claim, which storage classes exist, how much quota is left, and the
           admission rules that will reject a deployment here.
         </p>

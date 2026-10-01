@@ -15,6 +15,7 @@ import ActionsCard from "@/app/components/actions-card"
 import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
 import ReleaseTabs from "./components/release-tabs"
+import PageLoading from "@/app/components/page-loading"
 
 const NO_USAGES: ImageUsage[] = []
 
@@ -34,6 +35,8 @@ export default function HelmReleaseDetailPage() {
   const actionRows = useMemo(() => deriveActions(usages, undefined, vulnerabilityReports), [usages, vulnerabilityReports])
   const currentCharts = useMemo(() => currentChartScopes(usages), [usages])
   const assessments = useActionAssessments(actionRows, currentCharts)
+
+  if (!data) return <PageLoading loading="release" />
 
   if (!data || !score) {
     return (

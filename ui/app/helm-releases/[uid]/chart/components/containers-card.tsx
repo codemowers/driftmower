@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ImageUsage } from "@/lib/cluster/reports"
@@ -77,9 +77,9 @@ function ContainerRow({ entry, reportId, first }: { entry: ContainerEntry; repor
     : `/topmost-owners/${workloadUid}/images/${digest}`
 
   return (
-    <Link href={href} className={rowClass}>
+    <PrefetchLink href={href} className={rowClass}>
       {inner}
-    </Link>
+    </PrefetchLink>
   )
 }
 

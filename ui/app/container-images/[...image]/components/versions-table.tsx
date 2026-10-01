@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -119,7 +119,7 @@ export default function VersionsTable({
               </div>
 
               {version.digest && (
-                <Link
+                <PrefetchLink
                   href={artifactHref(version.artifactKey)}
                   aria-label={`Inspect ${version.resolvedTag ?? version.digest}`}
                   className="absolute inset-0"

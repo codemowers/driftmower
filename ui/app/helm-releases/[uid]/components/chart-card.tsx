@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { Map, ArrowRight } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
@@ -43,7 +43,7 @@ export default function ChartCard({ releaseInfo, href }: { releaseInfo: ReleaseI
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Helm Chart
       </p>
-      <Link href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
+      <PrefetchLink href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
           <Map className="size-6" strokeWidth={2} />
         </div>
@@ -62,7 +62,7 @@ export default function ChartCard({ releaseInfo, href }: { releaseInfo: ReleaseI
           <DriftIndicator releaseInfo={releaseInfo} />
           <ArrowRight className="size-4 text-muted-foreground transition-colors group-hover:text-brand-text" />
         </div>
-      </Link>
+      </PrefetchLink>
     </div>
   )
 }

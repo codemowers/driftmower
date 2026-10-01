@@ -11,6 +11,7 @@ import type { PodVolume, ResourceTriplet } from "@/lib/features/prometheus/query
 import type { PerPodMetrics } from "@/lib/features/prometheus/workload-metrics"
 import { useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import PrefetchLink from "@/app/components/prefetch-link"
 
 const MAX_VISIBLE = 5
 
@@ -322,7 +323,7 @@ function PodRow({ pod, href, divider }: { pod: PerPodMetrics; href: string | nul
   )
 
   if (href) {
-    return <a href={href} className="group contents">{inner}</a>
+    return <PrefetchLink href={href} className="group contents">{inner}</PrefetchLink>
   }
   return inner
 }

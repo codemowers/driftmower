@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
@@ -29,7 +29,7 @@ export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkl
       {pods.map((pod, idx) => {
         const href = linkTo(`/topmost-owners/${reportWorkloadUid}/${pod.uid}`, { drop: ["ptab"] })
         return (
-          <Link
+          <PrefetchLink
             key={pod.uid}
             href={href}
             className={cn(
@@ -42,7 +42,7 @@ export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkl
             <span className="font-mono text-xs text-muted-foreground">{pod.nodeName ?? "—"}</span>
             <span className="font-mono text-xs text-muted-foreground">{pod.ips?.[0] ?? "—"}</span>
             <ChevronRight className="size-4 text-muted-foreground/60" />
-          </Link>
+          </PrefetchLink>
         )
       })}
     </div>

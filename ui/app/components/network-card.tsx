@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { Activity, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useNetstatd, recentCounts, filterListening, groupListening } from "@/lib/features/netstatd"
@@ -100,12 +100,12 @@ export default function NetworkCard({ href, podIPs, podUid }: Props) {
     <div>
       <SectionLabel />
       {href ? (
-        <Link
+        <PrefetchLink
           href={href}
           className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 transition-colors hover:border-brand/40 hover:bg-brand-bg/30"
         >
           {inner}
-        </Link>
+        </PrefetchLink>
       ) : (
         <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
           {inner}

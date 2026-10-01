@@ -16,6 +16,7 @@ import IssuesCard from "./components/issues-card"
 import PodTabs from "./components/pod-tabs"
 import DiagnosisCard from "./components/diagnosis-card"
 import { usePodMetrics } from "./hooks/use-pod-metrics"
+import PageLoading from "@/app/components/page-loading"
 
 export default function PodDetailPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
@@ -31,6 +32,8 @@ export default function PodDetailPage() {
         ([, usages]) => usages[0]?.workloadRootInfo?.uid === workloadUid,
       )
     : undefined
+
+  if (!data) return <PageLoading loading="pod" />
 
   if (!data || !pod || !workloadMatch) {
     return (

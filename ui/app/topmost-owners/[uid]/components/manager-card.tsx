@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { ShipWheel, Anchor, ArrowRight, ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
@@ -31,7 +31,7 @@ function HelmCard({ releaseInfo, releaseUid, reportId }: Extract<Props, { kind: 
   return (
     <div>
       <SectionLabel>Managed by Helm</SectionLabel>
-      <Link href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
+      <PrefetchLink href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
           <ShipWheel className="size-6" strokeWidth={2} />
         </div>
@@ -46,7 +46,7 @@ function HelmCard({ releaseInfo, releaseUid, reportId }: Extract<Props, { kind: 
           </p>
         </div>
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-text" />
-      </Link>
+      </PrefetchLink>
     </div>
   )
 }

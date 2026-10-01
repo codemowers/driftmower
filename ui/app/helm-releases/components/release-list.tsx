@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
@@ -36,7 +36,7 @@ function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: LinkTo })
   const href = linkTo(`/helm-releases/${releaseInfo.uid}`, { drop: ["htab", "focus"] })
 
   return (
-    <Link
+    <PrefetchLink
       href={href}
       className="grid grid-cols-[2.5fr_3fr_1fr_1fr_1fr] gap-4 pl-6 pr-4 py-4 items-center hover:bg-brand-bg/40 transition-colors"
     >
@@ -88,7 +88,7 @@ function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: LinkTo })
           </span>
         )}
       </div>
-    </Link>
+    </PrefetchLink>
   )
 }
 

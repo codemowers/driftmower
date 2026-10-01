@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ReleaseScore } from "@/lib/cluster/reports"
@@ -22,7 +22,7 @@ export default function UsedByCard({ releases, linkTo }: Props) {
       </p>
       <div className="rounded-xl border border-gray-200 bg-white">
         {releases.map((score, i) => (
-          <Link
+          <PrefetchLink
             key={score.groupKey}
             href={linkTo(`/helm-releases/${score.releaseInfo.uid}`, { drop: ["htab", "focus"] })}
             className={cn(
@@ -41,7 +41,7 @@ export default function UsedByCard({ releases, linkTo }: Props) {
               {score.releaseInfo.revision !== undefined && <> · rev {score.releaseInfo.revision}</>}
             </span>
             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-          </Link>
+          </PrefetchLink>
         ))}
       </div>
     </div>

@@ -20,6 +20,7 @@ import ActionsCard from "@/app/components/actions-card"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
+import PageLoading from "@/app/components/page-loading"
 
 const NO_USAGES: ImageUsage[] = []
 
@@ -51,6 +52,8 @@ export default function WorkloadDetailPage() {
   const actionRows = deriveActions(actionUsages, root, vulnerabilityReports)
   const currentCharts = currentChartScopes(actionUsages)
   const assessments = useActionAssessments(actionRows, currentCharts)
+
+  if (!data) return <PageLoading loading="workload" />
 
   if (!data || !match) {
     return (

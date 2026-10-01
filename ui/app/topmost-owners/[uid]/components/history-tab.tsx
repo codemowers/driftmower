@@ -6,12 +6,13 @@ import TimelineDateAxis from "@/app/components/drift-history/timeline-date-axis"
 import { percentLabel, windowSummary } from "@/lib/features/drift-history/format"
 import { useWorkloadSeries } from "@/lib/features/drift-history/use-drift-history"
 import { cn } from "@/lib/utils/cn"
+import LoadingLine from "@/app/components/loading-line"
 
 export default function HistoryTab({ workloadGroupKey }: { workloadGroupKey: string }) {
   const { data, loading, error } = useWorkloadSeries(workloadGroupKey)
 
   if (error) return <p className="text-sm text-muted-foreground">Drift history is unavailable.</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading drift history...</p>
+  if (!data) return <LoadingLine loading="drift history" />
 
   const behind = data.series.filter(
     s => s.stats.currentStatus !== "up_to_date" && s.stats.currentStatus !== "ahead",

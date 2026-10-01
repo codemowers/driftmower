@@ -16,6 +16,7 @@ import TableOfContents, { type TocEntry } from "./components/table-of-contents"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
 import { useSandboxContext, useSandboxScope, type SandboxInfo } from "@/lib/tenancy/sandbox-context"
 import type { CapabilityResponse } from "@/lib/features/provisioning/types"
+import LoadingLine from "@/app/components/loading-line"
 
 const SUBTITLE =
   "What this cluster will let you deploy, and the rules it enforces. Nothing here changes anything."
@@ -36,7 +37,7 @@ export default function ProvisioningPage() {
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
         <PageHeader title="Provisioning" subtitle={SUBTITLE} accessory={<ClusterScopePill />} />
 
-        {state.status === "loading" && <p className="text-sm text-muted-foreground">Loading cluster support…</p>}
+        {state.status === "loading" && <LoadingLine loading="cluster support" />}
 
         {state.status === "not-in-cluster" && <p className="text-sm text-muted-foreground">{NOT_IN_CLUSTER}</p>}
 

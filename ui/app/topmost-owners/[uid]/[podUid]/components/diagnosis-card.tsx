@@ -10,6 +10,7 @@ import { StatCell, StatValue } from "@/app/components/stats-card"
 import type { DiagnosisCategory, DiagnosisFacts, Evidence } from "@/lib/features/pod-diagnosis/types"
 import { usePodDiagnosis } from "../hooks/use-pod-diagnosis"
 import { POD_TABS, POD_TABS_ID } from "./pod-tabs"
+import PrefetchLink from "@/app/components/prefetch-link"
 
 const CATEGORY_LABEL: Record<DiagnosisCategory, string> = {
   crash: "Crash loop",
@@ -156,6 +157,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+const EVIDENCE_LINK = "shrink-0 font-mono text-xs text-muted-foreground hover:text-brand hover:underline"
 const MONO_EVIDENCE = new Set<Evidence["kind"]>(["logs", "spec"])
 
 function EvidenceLine({ kind, line }: { kind: Evidence["kind"]; line: string }) {
@@ -208,16 +210,15 @@ function EvidenceGroup({
           </ul>
         )}
       </div>
-      {href && group.link && (
-        <a
-          href={href}
-          target={group.link === "yaml" ? "_blank" : undefined}
-          rel={group.link === "yaml" ? "noreferrer" : undefined}
-          onClick={group.link === "logs" ? onLogsClick : undefined}
-          className="shrink-0 font-mono text-xs text-muted-foreground hover:text-brand hover:underline"
-        >
+      {href && group.link === "yaml" && (
+        <a href={href} target="_blank" rel="noreferrer" className={EVIDENCE_LINK}>
           {LINK_LABEL[group.link]} ↗
         </a>
+      )}
+      {href && group.link && group.link !== "yaml" && (
+        <PrefetchLink href={href} onClick={group.link === "logs" ? onLogsClick : undefined} className={EVIDENCE_LINK}>
+          {LINK_LABEL[group.link]} ↗
+        </PrefetchLink>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
@@ -133,9 +133,9 @@ export default function DescendantsTab({ clusterResources, reportWorkloadUid, li
           )
 
           return podHref ? (
-            <Link key={r.uid} href={podHref} className={rowClassName}>
+            <PrefetchLink key={r.uid} href={podHref} className={rowClassName}>
               {inner}
-            </Link>
+            </PrefetchLink>
           ) : (
             <div key={r.uid} className={rowClassName}>
               {inner}

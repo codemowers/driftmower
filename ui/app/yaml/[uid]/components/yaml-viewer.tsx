@@ -6,6 +6,7 @@ import DocumentViewer from "@/app/components/document-viewer"
 import { generatedAnnotator, stripGenerated } from "@/lib/features/yaml/managed-fields"
 import { useSearchParam } from "@/lib/hooks/use-search-param"
 import { emitYamlLines } from "@/lib/features/yaml/yaml-lines"
+import LoadingLine from "@/app/components/loading-line"
 
 type Props = {
   uid: string
@@ -58,7 +59,7 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
   }, [resource])
 
   if (state.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading YAML…</p>
+    return <LoadingLine loading="YAML" />
   }
 
   if (state.status === "error") {

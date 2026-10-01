@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import PrefetchLink from "@/app/components/prefetch-link"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
 import type { ImageRelease } from "../../utils/image-entries"
 
@@ -25,7 +25,7 @@ export default function ManagedByCard({
       {releases.length > 0 ? (
         <div className="divide-y divide-gray-100">
           {releases.map(release => (
-            <Link
+            <PrefetchLink
               key={release.uid}
               href={linkTo(`/helm-releases/${release.uid}`, { drop: ["htab", "focus"] })}
               className="flex flex-col gap-0.5 px-5 py-3 transition-colors hover:bg-brand-bg/40"
@@ -40,7 +40,7 @@ export default function ManagedByCard({
                 {release.chartName} {release.chartVersion}
                 {release.revision !== undefined && ` · rev ${release.revision}`}
               </span>
-            </Link>
+            </PrefetchLink>
           ))}
         </div>
       ) : (
