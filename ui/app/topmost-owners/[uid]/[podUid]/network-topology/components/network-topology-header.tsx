@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import {
   useNetstatd,
+  useNetstatdMissing,
   type NetstatdStatus,
   aggregate,
   filterListening,
@@ -11,6 +12,7 @@ import {
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import Breadcrumbs from "@/app/components/breadcrumbs"
+import { NetstatdMissingStatus } from "@/app/components/netstatd-missing"
 import LiveAge from "@/app/topmost-owners/[uid]/network-topology/components/live-age"
 
 type Props = {
@@ -55,6 +57,7 @@ export default function NetworkTopologyHeader({
   const lastFlushedAt = useNetstatd(s => s.lastFlushedAt)
   const hiddenCount = useNetstatd(s => s.hiddenCount)
   const upstream = useNetstatd(s => s.upstream)
+  const missing = useNetstatdMissing()
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
 
@@ -105,28 +108,32 @@ export default function NetworkTopologyHeader({
             <span>{namespace}</span>
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
-            <span className={cn("size-2.5 shrink-0 rounded-full", STATUS_DOT[status])} />
-            <span className="text-sm font-medium text-foreground">{STATUS_LABEL[status]}</span>
-            {status === "open" && (
-              <LiveAge
-                timestamp={lastFlushedAt}
-                prefix="· "
-                className="font-mono text-[11px] tabular-nums text-muted-foreground"
-              />
+        {missing ? (
+          <NetstatdMissingStatus />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              <span className={cn("size-2.5 shrink-0 rounded-full", STATUS_DOT[status])} />
+              <span className="text-sm font-medium text-foreground">{STATUS_LABEL[status]}</span>
+              {status === "open" && (
+                <LiveAge
+                  timestamp={lastFlushedAt}
+                  prefix="· "
+                  className="font-mono text-[11px] tabular-nums text-muted-foreground"
+                />
+              )}
+            </div>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              live · netstatd · /conntrack
+              {upstream && ` · ${upstream.connected}/${upstream.total} nodes`}
+            </p>
+            {hiddenCount > 0 && (
+              <p className="font-mono text-[10px] tracking-wider text-muted-foreground/70 tabular-nums">
+                {hiddenCount.toLocaleString()} more not shown
+              </p>
             )}
           </div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
-            live · netstatd · /conntrack
-            {upstream && ` · ${upstream.connected}/${upstream.total} nodes`}
-          </p>
-          {hiddenCount > 0 && (
-            <p className="font-mono text-[10px] tracking-wider text-muted-foreground/70 tabular-nums">
-              {hiddenCount.toLocaleString()} more not shown
-            </p>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="relative min-h-6">

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import PrefetchLink from "@/app/components/prefetch-link"
 import { Activity, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { useNetstatd, recentCounts, filterListening, groupListening } from "@/lib/features/netstatd"
+import { useNetstatd, useNetstatdMissing, recentCounts, filterListening, groupListening } from "@/lib/features/netstatd"
 
 type Props = {
   href?: string
@@ -38,11 +38,13 @@ function SectionLabel() {
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, missing }: { status: string; missing: boolean }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={cn("size-2 rounded-full", STATUS_DOT[status] ?? "bg-gray-400")} />
-      <span className="text-xs font-medium text-foreground">{STATUS_LABEL[status] ?? status}</span>
+      <span className={cn("size-2 rounded-full", missing ? "bg-gray-400" : STATUS_DOT[status] ?? "bg-gray-400")} />
+      <span className={cn("text-xs font-medium", missing ? "text-muted-foreground" : "text-foreground")}>
+        {missing ? "netstatd not found" : STATUS_LABEL[status] ?? status}
+      </span>
     </span>
   )
 }
@@ -61,6 +63,8 @@ export default function NetworkCard({ href, podIPs, podUid }: Props) {
   const status = useNetstatd(s => s.status)
   const aggregates = useNetstatd(s => s.aggregates)
   const listening = useNetstatd(s => s.listening)
+  const missing = useNetstatdMissing()
+  const link = missing ? undefined : href
 
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -78,19 +82,22 @@ export default function NetworkCard({ href, podIPs, podUid }: Props) {
 
   const inner = (
     <>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
+      <div className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+        missing ? "bg-gray-100 text-muted-foreground" : "bg-brand-bg text-brand-icon",
+      )}>
         <Activity className="size-6" strokeWidth={2} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground">Network topology</p>
+        <p className={cn("text-sm font-semibold", missing ? "text-muted-foreground" : "text-foreground")}>Network topology</p>
         <div className="mt-1 flex items-center gap-x-2.5 whitespace-nowrap">
-          <StatusBadge status={status} />
-          {status === "open" && (
+          <StatusBadge status={status} missing={missing} />
+          {status === "open" && !missing && (
             <ActivityLine active={inbound + outbound} listening={listeningCount} />
           )}
         </div>
       </div>
-      {href && (
+      {link && (
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-text" />
       )}
     </>
@@ -99,9 +106,9 @@ export default function NetworkCard({ href, podIPs, podUid }: Props) {
   return (
     <div>
       <SectionLabel />
-      {href ? (
+      {link ? (
         <PrefetchLink
-          href={href}
+          href={link}
           className="group flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 transition-colors hover:border-brand/40 hover:bg-brand-bg/30"
         >
           {inner}

@@ -20,7 +20,7 @@ import WorkloadTabs from "./components/workload-tabs"
 import ActionsCard from "@/app/components/actions-card"
 import LivenessProbeCard from "@/app/components/liveness-probe-card"
 import RestartTile, { type RestartTarget } from "@/app/components/restart-tile"
-import { useWorkloadRestart } from "@/app/components/workload-restart-init"
+import { useFeatureFlags } from "@/app/components/feature-flags-init"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
@@ -34,7 +34,7 @@ export default function WorkloadDetailPage() {
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
-  const restartEnabled = useWorkloadRestart(s => s.enabled)
+  const restartEnabled = useFeatureFlags(s => s.workloadRestart)
   const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
 

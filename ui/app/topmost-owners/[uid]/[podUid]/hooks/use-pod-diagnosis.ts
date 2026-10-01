@@ -5,6 +5,7 @@ import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-sta
 import { buildDiagnosisFacts, duplicatesFor, isDiagnosable, ownerKindOf } from "@/lib/features/pod-diagnosis/signature"
 import { diagnosePod, recallDiagnosis, rememberDiagnoses } from "@/lib/features/pod-diagnosis/client"
 import type { DiagnosisFacts, DiagnosisState } from "@/lib/features/pod-diagnosis/types"
+import { useFeatureFlags } from "@/app/components/feature-flags-init"
 
 const POLL_INTERVAL = 4000
 
@@ -21,6 +22,7 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
   const clusterResources = useClusterState(s => s.clusterResources)
   const nodeDrift = useClusterState(s => s.nodeDrift)
   const nodeStorage = useClusterState(s => s.nodeStorage)
+  const llm = useFeatureFlags(s => s.llm)
   const [openedAt] = useState(() => Date.now())
   const [fresh, setFresh] = useState<DiagnosisState | null>(null)
   const [unavailable, setUnavailable] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
   const state = useMemo(() => fresh ?? (key ? recallDiagnosis(key) ?? null : null), [fresh, key])
 
   useEffect(() => {
-    if (!podUid) return
+    if (!podUid || !llm) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -72,12 +74,12 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
       if (timer) clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, forceToken])
+  }, [key, forceToken, llm])
 
   const recheck = useCallback(() => {
     setRechecking(true)
     setForceToken(token => token + 1)
   }, [])
 
-  return { facts, state, unavailable, error, rechecking, recheck }
+  return { facts, state, unavailable: llm ? unavailable : "LLM is not configured", error, rechecking, recheck }
 }

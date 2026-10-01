@@ -257,11 +257,13 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
     <div className="mt-2">
       <div className="mb-2 flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis</p>
-        <span className="rounded-md bg-brand-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-label">AI</span>
+        {!unavailable && (
+          <span className="rounded-md bg-brand-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-label">AI</span>
+        )}
       </div>
 
       <div className={cn("overflow-hidden rounded-xl border border-gray-200 border-t-4 bg-white", categoryEdge(category ?? "crash"))}>
-        <div className="grid grid-cols-4 divide-x divide-gray-200">
+        <div className={cn("grid divide-x divide-gray-200", unavailable ? "grid-cols-3" : "grid-cols-4")}>
           <StatCell label="Cause" className={DENSE_CELL}>
             <StatValue className={DENSE_VALUE}>{category ? CATEGORY_LABEL[category] : pendingLabel(pod)}</StatValue>
             <StatCaption caption={causeCaption(facts)} />
@@ -274,30 +276,32 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
             <StatValue className={DENSE_VALUE}>{affectsLabel(facts)}</StatValue>
             <StatCaption caption={affectsCaption(facts)} />
           </StatCell>
-          <StatCell label="Confidence" className={DENSE_CELL}>
-            {result && !pending ? (
-              <StatValue className={cn(DENSE_VALUE, "flex items-center gap-2")}>
-                <span className="capitalize">{result.confidence}</span>
-                <Dots level={result.confidence} />
-              </StatValue>
-            ) : (
-              <StatValue className={DENSE_VALUE}>—</StatValue>
-            )}
-            <StatCaption caption={{ text: result && !pending ? result.confidenceNote : "waiting for the model", mono: false }} />
-          </StatCell>
+          {!unavailable && (
+            <StatCell label="Confidence" className={DENSE_CELL}>
+              {result && !pending ? (
+                <StatValue className={cn(DENSE_VALUE, "flex items-center gap-2")}>
+                  <span className="capitalize">{result.confidence}</span>
+                  <Dots level={result.confidence} />
+                </StatValue>
+              ) : (
+                <StatValue className={DENSE_VALUE}>—</StatValue>
+              )}
+              <StatCaption caption={{ text: result && !pending ? result.confidenceNote : "waiting for the model", mono: false }} />
+            </StatCell>
+          )}
         </div>
 
-        <Section title={awaitingFirst && !unavailable ? "Assessing" : "What happened"}>
-          {unavailable ? (
-            <p className="text-sm text-muted-foreground">AI diagnosis is off ({unavailable}). The status and evidence above still come from the cluster.</p>
-          ) : awaitingFirst ? (
-            <p className="text-sm text-muted-foreground">
-              {error ? `Can't reach the diagnosis service, retrying: ${error}` : "Reading logs, events and node state. This usually takes a few minutes."}
-            </p>
-          ) : (
-            <p className="text-[15px] font-semibold text-foreground">{result?.cause}</p>
-          )}
-        </Section>
+        {!unavailable && (
+          <Section title={awaitingFirst ? "Assessing" : "What happened"}>
+            {awaitingFirst ? (
+              <p className="text-sm text-muted-foreground">
+                {error ? `Can't reach the diagnosis service, retrying: ${error}` : "Reading logs, events and node state. This usually takes a few minutes."}
+              </p>
+            ) : (
+              <p className="text-[15px] font-semibold text-foreground">{result?.cause}</p>
+            )}
+          </Section>
+        )}
 
         {result && result.evidence.length > 0 && (
           <Section title="Evidence">
@@ -334,24 +338,26 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
           </Section>
         )}
 
-        <div className="flex items-center justify-between gap-4 border-t border-gray-200 px-5 py-2.5">
-          <span className="text-[11.5px] text-muted-foreground">
-            {rechecking
-              ? "Re-checking this pod, this may take some time."
-              : state && state.state !== "pending" && state.computedAt
-                ? `Assessed ${new Date(state.computedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                : "Not assessed yet"}
-          </span>
-          {!pending && !rechecking && (
-            <button
-              type="button"
-              onClick={recheck}
-              className="text-xs text-muted-foreground hover:text-brand-label hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              Re-check
-            </button>
-          )}
-        </div>
+        {!unavailable && (
+          <div className="flex items-center justify-between gap-4 border-t border-gray-200 px-5 py-2.5">
+            <span className="text-[11.5px] text-muted-foreground">
+              {rechecking
+                ? "Re-checking this pod, this may take some time."
+                : state && state.state !== "pending" && state.computedAt
+                  ? `Assessed ${new Date(state.computedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  : "Not assessed yet"}
+            </span>
+            {!pending && !rechecking && (
+              <button
+                type="button"
+                onClick={recheck}
+                className="text-xs text-muted-foreground hover:text-brand-label hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                Re-check
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

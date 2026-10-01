@@ -6,8 +6,9 @@ import NavBar from "./components/core/nav-bar"
 import RefreshingOverlay from "./components/core/refreshing-overlay"
 import ClusterInit from "./components/cluster-init"
 import SandboxContextInit from "./components/sandbox-context-init"
-import WorkloadRestartInit from "./components/workload-restart-init"
+import FeatureFlagsInit from "./components/feature-flags-init"
 import { workloadRestartEnabled } from "@/lib/server/restart-workload"
+import { isLlmConfigured } from "@/lib/llm"
 import { getSession } from "@/lib/auth/session"
 import { callerSeesClusterWideViews } from "@/lib/server/sandbox-scope-filter"
 import { STRIP_DZ_INJECTED } from "@/lib/browser/strip-dz-injected"
@@ -54,7 +55,7 @@ export default async function RootLayout({
           <>
             <Suspense><ClusterInit /></Suspense>
             <Suspense><SandboxContextInit /></Suspense>
-            <WorkloadRestartInit enabled={workloadRestartEnabled()} />
+            <FeatureFlagsInit workloadRestart={workloadRestartEnabled()} llm={isLlmConfigured()} />
             <RefreshingOverlay />
 
             <TooltipProvider>

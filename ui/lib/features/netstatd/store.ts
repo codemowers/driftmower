@@ -24,6 +24,8 @@ const initial = (): NetstatdState => ({
 
 export const useNetstatd = create<NetstatdState>(initial)
 
+export const useNetstatdMissing = () => useNetstatd(s => s.upstream?.total === 0)
+
 const PRUNE_INTERVAL_MS = 10_000
 const AGG_CAP = 2_000
 const LISTENING_CAP = 2_000

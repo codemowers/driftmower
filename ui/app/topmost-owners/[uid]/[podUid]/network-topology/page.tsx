@@ -4,11 +4,14 @@ import { useParams } from "next/navigation"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import NetworkTopologyHeader from "./components/network-topology-header"
 import NetworkTopologyGraph from "./components/network-topology-graph"
+import { NetstatdMissingNotice } from "@/app/components/netstatd-missing"
+import { useNetstatdMissing } from "@/lib/features/netstatd"
 
 export default function PodNetworkTopologyPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const missing = useNetstatdMissing()
 
   const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
 
@@ -46,9 +49,13 @@ export default function PodNetworkTopologyPage() {
           nodeName={pod.nodeName ?? null}
           podIPs={pod.ips ?? []}
         />
-        <div className="min-h-0 flex-1">
-          <NetworkTopologyGraph podName={pod.name} podNamespace={pod.namespace} podIPs={pod.ips ?? []} />
-        </div>
+        {missing ? (
+          <NetstatdMissingNotice />
+        ) : (
+          <div className="min-h-0 flex-1">
+            <NetworkTopologyGraph podName={pod.name} podNamespace={pod.namespace} podIPs={pod.ips ?? []} />
+          </div>
+        )}
       </main>
     </div>
   )

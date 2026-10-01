@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import {
   useNetstatd,
+  useNetstatdMissing,
   findDescendantPodUids,
   aggregate,
   filterListening,
@@ -19,6 +20,7 @@ import UnknownPeersList from "./unknown-peers-list"
 import PortMatrix from "./port-matrix"
 import StickyHeader from "./sticky-header"
 import NetworkTopologyHeader from "./network-topology-header"
+import { NetstatdMissingNotice } from "@/app/components/netstatd-missing"
 
 type Props = {
   uid: string
@@ -37,6 +39,7 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
   const listening = useNetstatd(s => s.listening)
   const hiddenCount = useNetstatd(s => s.hiddenCount)
   const upstream = useNetstatd(s => s.upstream)
+  const missing = useNetstatdMissing()
 
   const scope = useMemo(
     () => findDescendantPodUids(clusterResources, uid),
@@ -63,6 +66,34 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
   const externalTotal = aggregated.external.length
   const unknownTotal = aggregated.unknownOut.length
 
+  const header = (
+    <NetworkTopologyHeader
+      uid={uid}
+      kind={kind}
+      kindLabel={kindLabel}
+      namespace={namespace}
+      name={name}
+      status={status}
+      lastFlushedAt={lastFlushedAt}
+      hiddenCount={hiddenCount}
+      upstream={upstream}
+      error={error}
+      peerTotal={peerTotal}
+      inboundCount={inboundCount}
+      externalTotal={externalTotal}
+      portTotal={portTotal}
+    />
+  )
+
+  if (missing) {
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
+        <NetstatdMissingNotice />
+      </div>
+    )
+  }
+
   return (
     <>
       <StickyHeader
@@ -74,22 +105,7 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
       />
 
       <div className="flex flex-col gap-6">
-        <NetworkTopologyHeader
-          uid={uid}
-          kind={kind}
-          kindLabel={kindLabel}
-          namespace={namespace}
-          name={name}
-          status={status}
-          lastFlushedAt={lastFlushedAt}
-          hiddenCount={hiddenCount}
-          upstream={upstream}
-          error={error}
-          peerTotal={peerTotal}
-          inboundCount={inboundCount}
-          externalTotal={externalTotal}
-          portTotal={portTotal}
-        />
+        {header}
 
         <SummaryStrip
           podCount={scope.podUids.size}

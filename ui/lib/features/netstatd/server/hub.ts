@@ -56,6 +56,7 @@ type HubState = {
   flushTimer: ReturnType<typeof setInterval> | null
   idleTimer: ReturnType<typeof setTimeout> | null
   started: boolean
+  ready: Promise<void> | null
 }
 
 const STATE_KEY = Symbol.for("driftmower.netstatd.hub")
@@ -80,6 +81,7 @@ function state(): HubState {
     flushTimer: null,
     idleTimer: null,
     started: false,
+    ready: null,
   }
   return g[STATE_KEY]
 }
@@ -437,6 +439,7 @@ function stopHub(s: HubState): void {
   s.indexTimer = null
   s.flushTimer = null
   s.started = false
+  s.ready = null
   for (const conn of [...s.conns.values()]) closeConn(s, conn)
   s.tables.hosts.clear()
   s.tables.containers.clear()
@@ -462,9 +465,9 @@ export async function addSubscriber(sub: Subscriber): Promise<void> {
 
   if (!s.started) {
     startTimers(s)
-    await refreshIndex(s).catch(() => {})
-    await refreshPods(s)
+    s.ready = refreshIndex(s).catch(() => {}).then(() => refreshPods(s))
   }
+  await s.ready
 }
 
 export function removeSubscriber(sub: Subscriber): void {
