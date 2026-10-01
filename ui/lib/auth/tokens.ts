@@ -5,6 +5,7 @@ import type { IronSession } from "iron-session"
 
 import { getOidcConfig, getOidcRuntimeConfig } from "./oidc"
 import type { SessionData } from "./session"
+import { causeOf } from "@/lib/server/error-response"
 
 const EXPIRY_SKEW_SECONDS = 60
 
@@ -52,6 +53,22 @@ export function applyTokens(session: IronSession<SessionData>, tokens: TokenResp
   }
 }
 
+export function describeOAuthError(error: unknown): { detail: string; cause?: string; rejected: boolean } {
+  const oauth = error as { error?: unknown; error_description?: unknown }
+  const cause = causeOf(error)
+  if (typeof oauth.error === "string") {
+    const description = typeof oauth.error_description === "string" ? `: ${oauth.error_description}` : ""
+    return { detail: `${oauth.error}${description}`, cause, rejected: true }
+  }
+  return { detail: error instanceof Error ? error.message : String(error), cause, rejected: false }
+}
+
+function logOAuthFailure(what: string, error: unknown): boolean {
+  const { detail, cause, rejected } = describeOAuthError(error)
+  console.error(`[auth] ${what} failed: ${detail}${cause ? ` (cause: ${cause})` : ""}`)
+  return rejected
+}
+
 export async function getValidAccessToken(session: IronSession<SessionData>): Promise<string | null> {
   if (!session.accessToken) {
     return null
@@ -75,8 +92,8 @@ export async function getValidAccessToken(session: IronSession<SessionData>): Pr
     await session.save()
 
     return session.accessToken ?? null
-  } catch {
-    await session.destroy()
+  } catch (error) {
+    if (logOAuthFailure("token refresh", error)) await session.destroy()
     return null
   }
 }
@@ -141,7 +158,7 @@ export async function getPlatformManagerToken(session: IronSession<SessionData>)
 
     return tokens.access_token
   } catch (error) {
-    console.error("platform-manager token grant failed:", error)
+    logOAuthFailure("platform-manager token grant", error)
     return null
   }
 }

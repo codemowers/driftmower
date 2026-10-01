@@ -46,7 +46,8 @@ export async function fetchCapabilitiesFromMcp(options: {
   try {
     parsed = JSON.parse(text)
   } catch {
-    return failure(424, "mcp_bad_response", `driftmower-mcp answered HTTP ${response.status} with a body that is not JSON`)
+    const snippet = text.replace(/\s+/g, " ").slice(0, 200)
+    return failure(424, "mcp_bad_response", `driftmower-mcp answered HTTP ${response.status} with a body that is not JSON: ${snippet}`)
   }
 
   if (response.ok) return { ok: true, body: parsed as CapabilityResponse }
@@ -72,5 +73,8 @@ function failure(status: 400 | 401 | 424, error: string, detail: string): McpCap
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  const message = error instanceof Error ? error.message : String(error)
+  const cause = (error as { cause?: { code?: unknown; message?: unknown } } | null)?.cause
+  const reason = typeof cause?.code === "string" ? cause.code : typeof cause?.message === "string" ? cause.message : null
+  return reason ? `${message} (${reason})` : message
 }

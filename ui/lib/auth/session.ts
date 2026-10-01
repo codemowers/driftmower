@@ -59,7 +59,8 @@ export async function hasSession(): Promise<boolean> {
   try {
     const session = await getSession()
     return Boolean(session.claims?.sub)
-  } catch {
+  } catch (error) {
+    console.error(`[auth] session check failed: ${error instanceof Error ? error.message : String(error)}`)
     return false
   }
 }

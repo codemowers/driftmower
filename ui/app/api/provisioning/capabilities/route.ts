@@ -55,5 +55,6 @@ export async function GET(req: Request) {
     offering: url.searchParams.get("offering"),
   })
 
+  if (!result.ok) console.error(`[provisioning] capabilities -> ${result.status} ${result.body.error}: ${result.body.detail}`)
   return Response.json(result.body, { status: result.ok ? 200 : result.status, headers: NO_STORE })
 }

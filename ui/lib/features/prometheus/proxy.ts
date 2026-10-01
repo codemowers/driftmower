@@ -1,6 +1,7 @@
 import "server-only"
 
 import { isInCluster } from "@/lib/server/k8s"
+import { errorResponse } from "@/lib/server/error-response"
 
 const INTERNAL_URL = "http://prometheus-operated.monitoring:9090"
 
@@ -23,13 +24,14 @@ export async function proxyPrometheusJson(
   try {
     res = await fetch(target.toString(), { cache: "no-store" })
   } catch (e) {
-    const cause = e instanceof Error ? e.message : String(e)
-    return Response.json({ error: "upstream unreachable", cause }, { status: 502 })
+    return errorResponse(e, "prometheus", `GET ${path}`)
   }
 
   const contentType = res.headers.get("content-type") ?? ""
   if (!contentType.includes("application/json")) {
-    return Response.json({ error: "upstream returned non-JSON", status: res.status }, { status: 502 })
+    const detail = (await res.text()).replace(/\s+/g, " ").slice(0, 300)
+    console.error(`[prometheus] GET ${path} -> ${res.status} non-JSON: ${detail}`)
+    return Response.json({ error: `Prometheus returned ${res.status} with a non-JSON body`, detail }, { status: 502 })
   }
 
   return Response.json(await res.json(), { status: res.status })

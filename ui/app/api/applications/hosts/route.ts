@@ -3,6 +3,7 @@ import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
 import { getHostEntries } from "@/lib/features/applications/hosts"
 import { fetchRegisteredApps } from "@/lib/features/applications/registered"
 import { hostOf } from "@/lib/features/applications/host-url"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -22,10 +23,7 @@ export async function GET() {
   try {
     entries = await getHostEntries()
   } catch (e) {
-    return Response.json(
-      { reason: "error", error: (e as Error).message },
-      { status: 500, headers: NO_STORE },
-    )
+    return errorResponse(e, "applications", "hosts", { headers: NO_STORE })
   }
 
   const ownHosts = new Set(

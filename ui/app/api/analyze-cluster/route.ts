@@ -2,6 +2,7 @@ import { Agent } from "undici"
 import { backendUrl, type FetchInit } from "@/lib/server/backend-proxy"
 import { getSession } from "@/lib/auth/session"
 import { getValidAccessToken } from "@/lib/auth/tokens"
+import { causeOf } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -27,9 +28,14 @@ export async function POST(req: Request) {
     cache: "no-store",
     dispatcher: triggerAgent,
   }
-  void fetch(`${backendUrl()}/analyze-cluster`, init).catch(e => {
-    console.error("[analyze-cluster] trigger failed:", String(e))
-  })
+  void fetch(`${backendUrl()}/analyze-cluster`, init)
+    .then(res => {
+      if (!res.ok) console.error(`[analyze-cluster] trigger -> ${res.status} ${res.statusText}`)
+    })
+    .catch(e => {
+      const cause = causeOf(e)
+      console.error(`[analyze-cluster] trigger failed: ${(e as Error).message}${cause ? ` (cause: ${cause})` : ""}`)
+    })
 
   return new Response(null, { status: 202 })
 }

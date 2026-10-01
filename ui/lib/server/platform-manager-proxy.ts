@@ -86,6 +86,7 @@ export async function fetchSandboxScope(): Promise<SandboxScope> {
   }
 
   if (response.status === 401 || response.status === 403) {
+    console.warn(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status}: treating the caller as unauthenticated`)
     return rememberScope(key, { state: "unauthenticated" }, now)
   }
 
@@ -94,7 +95,13 @@ export async function fetchSandboxScope(): Promise<SandboxScope> {
     return rememberScope(key, { state: "unreachable" }, now)
   }
 
-  const body = (await response.json()) as SandboxesResponse
+  let body: SandboxesResponse
+  try {
+    body = (await response.json()) as SandboxesResponse
+  } catch (e) {
+    console.error(`[pm-scope] GET ${baseUrl}${SANDBOXES_PATH} -> ${response.status} with a non-JSON body: ${(e as Error).message}`)
+    return rememberScope(key, { state: "unreachable" }, now)
+  }
   const namespaces = (body.sandboxes ?? []).map(s => s.namespace).filter(Boolean)
 
   return rememberScope(
@@ -121,7 +128,8 @@ export async function proxyPlatformManagerRequest(req: Request, upstreamPath: st
   const response = await forwardRequest(req, `${baseUrl}${upstreamPath}`, accessToken, "pm-proxy")
 
   if (response.status === 502 && response.headers.get("x-proxy-unreachable") === "1") {
-    return Response.json({ error: "platform-manager unreachable" }, { status: 503 })
+    const { cause } = (await response.json().catch(() => ({}))) as { cause?: string }
+    return Response.json({ error: "platform-manager unreachable", cause }, { status: 503 })
   }
 
   return response

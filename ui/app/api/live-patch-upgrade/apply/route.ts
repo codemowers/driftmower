@@ -10,6 +10,6 @@ export async function POST(req: Request) {
   try {
     return Response.json(await applyLivePatchUpgrade(parsed.request, parsed.actor), { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return livePatchUpgradeErrorResponse(e)
+    return livePatchUpgradeErrorResponse(e, "apply")
   }
 }

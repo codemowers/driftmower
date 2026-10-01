@@ -2,6 +2,7 @@ import { isInCluster } from "@/lib/server/k8s"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { getResourceObject } from "@/lib/cluster-resources/resource-object"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -30,7 +31,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
   try {
     resource = await getResourceObject(kind, namespace, name)
   } catch (e) {
-    return Response.json({ error: String((e as Error).message) }, { status: 502 })
+    return errorResponse(e, "yaml", `${kind} ${namespace}/${name}`)
   }
 
   if (!resource || resource.metadata?.uid !== uid) {

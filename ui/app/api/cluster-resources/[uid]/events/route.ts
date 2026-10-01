@@ -1,6 +1,7 @@
 import { isInCluster } from "@/lib/server/k8s"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { getPodEvents } from "@/lib/cluster-resources/events"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -23,6 +24,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ uid: str
     const events = await getPodEvents(namespace, uid)
     return Response.json({ events }, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return Response.json({ error: String((e as Error).message) }, { status: 502 })
+    return errorResponse(e, "events", `${namespace}/${uid}`)
   }
 }

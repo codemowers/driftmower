@@ -1,6 +1,7 @@
 import { getReleaseValues } from "@/lib/features/helm-releases/releases"
-import { isInCluster, KubeApiError } from "@/lib/server/k8s"
+import { isInCluster } from "@/lib/server/k8s"
 import { hasSession } from "@/lib/auth/session"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -26,12 +27,6 @@ export async function GET(req: Request) {
     }
     return Response.json(values)
   } catch (e) {
-    if (e instanceof KubeApiError && e.status === 403) {
-      return Response.json(
-        { error: "The driftmower-ui service account cannot read Helm release secrets" },
-        { status: 403 },
-      )
-    }
-    return Response.json({ error: String((e as Error).message) }, { status: 502 })
+    return errorResponse(e, "helm-releases", `values ${namespace}/${name}`)
   }
 }

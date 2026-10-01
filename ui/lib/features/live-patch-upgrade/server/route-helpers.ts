@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session"
 import { managerNamespace } from "@/lib/features/actions/types"
 import { isInCluster } from "@/lib/server/k8s"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
+import { errorResponse } from "@/lib/server/error-response"
 import { livePatchUpgradeRequestSchema } from "../schema"
 import type { LivePatchUpgradeRequest } from "../types"
 import { LivePatchUpgradeError } from "./error"
@@ -48,7 +49,7 @@ export async function parseLivePatchUpgradeRequest(req: Request): Promise<Parsed
   return { request: parsed.data as LivePatchUpgradeRequest, actor }
 }
 
-export function livePatchUpgradeErrorResponse(e: unknown): Response {
-  const status = e instanceof LivePatchUpgradeError ? e.status : 502
-  return Response.json({ error: String((e as Error).message) }, { status })
+export function livePatchUpgradeErrorResponse(e: unknown, action: string): Response {
+  if (e instanceof LivePatchUpgradeError) return Response.json({ error: e.message }, { status: e.status })
+  return errorResponse(e, "live-patch-upgrade", action)
 }

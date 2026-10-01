@@ -1,5 +1,6 @@
 import { isInCluster, kubeApiGet } from "@/lib/server/k8s"
 import { createTtlCache } from "@/lib/utils/ttl-cache"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -39,9 +40,6 @@ export async function GET() {
     const url = await getPrometheusUrl()
     return Response.json({ url }, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return Response.json(
-      { url: "", error: (e as Error).message },
-      { status: 500, headers: { "Cache-Control": "no-store" } },
-    )
+    return errorResponse(e, "prometheus", "config", { headers: { "Cache-Control": "no-store" } })
   }
 }

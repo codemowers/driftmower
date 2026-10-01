@@ -1,5 +1,6 @@
 import { listContainers } from "@/lib/features/logs/pod"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -29,6 +30,6 @@ export async function GET(req: Request) {
     cache.set(key, { containers, expiresAt: now + CACHE_TTL_MS })
     return Response.json({ containers }, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return Response.json({ error: (e as Error).message, containers: [] }, { status: 502 })
+    return errorResponse(e, "logs", `containers ${ns}/${pod}`)
   }
 }

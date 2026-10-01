@@ -24,11 +24,25 @@ async function readCa(): Promise<Buffer> {
 
 export class KubeApiError extends Error {
   readonly status: number
+  readonly reason: string | null
+  readonly kubeMessage: string
 
-  constructor(message: string, status: number) {
-    super(message)
+  constructor(path: string, status: number, reason: string | null, kubeMessage: string) {
+    super(`Kubernetes API ${path} returned ${status}: ${kubeMessage}`)
     this.name = "KubeApiError"
     this.status = status
+    this.reason = reason
+    this.kubeMessage = kubeMessage
+  }
+}
+
+export class KubeTransportError extends Error {
+  readonly code: string
+
+  constructor(method: KubeMethod, path: string, code: string, message: string) {
+    super(`Kubernetes API ${method} ${path} failed: ${message}`)
+    this.name = "KubeTransportError"
+    this.code = code
   }
 }
 
@@ -43,13 +57,16 @@ const KUBE_API_HOST = "kubernetes.default.svc"
 const JSON_ACCEPT = "application/json"
 const TEXT_ACCEPT = "text/plain, application/json"
 const STATUS_MESSAGE_MAX = 300
+const KUBE_TIMEOUT_MS = 30_000
 
-function statusMessage(body: string): string {
+function parseStatus(body: string): { reason: string | null; message: string } {
   try {
-    const parsed = JSON.parse(body) as { kind?: string; message?: string }
-    if (parsed.kind === "Status" && typeof parsed.message === "string") return parsed.message.slice(0, STATUS_MESSAGE_MAX)
+    const parsed = JSON.parse(body) as { kind?: string; reason?: string; message?: string }
+    if (parsed.kind === "Status" && typeof parsed.message === "string") {
+      return { reason: parsed.reason ?? null, message: parsed.message.slice(0, STATUS_MESSAGE_MAX) }
+    }
   } catch {}
-  return body.replace(/\s+/g, " ").slice(0, STATUS_MESSAGE_MAX)
+  return { reason: null, message: body.replace(/\s+/g, " ").slice(0, STATUS_MESSAGE_MAX) }
 }
 
 async function kubeRequestText(method: KubeMethod, path: string, init: KubeRequestInit): Promise<string> {
@@ -77,19 +94,22 @@ async function kubeRequestText(method: KubeMethod, path: string, init: KubeReque
           if (res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300) {
             resolve(body)
           } else {
-            const detail = statusMessage(body)
-            console.error(`[kube-api] ${method} ${path} -> ${res.statusCode}: ${detail}`)
-            reject(new KubeApiError(
-              `Kubernetes API ${path} returned ${res.statusCode}: ${detail}`,
-              res.statusCode ?? 0,
-            ))
+            const status = res.statusCode ?? 0
+            const { reason, message } = parseStatus(body)
+            const log = status === 404 ? console.warn : console.error
+            log(`[kube-api] ${method} ${path} -> ${status}${reason ? ` ${reason}` : ""}: ${message}`)
+            reject(new KubeApiError(path, status, reason, message))
           }
         })
       },
     )
+    req.setTimeout(KUBE_TIMEOUT_MS, () => {
+      req.destroy(Object.assign(new Error(`no response after ${KUBE_TIMEOUT_MS / 1000} s`), { code: "ETIMEDOUT" }))
+    })
     req.on("error", e => {
-      console.error(`[kube-api] ${method} ${path} -> request error:`, (e as Error).message)
-      reject(e)
+      const code = (e as NodeJS.ErrnoException).code ?? "EREQUEST"
+      console.error(`[kube-api] ${method} ${path} -> ${code}: ${e.message}`)
+      reject(new KubeTransportError(method, path, code, e.message))
     })
     if (payload) req.write(payload)
     req.end()

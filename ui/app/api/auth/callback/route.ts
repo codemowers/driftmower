@@ -3,7 +3,7 @@ import * as oidc from "openid-client"
 
 import { getOidcConfig, getOidcRuntimeConfig } from "@/lib/auth/oidc"
 import { getSession } from "@/lib/auth/session"
-import { applyTokens } from "@/lib/auth/tokens"
+import { applyTokens, describeOAuthError } from "@/lib/auth/tokens"
 
 export const dynamic = "force-dynamic"
 
@@ -16,14 +16,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/api/auth/login", appBaseUrl))
   }
 
-  const config = await getOidcConfig()
-
   // Behind the TLS-terminating proxy, req.url carries the internal scheme/host,
   // so the callback URL must be rebuilt from the configured external redirect URI.
   const callbackUrl = new URL(redirectUri)
   callbackUrl.search = new URL(req.url).search
 
   try {
+    const config = await getOidcConfig()
     const tokens = await oidc.authorizationCodeGrant(
       config,
       callbackUrl,
@@ -43,8 +42,9 @@ export async function GET(req: NextRequest) {
     session.state = undefined
     await session.save()
 
-    const detail = error instanceof Error ? error.message : "authorization failed"
+    const { detail, cause } = describeOAuthError(error)
+    console.error(`[auth] callback failed: ${detail}${cause ? ` (cause: ${cause})` : ""}`)
 
-    return NextResponse.json({ error: "authentication failed", detail }, { status: 401 })
+    return NextResponse.json({ error: "authentication failed", detail, cause }, { status: cause ? 502 : 401 })
   }
 }

@@ -2,6 +2,7 @@ import { getPodLogs } from "@/lib/features/logs/pod"
 import { guardNamespace } from "@/lib/server/sandbox-scope-filter"
 import { TAIL_LINES } from "@/lib/features/logs/constants"
 import type { LogSource } from "@/lib/features/logs/types"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,6 @@ export async function GET(req: Request) {
     const body = await getPodLogs({ ns, pod, uid, container, sinceNs, limit, source, previous })
     return Response.json(body, { headers: { "Cache-Control": "no-store" } })
   } catch (e) {
-    return Response.json({ error: (e as Error).message }, { status: 502 })
+    return errorResponse(e, "logs", `${ns}/${pod}`)
   }
 }
