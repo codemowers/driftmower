@@ -58,5 +58,5 @@ export type DiagnosisState =
   | { state: "ready"; result: DiagnosisResult; computedAt: number }
   | { state: "failed"; result: DiagnosisResult; computedAt: number }
 
-export type DiagnoseRequest = { focus: boolean; force?: boolean; pods: DiagnosisFacts[] }
-export type DiagnoseResponse = { results: Record<string, DiagnosisState> }
+export type DiagnoseRequest = { podUid: string; force: boolean } | { prewarm: true }
+export type DiagnoseResponse = { key: string | null; results: Record<string, DiagnosisState> }

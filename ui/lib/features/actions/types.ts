@@ -130,6 +130,16 @@ export function managerNamespace(manager: { kind: string; namespace?: unknown })
   return typeof manager.namespace === "string" ? manager.namespace : null
 }
 
+function factsHash(facts: ActionFacts): string {
+  const text = JSON.stringify(facts)
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(16).padStart(8, "0")
+}
+
 export function assessKey(facts: ActionFacts): string {
-  return `v${PROMPT_VERSION}:${facts.kind}:${facts.repository}|${facts.from}|${facts.to}|${managerScope(facts.manager)}`
+  return `v${PROMPT_VERSION}:${facts.kind}:${facts.repository}|${facts.from}|${facts.to}|${managerScope(facts.manager)}|${factsHash(facts)}`
 }

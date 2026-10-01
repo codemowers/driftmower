@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
-import { buildDiagnosisFacts, isDiagnosable } from "@/lib/features/pod-diagnosis/signature"
-import { duplicatesFor, ownerKindOf, postDiagnose, recallDiagnosis, rememberDiagnoses } from "@/lib/features/pod-diagnosis/client"
+import { buildDiagnosisFacts, duplicatesFor, isDiagnosable, ownerKindOf } from "@/lib/features/pod-diagnosis/signature"
+import { diagnosePod, recallDiagnosis, rememberDiagnoses } from "@/lib/features/pod-diagnosis/client"
 import type { DiagnosisFacts, DiagnosisState } from "@/lib/features/pod-diagnosis/types"
 
 const POLL_INTERVAL = 4000
@@ -36,15 +36,16 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
   }, [pod, clusterResources, nodeDrift, nodeStorage, openedAt])
 
   const key = facts?.key ?? null
+  const podUid = facts?.podUid ?? null
   const state = useMemo(() => fresh ?? (key ? recallDiagnosis(key) ?? null : null), [fresh, key])
 
   useEffect(() => {
-    if (!facts) return
+    if (!podUid) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
 
     async function tick(first: boolean) {
-      const outcome = await postDiagnose([facts as DiagnosisFacts], true, first && forceToken > 0).catch((e: Error) => e)
+      const outcome = await diagnosePod(podUid as string, first && forceToken > 0).catch((e: Error) => e)
       if (cancelled) return
       if (outcome instanceof Error) {
         setError(outcome.message)
@@ -55,9 +56,9 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
       } else {
         setError(null)
         rememberDiagnoses(outcome.results)
-        const next = outcome.results[(facts as DiagnosisFacts).key]
+        const next = outcome.key ? outcome.results[outcome.key] : undefined
         if (next) setFresh(next)
-        if (next && next.state !== "pending") {
+        if (!outcome.key || next?.state !== "pending") {
           setRechecking(false)
           return
         }

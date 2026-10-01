@@ -1,4 +1,4 @@
-import { generateText, streamText, type JSONValue } from "ai"
+import { generateText, type JSONValue } from "ai"
 import type { z } from "zod"
 import { llamaModel } from "./config"
 import { PROVIDER_KEY, resolveSpec, type ModelKey, type ModelSpec } from "./models"
@@ -43,6 +43,3 @@ export async function queryObject<T extends z.ZodType>(args: QueryArgs & { schem
   return parseObject(await query(args), args.schema)
 }
 
-export function streamQuery(args: QueryArgs) {
-  return streamText(callParams(args))
-}

@@ -36,8 +36,7 @@ export type ModelSpec = {
 export const PROVIDER_KEY = "llama"
 
 // The keys are roles, not model names: a caller asks for "classify", and which
-// model answers is deployment configuration. They keep their historical
-// spelling because /api/llm takes them as a request parameter.
+// model answers is deployment configuration.
 export const MODELS = {
   "qwen3.6-classify": {
     id: "Qwen3.6-35B-A3B-UD-Q4_K_M",

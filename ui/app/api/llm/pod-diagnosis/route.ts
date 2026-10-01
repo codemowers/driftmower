@@ -1,47 +1,43 @@
-import { hasSession } from "@/lib/auth/session"
 import { llmConfigError } from "@/lib/llm"
-import { sync } from "@/lib/features/pod-diagnosis/diagnose"
-import { MAX_PODS_PER_REQUEST } from "@/lib/features/pod-diagnosis/client"
-import type { DiagnosisFacts } from "@/lib/features/pod-diagnosis/types"
+import { podFacts, prewarmFacts, sync } from "@/lib/features/pod-diagnosis/diagnose"
+import { readScope } from "@/lib/server/sandbox-scope-filter"
+import { errorResponse } from "@/lib/server/error-response"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-function isDiagnosisFacts(value: unknown): value is DiagnosisFacts {
-  if (!value || typeof value !== "object") return false
-  const f = value as Record<string, unknown>
-  const podStatus = f.podStatus as Record<string, unknown> | undefined
-  return (
-    typeof f.key === "string" && f.key.length > 0 &&
-    typeof f.podUid === "string" && f.podUid.length > 0 &&
-    typeof f.namespace === "string" && f.namespace.length > 0 &&
-    typeof f.name === "string" && f.name.length > 0 &&
-    !!podStatus && typeof podStatus.display === "string" && Array.isArray(podStatus.containers)
-  )
-}
+const NO_STORE = { "Cache-Control": "no-store" }
 
 export async function POST(req: Request) {
-  if (!(await hasSession())) {
-    return Response.json({ error: "not authenticated" }, { status: 401 })
-  }
-
-  let body: { focus?: unknown; force?: unknown; pods?: unknown }
+  let body: { podUid?: unknown; force?: unknown; prewarm?: unknown }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: "invalid JSON body" }, { status: 400 })
   }
-  if (!Array.isArray(body.pods) || body.pods.length > MAX_PODS_PER_REQUEST || !body.pods.every(isDiagnosisFacts)) {
-    return Response.json({ error: "pods must be an array of diagnosis facts" }, { status: 400 })
+  if (body.prewarm !== true && (typeof body.podUid !== "string" || body.podUid.length === 0)) {
+    return Response.json({ error: "podUid or prewarm is required" }, { status: 400 })
   }
+
+  const allows = await readScope()
+  if (allows instanceof Response) return allows
 
   const configError = llmConfigError()
   if (configError) {
     return Response.json({ error: configError }, { status: 503 })
   }
 
-  return Response.json(
-    { results: sync(body.pods, body.focus === true, body.force === true) },
-    { headers: { "Cache-Control": "no-store" } },
-  )
+  try {
+    if (body.prewarm === true) {
+      return Response.json({ key: null, results: sync(await prewarmFacts(allows), false, false) }, { headers: NO_STORE })
+    }
+
+    const facts = await podFacts(body.podUid as string, allows)
+    if (facts instanceof Response) return facts
+    if (!facts) return Response.json({ key: null, results: {} }, { headers: NO_STORE })
+
+    return Response.json({ key: facts.key, results: sync([facts], true, body.force === true) }, { headers: NO_STORE })
+  } catch (e) {
+    return errorResponse(e, "pod-diagnosis", body.prewarm === true ? "prewarm" : String(body.podUid))
+  }
 }

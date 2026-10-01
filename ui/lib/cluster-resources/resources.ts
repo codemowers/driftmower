@@ -1,6 +1,7 @@
 import "server-only"
 
 import { isInCluster, kubeApiGet } from "@/lib/server/k8s"
+import { createTtlCache } from "@/lib/utils/ttl-cache"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { managerFromAnnotations, type ManagerInfo } from "./manager"
 import { derivePodStatus, type RawPodStatus } from "./pod-status"
@@ -155,3 +156,7 @@ function addCrdStubs(resources: ClusterResource[], raws: { obj: RawObject }[]): 
 
   resources.push(...stubs.values())
 }
+
+const SNAPSHOT_TTL_MS = 10_000
+
+export const getClusterResourcesSnapshot = createTtlCache(SNAPSHOT_TTL_MS, getClusterResources)

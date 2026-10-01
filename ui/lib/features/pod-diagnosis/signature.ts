@@ -190,3 +190,21 @@ export function buildDiagnosisFacts(
       : null,
   }
 }
+
+export function duplicatesFor(pod: ClusterResource, resources: ClusterResource[], now = Date.now()): number {
+  const byUid = new Map(resources.map(r => [r.uid, r]))
+  const key = diagnosisKey(pod)
+  let count = 0
+  for (const other of resources) {
+    if (other.kind !== "Pod") continue
+    const ownerKind = other.ownerUID ? byUid.get(other.ownerUID)?.kind ?? null : null
+    if (!isDiagnosable(other, ownerKind, now)) continue
+    if (diagnosisKey(other) === key) count++
+  }
+  return Math.max(1, count)
+}
+
+export function ownerKindOf(pod: ClusterResource, resources: ClusterResource[]): string | null {
+  const byUid = new Map(resources.map(r => [r.uid, r]))
+  return ownerChainOf(pod, byUid)[0]?.kind ?? null
+}

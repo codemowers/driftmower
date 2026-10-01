@@ -1,10 +1,18 @@
 import "server-only"
 
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
+import { getClusterNodes } from "@/lib/cluster-resources/nodes"
+import { getClusterResourcesSnapshot } from "@/lib/cluster-resources/resources"
+import { loadNodeStorage } from "@/lib/features/prometheus/node-storage"
+import { prometheus } from "@/lib/features/prometheus/proxy"
+import type { NamespaceFilter } from "@/lib/server/sandbox-scope-filter"
+import { createTtlCache } from "@/lib/utils/ttl-cache"
 import { TIER, bump, enqueue, isQueued, nextFocusSeq, queuedCount } from "@/lib/llm/queue"
 import { callDiagnosePrompt, type DiagnosisAnswer } from "@/lib/llm/prompts/diagnose-pod-failure"
 import { buildDiagnosisPayload, collectDiagnosisInputs, type DiagnosisPayload } from "./payload"
 import { checkText, commandsFor } from "./commands"
 import { assessConfidence } from "./confidence"
+import { buildDiagnosisFacts, duplicatesFor, isDiagnosable, ownerKindOf } from "./signature"
 import { PROMPT_VERSION, type DiagnosisFacts, type DiagnosisResult, type DiagnosisState, type Evidence } from "./types"
 
 const STORE_IDLE_MS = 14 * 24 * 60 * 60 * 1000
@@ -13,6 +21,7 @@ const FAILED_RETRY_MS = 5 * 60 * 1000
 const STALE_MS = 6 * 60 * 60 * 1000
 const FORCE_MIN_INTERVAL_MS = 60 * 1000
 const QUEUE_CAP = 50
+const NODE_FACTS_TTL_MS = 30_000
 
 type StoreEntry = DiagnosisState & { lastSeenAt: number; forcedAt?: number }
 type State = { store: Map<string, StoreEntry> }
@@ -180,4 +189,50 @@ export function fallbackResult(reason?: string): DiagnosisResult {
     check: "",
     since: null,
   }
+}
+
+const getNodes = createTtlCache(NODE_FACTS_TTL_MS, getClusterNodes)
+const getNodeStorage = createTtlCache(NODE_FACTS_TTL_MS, () => loadNodeStorage(prometheus))
+
+async function snapshot(allows: NamespaceFilter) {
+  const [all, nodes, storage] = await Promise.all([
+    getClusterResourcesSnapshot(),
+    getNodes().catch(() => null),
+    getNodeStorage().catch(() => null),
+  ])
+  const resources = allows ? all.filter(r => allows(r.namespace)) : all
+  return { resources, nodes, storage }
+}
+
+export async function podFacts(podUid: string, allows: NamespaceFilter): Promise<DiagnosisFacts | null | Response> {
+  const { resources, nodes, storage } = await snapshot(allows)
+  const pod = resources.find(r => r.kind === "Pod" && r.uid === podUid)
+  if (!pod) return Response.json({ error: "pod not found" }, { status: 404 })
+
+  const now = Date.now()
+  if (!isDiagnosable(pod, ownerKindOf(pod, resources), now)) return null
+  return buildDiagnosisFacts(pod, resources, nodes, storage, null, duplicatesFor(pod, resources, now))
+}
+
+export async function prewarmFacts(allows: NamespaceFilter): Promise<DiagnosisFacts[]> {
+  const { resources, nodes, storage } = await snapshot(allows)
+  const now = Date.now()
+  const byUid = new Map(resources.map(r => [r.uid, r]))
+  const representatives = new Map<string, { pod: ClusterResource; count: number }>()
+
+  for (const pod of resources) {
+    if (pod.kind !== "Pod") continue
+    const ownerKind = pod.ownerUID ? byUid.get(pod.ownerUID)?.kind ?? null : null
+    if (!isDiagnosable(pod, ownerKind, now)) continue
+    const facts = buildDiagnosisFacts(pod, resources, nodes, storage, null)
+    const existing = representatives.get(facts.key)
+    if (!existing) {
+      representatives.set(facts.key, { pod, count: 1 })
+      continue
+    }
+    existing.count++
+    if ((pod.podStatus?.restarts ?? 0) > (existing.pod.podStatus?.restarts ?? 0)) existing.pod = pod
+  }
+
+  return [...representatives.values()].map(({ pod, count }) => buildDiagnosisFacts(pod, resources, nodes, storage, null, count))
 }
