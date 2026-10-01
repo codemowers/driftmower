@@ -12,9 +12,9 @@ metadata:
 spec:
   applicationType: web
   displayName: Driftmower
-  uri: https://driftmower-ui.ee-lte-1.codemowers.io/
+  uri: https://driftmower.ee/
   redirectUris:
-    - https://driftmower-ui.ee-lte-1.codemowers.io/api/auth/callback
+    - https://driftmower.ee/api/auth/callback
   grantTypes:
     - authorization_code
     - refresh_token

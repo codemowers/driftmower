@@ -9,7 +9,7 @@ deploy:
 
 build:
   artifacts:
-    - image: zot.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
+    - image: zot.registry.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
       platforms:
         - linux/amd64
       docker:

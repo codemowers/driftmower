@@ -18,17 +18,17 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       imagePullSecrets:
-        - name: rasmus-gitea-registry-secret
+        - name: driftmower-ui-registry
       containers:
         - name: app
-          image: zot.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui:0.1.0
+          image: zot.registry.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           env:
             - name: BACKEND_URL
               value: "http://driftmower-be:3030"
             - name: ARGO_URL
-              value: "https://argocd.ee-west-1.codemowers.io/"
+              value: "https://argocd.ee-west-1.codemowers.io"
             - name: LLM_BASE_URL
               value: "https://llama-api.ee-lte-1.codemowers.io/v1"
             - name: OPENAI_API_KEY
@@ -36,6 +36,7 @@ spec:
                 secretKeyRef:
                   name: llama-api-token
                   key: token
+                  optional: true
             # Optional: raises the GitHub Releases rate limit for the Actions card's changelog lookups.
             - name: GITHUB_TOKEN
               valueFrom:
@@ -52,7 +53,7 @@ spec:
               value: "https://platform-manager-api"
             # Public base URL of this app (used to build the OIDC redirect URI).
             - name: APP_BASE_URL
-              value: "https://driftmower-ui.ee-lte-1.codemowers.io"
+              value: "https://driftmower.ee"
             # Resource indicator requested from passmower; must equal the
             # backend's OIDC_AUDIENCE so the JWT access token validates.
             - name: OIDC_AUDIENCE
