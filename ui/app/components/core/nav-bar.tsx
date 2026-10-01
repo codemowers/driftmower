@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/session"
 import { useSandboxContext } from "@/lib/tenancy/sandbox-context"
+import { noteNavigation } from "@/lib/browser/in-app-history"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
@@ -70,6 +71,10 @@ export default function NavBar({
   if (reportId) carriedParams.set("report", reportId)
   if (selectedSandboxes.length > 0) carriedParams.set("sandbox", selectedSandboxes.join(","))
   const carriedQuery = carriedParams.toString()
+
+  useEffect(() => {
+    noteNavigation(pathname)
+  }, [pathname])
 
   useEffect(() => {
     if (localStorage.getItem("nav-expanded") === "false") {
