@@ -3,6 +3,8 @@
 // stripped by ClusterInit; it is never written back into a URL.
 export const REFRESH_PARAM = "refresh"
 
+export const SESSION_ENDED_HEADER = "x-session-ended"
+
 export const ANALYZE_CLUSTER_URL = "/api/analyze-cluster"
 export const KUBERNETES_CONTEXTS_URL = "/api/kubernetes-contexts"
 export const REPORTS_URL = "/api/reports"

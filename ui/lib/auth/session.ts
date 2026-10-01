@@ -18,12 +18,18 @@ export interface SessionData {
   // platform-manager (tenancy control plane) API.
   // Epoch seconds.
   claims?: SessionClaims
+  // Epoch seconds.
+  createdAt?: number
+  lastSeenAt?: number
   codeVerifier?: string
   state?: string
   returnTo?: string
 }
 
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || "driftmower_session"
+
+export const SESSION_IDLE_SECONDS = 24 * 60 * 60
+export const SESSION_MAX_SECONDS = 3 * 24 * 60 * 60
 
 export function getSessionOptions(): SessionOptions {
   const password = process.env.SESSION_SECRET
@@ -35,8 +41,7 @@ export function getSessionOptions(): SessionOptions {
   return {
     password,
     cookieName: SESSION_COOKIE_NAME,
-    // Matches passmower's refresh-token lifetime.
-    ttl: 60 * 60 * 24 * 14,
+    ttl: SESSION_MAX_SECONDS,
     cookieOptions: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

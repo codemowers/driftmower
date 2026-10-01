@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import * as oidc from "openid-client"
 
-import { getOidcConfig, getOidcRuntimeConfig } from "@/lib/auth/oidc"
+import { getOidcConfig, getOidcRuntimeConfig, sameOriginPath } from "@/lib/auth/oidc"
 import { mcpAudience } from "@/lib/auth/mcp-audience"
 import { getSession } from "@/lib/auth/session"
 import { platformManagerAudience } from "@/lib/auth/tokens"
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest) {
   const config = await getOidcConfig()
-  const { redirectUri, scope, resource } = getOidcRuntimeConfig()
+  const { redirectUri, scope, resource, appBaseUrl } = getOidcRuntimeConfig()
 
   const codeVerifier = oidc.randomPKCECodeVerifier()
   const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier)
@@ -20,8 +20,7 @@ export async function GET(req: NextRequest) {
   session.codeVerifier = codeVerifier
   session.state = state
 
-  const returnTo = req.nextUrl.searchParams.get("returnTo")
-  session.returnTo = returnTo && returnTo.startsWith("/") ? returnTo : "/"
+  session.returnTo = sameOriginPath(req.nextUrl.searchParams.get("returnTo"), appBaseUrl)
   await session.save()
 
   // URLSearchParams so `resource` can repeat: the grant must contain every

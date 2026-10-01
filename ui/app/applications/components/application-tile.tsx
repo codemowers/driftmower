@@ -125,6 +125,15 @@ function HelmIcon({ manager }: { manager: Extract<ManagerLink, { kind: "helm" }>
   )
 }
 
+function safeHref(url: string): string | undefined {
+  try {
+    const { protocol } = new URL(url)
+    return protocol === "https:" || protocol === "http:" ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export default function ApplicationTile({
   entry,
   manager,
@@ -140,7 +149,7 @@ export default function ApplicationTile({
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <a
-          href={entry.url}
+          href={safeHref(entry.url)}
           target="_blank"
           rel="noreferrer"
           className="font-heading text-base font-semibold text-foreground after:absolute after:inset-0 focus-visible:outline-none"
@@ -154,10 +163,7 @@ export default function ApplicationTile({
         </div>
 
         {entry.description && (
-          <div
-            className="line-clamp-2 text-sm text-muted-foreground [&_a]:relative [&_a]:z-10 [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: entry.description }}
-          />
+          <p className="line-clamp-2 text-sm text-muted-foreground">{entry.description}</p>
         )}
       </div>
 

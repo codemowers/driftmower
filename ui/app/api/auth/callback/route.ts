@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import * as oidc from "openid-client"
 
-import { getOidcConfig, getOidcRuntimeConfig } from "@/lib/auth/oidc"
+import { getOidcConfig, getOidcRuntimeConfig, sameOriginPath } from "@/lib/auth/oidc"
 import { getSession } from "@/lib/auth/session"
 import { applyTokens, describeOAuthError } from "@/lib/auth/tokens"
 
@@ -31,12 +31,13 @@ export async function GET(req: NextRequest) {
     )
 
     applyTokens(session, tokens)
+    session.createdAt = session.lastSeenAt = Math.floor(Date.now() / 1000)
     session.codeVerifier = undefined
     session.state = undefined
     session.returnTo = undefined
     await session.save()
 
-    return NextResponse.redirect(new URL(returnTo || "/", appBaseUrl))
+    return NextResponse.redirect(new URL(sameOriginPath(returnTo, appBaseUrl), appBaseUrl))
   } catch (error) {
     session.codeVerifier = undefined
     session.state = undefined

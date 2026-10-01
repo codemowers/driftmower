@@ -77,3 +77,14 @@ export function getOidcConfig(): Promise<oidc.Configuration> {
 
   return configPromise
 }
+
+export function sameOriginPath(target: string | null | undefined, appBaseUrl: string): string {
+  if (!target) return "/"
+  try {
+    const base = new URL(appBaseUrl)
+    const url = new URL(target, base)
+    return url.origin === base.origin ? `${url.pathname}${url.search}${url.hash}` : "/"
+  } catch {
+    return "/"
+  }
+}

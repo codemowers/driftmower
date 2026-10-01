@@ -30,6 +30,16 @@ function readCookie(cookieHeader, name) {
   return null
 }
 
+function isCrossSite(req) {
+  const origin = req.headers.origin
+  if (!origin) return false
+  try {
+    return new URL(origin).host !== req.headers.host
+  } catch {
+    return true
+  }
+}
+
 // The browser can't set Authorization on a socket.io connection, so the
 // bearer is unsealed from the session cookie and injected here.
 async function injectAuthHeader(req) {
@@ -73,6 +83,10 @@ app.prepare().then(async () => {
 
   const server = createServer((req, res) => {
     if (req.url.startsWith(SOCKET_PATH)) {
+      if (isCrossSite(req)) {
+        res.writeHead(403).end()
+        return
+      }
       injectAuthHeader(req).finally(() => proxy.web(req, res))
       return
     }
@@ -82,6 +96,10 @@ app.prepare().then(async () => {
   server.on("upgrade", (req, socket, head) => {
     if (req.url.startsWith(SOCKET_PATH)) {
       socket.on("error", () => {})
+      if (isCrossSite(req)) {
+        socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
+        return
+      }
       injectAuthHeader(req).finally(() => proxy.ws(req, socket, head))
       return
     }

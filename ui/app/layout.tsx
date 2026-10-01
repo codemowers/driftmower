@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { Inter, JetBrains_Mono } from "next/font/google"
+import { headers } from "next/headers"
 import NavBar from "./components/core/nav-bar"
 import RefreshingOverlay from "./components/core/refreshing-overlay"
 import ClusterInit from "./components/cluster-init"
@@ -32,6 +33,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession()
+  const nonce = (await headers()).get("x-nonce") ?? undefined
   const claims = session.accessToken ? session.claims : undefined
   const seesClusterWideViews = claims ? await callerSeesClusterWideViews() : false
 
@@ -42,7 +44,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: STRIP_DZ_INJECTED }}/>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: STRIP_DZ_INJECTED }}/>
       </head>
 
       <body className="flex h-screen min-h-0 flex-col overflow-hidden">
