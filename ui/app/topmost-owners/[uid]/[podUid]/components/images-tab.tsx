@@ -1,11 +1,12 @@
 "use client"
 
 import PrefetchLink from "@/app/components/prefetch-link"
+import { LIVENESS_GUIDANCE, LivenessBadge } from "@/app/components/liveness-probe-card"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useClusterState, type LivenessProbe } from "@/lib/cluster/cluster-state"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import type { VulnerabilityReport, VulnerabilitySeverity, Vulnerability } from "@/lib/features/vulnerability"
@@ -83,12 +84,13 @@ type Props = {
   issues: Issue[]
   workloadUid: string
   contextQuery: string
+  livenessProbes: LivenessProbe[]
 }
 
 const GRID = "grid-cols-[3fr_5fr_1.5fr_1.5fr_1.5fr_1.5fr]"
 const HEADERS = ["Container", "Image", "Running", "Available", "Version drift", "Worst CVE"]
 
-export default function ImagesTab({ usages, issues, workloadUid, contextQuery }: Props) {
+export default function ImagesTab({ usages, issues, workloadUid, contextQuery, livenessProbes }: Props) {
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
 
   if (usages.length === 0) {
@@ -117,9 +119,21 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
               className={cn(idx > 0 && "border-t border-gray-100")}
             >
               <div className={cn("grid items-center gap-4 px-4 py-3", GRID)}>
-                <span className="truncate font-mono text-sm font-medium text-foreground">
-                  {u.containerName}
-                </span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-mono text-sm font-medium text-foreground">
+                    {u.containerName}
+                  </span>
+                  {livenessProbes.filter(probe => probe.container === u.containerName).map(probe => (
+                    <Tooltip key={probe.check}>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0} className="inline-flex rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                          <LivenessBadge label="Liveness probe" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="font-mono">{probe.check}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
                 <PrefetchLink
                   href={`/topmost-owners/${workloadUid}/images/${encodeURIComponent(u.imageInfo.digest)}${contextQuery}`}
                   className="group inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-brand-text hover:underline"
@@ -155,6 +169,9 @@ export default function ImagesTab({ usages, issues, workloadUid, contextQuery }:
           )
         })}
       </div>
+      {livenessProbes.length > 0 && (
+        <p className="border-t border-gray-200 px-4 py-3 text-sm text-muted-foreground">{LIVENESS_GUIDANCE}</p>
+      )}
     </div>
   )
 }

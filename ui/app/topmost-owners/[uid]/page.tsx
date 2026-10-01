@@ -17,6 +17,7 @@ import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
 import ActionsCard from "@/app/components/actions-card"
+import LivenessProbeCard from "@/app/components/liveness-probe-card"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
@@ -44,7 +45,8 @@ export default function WorkloadDetailPage() {
   const name = rootInfo?.name ?? ""
   const kindLabel = rootInfo?.qualifiedKind ?? kind
   const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
-  const livePodNames = clusterResources && root ? collectOwnedPods(clusterResources, root.uid).map(p => p.name) : []
+  const livePods = clusterResources && root ? collectOwnedPods(clusterResources, root.uid) : []
+  const livePodNames = livePods.map(p => p.name)
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
   const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
   const workloadMetrics = useWorkloadMetrics(namespace, podNames)
@@ -141,6 +143,8 @@ export default function WorkloadDetailPage() {
         ) : isArgo && argoApp ? (
           <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
         ) : null}
+
+        <LivenessProbeCard probes={livePods.flatMap(p => p.livenessProbes ?? [])} />
 
         <ActionsCard {...assessments} />
 

@@ -37,7 +37,7 @@ export default function PodTabs({ pod, usages, issues, workloadUid }: Props) {
       }}
       rootRef={rootRef}
     >
-      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} />}
+      {active === "Images" && <ImagesTab usages={usages} issues={issues} workloadUid={workloadUid} contextQuery={contextQuery} livenessProbes={pod.livenessProbes ?? []} />}
       {active === "Ports" && <PortsTab pod={pod} />}
       {active === "Logs" && <LogsTab pod={pod} />}
       {active === "Metadata" && <MetadataTab pod={pod} />}

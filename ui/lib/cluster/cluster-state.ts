@@ -26,6 +26,8 @@ export type PodStatus = {
   containers: PodContainerStatus[]
 }
 
+export type LivenessProbe = { container: string; check: string }
+
 export type ClusterResource = {
   uid: string
   kind: string
@@ -38,6 +40,7 @@ export type ClusterResource = {
   argoApp?: { name: string; url?: string; detailsUrl?: string; kind?: string; resourceRef?: string }
   ips?: string[]
   declaredPorts?: { container: string; name?: string; port: number; protocol: string }[]
+  livenessProbes?: LivenessProbe[]
   hostNetwork?: boolean
   nodeName?: string
   phase?: string

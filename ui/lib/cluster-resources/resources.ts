@@ -8,11 +8,21 @@ import { derivePodStatus, type RawPodStatus } from "./pod-status"
 
 type OwnerRef = { apiVersion: string; kind: string; name: string; uid: string }
 
+type RawProbe = {
+  httpGet?: { path?: string; port?: number | string }
+  tcpSocket?: { port?: number | string }
+  grpc?: { port?: number }
+  exec?: { command?: string[] }
+}
+
 type RawContainer = {
   name: string
   restartPolicy?: string
   ports?: { containerPort: number; name?: string; protocol?: string }[]
+  livenessProbe?: RawProbe
 }
+
+const EXEC_CHECK_MAX_CHARS = 60
 
 type RawObject = {
   metadata: {
@@ -117,6 +127,8 @@ function toClusterResource(
     if (ips.length) resource.ips = ips
     const declaredPorts = declaredPodPorts(obj.spec)
     if (declaredPorts.length) resource.declaredPorts = declaredPorts
+    const livenessProbes = podLivenessProbes(obj.spec)
+    if (livenessProbes.length) resource.livenessProbes = livenessProbes
     if (obj.spec?.hostNetwork) resource.hostNetwork = true
     if (obj.spec?.nodeName) resource.nodeName = obj.spec.nodeName
     if (obj.status?.phase) resource.phase = obj.status.phase
@@ -126,10 +138,27 @@ function toClusterResource(
   return resource
 }
 
-function declaredPodPorts(spec: RawObject["spec"]) {
+function runningContainers(spec: RawObject["spec"]): RawContainer[] {
   const sidecars = spec?.initContainers?.filter(c => c.restartPolicy === "Always") ?? []
-  const containers = [...(spec?.containers ?? []), ...sidecars]
-  return containers.flatMap(container =>
+  return [...(spec?.containers ?? []), ...sidecars]
+}
+
+function probeCheck(probe: RawProbe): string {
+  if (probe.httpGet) return `HTTP GET ${probe.httpGet.path ?? "/"} :${probe.httpGet.port ?? ""}`
+  if (probe.tcpSocket) return `TCP :${probe.tcpSocket.port ?? ""}`
+  if (probe.grpc) return `gRPC :${probe.grpc.port ?? ""}`
+  const command = (probe.exec?.command ?? []).join(" ")
+  return `exec ${command.length > EXEC_CHECK_MAX_CHARS ? `${command.slice(0, EXEC_CHECK_MAX_CHARS)}…` : command}`
+}
+
+function podLivenessProbes(spec: RawObject["spec"]) {
+  return runningContainers(spec).flatMap(container =>
+    container.livenessProbe ? [{ container: container.name, check: probeCheck(container.livenessProbe) }] : [],
+  )
+}
+
+function declaredPodPorts(spec: RawObject["spec"]) {
+  return runningContainers(spec).flatMap(container =>
     (container.ports ?? []).map(port => ({
       container: container.name,
       ...(port.name ? { name: port.name } : {}),
