@@ -56,11 +56,15 @@ export async function fetchLokiLines(args: {
   let res: Response
   try {
     res = await fetch(target.toString(), { cache: "no-store" })
-  } catch {
+  } catch (e) {
+    const cause = (e as { cause?: { code?: string } }).cause?.code
+    console.warn(`[logs] loki ${url} unreachable, falling back to the kube API: ${(e as Error).message}${cause ? ` (${cause})` : ""}`)
     return null
   }
-  if (!res.ok) return null
-  if (!(res.headers.get("content-type") ?? "").includes("application/json")) return null
+  if (!res.ok || !(res.headers.get("content-type") ?? "").includes("application/json")) {
+    console.warn(`[logs] loki ${url} -> ${res.status} ${res.headers.get("content-type") ?? ""}, falling back to the kube API`)
+    return null
+  }
 
   const json = (await res.json()) as LokiResult
   const lines: LogLine[] = []

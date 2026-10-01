@@ -137,7 +137,7 @@ export default function ImageVulnerabilities({ usage }: { usage: ImageUsage }) {
 
       {vulnError && (
         <p className="text-sm text-muted-foreground">
-          Vulnerability scanning unavailable. Trivy operator not installed
+          Vulnerability scan reports could not be loaded: {vulnError}
         </p>
       )}
 

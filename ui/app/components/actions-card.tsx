@@ -319,7 +319,7 @@ export default function ActionsCard({ displayRows, results, unavailable }: Actio
 
   if (displayRows.length === 0) return null
 
-  const enriched = displayRows.map(row => enrichRow(row, results, unavailable))
+  const enriched = displayRows.map(row => enrichRow(row, results, unavailable !== null))
   enriched.sort((a, b) => {
     const ra = a.risk ? RISK_RANK[a.risk] : 1.5
     const rb = b.risk ? RISK_RANK[b.risk] : 1.5
@@ -380,7 +380,7 @@ export default function ActionsCard({ displayRows, results, unavailable }: Actio
 
         {unavailable && (
           <p className="px-5 py-1.5 text-[11.5px] text-muted-foreground">
-            AI verdicts are off: LLM not configured. Deterministic rows still show; risk and changelog are not assessed.
+            AI verdicts are off ({unavailable}). Deterministic rows still show; risk and changelog are not assessed.
           </p>
         )}
       </div>

@@ -1,6 +1,9 @@
 import { checkConnection } from "./check-connection"
-import { useClusterState } from "./cluster-state"
+import { useClusterState, type ClusterResource } from "./cluster-state"
 import { CLUSTER_RESOURCES_URL, CLUSTER_NODES_URL, LIVE_PATCH_UPGRADE_URL } from "./constants"
+import { fetchJson } from "@/lib/utils/fetch-json"
+import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
+import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upgrade/types"
 import { fetchClusterAlerts } from "@/lib/features/prometheus/alerts"
 import { fetchClusterMetrics } from "@/lib/features/prometheus/metrics"
 import { fetchNodeStorage } from "@/lib/features/prometheus/node-storage"
@@ -34,20 +37,23 @@ export function startLiveDataFetching(): () => void {
           .then(data => { if (!cancelled) useClusterState.setState({ nodeStorage: data }) })
           .catch(() => {}),
         ...(shouldFetchResources ? [
-          fetch(CLUSTER_RESOURCES_URL, { cache: "no-store" })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data && !cancelled) useClusterState.setState({ clusterResources: data }) })
-            .catch(() => {}),
-          fetch(LIVE_PATCH_UPGRADE_URL, { cache: "no-store" })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data && !cancelled) useClusterState.setState({ livePatchUpgrades: data }) })
-            .catch(() => {}),
+          fetchJson<ClusterResource[]>(CLUSTER_RESOURCES_URL)
+            .then(data => { if (!cancelled) useClusterState.setState({ clusterResources: data, clusterResourcesError: null }) })
+            .catch((e: Error) => {
+              console.error(`[live-data] cluster resources: ${e.message}`)
+              if (!cancelled) useClusterState.setState({ clusterResourcesError: e.message })
+            }),
+          fetchJson<LivePatchUpgradeListResponse>(LIVE_PATCH_UPGRADE_URL)
+            .then(data => { if (!cancelled) useClusterState.setState({ livePatchUpgrades: data }) })
+            .catch((e: Error) => console.warn(`[live-data] temporary fixes: ${e.message}`)),
         ] : []),
         ...(isConnected ? [
-          fetch(CLUSTER_NODES_URL, { cache: "no-store" })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data && !cancelled) useClusterState.setState({ nodeDrift: data }) })
-            .catch(() => {}),
+          fetchJson<ClusterNodesResponse>(CLUSTER_NODES_URL)
+            .then(data => { if (!cancelled) useClusterState.setState({ nodeDrift: data, nodeDriftError: null }) })
+            .catch((e: Error) => {
+              console.error(`[live-data] nodes: ${e.message}`)
+              if (!cancelled) useClusterState.setState({ nodeDriftError: e.message })
+            }),
         ] : []),
       ])
 

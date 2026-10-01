@@ -7,6 +7,7 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import ResourceHeader from "@/app/components/resource-header"
 import YamlViewer from "./components/yaml-viewer"
+import ClusterDataPending from "@/app/components/cluster-data-pending"
 
 export default function YamlPage() {
   const { uid } = useParams<{ uid: string }>()
@@ -18,7 +19,7 @@ export default function YamlPage() {
     return (
       <div className="min-h-full flex flex-col items-center">
         <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-          <p className="text-sm text-muted-foreground">Loading cluster data…</p>
+          <ClusterDataPending />
         </main>
       </div>
     )

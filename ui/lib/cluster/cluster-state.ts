@@ -51,15 +51,18 @@ export type ClusterState = {
   isLoading: boolean
   isFetchingReport: boolean
   isConnected: boolean
+  connectionError: string | null
   error: string | null
   lastRefreshed: Date | null
   socketProgress: AnalyzeClusterProgress | null
   containerCount: number | null
   clusterResources: ClusterResource[] | null
+  clusterResourcesError: string | null
   livePatchUpgrades: LivePatchUpgradeListResponse | null
   nodeDrift: ClusterNodesResponse | null
+  nodeDriftError: string | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
-  vulnerabilityReportsError: boolean
+  vulnerabilityReportsError: string | null
   prometheusAlerts: AlertsResult | null
   clusterMetrics: ClusterMetrics | null
   nodeStorage: NodeStorageMap | null
@@ -72,15 +75,18 @@ export const useClusterState = create<ClusterState>(() => ({
   isLoading: false,
   isFetchingReport: false,
   isConnected: false,
+  connectionError: null,
   error: null,
   lastRefreshed: null,
   socketProgress: null,
   containerCount: null,
   clusterResources: null,
+  clusterResourcesError: null,
   livePatchUpgrades: null,
   nodeDrift: null,
+  nodeDriftError: null,
   vulnerabilityReports: null,
-  vulnerabilityReportsError: false,
+  vulnerabilityReportsError: null,
   prometheusAlerts: null,
   clusterMetrics: null,
   nodeStorage: null,

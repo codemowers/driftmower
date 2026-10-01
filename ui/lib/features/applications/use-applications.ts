@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { suffixFromAppBaseUrl } from "@/lib/features/provisioning/ingress-facts"
 import { hostOf } from "./host-url"
 import type { ApplicationEntry, HostsResponse, OidcApp, TenancyState } from "./types"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 const REGISTERED_URL = "/api/applications/registered"
 const HOSTS_URL = "/api/applications/hosts"
@@ -17,7 +18,7 @@ export type LauncherState =
 
 export type InventoryState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; message: string }
   | { status: "ready"; entries: ApplicationEntry[]; tenancy: TenancyState }
 
 export type ApplicationsState = { launcher: LauncherState; inventory: InventoryState }
@@ -36,15 +37,15 @@ async function fetchRegistered(): Promise<OidcApp[] | LauncherState> {
     return { status: "scope-not-configured" }
   }
   if (res.status === 403 || res.status === 401) return { status: "stale-session" }
-  if (!res.ok) return { status: "error", message: `Request failed with status ${res.status}` }
+  if (!res.ok) return { status: "error", message: await readApiError(res) }
 
   const body: { apps: OidcApp[] } = await res.json()
   return body.apps
 }
 
-async function fetchHosts(): Promise<HostsResponse | null> {
+async function fetchHosts(): Promise<HostsResponse | { error: string }> {
   const res = await fetch(HOSTS_URL, { cache: "no-store" })
-  if (!res.ok) return null
+  if (!res.ok) return { error: await readApiError(res) }
   return (await res.json()) as HostsResponse
 }
 
@@ -61,16 +62,16 @@ export function useApplications(): ApplicationsState {
       .then(([registered, hosts]) => {
         if (cancelled) return
 
-        const inventory: InventoryState = hosts
-          ? { status: "ready", entries: [], tenancy: hosts.tenancy }
-          : { status: "error" }
+        const inventory: InventoryState = "error" in hosts
+          ? { status: "error", message: hosts.error }
+          : { status: "ready", entries: [], tenancy: hosts.tenancy }
 
         if (!Array.isArray(registered)) {
           setState({ launcher: registered, inventory })
           return
         }
 
-        const hostList = hosts?.hosts ?? []
+        const hostList = "error" in hosts ? [] : hosts.hosts
         const byHost = new Map(hostList.map(h => [h.host, h]))
         const claimed = new Set<string>()
 
@@ -106,14 +107,14 @@ export function useApplications(): ApplicationsState {
 
         setState({
           launcher: { status: "ready", entries: launcher },
-          inventory: hosts ? { status: "ready", entries: others, tenancy: hosts.tenancy } : { status: "error" },
+          inventory: "error" in hosts ? inventory : { status: "ready", entries: others, tenancy: hosts.tenancy },
         })
       })
-      .catch(e => {
+      .catch((e: Error) => {
         if (cancelled) return
         setState({
-          launcher: { status: "error", message: String(e) },
-          inventory: { status: "error" },
+          launcher: { status: "error", message: e.message },
+          inventory: { status: "error", message: e.message },
         })
       })
 

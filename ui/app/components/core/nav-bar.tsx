@@ -60,7 +60,7 @@ export default function NavBar({
   seesClusterWideViews: boolean
 }) {
   const [isExpanded, setIsExpanded] = useState(true)
-  const { isConnected, clusterName, reportId } = useClusterState()
+  const { isConnected, connectionError, clusterName, reportId } = useClusterState()
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
 
@@ -261,7 +261,7 @@ export default function NavBar({
                   {isConnected ? "Connected" : "Disconnected"}
                 </p>
                 <p className="text-muted-foreground">
-                  {isConnected ? `Cluster: ${clusterName}` : null}
+                  {isConnected ? `Cluster: ${clusterName}` : connectionError}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -270,6 +270,11 @@ export default function NavBar({
         {isExpanded && (
           <p className="text-xs font-mono text-gray-400 pl-4">
             Cluster: {clusterName ?? "none"}
+          </p>
+        )}
+        {isExpanded && !isConnected && connectionError && (
+          <p className="line-clamp-3 break-words pl-4 font-mono text-xs text-status-major-text" title={connectionError}>
+            {connectionError}
           </p>
         )}
       </footer>

@@ -9,6 +9,8 @@ import PrometheusAlerts from "./components/prometheus-alerts"
 import ClusterMetrics from "./components/cluster-metrics"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { NodeDrift, SupportSeverity } from "@/lib/cluster-resources/types"
+import LoadingLine from "@/app/components/loading-line"
+import LoadError from "@/app/components/load-error"
 
 const DISPLAY_ORDER: Record<SupportSeverity, number> = {
   eol:      0,
@@ -48,6 +50,7 @@ function groupByRole(nodes: NodeDrift[]): RoleGroup[] {
 export default function ClusterPage() {
   const nodeDrift = useClusterState(s => s.nodeDrift)
   const isConnected = useClusterState(s => s.isConnected)
+  const nodeDriftError = useClusterState(s => s.nodeDriftError)
   const [alertsHeight, setAlertsHeight] = useState<number | null>(null)
 
   const nodes = nodeDrift?.nodes ?? []
@@ -63,9 +66,11 @@ export default function ClusterPage() {
         />
 
         {nodeDrift === null ? (
-          <p className="text-sm text-muted-foreground">
-            {isConnected ? "Loading nodes…" : "Waiting for cluster connection."}
-          </p>
+          nodeDriftError
+            ? <LoadError message={`Could not load nodes: ${nodeDriftError}`} />
+            : isConnected
+              ? <LoadingLine loading="nodes" />
+              : <p className="text-sm text-muted-foreground">Waiting for cluster connection.</p>
         ) : (
           <>
             <ClusterHeader

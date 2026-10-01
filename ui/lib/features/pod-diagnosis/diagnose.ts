@@ -76,7 +76,7 @@ export function sync(pods: DiagnosisFacts[], focus: boolean, force: boolean): Re
         seq,
         order,
         run: signal => runDiagnosis(facts, signal),
-        onFailed: () => storeFailed(facts),
+        onFailed: reason => storeFailed(facts, reason),
       })
     } else if (existing?.state === "pending" && focus) {
       bump("pod-diagnosis", key, tier, seq)
@@ -95,8 +95,8 @@ async function runDiagnosis(facts: DiagnosisFacts, signal: AbortSignal): Promise
   storeSet(facts.key, { state: "ready", result: toResult(answer, facts, payload), computedAt: Date.now() })
 }
 
-function storeFailed(facts: DiagnosisFacts): void {
-  storeSet(facts.key, { state: "failed", result: fallbackResult(), computedAt: Date.now() })
+function storeFailed(facts: DiagnosisFacts, reason: string): void {
+  storeSet(facts.key, { state: "failed", result: fallbackResult(reason), computedAt: Date.now() })
 }
 
 function storeSet(key: string, value: DiagnosisState): void {
@@ -169,10 +169,10 @@ export function resolveEvidence(indices: string[], payload: DiagnosisPayload): E
   return out
 }
 
-export function fallbackResult(): DiagnosisResult {
+export function fallbackResult(reason?: string): DiagnosisResult {
   return {
     category: null,
-    cause: "Diagnosis unavailable",
+    cause: reason ? `Diagnosis unavailable: ${reason}` : "Diagnosis unavailable",
     confidence: "low",
     confidenceNote: "model did not answer",
     evidence: [],

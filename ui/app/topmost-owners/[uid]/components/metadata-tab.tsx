@@ -1,6 +1,7 @@
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import YamlLink from "@/app/components/yaml-link"
+import ClusterDataPending from "@/app/components/cluster-data-pending"
 
 type Props = {
   clusterResources: ClusterResource[] | null
@@ -9,7 +10,7 @@ type Props = {
 
 export default function MetadataTab({ clusterResources, liveWorkloadUid }: Props) {
   if (clusterResources === null) {
-    return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
+    return <ClusterDataPending />
   }
 
   const resource = clusterResources.find(r => r.uid === liveWorkloadUid)

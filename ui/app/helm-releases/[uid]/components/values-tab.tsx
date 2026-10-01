@@ -7,6 +7,7 @@ import TabMessage from "./tab-message"
 import { HELM_RELEASES_URL } from "@/lib/cluster/constants"
 import { countLeaves, mergeValues, valueLines, type ReleaseValues, type ValuesView } from "@/lib/features/helm-releases/values"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 type Props = {
   uid: string
@@ -32,11 +33,12 @@ export default function ValuesTab({ uid, releaseInfo }: Props) {
     fetch(`${HELM_RELEASES_URL}/${encodeURIComponent(uid)}/values?${query}`, { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
-        const json = await res.json()
         if (!res.ok) {
-          setState({ status: "error", message: json.error ?? `Request failed with status ${res.status}` })
+          const message = await readApiError(res)
+          if (!cancelled) setState({ status: "error", message })
           return
         }
+        const json = await res.json()
         setState({ status: "ready", values: json })
       })
       .catch(e => {

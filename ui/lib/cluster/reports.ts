@@ -196,7 +196,7 @@ async function loadReport(getReport: () => Promise<Report>): Promise<void> {
       isFetchingReport: false,
     })
   } catch (e) {
-    useClusterState.setState({ error: String(e), isFetchingReport: false })
+    useClusterState.setState({ error: `Could not load the report: ${(e as Error).message}`, isFetchingReport: false })
   }
 }
 

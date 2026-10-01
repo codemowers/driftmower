@@ -72,11 +72,12 @@ export function useLogs(
         sinceNs: cursor,
         limit: TAIL_LINES,
         sourceHint: source,
-      }).catch(() => null)
+      }).catch((e: Error) => e)
       if (cancelled) return
 
-      if (!resp) {
-        setState(s => (s.error ? s : { ...s, error: "log source unreachable" }))
+      if (resp instanceof Error) {
+        const message = `Could not load logs: ${resp.message}`
+        setState(s => (s.error === message ? s : { ...s, error: message }))
         return
       }
       source = resp.source
@@ -90,6 +91,7 @@ export function useLogs(
           notice = prev.notice ?? null
         }
       }
+      if (resp.notice) notice = resp.notice
       if (absorb(resp.lines)) changed = true
       if (changed) buffer.sort((a, b) => compareNs(a.tsNs, b.tsNs))
 

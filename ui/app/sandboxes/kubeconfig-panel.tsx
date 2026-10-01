@@ -5,6 +5,7 @@ import { Check, Copy, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import CopyButton from "../components/copy-button"
 import { cn } from "@/lib/utils/cn"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 const KREW_INSTALL_URL = "https://krew.sigs.k8s.io/docs/user-guide/setup/install/"
 
@@ -41,7 +42,8 @@ export default function KubeconfigPanel({ sandbox }: { sandbox: string }) {
       .then(async res => {
         if (cancelled) return
         if (!res.ok) {
-          setState({ status: "error", message: `Request failed with status ${res.status}` })
+          const message = await readApiError(res)
+          if (!cancelled) setState({ status: "error", message })
           return
         }
         const yaml = await res.text()

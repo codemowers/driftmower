@@ -11,7 +11,7 @@ export type ActionAssessments<T extends ActionRow = ActionRow> = {
   rows: T[]
   displayRows: DisplayRow<T>[]
   results: Record<string, AssessState>
-  unavailable: boolean
+  unavailable: string | null
 }
 
 type Options = { focus?: boolean }
@@ -20,7 +20,7 @@ export function useActionAssessments<T extends ActionRow>(rows: T[], currentChar
   const focus = options.focus ?? true
   const rowsKey = rows.map(r => r.key).join("\n")
   const [fresh, setResults] = useState<Record<string, AssessState>>({})
-  const [unavailable, setUnavailable] = useState(false)
+  const [unavailable, setUnavailable] = useState<string | null>(null)
   const results = useMemo(() => ({ ...recallResults(rows), ...fresh }), [rows, fresh])
   const displayRows = useMemo(() => relateRows(rows, results, currentCharts), [rows, results, currentCharts])
 
@@ -30,10 +30,13 @@ export function useActionAssessments<T extends ActionRow>(rows: T[], currentChar
     let timer: ReturnType<typeof setTimeout> | undefined
 
     async function tick(first: boolean) {
-      const outcome = await postAssessAll(rows.map(r => r.facts), first && focus).catch(() => null)
+      const outcome = await postAssessAll(rows.map(r => r.facts), first && focus).catch((e: Error) => {
+        console.error(`[actions] assess failed: ${e.message}`)
+        return null
+      })
       if (cancelled) return
-      if (outcome === "unavailable") {
-        setUnavailable(true)
+      if (outcome && "unavailable" in outcome) {
+        setUnavailable(outcome.unavailable)
         return
       }
       if (outcome) {

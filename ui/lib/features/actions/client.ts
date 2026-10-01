@@ -2,12 +2,13 @@ import type { Report } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import { ACTIONS_ASSESS_URL } from "@/lib/cluster/constants"
+import { readApiError } from "@/lib/utils/read-api-error"
 import { deriveClusterActions } from "./derive"
 import type { ActionFacts, ActionRow, AssessResponse, AssessState } from "./types"
 
 export const MAX_ACTIONS_PER_REQUEST = 500
 
-export type AssessOutcome = AssessResponse | "unavailable"
+export type AssessOutcome = AssessResponse | { unavailable: string }
 
 const known = new Map<string, AssessState>()
 
@@ -31,8 +32,8 @@ export async function postAssess(actions: ActionFacts[], focus: boolean): Promis
     body: JSON.stringify({ focus, actions }),
     cache: "no-store",
   })
-  if (res.status === 401 || res.status === 503) return "unavailable"
-  if (!res.ok) throw new Error(`assess ${res.status}`)
+  if (res.status === 401 || res.status === 503) return { unavailable: await readApiError(res) }
+  if (!res.ok) throw new Error(await readApiError(res))
   return (await res.json()) as AssessResponse
 }
 
@@ -40,7 +41,7 @@ export async function postAssessAll(actions: ActionFacts[], focus: boolean): Pro
   const merged: AssessResponse = { results: {} }
   for (let i = 0; i < actions.length; i += MAX_ACTIONS_PER_REQUEST) {
     const outcome = await postAssess(actions.slice(i, i + MAX_ACTIONS_PER_REQUEST), focus)
-    if (outcome === "unavailable") return outcome
+    if ("unavailable" in outcome) return outcome
     Object.assign(merged.results, outcome.results)
   }
   return merged
@@ -59,6 +60,6 @@ export function prewarmActions(
   const actions = deriveClusterActions(data, clusterResources, vulnReports, null).map(row => row.facts)
   if (actions.length === 0) return
   void postAssessAll(actions, false)
-    .then(outcome => outcome !== "unavailable" && rememberResults(outcome.results))
+    .then(outcome => "results" in outcome && rememberResults(outcome.results))
     .catch(() => prewarmed.delete(reportId))
 }

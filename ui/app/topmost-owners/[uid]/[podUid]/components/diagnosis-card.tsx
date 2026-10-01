@@ -225,7 +225,7 @@ function EvidenceGroup({
 }
 
 export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResource; workloadUid: string }) {
-  const { facts, state, unavailable, rechecking, recheck } = usePodDiagnosis(pod)
+  const { facts, state, unavailable, error, rechecking, recheck } = usePodDiagnosis(pod)
   const { linkTo } = useContextHref()
   const seesClusterWideViews = useSeesClusterWideViews()
   const [, setPodTab] = useTabParam("ptab", POD_TABS)
@@ -289,9 +289,11 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
 
         <Section title={awaitingFirst && !unavailable ? "Assessing" : "What happened"}>
           {unavailable ? (
-            <p className="text-sm text-muted-foreground">AI diagnosis is off: LLM not configured. The status and evidence above still come from the cluster.</p>
+            <p className="text-sm text-muted-foreground">AI diagnosis is off ({unavailable}). The status and evidence above still come from the cluster.</p>
           ) : awaitingFirst ? (
-            <p className="text-sm text-muted-foreground">Reading logs, events and node state. This usually takes a few minutes.</p>
+            <p className="text-sm text-muted-foreground">
+              {error ? `Can't reach the diagnosis service, retrying: ${error}` : "Reading logs, events and node state. This usually takes a few minutes."}
+            </p>
           ) : (
             <p className="text-[15px] font-semibold text-foreground">{result?.cause}</p>
           )}

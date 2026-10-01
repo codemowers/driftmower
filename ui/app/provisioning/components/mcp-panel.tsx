@@ -5,6 +5,7 @@ import { Eye, EyeOff, KeyRound, TriangleAlert } from "lucide-react"
 
 import CopyButton from "@/app/components/copy-button"
 import { cn } from "@/lib/utils/cn"
+import { readApiError } from "@/lib/utils/read-api-error"
 import {
   maskSnippet,
   mcpQuickstarts,
@@ -47,12 +48,12 @@ export default function McpPanel() {
     fetch("/api/mcp/config", { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
-        const body = await res.json()
-
         if (!res.ok) {
-          setConfig({ status: "unconfigured", reason: body.detail ?? `Request failed (${res.status})` })
+          const reason = await readApiError(res)
+          if (!cancelled) setConfig({ status: "unconfigured", reason })
           return
         }
+        const body = await res.json()
         if (!body.enabled) {
           setConfig({
             status: "unconfigured",

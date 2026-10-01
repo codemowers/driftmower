@@ -71,7 +71,7 @@ export default function TopActions({ rows, currentCharts, reportId }: Props) {
 
   if (displayRows.length === 0) return null
 
-  const enriched = displayRows.map(row => enrichRow(row, results, unavailable))
+  const enriched = displayRows.map(row => enrichRow(row, results, unavailable !== null))
   enriched.sort((a, b) => rank(a) - rank(b))
 
   const counts: Record<Risk, number> = { safe: 0, review: 0, risky: 0 }
@@ -124,7 +124,7 @@ export default function TopActions({ rows, currentCharts, reportId }: Props) {
 
       {unavailable && (
         <p className="mt-3 px-6 text-[11.5px] text-muted-foreground">
-          AI verdicts are off: LLM not configured. Deterministic rows still show; risk and changelog are not assessed.
+          AI verdicts are off ({unavailable}). Deterministic rows still show; risk and changelog are not assessed.
         </p>
       )}
     </div>

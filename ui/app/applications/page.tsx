@@ -127,7 +127,7 @@ export default function ApplicationsPage() {
             </section>
 
             {inventory.status === "error" && (
-              <p className="text-sm text-muted-foreground">Could not list cluster hosts.</p>
+              <p className="text-sm text-muted-foreground">Could not list cluster hosts: {inventory.message}</p>
             )}
 
             {inventory.status === "ready" && inventory.tenancy === "unreachable" && (

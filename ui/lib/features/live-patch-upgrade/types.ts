@@ -24,6 +24,7 @@ export type LivePatchUpgradeListResponse = {
   available: boolean
   canWrite: boolean
   fixes: LivePatchUpgradeRecord[]
+  blockedReason: string | null
 }
 
 export type LivePatchUpgradePreviewResponse = {

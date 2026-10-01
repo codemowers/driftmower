@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
+import ClusterDataPending from "@/app/components/cluster-data-pending"
 
 type Props = {
   clusterResources: ClusterResource[] | null
@@ -43,7 +44,7 @@ function buildRows(root: ClusterResource, childIndex: Map<string, ClusterResourc
 
 export default function DescendantsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, linkTo }: Props) {
   if (clusterResources === null) {
-    return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
+    return <ClusterDataPending />
   }
 
   const root = clusterResources.find(r => r.uid === liveWorkloadUid)

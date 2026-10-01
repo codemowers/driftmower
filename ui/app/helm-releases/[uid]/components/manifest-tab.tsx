@@ -9,6 +9,7 @@ import { HELM_RELEASES_URL } from "@/lib/cluster/constants"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 import { cn } from "@/lib/utils/cn"
 import { textLines } from "@/lib/features/yaml/yaml-lines"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 type ManifestDocumentSummary = {
   index: number
@@ -37,6 +38,7 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" })
   const [selected, setSelected] = useState(0)
   const [loaded, setLoaded] = useState<{ index: number; text: string } | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const { namespace, name } = releaseInfo
   const documents = state.status === "ready" ? state.index.documents : []
@@ -49,11 +51,12 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
     fetch(`${base}?${query}`, { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
-        const json = await res.json()
         if (!res.ok) {
-          setState({ status: "error", message: json.error ?? `Request failed with status ${res.status}` })
+          const message = await readApiError(res)
+          if (!cancelled) setState({ status: "error", message })
           return
         }
+        const json = await res.json()
         setState({ status: "ready", index: json })
       })
       .catch(e => {
@@ -70,12 +73,15 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
     let cancelled = false
 
     fetch(`${base}?${query}&doc=${selected}`, { cache: "no-store" })
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) throw new Error(await readApiError(res))
+        return res.json()
+      })
       .then(json => {
         if (!cancelled) setLoaded({ index: selected, text: json.text ?? "" })
       })
-      .catch(() => {
-        if (!cancelled) setLoaded({ index: selected, text: "" })
+      .catch((e: Error) => {
+        if (!cancelled) setLoaded({ index: selected, text: `# Could not load this document: ${e.message}` })
       })
 
     return () => {
@@ -101,6 +107,11 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
 
   async function downloadManifest() {
     const res = await fetch(`${base}?${query}&doc=all`, { cache: "no-store" })
+    if (!res.ok) {
+      setDownloadError(await readApiError(res))
+      return
+    }
+    setDownloadError(null)
     const json = await res.json()
     const url = URL.createObjectURL(new Blob([json.text ?? ""], { type: "application/yaml" }))
     const a = document.createElement("a")
@@ -121,6 +132,9 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
           Download manifest
         </Button>
       </div>
+      {downloadError && (
+        <p className="border-b border-gray-200 px-4 py-2 text-xs text-status-major-text">Download failed: {downloadError}</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="border-b border-gray-200 md:border-b-0 md:border-r">

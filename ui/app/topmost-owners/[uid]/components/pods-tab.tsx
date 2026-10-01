@@ -5,6 +5,7 @@ import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { classifyPod, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
 import { collectOwnedPods } from "@/lib/cluster/workload-root"
 import type { LinkTo } from "@/lib/hooks/use-context-href"
+import ClusterDataPending from "@/app/components/cluster-data-pending"
 
 type Props = {
   clusterResources: ClusterResource[] | null
@@ -15,7 +16,7 @@ type Props = {
 
 export default function PodsTab({ clusterResources, reportWorkloadUid, liveWorkloadUid, linkTo }: Props) {
   if (clusterResources === null) {
-    return <p className="text-sm text-muted-foreground">Loading cluster data…</p>
+    return <ClusterDataPending />
   }
 
   const pods = collectOwnedPods(clusterResources, liveWorkloadUid)

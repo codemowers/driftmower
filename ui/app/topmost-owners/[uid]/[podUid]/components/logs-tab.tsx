@@ -24,9 +24,11 @@ export default function LogsTab({ pod }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    fetchContainers(ns, name).then(c => {
-      if (!cancelled) setContainers(c)
-    })
+    fetchContainers(ns, name)
+      .then(c => {
+        if (!cancelled) setContainers(c)
+      })
+      .catch((e: Error) => console.error(`[logs] containers for ${ns}/${name}: ${e.message}`))
     return () => {
       cancelled = true
     }

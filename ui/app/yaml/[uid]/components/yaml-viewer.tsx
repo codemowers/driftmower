@@ -7,6 +7,7 @@ import { generatedAnnotator, stripGenerated } from "@/lib/features/yaml/managed-
 import { useSearchParam } from "@/lib/hooks/use-search-param"
 import { emitYamlLines } from "@/lib/features/yaml/yaml-lines"
 import LoadingLine from "@/app/components/loading-line"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 type Props = {
   uid: string
@@ -34,11 +35,12 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
     fetch(`/api/cluster-resources/${encodeURIComponent(uid)}/yaml?${query}`, { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
-        const json = await res.json()
         if (!res.ok) {
-          setState({ status: "error", message: json.error ?? `Request failed with status ${res.status}` })
+          const message = await readApiError(res)
+          if (!cancelled) setState({ status: "error", message })
           return
         }
+        const json = await res.json()
         setState({ status: "ready", resource: json })
       })
       .catch(e => {

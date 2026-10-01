@@ -31,7 +31,7 @@ export type QueueJob = {
   order: number
   timeoutMs?: number
   run: (signal: AbortSignal) => Promise<void>
-  onFailed: (error: unknown) => void
+  onFailed: (reason: string) => void
 }
 
 type Job = QueueJob & { notBefore: number }
@@ -107,6 +107,17 @@ async function waitForNext(s: State): Promise<Job | undefined> {
   }
 }
 
+export function failureReason(e: unknown, timeoutMs: number): string {
+  if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+    return `model did not answer within ${Math.round(timeoutMs / 1000)} s`
+  }
+  const statusCode = (e as { statusCode?: unknown } | null)?.statusCode
+  if (typeof statusCode === "number") return `model API returned ${statusCode}`
+  const cause = (e as { cause?: { code?: unknown } } | null)?.cause?.code
+  if (typeof cause === "string") return `model API unreachable (${cause})`
+  return e instanceof Error ? e.message : String(e)
+}
+
 type Outcome = { state: "ready" | "failed" } | { state: "deferred"; until: number }
 
 async function runJob(job: Job): Promise<Outcome> {
@@ -120,8 +131,9 @@ async function runJob(job: Job): Promise<Outcome> {
       lastError = e
     }
   }
-  console.warn(`[llm-queue] ${job.kind} ${job.key} failed:`, (lastError as Error)?.message ?? lastError)
-  job.onFailed(lastError)
+  const reason = failureReason(lastError, job.timeoutMs ?? JOB_TIMEOUT_MS)
+  console.warn(`[llm-queue] ${job.kind} ${job.key} failed: ${reason}`)
+  job.onFailed(reason)
   return { state: "failed" }
 }
 

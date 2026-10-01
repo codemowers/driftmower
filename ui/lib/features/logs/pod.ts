@@ -1,10 +1,10 @@
 import "server-only"
 
 import { kubeApiGet } from "@/lib/server/k8s"
-import type { LogLine, LogsResponse, LogSource } from "./types"
+import type { LogsResponse, LogSource } from "./types"
 import { TAIL_LINES } from "./constants"
 import { fetchLokiLines, resolveLokiUrl } from "./sources/loki"
-import { fetchKubeAll, fetchKubeContainer } from "./sources/kube"
+import { fetchKubeAll, fetchKubeContainer, type KubeLogs } from "./sources/kube"
 
 type PodSpecResponse = {
   spec?: {
@@ -41,16 +41,21 @@ export async function getPodLogs(args: {
   const limit = args.limit ?? TAIL_LINES
   const previous = args.previous ?? false
 
-  async function fetchKube(): Promise<LogLine[]> {
+  async function fetchKube(): Promise<KubeLogs> {
     const containers = container ? [container] : await listContainers(ns, pod)
     return container
       ? fetchKubeContainer({ ns, pod, container, sinceNs, limit, previous })
       : fetchKubeAll({ ns, pod, containers, sinceNs, limit, previous })
   }
 
+  function fromKube({ lines, failures }: KubeLogs): LogsResponse {
+    if (lines.length === 0 && failures.length > 0) return { source: "kube API", lines, notice: failures.join("; ") }
+    return { source: "kube API", lines }
+  }
+
   if (previous) {
     try {
-      return { source: "kube API", lines: await fetchKube() }
+      return { source: "kube API", lines: (await fetchKube()).lines }
     } catch (e) {
       return { source: "kube API", lines: [], notice: previousRunNotice(e) }
     }
@@ -62,12 +67,12 @@ export async function getPodLogs(args: {
       const lokiLines = await fetchLokiLines({ url: lokiUrl, uid, container, sinceNs, limit })
       if (lokiLines !== null) {
         if (lokiLines.length > 0 || sinceNs !== null) return { source: "loki", lines: lokiLines }
-        const kubeLines = await fetchKube()
-        if (kubeLines.length > 0) return { source: "kube API", lines: kubeLines }
+        const kube = await fetchKube()
+        if (kube.lines.length > 0) return { source: "kube API", lines: kube.lines }
         return { source: "loki", lines: [] }
       }
     }
   }
 
-  return { source: "kube API", lines: await fetchKube() }
+  return fromKube(await fetchKube())
 }

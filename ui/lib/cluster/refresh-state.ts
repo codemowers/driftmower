@@ -3,6 +3,7 @@ import { useClusterState, type ClusterState } from "./cluster-state"
 import { ANALYZE_CLUSTER_URL } from "./constants"
 import { fetchDynamicData } from "./dynamic-data"
 import { getAnalysisSocket, waitForSocketConnect } from "./analysis-socket"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 export type { ImageUsage } from "./reports"
 
@@ -38,6 +39,7 @@ export async function refreshState(): Promise<void> {
   socket.on("analyze-cluster progress", onProgress)
 
   const newReportId = waitForReportCreated(socket)
+  newReportId.catch(() => {})
 
   try {
     await waitForSocketConnect(socket, SOCKET_CONNECT_TIMEOUT_MS)
@@ -51,7 +53,7 @@ export async function refreshState(): Promise<void> {
       body: "{}",
     })
     if (!response.ok) {
-      throw new Error(`Starting cluster analysis failed (HTTP ${response.status}).`)
+      throw new Error(`Starting cluster analysis failed: ${await readApiError(response)}`)
     }
 
     const reportId = await newReportId
@@ -63,7 +65,7 @@ export async function refreshState(): Promise<void> {
     useClusterState.setState({ isLoading: false })
   } catch (e) {
     useClusterState.setState({
-      error: String(e),
+      error: (e as Error).message,
       isLoading: false,
       socketProgress: null,
       containerCount: null,

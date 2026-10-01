@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { CAPABILITIES_URL } from "./constants"
 import type { CapabilityResponse } from "./types"
+import { readApiError } from "@/lib/utils/read-api-error"
 
 export type CapabilityState =
   | { status: "loading" }
@@ -32,13 +33,12 @@ export function useCapabilities(namespaces: string[]): CapabilityState {
           setState({ status: "unauthenticated" })
           return
         }
-        const body = await res.json()
         if (!res.ok) {
-          // The detail names the cause (driftmower-mcp unreachable, MCP not
-          // enabled, ...); the code alone is for machines.
-          setState({ status: "error", message: body.detail ?? body.error ?? `Request failed with status ${res.status}` })
+          const message = await readApiError(res)
+          if (!cancelled) setState({ status: "error", message })
           return
         }
+        const body = await res.json()
         const capabilities = body as CapabilityResponse
         setState(
           capabilities.inCluster

@@ -12,11 +12,13 @@ export async function checkConnection(): Promise<void> {
 
     useClusterState.setState({
       isConnected: true,
+      connectionError: null,
       clusterName: data.contexts[0] ?? null,
     })
   } catch (e) {
     useClusterState.setState({
       isConnected: false,
+      connectionError: (e as Error).message,
       clusterName: null,
     })
     throw new Error("failed to connect to backend", { cause: e })

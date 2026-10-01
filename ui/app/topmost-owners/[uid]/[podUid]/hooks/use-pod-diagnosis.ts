@@ -11,7 +11,8 @@ const POLL_INTERVAL = 4000
 export type PodDiagnosis = {
   facts: DiagnosisFacts | null
   state: DiagnosisState | null
-  unavailable: boolean
+  unavailable: string | null
+  error: string | null
   rechecking: boolean
   recheck: () => void
 }
@@ -22,7 +23,8 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
   const nodeStorage = useClusterState(s => s.nodeStorage)
   const [openedAt] = useState(() => Date.now())
   const [fresh, setFresh] = useState<DiagnosisState | null>(null)
-  const [unavailable, setUnavailable] = useState(false)
+  const [unavailable, setUnavailable] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [rechecking, setRechecking] = useState(false)
   const [forceToken, setForceToken] = useState(0)
 
@@ -42,14 +44,16 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
     let timer: ReturnType<typeof setTimeout> | undefined
 
     async function tick(first: boolean) {
-      const outcome = await postDiagnose([facts as DiagnosisFacts], true, first && forceToken > 0).catch(() => null)
+      const outcome = await postDiagnose([facts as DiagnosisFacts], true, first && forceToken > 0).catch((e: Error) => e)
       if (cancelled) return
-      if (outcome === "unavailable") {
-        setUnavailable(true)
+      if (outcome instanceof Error) {
+        setError(outcome.message)
+      } else if ("unavailable" in outcome) {
+        setUnavailable(outcome.unavailable)
         setRechecking(false)
         return
-      }
-      if (outcome) {
+      } else {
+        setError(null)
         rememberDiagnoses(outcome.results)
         const next = outcome.results[(facts as DiagnosisFacts).key]
         if (next) setFresh(next)
@@ -74,5 +78,5 @@ export function usePodDiagnosis(pod: ClusterResource | null): PodDiagnosis {
     setForceToken(token => token + 1)
   }, [])
 
-  return { facts, state, unavailable, rechecking, recheck }
+  return { facts, state, unavailable, error, rechecking, recheck }
 }

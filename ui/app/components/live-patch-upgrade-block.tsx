@@ -136,6 +136,11 @@ export default function LivePatchUpgradeBlock({ row, target, state }: Props) {
             <span className="first-letter:uppercase">{restartLabel(target)}</span>
           </div>
         )}
+        {!active && !state.canWrite && state.blockedReason && (
+          <p className="border-t border-gray-200 px-4 py-2 text-xs text-muted-foreground">
+            Driftmower cannot apply this itself: <span className="font-mono text-foreground">{state.blockedReason}</span>
+          </p>
+        )}
         {!active && !state.canWrite && (
           <div className="flex items-center gap-3 border-t border-gray-200 px-4 py-2">
             <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">kubectl</span>

@@ -5,18 +5,20 @@ import { fetchSandboxScope } from "@/lib/server/platform-manager-proxy"
 import { namespaceFilter } from "@/lib/server/sandbox-scope-filter"
 import { ACTION_KEY_ANNOTATION, NAMESPACE_ANNOTATION } from "../manifest"
 import type { LivePatchUpgradeListResponse, LivePatchUpgradeRecord } from "../types"
-import { getLivePatchUpgradeAvailability } from "./availability"
+import { getLivePatchUpgradeAvailability, kubeDenial } from "./availability"
 import { bindingPath, LABEL_SELECTOR, policyPath } from "./paths"
 
 type LabelledObject = { metadata: { annotations?: Record<string, string> } }
 type ObjectList = { items: LabelledObject[] }
 
-async function listLabelled(path: string): Promise<LabelledObject[] | null> {
+type Listed = { items: LabelledObject[] } | { denied: string }
+
+async function listLabelled(path: string): Promise<Listed> {
   try {
     const list = await kubeApiGet<ObjectList>(`${path}?labelSelector=${LABEL_SELECTOR}`)
-    return list.items ?? []
+    return { items: list.items ?? [] }
   } catch (e) {
-    if (e instanceof KubeApiError && (e.status === 403 || e.status === 404)) return null
+    if (e instanceof KubeApiError && (e.status === 403 || e.status === 404)) return { denied: kubeDenial(e) }
     throw e
   }
 }
@@ -32,15 +34,19 @@ function toRecords(objects: LabelledObject[]): LivePatchUpgradeRecord[] {
 
 export async function listLivePatchUpgrades(): Promise<LivePatchUpgradeListResponse> {
   const [availability, scope] = await Promise.all([getLivePatchUpgradeAvailability(), fetchSandboxScope()])
-  const unavailable = { available: false, canWrite: false, fixes: [] }
-  if (!availability.version) return unavailable
+  if (!availability.version) {
+    return { available: false, canWrite: false, fixes: [], blockedReason: "This cluster does not serve MutatingAdmissionPolicy" }
+  }
   const [policies, bindings] = await Promise.all([listLabelled(policyPath(availability.version)), listLabelled(bindingPath(availability.version))])
-  if (policies === null || bindings === null) return unavailable
+  const copyOnly = (denied: string) => ({ available: true, canWrite: false, fixes: [], blockedReason: `Can't read existing temporary fixes: ${denied}` })
+  if ("denied" in policies) return copyOnly(policies.denied)
+  if ("denied" in bindings) return copyOnly(bindings.denied)
   const allows = namespaceFilter(scope)
-  const records = toRecords([...policies, ...bindings])
+  const records = toRecords([...policies.items, ...bindings.items])
   return {
     available: true,
     canWrite: availability.canWrite,
     fixes: allows ? records.filter(r => allows(r.namespace)) : records,
+    blockedReason: availability.writeBlocked,
   }
 }
