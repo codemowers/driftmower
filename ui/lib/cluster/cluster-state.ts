@@ -41,6 +41,7 @@ export type ClusterResource = {
   ips?: string[]
   declaredPorts?: { container: string; name?: string; port: number; protocol: string }[]
   livenessProbes?: LivenessProbe[]
+  restartedAt?: string
   hostNetwork?: boolean
   nodeName?: string
   phase?: string

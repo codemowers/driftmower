@@ -83,7 +83,7 @@ export default function NetworkCard({ href, podIPs, podUid }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">Network topology</p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+        <div className="mt-1 flex items-center gap-x-2.5 whitespace-nowrap">
           <StatusBadge status={status} />
           {status === "open" && (
             <ActivityLine active={inbound + outbound} listening={listeningCount} />

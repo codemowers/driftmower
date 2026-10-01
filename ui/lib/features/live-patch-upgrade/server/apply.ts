@@ -11,7 +11,7 @@ import { LivePatchUpgradeError } from "./error"
 import { listLivePatchUpgrades } from "./list"
 import { bindingPath, configMapPath, DRY_RUN, policyPath } from "./paths"
 import { resolveInput } from "./resolve"
-import { ignoreNotFound, restartWorkload } from "./restart"
+import { ignoreNotFound, restartWorkload } from "@/lib/server/restart-workload"
 
 const ALREADY_EXISTS = 409
 

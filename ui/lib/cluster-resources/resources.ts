@@ -23,6 +23,7 @@ type RawContainer = {
 }
 
 const EXEC_CHECK_MAX_CHARS = 60
+export const RESTARTED_AT_ANNOTATION = "kubectl.kubernetes.io/restartedAt"
 
 type RawObject = {
   metadata: {
@@ -40,6 +41,7 @@ type RawObject = {
     hostNetwork?: boolean
     containers?: RawContainer[]
     initContainers?: RawContainer[]
+    template?: { metadata?: { annotations?: Record<string, string> } }
   }
   status?: RawPodStatus & {
     podIP?: string
@@ -120,6 +122,9 @@ function toClusterResource(
     resource.managerUID = manager.managerUID
     if (manager.argoApp) resource.argoApp = manager.argoApp
   }
+
+  const restartedAt = obj.spec?.template?.metadata?.annotations?.[RESTARTED_AT_ANNOTATION]
+  if (restartedAt) resource.restartedAt = restartedAt
 
   if (kind === "Pod") {
     const ips = obj.status?.podIPs?.map(entry => entry.ip).filter(Boolean)

@@ -7,6 +7,7 @@ import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
+import { cn } from "@/lib/utils/cn"
 import { workloadMetricQueries } from "@/lib/features/prometheus/workload-metrics"
 import ResourceHeader from "@/app/components/resource-header"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
@@ -18,18 +19,22 @@ import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
 import ActionsCard from "@/app/components/actions-card"
 import LivenessProbeCard from "@/app/components/liveness-probe-card"
+import RestartTile, { type RestartTarget } from "@/app/components/restart-tile"
+import { useWorkloadRestart } from "@/app/components/workload-restart-init"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
 import PageLoading from "@/app/components/page-loading"
 
 const NO_USAGES: ImageUsage[] = []
+const RESTARTABLE_KINDS = new Set(["Deployment", "StatefulSet"])
 
 export default function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
+  const restartEnabled = useWorkloadRestart(s => s.enabled)
   const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
 
@@ -104,6 +109,10 @@ export default function WorkloadDetailPage() {
   const argoApp = root?.argoApp
   const isArgo = !isHelm && !!argoApp
   const liveWorkloadUid = root?.uid ?? uid
+  const restartTarget: RestartTarget | null =
+    restartEnabled && root && !root.ownerUID && RESTARTABLE_KINDS.has(root.kind)
+      ? { kind: root.kind, namespace: root.namespace, name: root.name, uid: root.uid, managerKind: root.argoApp ? "argo" : "standalone" }
+      : null
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
   const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
@@ -162,15 +171,10 @@ export default function WorkloadDetailPage() {
           }}
         />
 
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
-          <div className="md:col-span-3">
-            <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={rootInfo?.apiGroup} />
-          </div>
-          <div className="md:col-span-2">
-            <NetworkCard
-              href={linkTo(`/topmost-owners/${uid}/network-topology`)}
-            />
-          </div>
+        <div className={cn("grid grid-cols-1 items-start gap-6", restartTarget ? "md:grid-cols-[2.5fr_2fr_auto]" : "md:grid-cols-[3fr_2fr]")}>
+          <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={rootInfo?.apiGroup} />
+          <NetworkCard href={linkTo(`/topmost-owners/${uid}/network-topology`)} />
+          {restartTarget && <RestartTile target={restartTarget} restartedAt={root?.restartedAt ?? null} pods={livePods} />}
         </div>
 
         <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} />
