@@ -109,16 +109,17 @@ test("samples keep the fields their CRDs require", () => {
 // Bucket and S3User names are global on Silo, so platform-manager's
 // sandbox-s3-guard holds them to the sandbox-id prefix and pins S3Users to the
 // platform-rendered <id>-rw policy. A sample that ignores that is rejected.
-test("in a sandbox the bucket sample carries the prefix the guard enforces", () => {
+test("in a sandbox the bucket sample carries the namespace prefix the guards enforce", () => {
   const sample = sampleFor("bucket", {
     apiVersion: "s3.onyxia.sh/v1alpha1",
     namespace: "sb-abc123-demo",
     sandboxId: "abc123-demo",
     storageClass: null,
   })
-  assert.match(sample.yaml, /^ {2}name: abc123-demo-my-bucket$/m)
+  assert.match(sample.yaml, /^ {2}name: sb-abc123-demo\.my-bucket$/m)
   assert.match(sample.yaml, /^kind: S3User$/m)
-  assert.match(sample.yaml, /^ {2}accessKey: abc123-demo-my-bucket-user$/m)
+  assert.match(sample.yaml, /^ {2}accessKey: sb-abc123-demo\.my-bucket-user$/m)
+  assert.match(sample.creates, /bucket named sb-abc123-demo\.my-bucket /)
   assert.match(sample.yaml, /^ {4}- abc123-demo-rw$/m)
   // The CRD defaults it to an instance these clusters do not have.
   assert.equal(sample.yaml.match(/^ {2}s3InstanceRef: minio\/default$/gm)?.length, 2)
