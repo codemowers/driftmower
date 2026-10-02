@@ -16,7 +16,10 @@
 > `MCP_ENABLED=true`; while that is off the page says so. What stays here is
 > only what other features import: `api-surface.ts` and `facts/discovery.ts`
 > (live-patch-upgrade), `ingress-facts.ts` (applications), the samples, the
-> registry host helper and the MCP quick starts. The fact, discovery, authz and
+> registry image helpers and the MCP quick starts. A sandbox registry's host and
+> its `skaffold.env` come from driftmower-mcp's per-namespace `registries` fact,
+> discovered from the namespace's Zot Deployment, Service and Ingress rather than
+> derived from a host convention. The fact, discovery, authz and
 > RBAC sections below are history kept for their reasoning; driftmower-mcp's
 > README is the current reference.
 >
