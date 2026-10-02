@@ -167,6 +167,7 @@ function namespaceFact(
         reason: 'The cluster does not serve Dragonfly.dragonflydb.io, so there is nothing to create yet'
       }
     },
+    registries: [],
     podSecurity: {
       enforce: 'restricted',
       requires: ['runAsNonRoot'],
@@ -174,7 +175,12 @@ function namespaceFact(
     }
   }
 
-  return { fact, labels: tenant ? { 'codemowers.io/sandbox': 'abc123-foo' } : {}, annotations: {}, degraded: [] }
+  return {
+    fact,
+    labels: tenant ? { 'codemowers.io/sandbox': 'abc123-foo' } : {},
+    annotations: {},
+    degraded: []
+  }
 }
 
 function service(
@@ -237,6 +243,39 @@ describe('ProvisioningService', () => {
     expect(markdown).toContain('Provision: postgres yes, dragonfly unknown (?.dragonflydb.io)')
     expect(markdown).toContain('exact instance name')
     expect(markdown).toContain('abc123-foo.ee-lte-1.codemowers.io')
+  })
+
+  it('suggests a skaffold.env for a registry the namespace publishes', async () => {
+    const fixture = namespaceFact('mine', 'yes')
+    const env = [
+      'SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/mine',
+      'SKAFFOLD_DEFAULT_REPO=registry.mine.ee-lte-1.codemowers.io',
+      'SKAFFOLD_NAMESPACE=mine'
+    ].join('\n')
+
+    fixture.fact.registries = [
+      {
+        kind: 'zot',
+        host: 'registry.mine.ee-lte-1.codemowers.io',
+        tls: true,
+        deployment: 'registry',
+        service: 'registry',
+        ingress: 'registry',
+        skaffoldEnv: env
+      }
+    ]
+    const { service: subject } = service({ namespaces: { mine: fixture } })
+    const result = await subject.describeNamespaceReadiness(identity, ['mine'])
+
+    if (result.status !== 'ok') throw new Error('expected ok')
+
+    const markdown = formatNamespaceReadiness(result)
+
+    expect(markdown).toContain('Container registry: Zot at `registry.mine.ee-lte-1.codemowers.io`')
+    expect(markdown).toContain('save these lines as `skaffold.env` next to `skaffold.yaml`')
+    expect(markdown).toContain(env)
+    expect(markdown).toContain('docker login registry.mine.ee-lte-1.codemowers.io')
+    expect(markdown).not.toContain('insecure registry')
   })
 
   it('returns everything for an unauthenticated caller with permission marked unknown, not withheld', async () => {

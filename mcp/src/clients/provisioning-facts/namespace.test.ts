@@ -36,6 +36,7 @@ function routes(extra: Record<string, unknown> = {}) {
       { metadata: { name: 'deny' }, spec: { podSelector: {}, policyTypes: ['Ingress'], ingress: [] } }
     ]),
     '/apis/cilium.io/v2/namespaces/team-a/ciliumnetworkpolicies': 404,
+    '/apis/apps/v1/namespaces/team-a/deployments': list([]),
     '/api/v1/namespaces/team-a': {
       metadata: {
         labels: { 'codemowers.io/sandbox': 'abc-team', 'pod-security.kubernetes.io/enforce': 'restricted' }
@@ -57,7 +58,8 @@ describe('loadNamespaceFacts', () => {
         target,
         targets: [target],
         tenantLabelKey: 'codemowers.io/sandbox',
-        admissionFacts: []
+        admissionFacts: [],
+        clusterId: null
       }
     )
 
@@ -97,7 +99,8 @@ describe('loadNamespaceFacts', () => {
       target,
       targets: [target],
       tenantLabelKey: null,
-      admissionFacts: facts
+      admissionFacts: facts,
+      clusterId: null
     }
 
     const blocked = await loadNamespaceFacts(
@@ -134,7 +137,8 @@ describe('loadNamespaceFacts', () => {
         target,
         targets: [target],
         tenantLabelKey: null,
-        admissionFacts: []
+        admissionFacts: [],
+        clusterId: null
       }
     )
 
@@ -154,7 +158,8 @@ describe('loadNamespaceFacts', () => {
         target,
         targets: [target],
         tenantLabelKey: null,
-        admissionFacts: []
+        admissionFacts: [],
+        clusterId: null
       }
     )
 
@@ -166,5 +171,91 @@ describe('loadNamespaceFacts', () => {
         message: expect.stringContaining('could not be evaluated')
       }
     ])
+  })
+
+  describe('container registries', () => {
+    const input = {
+      namespace: 'team-a',
+      identity: null,
+      offeringLabelKey: null,
+      target: null,
+      targets: [target],
+      tenantLabelKey: null,
+      admissionFacts: [],
+      clusterId: 'ee-lte-1.codemowers.io'
+    }
+    const zotDeployment = list([
+      {
+        metadata: { name: 'registry' },
+        spec: {
+          template: {
+            metadata: { labels: { 'app.kubernetes.io/name': 'registry' } },
+            spec: { containers: [{ image: 'ghcr.io/project-zot/zot-linux-amd64:v2.1.2' }] }
+          }
+        }
+      }
+    ])
+    const published = {
+      '/apis/apps/v1/namespaces/team-a/deployments': zotDeployment,
+      '/api/v1/namespaces/team-a/services': list([
+        { metadata: { name: 'registry' }, spec: { selector: { 'app.kubernetes.io/name': 'registry' } } }
+      ]),
+      '/apis/networking.k8s.io/v1/namespaces/team-a/ingresses': list([
+        {
+          metadata: { name: 'registry' },
+          spec: {
+            tls: [{ hosts: ['registry.team-a.example'] }],
+            rules: [
+              {
+                host: 'registry.team-a.example',
+                http: { paths: [{ backend: { service: { name: 'registry' } } }] }
+              }
+            ]
+          }
+        }
+      ])
+    }
+
+    it('reads no Services or Ingresses when nothing in the namespace runs Zot', async () => {
+      const { read, calls } = fakeReader(routes())
+      const { fact } = await loadNamespaceFacts({ read, matrix: builder() }, input)
+
+      expect(fact.registries).toEqual([])
+      expect(calls.map(call => call.path)).not.toContain('/api/v1/namespaces/team-a/services')
+    })
+
+    it('publishes a Zot registry with a skaffold.env for the namespace-qualified context', async () => {
+      const { read } = fakeReader(routes(published))
+      const { fact, degraded } = await loadNamespaceFacts({ read, matrix: builder() }, input)
+
+      expect(degraded).toEqual([])
+      expect(fact.registries).toEqual([
+        {
+          kind: 'zot',
+          host: 'registry.team-a.example',
+          tls: true,
+          deployment: 'registry',
+          service: 'registry',
+          ingress: 'registry',
+          skaffoldEnv: [
+            'SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/team-a',
+            'SKAFFOLD_DEFAULT_REPO=registry.team-a.example',
+            'SKAFFOLD_NAMESPACE=team-a'
+          ].join('\n')
+        }
+      ])
+    })
+
+    it('reports an Ingress refusal as degraded instead of an absent registry', async () => {
+      const { read } = fakeReader(
+        routes({ ...published, '/apis/networking.k8s.io/v1/namespaces/team-a/ingresses': 403 })
+      )
+      const { fact, degraded } = await loadNamespaceFacts({ read, matrix: builder() }, input)
+
+      expect(fact.registries).toEqual([])
+      expect(degraded).toEqual([
+        { source: 'ingresses', status: 403, message: expect.stringContaining('ingresses') }
+      ])
+    })
   })
 })

@@ -58,7 +58,8 @@ async function main(): Promise<void> {
       appConfig.kubernetes,
       appConfig.observability,
       appConfig.tenancy,
-      appConfig.provisioning
+      appConfig.provisioning,
+      () => appConfig.cluster.id
     )
 
     appConfig.cluster = await discoverClusterIdentity(

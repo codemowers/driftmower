@@ -107,6 +107,17 @@ export const namespaceFactSchema = z.object({
   mayCreate: verdictSchema,
   mayCreateReason: z.string(),
   offerings: z.record(z.string(), z.object({ verdict: verdictSchema, reason: z.string() })),
+  registries: z.array(
+    z.object({
+      kind: z.literal('zot'),
+      host: z.string(),
+      tls: z.boolean(),
+      deployment: z.string(),
+      service: z.string(),
+      ingress: z.string(),
+      skaffoldEnv: z.string()
+    })
+  ),
   podSecurity: z
     .object({
       enforce: z.enum(['privileged', 'baseline', 'restricted']),

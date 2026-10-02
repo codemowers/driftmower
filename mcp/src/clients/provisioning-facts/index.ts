@@ -67,7 +67,7 @@ export interface ProvisioningFacts {
   cluster(): Promise<ClusterFacts>
   // Per namespace, never cached (the access matrix caches its own reviews).
   namespace(
-    input: Omit<NamespaceFactsInput, 'targets' | 'tenantLabelKey' | 'admissionFacts'>
+    input: Omit<NamespaceFactsInput, 'targets' | 'tenantLabelKey' | 'admissionFacts' | 'clusterId'>
   ): Promise<NamespaceFactsResult>
   invalidate(): void
 }
@@ -82,6 +82,8 @@ export interface ProvisioningFactsOptions {
   topologyTtlMs: number
   operatorTtlMs: number
   matrixConcurrency?: number
+  // Read per call: the identity is discovered after these facts are built.
+  clusterId?: () => string | null
   now?: () => number
 }
 
@@ -195,7 +197,8 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
           ...input,
           targets: facts.targets,
           tenantLabelKey: facts.tenantLabelKey,
-          admissionFacts: facts.admission
+          admissionFacts: facts.admission,
+          clusterId: options.clusterId?.() ?? null
         }
       )
     },

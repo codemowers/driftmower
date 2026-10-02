@@ -133,7 +133,8 @@ export function registerProvisioningTools(
       description:
         'For one or more namespaces: quota and remaining headroom, LimitRange defaults, network posture and ' +
         'any policies that select on an exact instance name, Pod Security enforcement, the hostnames the ' +
-        'namespace may claim, and your access there as the cluster authorizer reports it (per resource type ' +
+        'namespace may claim, any container registry published from the namespace with the skaffold.env ' +
+        'to build against it, and your access there as the cluster authorizer reports it (per resource type ' +
         'and verb, summarised; the full matrix is in the structured content). With `offering`, whether you ' +
         'may create that offering there. Namespaces where you may not list pods are withheld, not empty. ' +
         'Read-only.',

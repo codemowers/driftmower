@@ -3,6 +3,9 @@
 // imports so the pure fact modules can be unit-tested with no cluster at all.
 
 import type { Verb, Verdict } from './access-facts.js'
+import type { RegistryFact } from './registry-facts.js'
+
+export type { RegistryFact }
 
 export type OfferingId =
   | 'postgres'
@@ -133,6 +136,9 @@ export type NamespaceFact = {
   // shows them all need not ask once per offering. Enforced admission policies
   // are applied here, unlike access.provision, which is RBAC alone.
   offerings: Partial<Record<OfferingId, { verdict: Verdict; reason: string }>>
+  // Container registries published from this namespace, discovered from its
+  // own Deployments, Services and Ingresses; empty when there are none.
+  registries: RegistryFact[]
   // Pod Security Admission is a built-in controller, so it appears in no
   // ValidatingAdmissionPolicy or Kyverno listing.
   podSecurity: {
