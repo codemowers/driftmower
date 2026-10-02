@@ -263,6 +263,9 @@ export function formatNamespaceReadiness(result: NamespaceReadiness): string {
         hostRule.exactHost
           ? `Hostnames this namespace may claim: \`${hostRule.exactHost}\`` +
               (hostRule.labelledPattern ? ` or \`${hostRule.labelledPattern}\`` : '') +
+              (hostRule.customDomains.length
+                ? `, or any name under ${hostRule.customDomains.map(domain => `\`${domain}\``).join(', ')}`
+                : '') +
               `. ${hostRule.note}`
           : hostRule.note
       )

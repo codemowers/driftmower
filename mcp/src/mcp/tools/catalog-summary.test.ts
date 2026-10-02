@@ -58,7 +58,7 @@ describe('compact catalog responses', () => {
       capabilities: [],
       ingressClasses: [],
       priorityClasses: [],
-      clusterIssuers: [{ name: 'internal', description: 'Internal TLS', ready: true }],
+      clusterIssuers: [{ name: 'internal', description: 'Internal TLS', ready: true, acme: null }],
       degraded: [],
       relatedTools: [],
       note: ''

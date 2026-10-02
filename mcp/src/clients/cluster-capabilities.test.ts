@@ -56,7 +56,12 @@ describe('TLS issuer capability discovery', () => {
                     'kubectl.kubernetes.io/last-applied-configuration': 'private configuration'
                   }
                 },
-                spec: { acme: { privateKeySecretRef: { name: 'account-key' } } },
+                spec: {
+                  acme: {
+                    privateKeySecretRef: { name: 'account-key' },
+                    solvers: [{ http01: { ingress: { ingressClassName: 'traefik' } } }]
+                  }
+                },
                 status: { conditions: [{ type: 'Ready', status: 'True' }] }
               },
               {
@@ -72,12 +77,19 @@ describe('TLS issuer capability discovery', () => {
     const result = await createClusterCapabilities(read).describe()
 
     expect(result.clusterIssuers).toEqual([
-      { name: 'letsencrypt', description: 'Public TLS for externally reachable hostnames.', ready: true },
-      { name: 'cluster-tls-issuer', description: 'In-cluster TLS; trust the internal CA.', ready: true },
-      { name: 'pending', description: null, ready: false },
-      { name: 'unknown', description: null, ready: null },
-      { name: 'new', description: null, ready: null }
+      // Only which challenge types the solvers offer, never their configuration.
+      {
+        name: 'letsencrypt',
+        description: 'Public TLS for externally reachable hostnames.',
+        ready: true,
+        acme: { http01: true, dns01: false }
+      },
+      { name: 'cluster-tls-issuer', description: 'In-cluster TLS; trust the internal CA.', ready: true, acme: null },
+      { name: 'pending', description: null, ready: false, acme: null },
+      { name: 'unknown', description: null, ready: null, acme: null },
+      { name: 'new', description: null, ready: null, acme: null }
     ])
+    expect(JSON.stringify(result)).not.toContain('account-key')
     expect(z.object(clusterCapabilitiesShape).parse(result)).toEqual(result)
     expect(result.degraded).toEqual([])
     expect(read).toHaveBeenCalledWith(

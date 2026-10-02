@@ -143,7 +143,12 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
     const cards = OFFERINGS.map(spec => toCard(spec, api, lookup)).sort(
       (a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name)
     )
-    const clusterIssuers = (platform.clusterIssuers ?? []).map(issuer => issuer.name)
+    const issuers = (platform.clusterIssuers ?? []).map(issuer => ({
+      name: issuer.name,
+      ready: issuer.ready,
+      acme: issuer.acme ?? null
+    }))
+    const clusterIssuers = issuers.map(issuer => issuer.name)
 
     return {
       surface: api,
@@ -159,7 +164,7 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
         domainSuffix: suffix.suffix,
         classes: platform.ingressClasses ?? [],
         clusterIssuers,
-        tlsAdvice: tlsAdvice(clusterIssuers)
+        tlsAdvice: tlsAdvice(issuers)
       },
       priorityClasses: (platform.priorityClasses ?? []).map(item => ({
         name: item.name,

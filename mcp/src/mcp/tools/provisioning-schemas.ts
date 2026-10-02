@@ -124,6 +124,7 @@ export const hostRuleSchema = z.object({
   labelledPattern: z.string().nullable(),
   enforcedBy: z.string().nullable(),
   enforcedMessage: z.string().nullable(),
+  customDomains: z.array(z.string()),
   note: z.string()
 })
 
