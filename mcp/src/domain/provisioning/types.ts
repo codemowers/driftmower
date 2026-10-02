@@ -185,6 +185,8 @@ export type HostRule = {
   // The guard's own denial text, so the consequence of getting it wrong is
   // visible before the apiserver says it.
   enforcedMessage: string | null
+  // Custom domains the guard also accepts here, with every name under them.
+  customDomains: string[]
   note: string
 }
 

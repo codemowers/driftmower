@@ -530,3 +530,38 @@ it('selector semantics follow Kubernetes', () => {
   )
   expect(selectorMatches({ matchExpressions: [{ key: 'tier', operator: 'Bogus' }] }, labels)).toBe(false)
 })
+
+// The namespace-anchored ingress guard with custom domains, as in
+// platform-manager's deploy/sandbox-guard.yaml since #17: the shape and the
+// domains are read off its own CEL, not assumed.
+it('notices which namespace annotations a guard reads and whether it anchors on the namespace', () => {
+  const guard: RawAdmissionPolicy = {
+    metadata: { name: 'sandbox-ingress-guard' },
+    spec: {
+      matchConstraints: {
+        resourceRules: [{ apiGroups: ['networking.k8s.io'], apiVersions: ['v1'], operations: ['CREATE'], resources: ['ingresses'] }]
+      },
+      variables: [
+        { name: 'space', expression: "'.' + request.namespace + variables.suffix" },
+        {
+          name: 'verified',
+          expression:
+            "has(namespaceObject.metadata.annotations) && 'codemowers.io/verified-domains' in namespaceObject.metadata.annotations ? namespaceObject.metadata.annotations['codemowers.io/verified-domains'].split(',') : []"
+        }
+      ],
+      validations: [{ expression: 'variables.verified.size() >= 0' }]
+    }
+  }
+  const legacy: RawAdmissionPolicy = {
+    metadata: { name: 'old-guard' },
+    spec: { variables: [{ name: 'sandbox', expression: "namespaceObject.metadata.labels['codemowers.io/sandbox']" }] }
+  }
+
+  const [fact] = toAdmissionFacts([guard], [{ spec: { policyName: 'sandbox-ingress-guard' } }])
+  const [old] = toAdmissionFacts([legacy], [{ spec: { policyName: 'old-guard' } }])
+
+  expect(fact!.namespaceAnnotationKeys).toEqual(['codemowers.io/verified-domains'])
+  expect(fact!.anchorsOnNamespace).toBe(true)
+  expect(old!.namespaceAnnotationKeys).toEqual([])
+  expect(old!.anchorsOnNamespace).toBe(false)
+})

@@ -1,9 +1,10 @@
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   hostIsAllowed,
   hostRejectionReason,
   hostRuleFor,
+  parseCustomDomains,
   suffixFromParams,
   tlsAdvice
 } from './ingress-facts.js'
@@ -65,8 +66,74 @@ it("the suffix comes from the guard's own ConfigMap key", () => {
 })
 
 it('TLS advice names the issuer when there is one, and says so when there is not', () => {
-  expect(tlsAdvice(['letsencrypt'])).toMatch(/letsencrypt ClusterIssuer/)
+  expect(tlsAdvice([{ name: 'letsencrypt', ready: true, acme: { http01: true, dns01: false } }])).toMatch(/letsencrypt ClusterIssuer/)
   expect(tlsAdvice([])).toMatch(/not automatic/)
+})
+
+// bravo's real list: the internal CA sorts first, and used to be what we advised
+// for public hosts. Only an ACME issuer can certify a public name.
+it('TLS advice picks the ACME issuer for public hostnames, never an internal CA', () => {
+  const advice = tlsAdvice([
+    { name: 'cluster-tls-issuer', ready: true, acme: null },
+    { name: 'letsencrypt', ready: true, acme: { http01: true, dns01: false } },
+    { name: 'selfsigned-issuer', ready: true, acme: null }
+  ])
+
+  expect(advice).toMatch(/one certificate each from the letsencrypt ClusterIssuer over ACME HTTP-01/)
+  expect(advice).toMatch(/cert-manager\.io\/cluster-issuer: letsencrypt/)
+  expect(advice).toMatch(/no ClusterIssuer here offers/)
+  expect(advice).toMatch(/ALIAS\/ANAME or CNAME flattening/)
+  expect(advice).not.toMatch(/cluster-tls-issuer/)
+})
+
+it('TLS advice mentions wildcards only where a DNS-01 issuer exists, and skips issuers that are not ready', () => {
+  expect(tlsAdvice([
+    { name: 'letsencrypt', ready: true, acme: { http01: true, dns01: false } },
+    { name: 'letsencrypt-dns', ready: true, acme: { http01: false, dns01: true } }
+  ])).toMatch(/which the letsencrypt-dns ClusterIssuer offers/)
+  expect(tlsAdvice([{ name: 'letsencrypt', ready: false, acme: { http01: true, dns01: false } }])).toMatch(/not automatic/)
+  expect(tlsAdvice([{ name: 'internal', ready: true, acme: null }])).toMatch(/not ACME issuers/)
+})
+
+describe('namespace-anchored hosts and custom domains', () => {
+  const rule = hostRuleFor('aws-us-west-2-bravo.codemowers.io', 'a1b2c3-demo', 'sandbox-ingress-guard', {
+    namespace: 'sb-a1b2c3-demo',
+    anchorsOnNamespace: true,
+    customDomains: ['acme.com']
+  })
+
+  it('spells out the namespace space', () => {
+    expect(rule.exactHost).toBe('sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io')
+    expect(rule.labelledPattern).toBe('<label>.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io')
+  })
+
+  it('mirrors the guard: namespace space, legacy prefix, verified domains', () => {
+    for (const host of [
+      'sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io',
+      'gitea.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io',
+      'a.b.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io',
+      'a1b2c3-demo-api.aws-us-west-2-bravo.codemowers.io',
+      'acme.com',
+      'www.acme.com'
+    ]) expect(hostIsAllowed(host, rule), host).toBe(true)
+
+    for (const host of [
+      'evil.sb-z9y8x7-other.aws-us-west-2-bravo.codemowers.io',
+      'xsb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io',
+      'notacme.com',
+      'victim.example.com',
+      '*.acme.com'
+    ]) expect(hostIsAllowed(host, rule), host).toBe(false)
+  })
+
+  it('names the custom domains when rejecting', () => {
+    expect(hostRejectionReason('victim.example.com', rule)).toMatch(/under acme\.com: anchored on your namespace/)
+  })
+
+  it('reads the verified domains annotation as written by the platform', () => {
+    expect(parseCustomDomains(' Acme.com, ,b.org ')).toEqual(['acme.com', 'b.org'])
+    expect(parseCustomDomains(undefined)).toEqual([])
+  })
 })
 
 // Parity with the apiserver, not just with my reading of the CEL. Each case

@@ -5,7 +5,7 @@ import { mapWithConcurrency } from '../clients/concurrency.js'
 import { composeCreateVerdict, type Verdict } from '../domain/provisioning/access-facts.js'
 import { denialsFor, type Denial } from '../domain/provisioning/admission-facts.js'
 import { OFFERINGS_BY_ID } from '../domain/provisioning/catalog/offerings.js'
-import { hostRuleFor } from '../domain/provisioning/ingress-facts.js'
+import { hostRuleFor, parseCustomDomains, VERIFIED_DOMAINS_ANNOTATION } from '../domain/provisioning/ingress-facts.js'
 import type {
   CapabilityResponse,
   DegradedRead,
@@ -147,7 +147,7 @@ export class ProvisioningService {
 
       namespaces.push(result.fact)
       for (const entry of result.degraded) record(degraded, entry)
-      hostRules.push(hostRuleFrom(cluster, result.fact, result.labels, identity))
+      hostRules.push(hostRuleFrom(cluster, result.fact, result.labels, result.annotations ?? {}, identity))
     }
 
     return {
@@ -349,6 +349,7 @@ function hostRuleFrom(
   cluster: ClusterFacts,
   fact: NamespaceFact,
   labels: Record<string, string>,
+  annotations: Record<string, string>,
   identity: KubernetesIdentity | null
 ): HostRule {
   const suffix = cluster.ingress.domainSuffix
@@ -368,7 +369,8 @@ function hostRuleFrom(
     tenantId,
     sandboxId: tenantId,
     enforcedBy: guard?.policy ?? null,
-    enforcedMessage: hostMessage
+    enforcedMessage: hostMessage,
+    customDomains: [] as string[]
   }
 
   if (!suffix) {
@@ -391,18 +393,37 @@ function hostRuleFrom(
     }
   }
 
-  const rule = hostRuleFor(suffix.value, tenantId, guard.policy)
+  // What the guard's own CEL reads decides the shape: anchored on the namespace
+  // or on the tenant id, and whether verified custom domains count.
+  const policy = cluster.admission.find(fact => fact.name === guard.policy)
+  const customDomains = policy?.namespaceAnnotationKeys.includes(VERIFIED_DOMAINS_ANNOTATION)
+    ? parseCustomDomains(annotations[VERIFIED_DOMAINS_ANNOTATION])
+    : []
+  const rule = hostRuleFor(suffix.value, tenantId, guard.policy, {
+    namespace: fact.namespace,
+    anchorsOnNamespace: policy?.anchorsOnNamespace ?? false,
+    customDomains
+  })
   const provenance =
     suffix.source === 'config'
       ? " The domain comes from this server's configuration rather than from the guard's own parameters, so confirm it before relying on it."
       : ''
 
+  const anchor = rule.anchorsOnNamespace ? 'namespace anchor' : 'tenant-id prefix'
+  const custom = customDomains.length
+    ? ` Names under ${customDomains.join(', ')} are accepted too: custom domains verified for this namespace's owners. ` +
+      `Point each such hostname at the cluster with a CNAME to ${rule.exactHost} (a bare domain needs the DNS provider's ` +
+      'ALIAS/ANAME or CNAME flattening, not A records), write the full hostname in the Ingress, and give it a certificate as the TLS advice says.'
+    : ''
+
   return {
     ...base,
     exactHost: rule.exactHost,
     labelledPattern: rule.labelledPattern,
+    customDomains,
     note:
-      `Only these hostnames are accepted here, and the ${guard.policy} admission policy enforces it: the ingress controller is shared, and the tenant-id prefix is what keeps one tenant from claiming another's traffic.` +
+      `Only these hostnames are accepted here, and the ${guard.policy} admission policy enforces it: the ingress controller is shared, and the ${anchor} is what keeps one tenant from claiming another's traffic.` +
+      custom +
       provenance
   }
 }

@@ -87,6 +87,12 @@ export type AdmissionPolicyFact = {
   // only the author can tell us that; without it such a guard would read as
   // "you cannot create this at all".
   effect: 'denies' | 'constrains'
+  // Namespace annotation keys the policy's CEL reads, e.g. a list of custom
+  // domains the platform wrote onto the namespace. Noticed, not evaluated.
+  namespaceAnnotationKeys: string[]
+  // True when the CEL builds names from `request.namespace + ...`: hosts (or
+  // other names) are anchored on the namespace itself rather than on a label.
+  anchorsOnNamespace: boolean
 }
 
 // Optional, set by a policy author. Harmless when absent.
@@ -132,6 +138,30 @@ function namespaceLabelKeysOf(policy: RawAdmissionPolicy): string[] {
   }
 
   return [...keys]
+}
+
+const NAMESPACE_ANNOTATION_REF = /namespaceObject\.metadata\.annotations\[\s*['"]([^'"]+)['"]\s*\]|['"]([^'"]+)['"]\s*in\s+namespaceObject\.metadata\.annotations/g
+const NAMESPACE_ANCHOR_REF = /request\.namespace\s*\+/
+
+function expressionsOf(policy: RawAdmissionPolicy): string[] {
+  return [
+    ...(policy.spec?.variables ?? []).map(v => v.expression ?? ''),
+    ...(policy.spec?.validations ?? []).flatMap(v => [v.expression ?? '', v.messageExpression ?? ''])
+  ]
+}
+
+function namespaceAnnotationKeysOf(policy: RawAdmissionPolicy): string[] {
+  const keys = new Set<string>()
+
+  for (const expression of expressionsOf(policy)) {
+    for (const match of expression.matchAll(NAMESPACE_ANNOTATION_REF)) keys.add(match[1] ?? match[2])
+  }
+
+  return [...keys]
+}
+
+function anchorsOnNamespace(policy: RawAdmissionPolicy): boolean {
+  return expressionsOf(policy).some(expression => NAMESPACE_ANCHOR_REF.test(expression))
 }
 
 // Matches `'group' in request.userInfo.groups`, the shape every guard here uses
@@ -207,7 +237,9 @@ export function toAdmissionFacts(
       scopedToNamespaceLabelKeys: namespaceLabelKeysOf(policy),
       exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
-      effect: policy.metadata?.annotations?.[EFFECT_ANNOTATION] === 'constrains' ? 'constrains' : 'denies'
+      effect: policy.metadata?.annotations?.[EFFECT_ANNOTATION] === 'constrains' ? 'constrains' : 'denies',
+      namespaceAnnotationKeys: namespaceAnnotationKeysOf(policy),
+      anchorsOnNamespace: anchorsOnNamespace(policy)
     })
   }
 

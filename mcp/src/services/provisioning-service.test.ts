@@ -174,7 +174,7 @@ function namespaceFact(
     }
   }
 
-  return { fact, labels: tenant ? { 'codemowers.io/sandbox': 'abc123-foo' } : {}, degraded: [] }
+  return { fact, labels: tenant ? { 'codemowers.io/sandbox': 'abc123-foo' } : {}, annotations: {}, degraded: [] }
 }
 
 function service(

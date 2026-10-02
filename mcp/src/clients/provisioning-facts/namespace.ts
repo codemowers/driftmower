@@ -47,6 +47,8 @@ export interface NamespaceFactsInput {
 export interface NamespaceFactsResult {
   fact: NamespaceFact
   labels: Record<string, string>
+  // The namespace's own annotations, for facts a guard reads from them.
+  annotations: Record<string, string>
   degraded: DegradedRead[]
 }
 
@@ -177,6 +179,7 @@ export async function loadNamespaceFacts(
       podSecurity: podSecurityFor(labels)
     },
     labels,
+    annotations: meta.metadata?.annotations ?? {},
     degraded
   }
 }

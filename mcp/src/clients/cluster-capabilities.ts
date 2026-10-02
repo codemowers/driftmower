@@ -36,7 +36,15 @@ export const clusterCapabilitiesShape = {
     .array(z.object({ name: z.string(), controller: z.string(), isDefault: z.boolean() }))
     .nullable(),
   clusterIssuers: z
-    .array(z.object({ name: z.string(), description: z.string().nullable(), ready: z.boolean().nullable() }))
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().nullable(),
+        ready: z.boolean().nullable(),
+        // ACME challenge types the issuer's solvers offer; null for non-ACME issuers.
+        acme: z.object({ http01: z.boolean(), dns01: z.boolean() }).nullable()
+      })
+    )
     .nullable(),
   priorityClasses: z
     .array(
@@ -164,15 +172,33 @@ export function createClusterCapabilities(
             (
               await list(
                 `/apis/cert-manager.io/${encodeURIComponent(issuerVersion)}/clusterissuers`,
-                z.object({ metadata, status: z.object({ conditions }).optional() })
+                z.object({
+                  metadata,
+                  spec: z
+                    .object({
+                      acme: z
+                        .object({ solvers: z.array(z.object({ http01: z.unknown(), dns01: z.unknown() }).partial()).optional() })
+                        .optional()
+                    })
+                    .optional(),
+                  status: z.object({ conditions }).optional()
+                })
               )
             ).map(item => {
               const ready = item.status?.conditions?.find(c => c.type === 'Ready')?.status
 
+              const solvers = item.spec?.acme ? (item.spec.acme.solvers ?? []) : null
+
               return {
                 name: item.metadata.name,
                 description: item.metadata.annotations?.['kubernetes.io/description'] ?? null,
-                ready: ready === 'True' ? true : ready === 'False' ? false : null
+                ready: ready === 'True' ? true : ready === 'False' ? false : null,
+                acme: solvers
+                  ? {
+                      http01: solvers.some(solver => solver.http01 !== undefined),
+                      dns01: solvers.some(solver => solver.dns01 !== undefined)
+                    }
+                  : null
               }
             })
           )
