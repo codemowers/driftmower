@@ -565,3 +565,48 @@ it('notices which namespace annotations a guard reads and whether it anchors on 
   expect(old!.namespaceAnnotationKeys).toEqual([])
   expect(old!.anchorsOnNamespace).toBe(false)
 })
+
+// aws-us-west-2-bravo's default-namespace-block: denies every CREATE of every
+// resource, but its matchConditions confine it to the `default` namespace. It
+// used to read as denying every create in every sandbox.
+it('a policy confined to one namespace by matchConditions does not deny elsewhere', () => {
+  const policy: RawAdmissionPolicy = {
+    metadata: { name: 'default-namespace-block' },
+    spec: {
+      matchConstraints: { resourceRules: [{ apiGroups: ['*'], apiVersions: ['*'], operations: ['CREATE'], resources: ['*'] }] },
+      matchConditions: [
+        { name: 'default-namespace', expression: "has(request.namespace) && request.namespace == 'default'" },
+        { name: 'controller-managed-resources', expression: "!(request.resource.resource in ['endpoints', 'endpointslices', 'events'])" }
+      ],
+      validations: [{ expression: 'false', message: 'The default namespace is reserved for platform-managed resources.' }]
+    }
+  }
+  const facts = toAdmissionFacts([policy], [{ spec: { policyName: 'default-namespace-block' } }])
+  const check = (namespace: string) =>
+    denialsFor(facts, {
+      group: 'postgresql.cnpg.io',
+      resource: 'clusters',
+      operation: 'CREATE',
+      namespaceLabels: { 'kubernetes.io/metadata.name': namespace, 'codemowers.io/sandbox': 'x' }
+    })
+
+  expect(facts[0]!.namespaceNames).toEqual({ only: ['default'], except: [] })
+  expect(check('sb-78ac58-tyybid')).toEqual([])
+  expect(check('default')).toHaveLength(1)
+})
+
+it('reads namespace lists and exclusions from matchConditions', () => {
+  const policy = (expression: string): RawAdmissionPolicy => ({
+    metadata: { name: 'p' },
+    spec: { matchConditions: [{ expression }] }
+  })
+  const [inList] = toAdmissionFacts([policy("request.namespace in ['a', 'b']")], [{ spec: { policyName: 'p' } }])
+  const [notIn] = toAdmissionFacts([policy("!(request.namespace in ['kube-system', 'argocd'])")], [{ spec: { policyName: 'p' } }])
+  const [ne] = toAdmissionFacts([policy("request.namespace != 'kube-system'")], [{ spec: { policyName: 'p' } }])
+  const [other] = toAdmissionFacts([policy("object.metadata.name == 'x'")], [{ spec: { policyName: 'p' } }])
+
+  expect(inList!.namespaceNames).toEqual({ only: ['a', 'b'], except: [] })
+  expect(notIn!.namespaceNames).toEqual({ only: null, except: ['kube-system', 'argocd'] })
+  expect(ne!.namespaceNames).toEqual({ only: null, except: ['kube-system'] })
+  expect(other!.namespaceNames).toEqual({ only: null, except: [] })
+})
