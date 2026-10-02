@@ -15,6 +15,17 @@ import {
   type RawResourceQuota
 } from '../../domain/provisioning/namespace-facts.js'
 import { podSecurityFor } from '../../domain/provisioning/pod-security-facts.js'
+import {
+  findRegistries,
+  isZotImage,
+  kubeContextFor,
+  skaffoldEnvFor,
+  type RawIngress,
+  type RawRegistryDeployment,
+  type DiscoveredRegistry,
+  type RawService,
+  type RegistryFact
+} from '../../domain/provisioning/registry-facts.js'
 import type { DegradedRead, NamespaceFact, PolicySelector } from '../../domain/provisioning/types.js'
 import type { KubernetesIdentity, KubernetesReader } from '../observability-kubernetes.js'
 import type { AccessMatrixBuilder } from './access-matrix.js'
@@ -42,6 +53,9 @@ export interface NamespaceFactsInput {
   // The label an enforced guard scopes tenancy on, discovered from admission.
   tenantLabelKey: string | null
   admissionFacts: AdmissionPolicyFact[]
+  // The cluster's identity, for the namespace-qualified kube context a
+  // registry's skaffold.env names. Null renders a <cluster> placeholder.
+  clusterId: string | null
 }
 
 export interface NamespaceFactsResult {
@@ -78,7 +92,7 @@ export async function loadNamespaceFacts(
   const items = <T>(path: string): Promise<{ items?: T[] }> =>
     read(path).then(body => JSON.parse(body) as { items?: T[] })
 
-  const [quotas, limits, native, cilium, namespaceMeta, matrix] = await Promise.all([
+  const [quotas, limits, native, cilium, namespaceMeta, matrix, registries] = await Promise.all([
     optional('resourcequotas', () =>
       items<RawResourceQuota>(`/api/v1/namespaces/${ns(namespace)}/resourcequotas`)
     ),
@@ -93,7 +107,8 @@ export async function loadNamespaceFacts(
       'namespaces',
       async () => JSON.parse(await read(`/api/v1/namespaces/${ns(namespace)}`)) as RawNamespace
     ),
-    input.identity ? dependencies.matrix.build(input.identity, namespace) : Promise.resolve(null)
+    input.identity ? dependencies.matrix.build(input.identity, namespace) : Promise.resolve(null),
+    loadRegistries(read, namespace, degraded)
   ])
 
   const quotaItems = record('resourcequotas', quotas, { items: [] }).items ?? []
@@ -176,10 +191,60 @@ export async function loadNamespaceFacts(
       mayCreate: permission.verdict,
       mayCreateReason: permission.reason,
       offerings,
+      registries: registries.map((registry): RegistryFact => ({
+        ...registry,
+        skaffoldEnv: skaffoldEnvFor({
+          context: kubeContextFor(input.clusterId, namespace),
+          registryHost: registry.host,
+          namespace
+        })
+      })),
       podSecurity: podSecurityFor(labels)
     },
     labels,
     annotations: meta.metadata?.annotations ?? {},
     degraded
   }
+}
+
+// Services and Ingresses are read only once a Deployment here runs Zot, so a
+// namespace without a registry costs one listing, and a cluster that grants
+// no Ingress reads loses only this fact. A refusal is reported like any other.
+async function loadRegistries(
+  read: KubernetesReader,
+  namespace: string,
+  degraded: DegradedRead[]
+): Promise<DiscoveredRegistry[]> {
+  const items = async <T>(path: string): Promise<T[]> =>
+    (JSON.parse(await read(path)) as { items?: T[] }).items ?? []
+  const note = (source: string, fact: { known: boolean; reason?: string; detail?: string }) => {
+    if (!fact.known && fact.reason === 'rbac' && fact.detail)
+      degraded.push({ source, status: 403, message: fact.detail })
+  }
+
+  const deployments = await optional('deployments', () =>
+    items<RawRegistryDeployment>(`/apis/apps/v1/namespaces/${ns(namespace)}/deployments`)
+  )
+
+  note('deployments', deployments)
+
+  const zot = deployments.known
+    ? deployments.value.filter(deployment =>
+        (deployment.spec?.template?.spec?.containers ?? []).some(c => c.image && isZotImage(c.image))
+      )
+    : []
+
+  if (zot.length === 0) return []
+
+  const [services, ingresses] = await Promise.all([
+    optional('services', () => items<RawService>(`/api/v1/namespaces/${ns(namespace)}/services`)),
+    optional('ingresses', () =>
+      items<RawIngress>(`/apis/networking.k8s.io/v1/namespaces/${ns(namespace)}/ingresses`)
+    )
+  ])
+
+  note('services', services)
+  note('ingresses', ingresses)
+
+  return services.known && ingresses.known ? findRegistries(zot, services.value, ingresses.value) : []
 }

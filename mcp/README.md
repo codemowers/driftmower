@@ -949,7 +949,22 @@ Takes `namespaces` (1 to `PROVISIONING_MAX_NAMESPACES`) and an optional
 posture, Pod Security enforcement, the tenant label and id an enforced guard
 scopes on, the hostnames the namespace may claim (only when a guard enforces
 a pattern; otherwise an honest note), any policy that selects on an **exact
-instance name**, and the caller's access there.
+instance name**, any container registry published from the namespace, and the
+caller's access there.
+
+A registry is discovered, not assumed: a Deployment in the namespace that runs
+Zot, a Service selecting its pods and an Ingress publishing that Service. For
+each, the tool suggests a `skaffold.env` to save next to `skaffold.yaml`, so a
+Skaffold build is pushed there and deployed through the namespace-qualified
+kube context, whichever context is current:
+
+```
+SKAFFOLD_KUBE_CONTEXT=<cluster>/<namespace>
+SKAFFOLD_DEFAULT_REPO=<registry host>
+SKAFFOLD_NAMESPACE=<namespace>
+```
+
+Services and Ingresses are read only in namespaces where Zot runs.
 
 Access is an **access matrix**: one SubjectAccessReview per namespaced
 resource type the cluster serves (kube primitives and every CRD) for each of
@@ -999,7 +1014,7 @@ one. A refused read that looks like an empty result is the single failure mode
 this layer exists to prevent. The service account needs the read-only rules in
 [observability-rbac.yaml](manifests/templates/observability-rbac.yaml): nodes,
 deployments, resourcequotas, limitranges, networkpolicies, ciliumnetworkpolicies,
-kyverno clusterpolicies and `get` on ConfigMaps (narrow it with the Helm value
+services and ingresses (for registries), kyverno clusterpolicies and `get` on ConfigMaps (narrow it with the Helm value
 `rbac.paramConfigMapNames`), on top of the catalogs and `subjectaccessreviews`.
 
 ## Development

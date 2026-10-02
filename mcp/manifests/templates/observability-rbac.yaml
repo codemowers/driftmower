@@ -42,6 +42,14 @@ rules:
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies]
     verbs: [list]
+  # A namespace's container registry: the Service selecting a Zot Deployment
+  # and the Ingress publishing it. Read only where such a Deployment runs.
+  - apiGroups: ['']
+    resources: [services]
+    verbs: [list]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [list]
   - apiGroups: [cilium.io]
     resources: [ciliumnetworkpolicies]
     verbs: [list]

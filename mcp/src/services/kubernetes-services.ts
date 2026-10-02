@@ -14,7 +14,10 @@ export function createKubernetesServices(
   config: KubernetesConfig,
   observability?: ObservabilityConfig | null,
   tenancy?: TenancyConfig | null,
-  provisioning?: ProvisioningConfig | null
+  provisioning?: ProvisioningConfig | null,
+  // The cluster's identity, read lazily because it is discovered after these
+  // services exist (from the kubelogin Ingress they provide).
+  clusterId?: () => string | null
 ) {
   const kubernetes = createObservabilityKubernetes({
     url: config.url,
@@ -40,7 +43,8 @@ export function createKubernetesServices(
     ingressDomainSuffix: provisioning?.ingressDomainSuffix ?? null,
     clusterFactTtlMs: provisioning?.clusterFactTtlMs ?? 300_000,
     topologyTtlMs: provisioning?.topologyTtlMs ?? 60_000,
-    operatorTtlMs: provisioning?.operatorTtlMs ?? 30_000
+    operatorTtlMs: provisioning?.operatorTtlMs ?? 30_000,
+    clusterId
   })
   const provisioningService = new ProvisioningService({
     facts,

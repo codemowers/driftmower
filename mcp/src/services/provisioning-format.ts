@@ -1,5 +1,11 @@
 import { VERBS } from '../domain/provisioning/access-facts.js'
-import type { Availability, DegradedRead, NamespaceFact, OfferingCard } from '../domain/provisioning/types.js'
+import type {
+  Availability,
+  DegradedRead,
+  NamespaceFact,
+  OfferingCard,
+  RegistryFact
+} from '../domain/provisioning/types.js'
 import type {
   AccessCheck,
   NamespaceReadiness,
@@ -271,10 +277,33 @@ export function formatNamespaceReadiness(result: NamespaceReadiness): string {
       )
     }
 
+    for (const registry of fact.registries) lines.push('', ...registrySection(registry))
+
     lines.push('')
   }
 
   return [...lines, ...degradedSection(result.degraded)].join('\n')
+}
+
+function registrySection(registry: RegistryFact): string[] {
+  return [
+    `Container registry: Zot at \`${registry.host}\` (Ingress \`${registry.ingress}\` → Service \`${registry.service}\` → Deployment \`${registry.deployment}\`)` +
+      (registry.tls
+        ? '.'
+        : ', served without TLS here, so Docker and Skaffold must be told it is an insecure registry.'),
+    '',
+    'To build with Skaffold, save these lines as `skaffold.env` next to `skaffold.yaml`. Skaffold reads that file on every run, ' +
+      'so builds are pushed to this registry and deployed to this namespace through its own kube context, whatever context is current. ' +
+      'Keep image names in `skaffold.yaml` bare (`myapp`, not a full reference): Skaffold prefixes them with the default repo. ' +
+      'The file is specific to this namespace and cluster, so keep it out of version control. ' +
+      'Prefer it over `skaffold config set default-repo`, which writes to global config instead of the project.',
+    '',
+    '```',
+    registry.skaffoldEnv,
+    '```',
+    '',
+    `Pushing needs credentials the registry accepts: run \`docker login ${registry.host}\` first.`
+  ]
 }
 
 function availabilitySummary(offering: OfferingCard): string {
