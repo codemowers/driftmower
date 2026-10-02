@@ -179,7 +179,7 @@ function Ready({
           title="Container registry"
           hint="Your sandbox's private Zot registry, with commands for pushing and pulling images."
         >
-          <RegistryCard sandboxes={sandboxes} ingress={capabilities.ingress} />
+          <RegistryCard sandboxes={sandboxes} namespaces={capabilities.namespaces} />
         </Section>
       )}
 

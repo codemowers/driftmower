@@ -3,8 +3,7 @@
 import { Package } from "lucide-react"
 
 import CopyButton from "@/app/components/copy-button"
-import { sandboxRegistryHost } from "@/lib/features/provisioning/registry-facts"
-import type { IngressFact } from "@/lib/features/provisioning/types"
+import type { NamespaceFact, RegistryFact } from "@/lib/features/provisioning/types"
 import type { SandboxInfo } from "@/lib/tenancy/sandbox-context"
 
 const ROBOT_SECRET = "registry-robot"
@@ -22,13 +21,6 @@ function pushCommands(host: string): string {
 docker push ${host}/myapp:v1`
 }
 
-// skaffold keys its global config by kube-context, so the registry follows the
-// sandbox context instead of being pinned in a shared skaffold.yaml.
-function skaffoldCommands(host: string): string {
-  return `skaffold config set --kube-context "$(kubectl config current-context)" default-repo ${host}
-skaffold dev`
-}
-
 function podSnippet(namespace: string, host: string): string {
   return `apiVersion: v1
 kind: Pod
@@ -44,13 +36,16 @@ spec:
 }
 
 // Whether a sandbox has its registry is platform-manager's setting, so it comes
-// from the sandbox list (/api/sandboxes) rather than from the cluster facts.
+// from the sandbox list (/api/sandboxes). Where the registry answers, and the
+// skaffold.env to build against it, are discovered by driftmower-mcp from the
+// namespace's own Deployment, Service and Ingress, so a host naming convention
+// is never guessed here.
 export default function RegistryCard({
   sandboxes,
-  ingress,
+  namespaces,
 }: {
   sandboxes: SandboxInfo[]
-  ingress: IngressFact
+  namespaces: NamespaceFact[]
 }) {
   const enabled = sandboxes.filter(entry => entry.registryEnabled)
 
@@ -63,64 +58,70 @@ export default function RegistryCard({
     )
   }
 
-  if (!ingress.domainSuffix) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        The registry is enabled, but this cluster publishes no ingress domain, so its public Zot address
-        cannot be derived here.
-      </p>
-    )
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {enabled.map(entry => {
-        const host = sandboxRegistryHost(entry.sandbox, ingress.domainSuffix!)
-        const login = loginCommand(entry.namespace, host)
-        const push = pushCommands(host)
-        const skaffold = skaffoldCommands(host)
-        const pod = podSnippet(entry.namespace, host)
+        const registry = namespaces.find(fact => fact.namespace === entry.namespace)?.registries?.[0]
 
-        return (
+        return registry ? (
+          <RegistryDetails key={entry.namespace} namespace={entry.namespace} registry={registry} />
+        ) : (
           <div key={entry.namespace} className="rounded-lg border border-border bg-card px-5 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Package className="size-4 shrink-0 text-brand-icon" aria-hidden />
-              <a
-                href={`https://${host}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-sm text-foreground hover:underline"
-              >
-                {host}
-              </a>
-              <CopyButton value={host} />
-              <span className="font-mono text-xs text-muted-foreground">{entry.namespace}</span>
-            </div>
-
-            <p className="mt-3 text-sm text-muted-foreground">
-              Sign in to the Zot web UI with your platform account. For Docker or CI, use the robot
-              credential already stored in <code className="font-mono text-xs text-brand-label">{ROBOT_SECRET}</code>.
-            </p>
-
-            <CommandBlock label="Log in from a shell" value={login} />
-            <CommandBlock label="Tag and push an image" value={push} />
-            <CommandBlock label="Or point skaffold at it for this context" value={skaffold} />
+            <span className="font-mono text-xs text-muted-foreground">{entry.namespace}</span>
             <p className="mt-2 text-sm text-muted-foreground">
-              Run it with the sandbox&rsquo;s kube-context selected. skaffold then prefixes every image in
-              <code className="mx-1 font-mono text-xs text-brand-label">skaffold.yaml</code>
-              with this registry, so keep image names bare (<code className="font-mono text-xs text-brand-label">myapp</code>)
-              and the same config deploys to other contexts with their own registries.
-            </p>
-            <CommandBlock label={`Pull it in ${entry.namespace}`} value={pod} />
-
-            <p className="mt-3 text-sm text-muted-foreground">
-              Repository names start directly after the host; do not repeat the sandbox id. The pre-created
-              <code className="mx-1 font-mono text-xs text-brand-label">{PULL_SECRET}</code>
-              secret lets pods authenticate when pulling.
+              The registry is enabled, but no Zot published from this namespace was found yet. It may still be
+              starting; if it stays missing, check &ldquo;Not checked&rdquo; above for a read the capability layer
+              was refused.
             </p>
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function RegistryDetails({ namespace, registry }: { namespace: string; registry: RegistryFact }) {
+  const { host } = registry
+
+  return (
+    <div className="rounded-lg border border-border bg-card px-5 py-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Package className="size-4 shrink-0 text-brand-icon" aria-hidden />
+        <a
+          href={`${registry.tls ? "https" : "http"}://${host}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-sm text-foreground hover:underline"
+        >
+          {host}
+        </a>
+        <CopyButton value={host} />
+        <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
+      </div>
+
+      <p className="mt-3 text-sm text-muted-foreground">
+        Sign in to the Zot web UI with your platform account. For Docker or CI, use the robot
+        credential already stored in <code className="font-mono text-xs text-brand-label">{ROBOT_SECRET}</code>.
+      </p>
+
+      <CommandBlock label="Log in from a shell" value={loginCommand(namespace, host)} />
+      <CommandBlock label="Tag and push an image" value={pushCommands(host)} />
+      <CommandBlock label="Or build with skaffold: save as skaffold.env next to skaffold.yaml" value={registry.skaffoldEnv} />
+      <p className="mt-2 text-sm text-muted-foreground">
+        skaffold reads this file on every run, so builds are pushed to this registry and deployed to {namespace}
+        {" "}through its own kube-context, whichever context is current. Keep image names in
+        <code className="mx-1 font-mono text-xs text-brand-label">skaffold.yaml</code>
+        bare (<code className="font-mono text-xs text-brand-label">myapp</code>): skaffold prefixes them with
+        this registry. The file is specific to this sandbox, so keep it out of version control. The context it
+        names must exist in your kubeconfig.
+      </p>
+      <CommandBlock label={`Pull it in ${namespace}`} value={podSnippet(namespace, host)} />
+
+      <p className="mt-3 text-sm text-muted-foreground">
+        Repository names start directly after the host; do not repeat the sandbox id. The pre-created
+        <code className="mx-1 font-mono text-xs text-brand-label">{PULL_SECRET}</code>
+        secret lets pods authenticate when pulling.
+      </p>
     </div>
   )
 }

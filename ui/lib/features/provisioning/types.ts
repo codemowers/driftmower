@@ -146,6 +146,10 @@ export type NamespaceFact = {
   // everything its sample creates, then enforced admission policies. This, not
   // access.provision (RBAC alone), is what to show a user.
   offerings: Partial<Record<OfferingId, { verdict: Verdict; reason: string }>>
+  // Container registries published from this namespace, discovered by
+  // driftmower-mcp from its Deployments, Services and Ingresses. Absent from
+  // MCP releases that predate the fact.
+  registries?: RegistryFact[]
   // Pod Security Admission is a built-in controller, so it appears in no
   // ValidatingAdmissionPolicy or Kyverno listing — and on these clusters it is
   // the constraint most likely to stop a first pod.
@@ -154,6 +158,19 @@ export type NamespaceFact = {
     requires: string[]
     summary: string
   } | null
+}
+
+export type RegistryFact = {
+  kind: "zot"
+  host: string
+  // Whether the Ingress terminates TLS for this host.
+  tls: boolean
+  deployment: string
+  service: string
+  ingress: string
+  // A ready-to-save skaffold.env: the namespace-qualified kube context, this
+  // registry as the default repo, and the namespace.
+  skaffoldEnv: string
 }
 
 export type PolicySelector = {

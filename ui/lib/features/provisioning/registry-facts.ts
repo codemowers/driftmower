@@ -21,13 +21,6 @@ export type RegistryFact = {
 // is not a hostname. Normalising keeps the counts honest.
 const DOCKER_HUB = "docker.io"
 
-// platform-manager's sandbox-stack chart gives every enabled Zot instance a
-// policy-defined host. Unlike the old cluster-image heuristic below, this is a
-// push target the sandbox owner is actually authorised to use.
-export function sandboxRegistryHost(sandbox: string, ingressDomain: string): string {
-  return `${sandbox}-registry.${ingressDomain}`
-}
-
 export function registryHostOf(image: string): string {
   const withoutDigest = image.split("@")[0]
   const segments = withoutDigest.split("/")

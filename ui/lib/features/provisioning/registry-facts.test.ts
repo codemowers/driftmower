@@ -6,16 +6,8 @@ import {
   pushAdvice,
   registriesInPullSecret,
   registryHostOf,
-  sandboxRegistryHost,
   summariseRegistries,
 } from "./registry-facts.ts"
-
-test("a sandbox registry host matches the platform-manager chart convention", () => {
-  assert.equal(
-    sandboxRegistryHost("5a7e2f-samples", "veebkolm.eu"),
-    "5a7e2f-samples-registry.veebkolm.eu",
-  )
-})
 
 test("a registry host is told apart from a Docker Hub namespace", () => {
   assert.equal(registryHostOf("zot.ee-lte-1.codemowers.io/originaldreamer/driftmower-ui"), "zot.ee-lte-1.codemowers.io")
