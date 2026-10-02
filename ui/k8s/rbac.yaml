@@ -54,6 +54,13 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["create", "delete"]
+  # Each policy reads its images from a ConfigMap parameter in the target
+  # workload's namespace, created next to the policy (also as the startup
+  # dryRun probe) and deleted with it once checked to be this app's own.
+  # Without these verbs the feature stays copy-only.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
