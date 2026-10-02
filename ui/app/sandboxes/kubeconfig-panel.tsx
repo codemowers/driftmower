@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import CopyButton from "../components/copy-button"
 import { cn } from "@/lib/utils/cn"
 import { readApiError } from "@/lib/utils/read-api-error"
+import { readContext } from "@/lib/features/sandboxes/kubeconfig"
 
 const KREW_INSTALL_URL = "https://krew.sigs.k8s.io/docs/user-guide/setup/install/"
 
@@ -15,15 +16,6 @@ type FetchState =
   | { status: "ready"; yaml: string }
 
 const cache = new Map<string, string>()
-
-// The kubeconfig names its context `<sandbox>.<cluster>`; the merge snippet
-// needs both halves (the context to switch to, the cluster for the scratch
-// file name) and the served YAML is the only place they exist client-side.
-function readContext(yaml: string, sandbox: string): { context: string; clusterName: string } {
-  const context = yaml.match(/^current-context:\s*(\S+)/m)?.[1] ?? sandbox
-  const clusterName = context.startsWith(`${sandbox}.`) ? context.slice(sandbox.length + 1) : context
-  return { context, clusterName }
-}
 
 export default function KubeconfigPanel({ sandbox }: { sandbox: string }) {
   const [state, setState] = useState<FetchState>(() => {
