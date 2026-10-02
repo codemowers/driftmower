@@ -149,29 +149,33 @@ spec:
       }
     }
 
-    // In a sandbox, sandbox-s3-guard holds bucket names and access keys to the
-    // sandbox-id prefix (both are global on Silo, not per namespace) and
-    // lets an S3User attach only the platform-rendered <id>-rw policy, which
-    // covers exactly the <id>-* buckets. The S3User makes the sample usable:
-    // without it the bucket exists and nothing can reach it.
+    // In a sandbox, bucket names and access keys are held to the namespace
+    // prefix `<namespace>.` (both are global on Silo, not per namespace) and an
+    // S3User may attach only the platform-rendered <id>-rw policy, which covers
+    // exactly this sandbox's buckets. Where the cluster expands short names, a
+    // bare `my-bucket` becomes `<namespace>.my-bucket` anyway; spelling the full
+    // name out keeps the sample right on clusters that do not, and makes the
+    // name it reports the real one. The S3User makes the sample usable: without
+    // it the bucket exists and nothing can reach it.
+    const prefix = `${namespace ?? `sb-${sandboxId}`}.`
     return {
       yaml: `${head(apiVersion, "Bucket", "my-bucket", namespace)}
 spec:
-  # Global on Silo: must start with ${sandboxId}-
-  name: ${sandboxId}-my-bucket
+  # Global on Silo: must start with ${prefix}
+  name: ${prefix}my-bucket
   s3InstanceRef: minio/default
   quota:
     default: 1073741824 # bytes (1Gi); unit strings break the operator
 ---
 ${head(apiVersion, "S3User", "my-bucket-user", namespace)}
 spec:
-  accessKey: ${sandboxId}-my-bucket-user
+  accessKey: ${prefix}my-bucket-user
   # Required: the CRD's default instance does not exist on these clusters.
   s3InstanceRef: minio/default
   policies:
     - ${sandboxId}-rw
   secretName: my-bucket-credentials`,
-      creates: `A 1Gi (1073741824-byte) bucket named ${sandboxId}-my-bucket on the cluster's Silo object store, and an S3User whose access key and secret land in the my-bucket-credentials Secret (accessKey, secretKey). Its ${sandboxId}-rw policy reaches this sandbox's buckets and no one else's.`,
+      creates: `A 1Gi (1073741824-byte) bucket named ${prefix}my-bucket on the cluster's Silo object store, and an S3User whose access key and secret land in the my-bucket-credentials Secret (accessKey, secretKey). Its ${sandboxId}-rw policy reaches this sandbox's buckets and no one else's.`,
       connect: `${kubectl(namespace)} get secret my-bucket-credentials -o jsonpath='{.data.secretKey}' | base64 -d`,
     }
   },
