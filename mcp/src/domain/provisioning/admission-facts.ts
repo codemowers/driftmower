@@ -23,6 +23,7 @@ export type RawAdmissionPolicy = {
     failurePolicy?: string
     paramKind?: { apiVersion?: string; kind?: string }
     matchConstraints?: { resourceRules?: RawResourceRule[] }
+    matchConditions?: { name?: string; expression?: string }[]
     variables?: { name?: string; expression?: string }[]
     validations?: { expression?: string; message?: string; messageExpression?: string; reason?: string }[]
   }
@@ -75,6 +76,12 @@ export type AdmissionPolicyFact = {
   // in the expressions, so without this a guard reads as governing every
   // namespace, including platform ones it actually exempts.
   scopedToNamespaceLabelKeys: string[]
+  // Namespace names the policy's matchConditions confine it to (`only`) or
+  // exclude (`except`), parsed from `request.namespace == 'x'`,
+  // `request.namespace in [...]` and their negations. Without this a policy
+  // that denies everything, but only in `default`, reads as denying every
+  // create in every namespace.
+  namespaceNames: { only: string[] | null; except: string[] }
   // Groups the policy's CEL exempts, parsed from `'x' in request.userInfo.groups`.
   // The real guards exempt by IDENTITY rather than by namespace, so without
   // this an admin is told they cannot do something they plainly can.
@@ -164,6 +171,45 @@ function anchorsOnNamespace(policy: RawAdmissionPolicy): boolean {
   return expressionsOf(policy).some(expression => NAMESPACE_ANCHOR_REF.test(expression))
 }
 
+const QUOTED = /['"]([^'"]+)['"]/g
+const NAME_EQ = /^(?:has\(request\.namespace\)\s*&&\s*)?request\.namespace\s*==\s*['"]([^'"]+)['"]$/
+const NAME_NE = /^(?:has\(request\.namespace\)\s*&&\s*)?request\.namespace\s*!=\s*['"]([^'"]+)['"]$/
+const NAME_IN = /^(?:has\(request\.namespace\)\s*&&\s*)?request\.namespace\s+in\s+\[([^\]]*)\]$/
+const NAME_NOT_IN = /^!\s*\(\s*request\.namespace\s+in\s+\[([^\]]*)\]\s*\)$/
+
+function quoted(list: string): string[] {
+  return [...list.matchAll(QUOTED)].map(match => match[1])
+}
+
+// Each matchCondition must hold for the policy to apply at all, so a condition
+// that is exactly a namespace-name test narrows where it applies. Anything
+// more complex is left alone: under-reading scope only ever over-reports a
+// denial, never hides one.
+function namespaceNamesOf(policy: RawAdmissionPolicy): { only: string[] | null; except: string[] } {
+  let only: string[] | null = null
+  const except: string[] = []
+
+  for (const condition of policy.spec?.matchConditions ?? []) {
+    const expression = (condition.expression ?? '').trim()
+    const eq = expression.match(NAME_EQ)?.[1]
+    const inList = expression.match(NAME_IN)?.[1]
+    const ne = expression.match(NAME_NE)?.[1]
+    const notIn = expression.match(NAME_NOT_IN)?.[1]
+
+    if (eq || inList !== undefined) {
+      const names = eq ? [eq] : quoted(inList!)
+
+      only = only ? only.filter(name => names.includes(name)) : names
+    }
+
+    if (ne) except.push(ne)
+
+    if (notIn !== undefined) except.push(...quoted(notIn))
+  }
+
+  return { only, except: [...new Set(except)] }
+}
+
 // Matches `'group' in request.userInfo.groups`, the shape every guard here uses
 // for its escape hatch.
 const EXEMPT_GROUP_REF = /['"]([^'"]+)['"]\s*in\s+request\.userInfo\.groups/g
@@ -235,6 +281,7 @@ export function toAdmissionFacts(
       bindingLabelKeys,
       bindingSelectors: denying.map(binding => binding.spec?.matchResources?.namespaceSelector ?? {}),
       scopedToNamespaceLabelKeys: namespaceLabelKeysOf(policy),
+      namespaceNames: namespaceNamesOf(policy),
       exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
       effect: policy.metadata?.annotations?.[EFFECT_ANNOTATION] === 'constrains' ? 'constrains' : 'denies',
@@ -303,6 +350,15 @@ export function selectorMatches(selector: LabelSelector, labels: Record<string, 
 }
 
 function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string, string>): boolean {
+  // The apiserver labels every namespace with its own name.
+  const name = namespaceLabels['kubernetes.io/metadata.name']
+
+  if (name && fact.namespaceNames) {
+    if (fact.namespaceNames.only && !fact.namespaceNames.only.includes(name)) return false
+
+    if (fact.namespaceNames.except.includes(name)) return false
+  }
+
   // A binding selector is the explicit, authoritative scope: the policy
   // governs the namespace when any denying binding selects it.
   if (
