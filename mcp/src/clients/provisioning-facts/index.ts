@@ -48,6 +48,8 @@ export interface ClusterFacts {
   topology: TopologyFact
   policies: PolicyFact[]
   admission: AdmissionPolicyFact[]
+  // Bound MutatingAdmissionPolicies, for what an operation is rewritten by.
+  mutations: MutationFact[]
   admissionPolicies: AdmissionFact[]
   tenantLabelKey: string | null
   ingress: {
@@ -162,6 +164,7 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
       topology: nodes.known ? nodes.value : EMPTY_TOPOLOGY,
       policies: policies.known ? policies.value : [],
       admission: admissionFacts,
+      mutations: mutationFacts,
       admissionPolicies: admissionFacts.map(toAdmissionFact),
       tenantLabelKey: tenantLabelKeyFor(admissionFacts),
       ingress: {

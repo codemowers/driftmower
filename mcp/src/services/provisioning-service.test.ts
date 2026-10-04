@@ -90,6 +90,7 @@ function clusterFacts(overrides: Partial<ClusterFacts> = {}): ClusterFacts {
     topology: { zones: [], schedulableNodes: 3, controlPlaneLabel: null },
     policies: [],
     admission: guard,
+    mutations: [],
     admissionPolicies: guard.map(toAdmissionFact),
     tenantLabelKey: 'codemowers.io/sandbox',
     ingress: {
@@ -479,5 +480,39 @@ describe('ProvisioningService', () => {
       verdict: 'unknown',
       identity: null
     })
+  })
+
+  it('lists the mutating policies that rewrite a create, for resources outside the catalog too', async () => {
+    const { service: subject } = service({
+      cluster: clusterFacts({
+        mutations: [
+          {
+            name: 'certificate-secret-name',
+            description: 'Certificates default spec.secretName to <metadata.name>-tls.',
+            guards: [{ group: 'cert-manager.io', resource: 'certificates', operations: ['CREATE', 'UPDATE'] }],
+            namespaceScoped: false
+          }
+        ]
+      }),
+      namespaces: { tenant: namespaceFact('tenant', 'yes') }
+    })
+    const certificate = { namespace: 'tenant', verb: 'create', group: 'cert-manager.io', resource: 'certificates' }
+    const created = await subject.checkAccess(identity, certificate)
+    const read = await subject.checkAccess(identity, { ...certificate, verb: 'get' })
+
+    if (created.status !== 'ok' || read.status !== 'ok') throw new Error('unexpected')
+
+    expect(created.admissionDefaults).toEqual([
+      {
+        policy: 'certificate-secret-name',
+        resource: 'certificates.cert-manager.io',
+        description: 'Certificates default spec.secretName to <metadata.name>-tls.',
+        namespaceScoped: false
+      }
+    ])
+    expect(formatAccessCheck(created, certificate)).toContain(
+      '- **certificate-secret-name** on `certificates.cert-manager.io`: Certificates default spec.secretName'
+    )
+    expect(read.admissionDefaults).toEqual([])
   })
 })

@@ -994,7 +994,9 @@ not cover: cluster-scoped resources, subresources such as `pods/log`, named
 objects, `proxy`, and any resource outside the offering catalog (Strimzi,
 Crunchy, whatever the cluster serves). Enforced admission policies that
 govern create, update or delete on the resource are reported alongside and
-outrank an RBAC yes.
+outrank an RBAC yes. For create and update, `admissionDefaults` lists every
+bound MutatingAdmissionPolicy that rewrites the object, with the policy's own
+`kubernetes.io/description`.
 
 ### `GET /api/provisioning/capabilities`
 

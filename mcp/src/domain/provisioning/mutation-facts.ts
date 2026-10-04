@@ -85,23 +85,23 @@ export function toMutationFacts(policies: RawMutatingPolicy[], bindings: RawMuta
   return facts.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+// Every bound policy that rewrites this operation on this resource.
+export function mutationsOf(
+  facts: MutationFact[],
+  check: { group: string; resource: string; operation: 'CREATE' | 'UPDATE' }
+): AdmissionDefault[] {
+  return facts
+    .filter(fact => fact.guards.some(guard => guardMatches(guard, check)))
+    .map(fact => ({
+      policy: fact.name,
+      resource: `${check.resource}.${check.group || 'core'}`,
+      description: fact.description,
+      namespaceScoped: fact.namespaceScoped
+    }))
+}
+
 export function defaultsFor(facts: MutationFact[], target: ProvisionTarget): AdmissionDefault[] {
-  const defaults: AdmissionDefault[] = []
-
-  for (const { group, resource } of target.resources) {
-    if (!resource) continue
-
-    for (const fact of facts) {
-      if (!fact.guards.some(guard => guardMatches(guard, { group, resource, operation: 'CREATE' }))) continue
-
-      defaults.push({
-        policy: fact.name,
-        resource: `${resource}.${group || 'core'}`,
-        description: fact.description,
-        namespaceScoped: fact.namespaceScoped
-      })
-    }
-  }
-
-  return defaults
+  return target.resources.flatMap(({ group, resource }) =>
+    resource ? mutationsOf(facts, { group, resource, operation: 'CREATE' }) : []
+  )
 }

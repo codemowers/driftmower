@@ -4,9 +4,11 @@ import type { ClusterFacts, ProvisioningFacts } from '../clients/provisioning-fa
 import { mapWithConcurrency } from '../clients/concurrency.js'
 import { composeCreateVerdict, type Verdict } from '../domain/provisioning/access-facts.js'
 import { denialsFor, type Denial } from '../domain/provisioning/admission-facts.js'
+import { mutationsOf } from '../domain/provisioning/mutation-facts.js'
 import { OFFERINGS_BY_ID } from '../domain/provisioning/catalog/offerings.js'
 import { hostRuleFor, parseCustomDomains, VERIFIED_DOMAINS_ANNOTATION } from '../domain/provisioning/ingress-facts.js'
 import type {
+  AdmissionDefault,
   CapabilityResponse,
   DegradedRead,
   HostRule,
@@ -82,6 +84,9 @@ export interface AccessCheck {
   reason: string
   rbac: { verdict: Verdict; reason: string | null }
   admission: Denial[]
+  // Mutating policies that rewrite the object on CREATE or UPDATE, with what
+  // each says it sets and requires.
+  admissionDefaults: AdmissionDefault[]
   identity: KubernetesIdentity | null
 }
 
@@ -272,6 +277,14 @@ export class ProvisioningService {
               callerGroups: identity?.groups
             })
           : []
+      const admissionDefaults =
+        operation === 'CREATE' || operation === 'UPDATE'
+          ? mutationsOf(cluster.mutations, {
+              group: input.group,
+              resource: input.subresource ? `${input.resource}/${input.subresource}` : input.resource,
+              operation
+            })
+          : []
 
       if (!identity) {
         return {
@@ -280,6 +293,7 @@ export class ProvisioningService {
           reason: `The call carried no verified caller, so permission was not checked. Run \`kubectl auth can-i ${input.verb} ${what}\`.`,
           rbac: { verdict: 'unknown', reason: 'no verified caller' },
           admission,
+          admissionDefaults,
           identity: null
         }
       }
@@ -304,7 +318,15 @@ export class ProvisioningService {
               ? { verdict: 'yes' as const, reason: `Kubernetes RBAC allows ${input.verb} on ${what}.` }
               : { verdict: rbac.verdict, reason: rbac.reason ?? 'The access review could not be evaluated' }
 
-      return { status: 'ok', verdict: composed.verdict, reason: composed.reason, rbac, admission, identity }
+      return {
+        status: 'ok',
+        verdict: composed.verdict,
+        reason: composed.reason,
+        rbac,
+        admission,
+        admissionDefaults,
+        identity
+      }
     })
   }
 

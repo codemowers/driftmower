@@ -33,6 +33,13 @@ const availabilitySchema = z.discriminatedUnion('state', [
   z.object({ state: z.literal('not-installed'), installHref: z.string().nullable() })
 ])
 
+const admissionDefaultSchema = z.object({
+  policy: z.string(),
+  resource: z.string(),
+  description: z.string().nullable(),
+  namespaceScoped: z.boolean()
+})
+
 export const offeringSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -45,14 +52,7 @@ export const offeringSchema = z.object({
   availability: availabilitySchema,
   presets: z.array(z.object({ id: z.string(), label: z.string(), summary: z.string() })),
   needs: z.array(z.string()),
-  admissionDefaults: z.array(
-    z.object({
-      policy: z.string(),
-      resource: z.string(),
-      description: z.string().nullable(),
-      namespaceScoped: z.boolean()
-    })
-  ),
+  admissionDefaults: z.array(admissionDefaultSchema),
   mayCreate: verdictSchema.optional(),
   mayCreateReason: z.string().optional()
 })
@@ -240,6 +240,7 @@ export const checkAccessOutputShape = {
   reason: z.string().optional(),
   rbac: z.object({ verdict: verdictSchema, reason: z.string().nullable() }).optional(),
   admission: z.array(z.object({ policy: z.string(), messages: z.array(z.string()) })).optional(),
+  admissionDefaults: z.array(admissionDefaultSchema).optional(),
   identity: z
     .object({ user: z.string(), groups: z.array(z.string()) })
     .nullable()
