@@ -187,6 +187,7 @@ function stubService(): ProvisioningService {
         reason: 'Kubernetes RBAC denies create kafkas.kafka.strimzi.io in namespace team-a'
       },
       admission: [],
+      admissionDefaults: [],
       identity: null
     })
   } as unknown as ProvisioningService

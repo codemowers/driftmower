@@ -378,7 +378,10 @@ function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string,
   return true
 }
 
-function guardMatches(guard: GuardedOperation, check: DenialCheck): boolean {
+export function guardMatches(
+  guard: GuardedOperation,
+  check: Pick<DenialCheck, 'group' | 'resource' | 'operation'>
+): boolean {
   const groupMatches = guard.group === '*' || guard.group === check.group
   const resourceMatches = guard.resource === '*' || guard.resource === check.resource
 

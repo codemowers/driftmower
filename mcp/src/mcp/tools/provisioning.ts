@@ -98,7 +98,8 @@ export function registerProvisioningTools(
       title: 'List provisionable offerings',
       description:
         'Every database, cache, queue and object store this platform can provision, each with whether it is ' +
-        'actually available on this cluster and, when it is not, why. With `namespace`, each offering also ' +
+        'actually available on this cluster and, when it is not, why, plus the admission defaults that ' +
+        'rewrite its resources on create, each with what its policy says it requires. With `namespace`, each offering also ' +
         'carries whether the cluster authorizer lets you create it there, checked as the verified caller for ' +
         'every resource the offering needs, with enforced admission policies considered. Read-only.',
       inputSchema: {
@@ -164,7 +165,9 @@ export function registerProvisioningTools(
         'Ask the cluster authorizer, as the verified caller, whether one verb on one resource is allowed: ' +
         'any group and resource, cluster-scoped or in a namespace, subresources such as pods/log, a named ' +
         'object. Enforced admission policies that govern the operation are reported alongside and outrank an ' +
-        'RBAC yes for create, update and delete. Use it for anything outside the offering catalog. Read-only.',
+        'RBAC yes for create, update and delete. For create and update it also lists the mutating admission ' +
+        'policies that rewrite the object, with what each says it requires, such as a Secret to provision first. ' +
+        'Use it for anything outside the offering catalog. Read-only.',
       inputSchema: {
         verb: z.enum([
           'get',

@@ -1,5 +1,6 @@
 import { VERBS } from '../domain/provisioning/access-facts.js'
 import type {
+  AdmissionDefault,
   Availability,
   DegradedRead,
   NamespaceFact,
@@ -138,10 +139,24 @@ export function formatAccessCheck(
   const what = `${input.verb} ${input.resource}.${input.group || 'core'}${input.namespace ? ` in namespace ${input.namespace}` : ' cluster-wide'}`
   const lines = [`## ${what} — ${result.verdict}`, '', result.reason]
 
+  if (result.admissionDefaults.length > 0) lines.push('', ...admissionDefaultLines(result.admissionDefaults))
+
   if (result.identity)
     lines.push('', `Asked of the cluster authorizer as Kubernetes user \`${result.identity.user}\`.`)
 
   return lines.join('\n')
+}
+
+function admissionDefaultLines(defaults: AdmissionDefault[]): string[] {
+  return [
+    'Admission defaults: these policies rewrite the object on its way in, so the cluster stores more than your ' +
+      'manifest says. Meet what each one requires before applying:',
+    ...defaults.map(
+      entry =>
+        `- **${entry.policy}** on \`${entry.resource}\`${entry.namespaceScoped ? ' (only in namespaces its binding selects)' : ''}: ` +
+        (entry.description ?? 'it carries no kubernetes.io/description; read its mutations with list_admission_policies.')
+    )
+  ]
 }
 
 export function formatOfferings(result: OfferingsListing): string {
@@ -172,6 +187,8 @@ export function formatOfferings(result: OfferingsListing): string {
         `Resource: \`${offering.resource}\`${offering.apiVersion ? ` (${offering.apiVersion})` : ''}.`
       )
     }
+
+    if (offering.admissionDefaults.length > 0) lines.push('', ...admissionDefaultLines(offering.admissionDefaults))
 
     if (offering.mayCreate) {
       lines.push('')

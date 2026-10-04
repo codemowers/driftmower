@@ -940,7 +940,10 @@ Every offering the platform can provision, with availability and, when it is
 unavailable, why. Optional `offering` narrows to one. Optional `namespace`
 adds `mayCreate` per offering: whether the caller may create every resource
 the offering's sample manifest creates there, with enforced admission
-policies considered.
+policies considered. Each offering also lists `admissionDefaults`: every bound
+MutatingAdmissionPolicy that rewrites one of its resources on create, with the
+policy's own `kubernetes.io/description`, so a default that references
+something the caller must provision first is known before the apply.
 
 ### `describe_namespace_readiness`
 
@@ -991,7 +994,9 @@ not cover: cluster-scoped resources, subresources such as `pods/log`, named
 objects, `proxy`, and any resource outside the offering catalog (Strimzi,
 Crunchy, whatever the cluster serves). Enforced admission policies that
 govern create, update or delete on the resource are reported alongside and
-outrank an RBAC yes.
+outrank an RBAC yes. For create and update, `admissionDefaults` lists every
+bound MutatingAdmissionPolicy that rewrites the object, with the policy's own
+`kubernetes.io/description`.
 
 ### `GET /api/provisioning/capabilities`
 

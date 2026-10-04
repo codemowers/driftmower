@@ -9,6 +9,7 @@ import {
 import { availabilityOf, type OperatorHealth } from '../../domain/provisioning/availability.js'
 import { OFFERINGS, type OfferingSpec } from '../../domain/provisioning/catalog/offerings.js'
 import { tenantLabelKeyFor, toAdmissionFact } from '../../domain/provisioning/admission-facts.js'
+import { defaultsFor, type MutationFact } from '../../domain/provisioning/mutation-facts.js'
 import { tlsAdvice, type DomainSuffix } from '../../domain/provisioning/ingress-facts.js'
 import { storageFactFromCatalog } from '../../domain/provisioning/storage-facts.js'
 import type {
@@ -47,6 +48,8 @@ export interface ClusterFacts {
   topology: TopologyFact
   policies: PolicyFact[]
   admission: AdmissionPolicyFact[]
+  // Bound MutatingAdmissionPolicies, for what an operation is rewritten by.
+  mutations: MutationFact[]
   admissionPolicies: AdmissionFact[]
   tenantLabelKey: string | null
   ingress: {
@@ -126,7 +129,8 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
     ])
     const issuerVersion = api.versionsByGroup.get('cert-manager.io')?.[0] ?? null
     const platform = await options.capabilities.listPlatformClasses(issuerVersion)
-    const admissionFacts = admission.known ? admission.value : []
+    const admissionFacts = admission.known ? admission.value.validating : []
+    const mutationFacts = admission.known ? admission.value.mutating : []
     const suffix = await loadIngressSuffix(read, admissionFacts, options.ingressDomainSuffix)
 
     note('storageclasses', storage)
@@ -142,7 +146,7 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
     const lookup = deployments.known
       ? operatorHealthLookup(deployments.value)
       : (): OperatorHealth | null => null
-    const cards = OFFERINGS.map(spec => toCard(spec, api, lookup)).sort(
+    const cards = OFFERINGS.map(spec => toCard(spec, api, lookup, mutationFacts)).sort(
       (a, b) => rank(a.card) - rank(b.card) || a.card.name.localeCompare(b.card.name)
     )
     const issuers = (platform.clusterIssuers ?? []).map(issuer => ({
@@ -160,6 +164,7 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
       topology: nodes.known ? nodes.value : EMPTY_TOPOLOGY,
       policies: policies.known ? policies.value : [],
       admission: admissionFacts,
+      mutations: mutationFacts,
       admissionPolicies: admissionFacts.map(toAdmissionFact),
       tenantLabelKey: tenantLabelKeyFor(admissionFacts),
       ingress: {
@@ -211,11 +216,25 @@ export function createProvisioningFacts(options: ProvisioningFactsOptions): Prov
 function toCard(
   spec: OfferingSpec,
   surface: ApiSurface,
-  lookup: (ref: OperatorRef) => OperatorHealth | null
+  lookup: (ref: OperatorRef) => OperatorHealth | null,
+  mutations: MutationFact[]
 ): { card: OfferingCard; target: ProvisionTarget } {
   const served: ServedResource | null = negotiateVersion(surface, spec.group, spec.kind, spec.versions)
   const health = lookup(spec.operatorRef)
   const availability = availabilityOf(served !== null, health, spec.operator.docsHref)
+  const target: ProvisionTarget = {
+    id: spec.id,
+    resources: [
+      served
+        ? { group: spec.group, resource: served.plural }
+        : {
+            group: spec.group,
+            resource: null,
+            reason: `The cluster does not serve ${spec.kind}.${spec.group}, so there is nothing to create yet`
+          },
+      ...spec.alsoRequires
+    ]
+  }
 
   return {
     card: {
@@ -229,21 +248,10 @@ function toCard(
       apiVersion: served ? `${spec.group}/${served.version}` : null,
       availability,
       presets: spec.presets,
-      needs: spec.needs
+      needs: spec.needs,
+      admissionDefaults: defaultsFor(mutations, target)
     },
-    target: {
-      id: spec.id,
-      resources: [
-        served
-          ? { group: spec.group, resource: served.plural }
-          : {
-              group: spec.group,
-              resource: null,
-              reason: `The cluster does not serve ${spec.kind}.${spec.group}, so there is nothing to create yet`
-            },
-        ...spec.alsoRequires
-      ]
-    }
+    target
   }
 }
 

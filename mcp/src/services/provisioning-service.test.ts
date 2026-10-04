@@ -51,7 +51,8 @@ const postgres: OfferingCard = {
   apiVersion: 'postgresql.cnpg.io/v1',
   availability: { state: 'ready', version: '1.24.0', watchedNamespaces: 'all' },
   presets: [],
-  needs: []
+  needs: [],
+  admissionDefaults: []
 }
 const dragonfly: OfferingCard = {
   ...postgres,
@@ -89,6 +90,7 @@ function clusterFacts(overrides: Partial<ClusterFacts> = {}): ClusterFacts {
     topology: { zones: [], schedulableNodes: 3, controlPlaneLabel: null },
     policies: [],
     admission: guard,
+    mutations: [],
     admissionPolicies: guard.map(toAdmissionFact),
     tenantLabelKey: 'codemowers.io/sandbox',
     ingress: {
@@ -344,6 +346,32 @@ describe('ProvisioningService', () => {
     expect(formatOfferings(plain)).toContain('Before it could be used here: The Dragonfly operator')
   })
 
+  it('lists the admission defaults an offering is rewritten by, in the policy author\'s words', () => {
+    const text = formatOfferings({
+      status: 'ok',
+      offerings: [
+        {
+          ...postgres,
+          admissionDefaults: [
+            {
+              policy: 'cnpg-tls',
+              resource: 'clusters.postgresql.cnpg.io',
+              description: 'Provision the referenced Secret before starting the Cluster.',
+              namespaceScoped: false
+            }
+          ]
+        }
+      ],
+      withheld: [],
+      degraded: []
+    })
+
+    expect(text).toContain('Admission defaults')
+    expect(text).toContain(
+      '- **cnpg-tls** on `clusters.postgresql.cnpg.io`: Provision the referenced Secret before starting the Cluster.'
+    )
+  })
+
   it('names the admission policy when it, not RBAC, is what blocks an offering', async () => {
     const guarded = namespaceFact('mine', 'yes')
 
@@ -452,5 +480,39 @@ describe('ProvisioningService', () => {
       verdict: 'unknown',
       identity: null
     })
+  })
+
+  it('lists the mutating policies that rewrite a create, for resources outside the catalog too', async () => {
+    const { service: subject } = service({
+      cluster: clusterFacts({
+        mutations: [
+          {
+            name: 'certificate-secret-name',
+            description: 'Certificates default spec.secretName to <metadata.name>-tls.',
+            guards: [{ group: 'cert-manager.io', resource: 'certificates', operations: ['CREATE', 'UPDATE'] }],
+            namespaceScoped: false
+          }
+        ]
+      }),
+      namespaces: { tenant: namespaceFact('tenant', 'yes') }
+    })
+    const certificate = { namespace: 'tenant', verb: 'create', group: 'cert-manager.io', resource: 'certificates' }
+    const created = await subject.checkAccess(identity, certificate)
+    const read = await subject.checkAccess(identity, { ...certificate, verb: 'get' })
+
+    if (created.status !== 'ok' || read.status !== 'ok') throw new Error('unexpected')
+
+    expect(created.admissionDefaults).toEqual([
+      {
+        policy: 'certificate-secret-name',
+        resource: 'certificates.cert-manager.io',
+        description: 'Certificates default spec.secretName to <metadata.name>-tls.',
+        namespaceScoped: false
+      }
+    ])
+    expect(formatAccessCheck(created, certificate)).toContain(
+      '- **certificate-secret-name** on `certificates.cert-manager.io`: Certificates default spec.secretName'
+    )
+    expect(read.admissionDefaults).toEqual([])
   })
 })
