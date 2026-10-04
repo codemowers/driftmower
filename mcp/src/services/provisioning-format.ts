@@ -173,6 +173,22 @@ export function formatOfferings(result: OfferingsListing): string {
       )
     }
 
+    if (offering.admissionDefaults.length > 0) {
+      lines.push('')
+      lines.push(
+        'Admission defaults: these policies rewrite the object on create, so the cluster stores more than your ' +
+          'manifest says. Meet what each one requires before applying:'
+      )
+
+      for (const entry of offering.admissionDefaults) {
+        lines.push(
+          `- **${entry.policy}** on \`${entry.resource}\`${entry.namespaceScoped ? ' (only in namespaces its binding selects)' : ''}: ` +
+            (entry.description ??
+              'it carries no kubernetes.io/description; read its mutations with list_admission_policies.')
+        )
+      }
+    }
+
     if (offering.mayCreate) {
       lines.push('')
       lines.push(

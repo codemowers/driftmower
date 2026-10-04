@@ -45,6 +45,14 @@ export const offeringSchema = z.object({
   availability: availabilitySchema,
   presets: z.array(z.object({ id: z.string(), label: z.string(), summary: z.string() })),
   needs: z.array(z.string()),
+  admissionDefaults: z.array(
+    z.object({
+      policy: z.string(),
+      resource: z.string(),
+      description: z.string().nullable(),
+      namespaceScoped: z.boolean()
+    })
+  ),
   mayCreate: verdictSchema.optional(),
   mayCreateReason: z.string().optional()
 })

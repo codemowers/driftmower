@@ -51,7 +51,8 @@ const postgres: OfferingCard = {
   apiVersion: 'postgresql.cnpg.io/v1',
   availability: { state: 'ready', version: '1.24.0', watchedNamespaces: 'all' },
   presets: [],
-  needs: []
+  needs: [],
+  admissionDefaults: []
 }
 const dragonfly: OfferingCard = {
   ...postgres,
@@ -342,6 +343,32 @@ describe('ProvisioningService', () => {
     expect(formatOfferings(scoped)).toContain('May you create it there: **yes**')
     expect(formatOfferings(plain)).toContain('1 of 2 ready')
     expect(formatOfferings(plain)).toContain('Before it could be used here: The Dragonfly operator')
+  })
+
+  it('lists the admission defaults an offering is rewritten by, in the policy author\'s words', () => {
+    const text = formatOfferings({
+      status: 'ok',
+      offerings: [
+        {
+          ...postgres,
+          admissionDefaults: [
+            {
+              policy: 'cnpg-tls',
+              resource: 'clusters.postgresql.cnpg.io',
+              description: 'Provision the referenced Secret before starting the Cluster.',
+              namespaceScoped: false
+            }
+          ]
+        }
+      ],
+      withheld: [],
+      degraded: []
+    })
+
+    expect(text).toContain('Admission defaults')
+    expect(text).toContain(
+      '- **cnpg-tls** on `clusters.postgresql.cnpg.io`: Provision the referenced Secret before starting the Cluster.'
+    )
   })
 
   it('names the admission policy when it, not RBAC, is what blocks an offering', async () => {

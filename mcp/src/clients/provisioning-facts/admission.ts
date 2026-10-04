@@ -4,19 +4,28 @@ import {
   type RawAdmissionBinding,
   type RawAdmissionPolicy
 } from '../../domain/provisioning/admission-facts.js'
+import {
+  toMutationFacts,
+  type MutationFact,
+  type RawMutatingBinding,
+  type RawMutatingPolicy
+} from '../../domain/provisioning/mutation-facts.js'
 import { suffixFromParams, type DomainSuffix } from '../../domain/provisioning/ingress-facts.js'
 import type { DegradedRead, Fact } from '../../domain/provisioning/types.js'
 import type { ClusterCatalog } from '../cluster-catalog.js'
 import type { KubernetesReader } from '../observability-kubernetes.js'
 import { optional } from './tolerate.js'
 
+export type AdmissionPolicies = { validating: AdmissionPolicyFact[]; mutating: MutationFact[] }
+
 // The policy catalog this server already reads (every served version of the
 // admission APIs, with bindings joined) is the source; only the projection to
-// the pure fact module's raw shape happens here.
-export function loadAdmissionFacts(catalog: ClusterCatalog): Promise<Fact<AdmissionPolicyFact[]>> {
+// the pure fact modules' raw shapes happens here.
+export function loadAdmissionFacts(catalog: ClusterCatalog): Promise<Fact<AdmissionPolicies>> {
   return optional('validatingadmissionpolicies', async () => {
     const { policies } = await catalog.listAdmissionPolicies()
     const validating = policies.filter(policy => policy.kind === 'ValidatingAdmissionPolicy')
+    const mutating = policies.filter(policy => policy.kind === 'MutatingAdmissionPolicy')
     const rawPolicies: RawAdmissionPolicy[] = validating.map(policy => ({
       metadata: { name: policy.name, annotations: policy.annotations },
       spec: policy.spec as RawAdmissionPolicy['spec']
@@ -28,7 +37,19 @@ export function loadAdmissionFacts(catalog: ClusterCatalog): Promise<Fact<Admiss
       }))
     )
 
-    return toAdmissionFacts(rawPolicies, rawBindings)
+    return {
+      validating: toAdmissionFacts(rawPolicies, rawBindings),
+      mutating: toMutationFacts(
+        mutating.map(policy => ({
+          metadata: { name: policy.name },
+          description: policy.description,
+          spec: policy.spec as RawMutatingPolicy['spec']
+        })),
+        mutating.flatMap(policy =>
+          (policy.bindings ?? []).map(binding => ({ spec: binding.spec as RawMutatingBinding['spec'] }))
+        )
+      )
+    }
   })
 }
 

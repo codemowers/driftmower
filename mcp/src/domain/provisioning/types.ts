@@ -3,9 +3,10 @@
 // imports so the pure fact modules can be unit-tested with no cluster at all.
 
 import type { Verb, Verdict } from './access-facts.js'
+import type { AdmissionDefault } from './mutation-facts.js'
 import type { RegistryFact } from './registry-facts.js'
 
-export type { RegistryFact }
+export type { AdmissionDefault, RegistryFact }
 
 export type OfferingId =
   | 'postgres'
@@ -60,6 +61,9 @@ export type OfferingCard = {
   presets: { id: PresetId; label: string; summary: string }[]
   // What the offering would need before it could be installed here.
   needs: string[]
+  // Bound MutatingAdmissionPolicies that rewrite the offering's resources on
+  // create, each with its author's description of what it sets and requires.
+  admissionDefaults: AdmissionDefault[]
   // Present only when a namespace was asked about: may the caller create this
   // offering there, from the access matrix and admission policies.
   mayCreate?: Verdict

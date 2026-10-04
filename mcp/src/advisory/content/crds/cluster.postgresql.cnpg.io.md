@@ -61,7 +61,7 @@ kubectl -n <namespace> get cluster example-database \
 ```
 
 - Without `spec.certificates`, CNPG generates both: the server certificate in `<Cluster-name>-server`, signed by its own CA in `<Cluster-name>-ca`.
-- When `spec.certificates.serverTLSSecret` and `serverCASecret` are set, the server presents that certificate instead, and clients must trust the CA in the Secret `serverCASecret` names. They may be set in the manifest or by an admission default the target cluster applies on create or update, so check the reconciled Cluster rather than the manifest you wrote.
+- When `spec.certificates.serverTLSSecret` and `serverCASecret` are set, the server presents that certificate instead, and clients must trust the CA in the Secret `serverCASecret` names. They may be set in the manifest or by an admission default the target cluster applies on create or update, so check the reconciled Cluster rather than the manifest you wrote. Before creating the Cluster, check whether any admission policy mutates `clusters.postgresql.cnpg.io` (`list_offerings` reports them as admission defaults, `list_admission_policies` lists them all) and meet what its description requires: a default that names a Secret leaves the Cluster waiting until that Secret exists.
 
 Either way, mount `ca.crt` from the Secret that `status.certificates.serverCASecret` names, and never hard-code `<Cluster-name>-ca`. That CA may also be part of a platform-wide trust bundle; trusting the bundle is equivalent only when the bundle verifiably contains it.
 

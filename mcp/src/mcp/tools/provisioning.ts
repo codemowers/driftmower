@@ -98,7 +98,8 @@ export function registerProvisioningTools(
       title: 'List provisionable offerings',
       description:
         'Every database, cache, queue and object store this platform can provision, each with whether it is ' +
-        'actually available on this cluster and, when it is not, why. With `namespace`, each offering also ' +
+        'actually available on this cluster and, when it is not, why, plus the admission defaults that ' +
+        'rewrite its resources on create, each with what its policy says it requires. With `namespace`, each offering also ' +
         'carries whether the cluster authorizer lets you create it there, checked as the verified caller for ' +
         'every resource the offering needs, with enforced admission policies considered. Read-only.',
       inputSchema: {

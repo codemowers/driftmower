@@ -940,7 +940,10 @@ Every offering the platform can provision, with availability and, when it is
 unavailable, why. Optional `offering` narrows to one. Optional `namespace`
 adds `mayCreate` per offering: whether the caller may create every resource
 the offering's sample manifest creates there, with enforced admission
-policies considered.
+policies considered. Each offering also lists `admissionDefaults`: every bound
+MutatingAdmissionPolicy that rewrites one of its resources on create, with the
+policy's own `kubernetes.io/description`, so a default that references
+something the caller must provision first is known before the apply.
 
 ### `describe_namespace_readiness`
 
