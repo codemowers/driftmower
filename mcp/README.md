@@ -1147,6 +1147,16 @@ resource the offering's sample creates and applies enforced admission policies
 on top, so it is the one to show a user; `access.provision` is the RBAC-only
 input to it.
 
+An enforced policy either **denies** the operation or **constrains** the
+object. The CEL is not evaluated: a policy constrains when every validation
+reads `object` or `oldObject`, directly or through its variables (a replica
+cap, an image source, a name prefix), because a differently written manifest
+can satisfy it. A validation that never looks at the object (`false`, or a
+test of the namespace or caller alone) denies. The annotation
+`codemowers.io/admission-effect: constrains` or `denies` overrides the
+inference. Constraints don't change a yes; their messages are appended to
+the reason.
+
 Namespaces where the caller may not list pods come back in `withheld`, and
 an inconclusive review is reported under `degraded`; neither reads as empty.
 
@@ -1157,8 +1167,9 @@ Takes `verb`, `resource`, optional `group`, `namespace`, `subresource` and
 not cover: cluster-scoped resources, subresources such as `pods/log`, named
 objects, `proxy`, and any resource outside the offering catalog (Strimzi,
 Crunchy, whatever the cluster serves). Enforced admission policies that
-govern create, update or delete on the resource are reported alongside and
-outrank an RBAC yes. For create and update, `admissionDefaults` lists every
+govern create, update or delete on the resource are reported alongside:
+denials (`admission`) outrank an RBAC yes, constraints
+(`admissionConstraints`) are requirements the manifest must meet. For create and update, `admissionDefaults` lists every
 bound MutatingAdmissionPolicy that rewrites the object, with the policy's own
 `kubernetes.io/description`.
 

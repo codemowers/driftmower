@@ -516,4 +516,44 @@ describe('ProvisioningService', () => {
     )
     expect(read.admissionDefaults).toEqual([])
   })
+
+  it('allows a create that a constraining policy shapes, and names what the manifest must meet', async () => {
+    const replicas = toAdmissionFacts(
+      [
+        {
+          metadata: { name: 'cnpg-replicas' },
+          spec: {
+            matchConstraints: {
+              resourceRules: [
+                { apiGroups: ['postgresql.cnpg.io'], operations: ['CREATE', 'UPDATE'], resources: ['clusters'] }
+              ]
+            },
+            validations: [
+              {
+                expression: '!has(object.spec.instances) || object.spec.instances <= 2',
+                message: 'spec.instances must be between 1 and 2.'
+              }
+            ]
+          }
+        }
+      ],
+      [{ spec: { policyName: 'cnpg-replicas', validationActions: ['Deny'] } }]
+    )
+    const { service: subject } = service({
+      cluster: clusterFacts({ admission: replicas }),
+      namespaces: { tenant: namespaceFact('tenant', 'yes') }
+    })
+    const cluster = { namespace: 'tenant', group: 'postgresql.cnpg.io', resource: 'clusters' }
+
+    expect(await subject.checkAccess(identity, { ...cluster, verb: 'create' })).toMatchObject({
+      verdict: 'yes',
+      reason: expect.stringContaining('cnpg-replicas: spec.instances must be between 1 and 2'),
+      admission: [],
+      admissionConstraints: [{ policy: 'cnpg-replicas', messages: ['spec.instances must be between 1 and 2.'] }]
+    })
+    expect(await subject.checkAccess(identity, { ...cluster, verb: 'update' })).toMatchObject({
+      verdict: 'yes',
+      reason: expect.stringContaining('cnpg-replicas')
+    })
+  })
 })
