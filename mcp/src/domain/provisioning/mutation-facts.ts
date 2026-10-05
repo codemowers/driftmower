@@ -10,12 +10,20 @@
 // mutation does and what it requires.
 
 import type { ProvisionTarget } from './access-facts.js'
-import { guardMatches, type GuardedOperation, type LabelSelector, type RawResourceRule } from './admission-facts.js'
+import {
+  exactVersionsOf,
+  guardMatches,
+  type GuardedOperation,
+  type LabelSelector,
+  type RawResourceRule
+} from './admission-facts.js'
 
 export type RawMutatingPolicy = {
   metadata?: { name?: string }
   description?: string | null
-  spec?: { matchConstraints?: { resourceRules?: RawResourceRule[]; namespaceSelector?: LabelSelector } }
+  spec?: {
+    matchConstraints?: { resourceRules?: RawResourceRule[]; namespaceSelector?: LabelSelector; matchPolicy?: string }
+  }
 }
 
 export type RawMutatingBinding = {
@@ -48,13 +56,18 @@ function selects(selector: LabelSelector | undefined): boolean {
 }
 
 function guardsOf(policy: RawMutatingPolicy): GuardedOperation[] {
+  const matchPolicy = policy.spec?.matchConstraints?.matchPolicy
+
   return (policy.spec?.matchConstraints?.resourceRules ?? []).flatMap(rule => {
     const operations = (rule.operations ?? []).includes('*')
       ? ['CREATE', 'UPDATE', 'DELETE']
       : (rule.operations ?? [])
+    const versions = exactVersionsOf(rule, matchPolicy)
 
     return (rule.apiGroups ?? []).flatMap(group =>
-      (rule.resources ?? []).map(resource => ({ group, resource, operations }))
+      (rule.resources ?? []).map(resource =>
+        versions ? { group, resource, operations, versions } : { group, resource, operations }
+      )
     )
   })
 }
@@ -88,7 +101,7 @@ export function toMutationFacts(policies: RawMutatingPolicy[], bindings: RawMuta
 // Every bound policy that rewrites this operation on this resource.
 export function mutationsOf(
   facts: MutationFact[],
-  check: { group: string; resource: string; operation: 'CREATE' | 'UPDATE' }
+  check: { group: string; resource: string; operation: 'CREATE' | 'UPDATE'; version?: string }
 ): AdmissionDefault[] {
   return facts
     .filter(fact => fact.guards.some(guard => guardMatches(guard, check)))
@@ -101,7 +114,7 @@ export function mutationsOf(
 }
 
 export function defaultsFor(facts: MutationFact[], target: ProvisionTarget): AdmissionDefault[] {
-  return target.resources.flatMap(({ group, resource }) =>
-    resource ? mutationsOf(facts, { group, resource, operation: 'CREATE' }) : []
+  return target.resources.flatMap(({ group, resource, version }) =>
+    resource ? mutationsOf(facts, { group, resource, operation: 'CREATE', version }) : []
   )
 }

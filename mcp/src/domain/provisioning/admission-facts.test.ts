@@ -744,3 +744,56 @@ it('reports a constraining policy as a requirement rather than a denial', () => 
   })
   expect(denialsFor(facts, check).map(denial => denial.policy)).toEqual(['legacy'])
 })
+
+// legacy-stateful-resource-creation on aws-us-west-2-bravo: only the old EMQX
+// API is refused, and only because the policy asks for an Exact match.
+function legacyEmqx(matchPolicy?: string): RawAdmissionPolicy {
+  return {
+    metadata: { name: 'legacy-stateful-resource-creation' },
+    spec: {
+      matchConstraints: {
+        matchPolicy,
+        resourceRules: [
+          { apiGroups: ['apps.emqx.io'], apiVersions: ['v2alpha1'], operations: ['CREATE'], resources: ['emqxes'] }
+        ]
+      },
+      validations: [{ expression: 'false', message: 'Legacy stateful workload APIs cannot be used for new resources.' }]
+    }
+  }
+}
+
+it('an Exact policy confined to one API version does not deny a create at another', () => {
+  const facts = toAdmissionFacts([legacyEmqx('Exact')], [bindingFor('legacy-stateful-resource-creation')])
+  const check = (version?: string) => ({
+    group: 'apps.emqx.io',
+    resource: 'emqxes',
+    operation: 'CREATE' as const,
+    version,
+    namespaceLabels: SANDBOX_SCOPE
+  })
+
+  expect(facts[0].guards[0].versions).toEqual(['v2alpha1'])
+  expect(denialsFor(facts, check('v2beta1'))).toEqual([])
+  expect(denialsFor(facts, check('v2alpha1')).map(denial => denial.policy)).toEqual([
+    'legacy-stateful-resource-creation'
+  ])
+  // Without a version the policy may apply, so it still denies.
+  expect(denialsFor(facts, check()).length).toBe(1)
+})
+
+it('under the default Equivalent match policy the listed versions do not narrow anything', () => {
+  for (const matchPolicy of [undefined, 'Equivalent']) {
+    const facts = toAdmissionFacts([legacyEmqx(matchPolicy)], [bindingFor('legacy-stateful-resource-creation')])
+
+    expect(facts[0].guards[0].versions).toBeUndefined()
+    expect(
+      denialsFor(facts, {
+        group: 'apps.emqx.io',
+        resource: 'emqxes',
+        operation: 'CREATE',
+        version: 'v2beta1',
+        namespaceLabels: SANDBOX_SCOPE
+      }).length
+    ).toBe(1)
+  }
+})

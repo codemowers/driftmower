@@ -100,7 +100,8 @@ describe('createProvisioningFacts', () => {
     expect(result.offerings.slice(1).every(card => card.availability.state === 'not-installed')).toBe(true)
     expect(result.targets.find(target => target.id === 'postgres')?.resources[0]).toEqual({
       group: 'postgresql.cnpg.io',
-      resource: 'clusters'
+      resource: 'clusters',
+      version: 'v1'
     })
     expect(result.targets.find(target => target.id === 'emqx')?.resources[0].resource).toBe(null)
     expect(result.storageClasses[0]).toMatchObject({ name: 'gp3', topology: 'zonal', replicaSafe: true })

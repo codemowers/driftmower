@@ -150,7 +150,14 @@ const admissionFactSchema = z.object({
   name: z.string(),
   enforced: z.boolean(),
   enforcement: z.string(),
-  guards: z.array(z.object({ group: z.string(), resource: z.string(), operations: z.array(z.string()) })),
+  guards: z.array(
+    z.object({
+      group: z.string(),
+      resource: z.string(),
+      operations: z.array(z.string()),
+      versions: z.array(z.string()).optional()
+    })
+  ),
   messages: z.array(z.string()),
   scopedToNamespaceLabels: z.record(z.string(), z.string()).nullable()
 })

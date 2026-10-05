@@ -39,8 +39,9 @@ export function resourceKey(group: string, resource: string): string {
 export interface ProvisionTarget {
   id: OfferingId
   // Every resource the offering's sample manifest creates. `null` for the
-  // primary kind when the cluster does not serve it.
-  resources: { group: string; resource: string | null; reason?: string }[]
+  // primary kind when the cluster does not serve it. `version` is the API
+  // version the sample uses, when it was negotiated.
+  resources: { group: string; resource: string | null; version?: string; reason?: string }[]
 }
 
 const VIEW = resourceKey('', 'pods')
