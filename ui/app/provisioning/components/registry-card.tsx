@@ -21,6 +21,14 @@ function pushCommands(host: string): string {
 docker push ${host}/myapp:v1`
 }
 
+// Same paste-and-run shape as the kubeconfig merge recipe: the env file's
+// contents come from driftmower-mcp, the heredoc just writes them in place.
+function skaffoldEnvCommand(skaffoldEnv: string): string {
+  return `cat << EOF > skaffold.env
+${skaffoldEnv.trimEnd()}
+EOF`
+}
+
 function podSnippet(namespace: string, host: string): string {
   return `apiVersion: v1
 kind: Pod
@@ -106,7 +114,10 @@ function RegistryDetails({ namespace, registry }: { namespace: string; registry:
 
       <CommandBlock label="Log in from a shell" value={loginCommand(namespace, host)} />
       <CommandBlock label="Tag and push an image" value={pushCommands(host)} />
-      <CommandBlock label="Or build with skaffold: save as skaffold.env next to skaffold.yaml" value={registry.skaffoldEnv} />
+      <CommandBlock
+        label="Or build with skaffold: run next to skaffold.yaml to write skaffold.env"
+        value={skaffoldEnvCommand(registry.skaffoldEnv)}
+      />
       <p className="mt-2 text-sm text-muted-foreground">
         skaffold reads this file on every run, so builds are pushed to this registry and deployed to {namespace}
         {" "}through its own kube-context, whichever context is current. Keep image names in
