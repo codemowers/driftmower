@@ -207,6 +207,7 @@ OIDC_JWKS_URI=                               # defaults to ${OIDC_ISSUER}/jwks
 OIDC_JWKS_BEARER_TOKEN_FILE=                 # bearer token for the key set, e.g. the mounted SA token when the
                                              # issuer is a kube-apiserver with --anonymous-auth=false
 MCP_AUDIENCE=https://mcp          # verified strictly as `aud`
+MCP_ALLOWED_CLIENT_IDS=                      # comma-separated client ids (`azp`/`client_id`) to accept; empty = any
 MCP_PUBLIC_URL=https://mcp.ee-lte-1.codemowers.io
 MCP_AUTH_ENABLED=true                        # false only for a server no one can reach
 
@@ -482,6 +483,14 @@ upstream responses at 4 MiB. Prometheus ranges allow at most 11,000 step interva
 (`https://driftmower-api`). Strict audience checking is what stops an ordinary
 browser session token from opening this server, so the two are deliberately
 different resource indicators.
+
+`aud` says which server a token is for, not which client obtained it. An
+authorization server that mints a token for whatever `resource` a client names
+will issue one for this server to any of its registered clients, so the owner
+of an unrelated client can collect the tokens of users who sign in to it. Set
+`MCP_ALLOWED_CLIENT_IDS` to the clients that legitimately call this server (the
+MCP OAuth client and the web UI's) to reject the rest, and restrict resources
+per client at the authorization server where it supports that.
 
 With `DRIFTMOWER_MCP_TRANSPORT=http` and `MCP_AUTH_ENABLED` unset (default
 `true`), the server refuses to start without `OIDC_ISSUER`. That is intentional:

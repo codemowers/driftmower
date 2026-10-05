@@ -30,7 +30,8 @@
     "jwksUri": "OIDC_JWKS_URI",
     "audience": "MCP_AUDIENCE",
     "namespacesClaim": "MCP_NAMESPACES_CLAIM",
-    "jwksBearerTokenFile": "OIDC_JWKS_BEARER_TOKEN_FILE"
+    "jwksBearerTokenFile": "OIDC_JWKS_BEARER_TOKEN_FILE",
+    "allowedClientIds": "MCP_ALLOWED_CLIENT_IDS"
   },
   "backend": {
     "enabled": {

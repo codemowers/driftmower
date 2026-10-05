@@ -26,6 +26,12 @@ export interface BearerAuthConfig {
   jwksBearerTokenFile?: string | null
   // See AccessTokenVerificationOptions.identityClaims.
   identityClaims?: { username: string; groups: string }
+  // Client ids (the token's `azp`, else `client_id`) whose tokens are
+  // accepted. `aud` alone does not identify the client: an authorization
+  // server that mints for any requested resource will put this server's
+  // resource in a token for any of its clients, including one whose owner
+  // collects the tokens of users who sign in to it. Empty accepts any client.
+  allowedClientIds?: string[]
 }
 
 export interface AuthorizedCall {
@@ -88,6 +94,17 @@ export function createBearerAuthenticator(
           namespacesClaim: config.namespacesClaim,
           identityClaims: config.identityClaims
         })
+
+        const allowedClientIds = config.allowedClientIds ?? []
+
+        if (allowedClientIds.length > 0 && !allowedClientIds.includes(readClientId(payload))) {
+          return {
+            ok: false,
+            status: 401,
+            error: 'invalid_token',
+            description: 'The token was issued to a client this server does not accept'
+          }
+        }
 
         return {
           ok: true,

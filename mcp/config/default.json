@@ -18,7 +18,8 @@
     "jwksUri": "",
     "audience": "",
     "namespacesClaim": "codemowers.io/namespaces",
-    "jwksBearerTokenFile": ""
+    "jwksBearerTokenFile": "",
+    "allowedClientIds": ""
   },
   "backend": {
     "enabled": true,
