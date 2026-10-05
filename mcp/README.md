@@ -346,6 +346,11 @@ KUBERNETES_USERNAME_PREFIX=${OIDC_ISSUER}#   # '' when the username claim is ema
 KUBERNETES_GROUPS_PREFIX=
 KUBERNETES_TIMEOUT_MS=10000
 OBSERVABILITY_TIMEOUT_MS=10000
+OBSERVABILITY_MAX_CONCURRENT_REQUESTS=8          # Prometheus/Loki requests in flight, all callers
+OBSERVABILITY_MAX_QUEUED_REQUESTS=32             # requests that may wait for a slot; 0 = none
+OBSERVABILITY_QUERIES_PER_MINUTE=120             # backend requests per caller, also the burst; 0 = off
+OBSERVABILITY_MAX_CONCURRENT_CALLS_PER_CALLER=2  # metrics, logs and volume tool calls in flight
+OBSERVABILITY_CACHE_TTL_MS=15000                 # identical Prometheus queries answered once; 0 = off
 ```
 
 Setting either service URL enables observability. `query_metrics` is registered
@@ -370,6 +375,41 @@ Namespace claims do not grant or bypass access to these tools. Users need
 namespace RoleBindings granting the permissions above; cluster-wide readers and
 admins can query any namespace their RBAC permits, but still name one per call.
 Missing identity, denied/inconclusive reviews, and API failures fail closed.
+
+### Denial-of-service guards on the shared backends
+
+Access reviews keep tenants out of each other's data, but every query still runs
+on the one Prometheus and Loki. All metrics, logs, resource-usage and volume
+tools reach them through one guarded path:
+
+- **Per-caller budget.** A token bucket of `OBSERVABILITY_QUERIES_PER_MINUTE`
+  backend requests, keyed by the caller's Kubernetes username and charged for
+  every request a call makes, so a resource-usage call that fans out to a dozen
+  queries pays for a dozen. A caller may have
+  `OBSERVABILITY_MAX_CONCURRENT_CALLS_PER_CALLER` such calls in flight.
+- **Server ceiling.** At most `OBSERVABILITY_MAX_CONCURRENT_REQUESTS` backend
+  requests in flight. Up to `OBSERVABILITY_MAX_QUEUED_REQUESTS` more may wait,
+  each for at most `OBSERVABILITY_TIMEOUT_MS`.
+- **Fail fast.** Over a budget or a full queue, the call is refused at once with
+  a retry hint. Nothing waits unboundedly behind a slow backend.
+- **One evaluation per identical query.** Identical requests in flight are
+  shared, and successful Prometheus query answers are cached for
+  `OBSERVABILITY_CACHE_TTL_MS`. Resource-usage evaluation times are aligned to
+  the same window, so refreshes within it ask Prometheus the identical query.
+  The access review still runs for every caller before any of this.
+- **Backend timeout.** Each Prometheus query carries Prometheus's own `timeout`,
+  a second under `OBSERVABILITY_TIMEOUT_MS`, so it stops evaluating when this
+  server would stop waiting.
+
+`driftmower_mcp_observability_guard_total{outcome}` counts backend requests
+answered (`ok`), from the cache (`cached`), by joining one in flight (`shared`),
+refused at the ceiling (`busy`) or failed (`error`), and calls refused per
+caller (`rate_limited`, `caller_busy`).
+
+The limits live in this process, so each replica enforces its own share. Pair
+them with Prometheus's `--query.timeout`, `--query.max-samples` and
+`--query.max-concurrency`, which bound every client of Prometheus, not only this
+gateway.
 
 The service account in [observability-rbac.yaml](manifests/templates/observability-rbac.yaml)
 can list capability catalogs, create access reviews, get pod logs and list/watch

@@ -31,6 +31,12 @@ export class ApplicationMetrics {
     labelNames: ['source'] as const,
     registers: [this.registry]
   })
+  readonly observabilityGuard = new Counter({
+    name: 'driftmower_mcp_observability_guard_total',
+    help: 'Observability backend requests by outcome (ok, cached, shared, busy, error) and calls refused per caller (rate_limited, caller_busy).',
+    labelNames: ['outcome'] as const,
+    registers: [this.registry]
+  })
   private readonly requests = new Counter({
     name: 'driftmower_http_requests_total',
     help: 'Completed or aborted HTTP requests.',

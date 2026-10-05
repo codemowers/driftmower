@@ -64,6 +64,20 @@ export interface ObservabilityConfig {
   prometheusUrl: string | null
   lokiUrl: string | null
   requestTimeoutMs: number
+  // Denial-of-service guards for the shared Prometheus and Loki.
+  guards: ObservabilityGuardConfig
+}
+
+export interface ObservabilityGuardConfig {
+  // Backend requests in flight across all callers, and how many may queue.
+  maxConcurrentRequests: number
+  maxQueuedRequests: number
+  // Backend requests per caller per minute (also the burst); 0 = unlimited.
+  queriesPerMinute: number
+  // Metrics and logs tool calls one caller may have in flight.
+  maxConcurrentCallsPerCaller: number
+  // Identical Prometheus queries answered once in this window; 0 = off.
+  cacheTtlMs: number
 }
 
 export interface TenancyConfig {
@@ -308,7 +322,29 @@ function readObservabilityConfig(source: ConfigSource, oidc: OidcConfig | null):
     requestTimeoutMs: readInteger(
       source.get<unknown>('observability.requestTimeoutMs'),
       'OBSERVABILITY_TIMEOUT_MS'
-    )
+    ),
+    guards: {
+      maxConcurrentRequests: readInteger(
+        source.get<unknown>('observability.guards.maxConcurrentRequests'),
+        'OBSERVABILITY_MAX_CONCURRENT_REQUESTS'
+      ),
+      maxQueuedRequests: readNonNegativeInteger(
+        source.get<unknown>('observability.guards.maxQueuedRequests'),
+        'OBSERVABILITY_MAX_QUEUED_REQUESTS'
+      ),
+      queriesPerMinute: readNonNegativeInteger(
+        source.get<unknown>('observability.guards.queriesPerMinute'),
+        'OBSERVABILITY_QUERIES_PER_MINUTE'
+      ),
+      maxConcurrentCallsPerCaller: readInteger(
+        source.get<unknown>('observability.guards.maxConcurrentCallsPerCaller'),
+        'OBSERVABILITY_MAX_CONCURRENT_CALLS_PER_CALLER'
+      ),
+      cacheTtlMs: readNonNegativeInteger(
+        source.get<unknown>('observability.guards.cacheTtlMs'),
+        'OBSERVABILITY_CACHE_TTL_MS'
+      )
+    }
   }
 }
 
