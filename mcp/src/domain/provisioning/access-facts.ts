@@ -116,7 +116,8 @@ export function summariseMatrix(matrix: AccessMatrix, targets: ProvisionTarget[]
 export function composeCreateVerdict(
   rbac: Judgement,
   denials: Denial[],
-  what: string
+  what: string,
+  constraints: Denial[] = []
 ): { verdict: Verdict; reason: string } {
   if (denials.length > 0) {
     const denial = denials[0]
@@ -136,16 +137,30 @@ export function composeCreateVerdict(
     case 'yes':
       return {
         verdict: 'yes',
-        reason: `Kubernetes RBAC allows creating ${what}, and no enforced admission policy governs it.`
+        reason:
+          constraints.length > 0
+            ? `Kubernetes RBAC allows creating ${what}, and no enforced admission policy forbids it. ${constraintSentence(constraints)}`
+            : `Kubernetes RBAC allows creating ${what}, and no enforced admission policy governs it.`
       }
     case 'no':
       return { verdict: 'no', reason: rbac.reason ?? `Kubernetes RBAC denies creating ${what}.` }
     default:
       return {
         verdict: 'unknown',
-        reason: `${rbac.reason ?? 'The access review could not be evaluated'}. Run \`kubectl auth can-i create ${what}\` to check.`
+        reason:
+          `${rbac.reason ?? 'The access review could not be evaluated'}. Run \`kubectl auth can-i create ${what}\` to check.` +
+          (constraints.length > 0 ? ` ${constraintSentence(constraints)}` : '')
       }
   }
+}
+
+// Requirements the manifest itself must meet, in the policies' own words.
+export function constraintSentence(constraints: Denial[]): string {
+  const rules = constraints.map(
+    constraint => `${constraint.policy}: ${constraint.messages.map(message => message.replace(/\.$/, '')).join('. ')}`
+  )
+
+  return `Enforced admission policies still check the manifest (${rules.join('; ')}).`
 }
 
 // The verdict for an offering in a namespace: every resource its sample would
@@ -154,7 +169,8 @@ export function mayCreateVerdict(
   profile: AccessProfile | null,
   target: ProvisionTarget | null,
   denials: Denial[],
-  what: string
+  what: string,
+  constraints: Denial[] = []
 ): { verdict: Verdict; reason: string } {
   if (!target) return { verdict: 'unknown', reason: 'No offering selected yet, so nothing has been checked.' }
 
@@ -193,5 +209,5 @@ export function mayCreateVerdict(
           }
         : { verdict: 'yes', reason: null }
 
-  return composeCreateVerdict(rbac, denials, what)
+  return composeCreateVerdict(rbac, denials, what, constraints)
 }

@@ -2,8 +2,8 @@ import type { AccessChecker } from '../clients/access-check.js'
 import type { KubernetesIdentity } from '../clients/observability-kubernetes.js'
 import type { ClusterFacts, ProvisioningFacts } from '../clients/provisioning-facts/index.js'
 import { mapWithConcurrency } from '../clients/concurrency.js'
-import { composeCreateVerdict, type Verdict } from '../domain/provisioning/access-facts.js'
-import { denialsFor, type Denial } from '../domain/provisioning/admission-facts.js'
+import { composeCreateVerdict, constraintSentence, type Verdict } from '../domain/provisioning/access-facts.js'
+import { admissionFor, type Denial } from '../domain/provisioning/admission-facts.js'
 import { mutationsOf } from '../domain/provisioning/mutation-facts.js'
 import { OFFERINGS_BY_ID } from '../domain/provisioning/catalog/offerings.js'
 import { hostRuleFor, parseCustomDomains, VERIFIED_DOMAINS_ANNOTATION } from '../domain/provisioning/ingress-facts.js'
@@ -84,6 +84,9 @@ export interface AccessCheck {
   reason: string
   rbac: { verdict: Verdict; reason: string | null }
   admission: Denial[]
+  // Enforced policies that only shape the object: the operation is allowed if
+  // the manifest meets them.
+  admissionConstraints: Denial[]
   // Mutating policies that rewrite the object on CREATE or UPDATE, with what
   // each says it sets and requires.
   admissionDefaults: AdmissionDefault[]
@@ -267,16 +270,16 @@ export class ProvisioningService {
               })
             ).labels
           : {}
-      const admission =
+      const { denials: admission, constraints: admissionConstraints } =
         operation === 'CREATE' || operation === 'UPDATE' || operation === 'DELETE'
-          ? denialsFor(cluster.admission, {
+          ? admissionFor(cluster.admission, {
               group: input.group,
               resource: input.resource,
               operation,
               namespaceLabels: labels,
               callerGroups: identity?.groups
             })
-          : []
+          : { denials: [], constraints: [] }
       const admissionDefaults =
         operation === 'CREATE' || operation === 'UPDATE'
           ? mutationsOf(cluster.mutations, {
@@ -293,6 +296,7 @@ export class ProvisioningService {
           reason: `The call carried no verified caller, so permission was not checked. Run \`kubectl auth can-i ${input.verb} ${what}\`.`,
           rbac: { verdict: 'unknown', reason: 'no verified caller' },
           admission,
+          admissionConstraints,
           admissionDefaults,
           identity: null
         }
@@ -308,14 +312,19 @@ export class ProvisioningService {
       })
       const composed =
         operation === 'CREATE'
-          ? composeCreateVerdict(rbac, admission, what)
+          ? composeCreateVerdict(rbac, admission, what, admissionConstraints)
           : admission.length > 0
             ? {
                 verdict: 'no' as const,
                 reason: `An enforced admission policy (${admission[0].policy}) governs ${input.verb} on ${what}: ${admission[0].messages.join('. ')}`
               }
             : rbac.verdict === 'yes'
-              ? { verdict: 'yes' as const, reason: `Kubernetes RBAC allows ${input.verb} on ${what}.` }
+              ? {
+                  verdict: 'yes' as const,
+                  reason:
+                    `Kubernetes RBAC allows ${input.verb} on ${what}.` +
+                    (admissionConstraints.length > 0 ? ` ${constraintSentence(admissionConstraints)}` : '')
+                }
               : { verdict: rbac.verdict, reason: rbac.reason ?? 'The access review could not be evaluated' }
 
       return {
@@ -324,6 +333,7 @@ export class ProvisioningService {
         reason: composed.reason,
         rbac,
         admission,
+        admissionConstraints,
         admissionDefaults,
         identity
       }
@@ -375,13 +385,18 @@ function hostRuleFrom(
   identity: KubernetesIdentity | null
 ): HostRule {
   const suffix = cluster.ingress.domainSuffix
-  const guard = denialsFor(cluster.admission, {
+  // The host guard shapes Ingresses rather than forbidding them, so whichever
+  // way its effect reads, it is the policy the host rule comes from.
+  const ingressAdmission = admissionFor(cluster.admission, {
     group: 'networking.k8s.io',
     resource: 'ingresses',
     operation: 'CREATE',
     namespaceLabels: labels,
     callerGroups: identity?.groups
-  })[0]
+  })
+  const guard =
+    ingressAdmission.denials[0] ??
+    ingressAdmission.constraints.find(constraint => constraint.messages.some(message => /host/i.test(message)))
   // The message about hosts, not one about some other resource the guard
   // also covers.
   const hostMessage = guard?.messages.find(m => /host/i.test(m)) ?? guard?.messages[0] ?? null

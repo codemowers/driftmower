@@ -237,6 +237,7 @@ export const checkAccessOutputShape = {
   reason: z.string().optional(),
   rbac: z.object({ verdict: verdictSchema, reason: z.string().nullable() }).optional(),
   admission: z.array(z.object({ policy: z.string(), messages: z.array(z.string()) })).optional(),
+  admissionConstraints: z.array(z.object({ policy: z.string(), messages: z.array(z.string()) })).optional(),
   admissionDefaults: z.array(admissionDefaultSchema).optional(),
   identity: z
     .object({ user: z.string(), groups: z.array(z.string()) })

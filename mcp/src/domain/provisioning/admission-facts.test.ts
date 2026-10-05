@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest'
 
 import {
+  admissionFor,
   denialsFor,
+  effectOf,
   selectorMatches,
   tenantLabelKeyFor,
   toAdmissionFact,
@@ -404,7 +406,7 @@ it('a policy annotated as constraining fields is not reported as a denial', () =
   expect(denialsFor(facts, check)).toEqual([])
 })
 
-it('without the annotation a policy still denies, so nothing loosens by default', () => {
+it('without the annotation, a validation that reads no object field still denies', () => {
   const unannotated = { ...S3_GUARD, metadata: { name: 'sandbox-s3-guard' } }
   const facts = toAdmissionFacts([unannotated], [bindingFor('sandbox-s3-guard')])
 
@@ -609,4 +611,136 @@ it('reads namespace lists and exclusions from matchConditions', () => {
   expect(notIn!.namespaceNames).toEqual({ only: null, except: ['kube-system', 'argocd'] })
   expect(ne!.namespaceNames).toEqual({ only: null, except: ['kube-system'] })
   expect(other!.namespaceNames).toEqual({ only: null, except: [] })
+})
+
+// Shapes taken from the stateful-workload policies on aws-us-west-2-bravo.
+function validating(
+  name: string,
+  validations: { expression: string; message?: string }[],
+  extra: Partial<NonNullable<RawAdmissionPolicy['spec']>> = {},
+  annotations?: Record<string, string>
+): RawAdmissionPolicy {
+  return {
+    metadata: { name, annotations },
+    spec: {
+      matchConstraints: {
+        resourceRules: [
+          {
+            apiGroups: ['postgresql.cnpg.io'],
+            apiVersions: ['v1'],
+            operations: ['CREATE', 'UPDATE'],
+            resources: ['clusters']
+          }
+        ]
+      },
+      validations,
+      ...extra
+    }
+  }
+}
+
+const CNPG_REPLICAS = validating('cnpg-replicas', [
+  {
+    expression:
+      '!has(object.spec) || !has(object.spec.instances) || (object.spec.instances >= 1 && object.spec.instances <= 2)',
+    message: 'spec.instances must be between 1 and 2.'
+  }
+])
+
+it('reads a policy whose every validation inspects the object as constraining it', () => {
+  expect(effectOf(CNPG_REPLICAS)).toBe('constrains')
+  expect(
+    effectOf(
+      validating('cnpg-managed-images', [
+        {
+          expression:
+            '!(has(dyn(object).spec) && has(dyn(object).spec.imagePullPolicy)) || dyn(object).spec.imagePullPolicy == "IfNotPresent"'
+        },
+        { expression: 'oldObject == null || object.spec.imageName == oldObject.spec.imageName' }
+      ])
+    )
+  ).toBe('constrains')
+})
+
+it('follows variables, including chains of them, to the object', () => {
+  const viaVariables = validating('via-variables', [{ expression: 'variables.ok' }], {
+    variables: [
+      { name: 'spec', expression: 'object.spec' },
+      { name: 'ok', expression: '!has(variables.spec.instances) || variables.spec.instances <= 2' }
+    ]
+  })
+  const cyclic = validating('cyclic', [{ expression: 'variables.a' }], {
+    variables: [
+      { name: 'a', expression: 'variables.b' },
+      { name: 'b', expression: 'variables.a' }
+    ]
+  })
+
+  expect(effectOf(viaVariables)).toBe('constrains')
+  expect(effectOf(cyclic)).toBe('denies')
+})
+
+it('keeps denying when a validation never looks at the object', () => {
+  // legacy-stateful-resource-creation: the operation itself is refused.
+  expect(effectOf(validating('legacy', [{ expression: 'false' }]))).toBe('denies')
+  // default-namespace-block: only the request's namespace decides.
+  expect(effectOf(validating('default-block', [{ expression: 'request.namespace != "default"' }]))).toBe(
+    'denies'
+  )
+  // Mixed: one rule can be met, the other cannot.
+  expect(
+    effectOf(
+      validating('mixed', [
+        { expression: 'object.spec.instances <= 2' },
+        { expression: "has(namespaceObject.metadata.labels['codemowers.io/sandbox'])" }
+      ])
+    )
+  ).toBe('denies')
+  expect(effectOf(validating('empty', []))).toBe('denies')
+  // A name that merely contains the word is not a reference to it.
+  expect(
+    effectOf(validating('lookalike', [{ expression: 'request.userInfo.username != "objectstore"' }]))
+  ).toBe('denies')
+})
+
+it('the annotation overrides the inference in both directions', () => {
+  expect(
+    effectOf(
+      validating(
+        'forced',
+        CNPG_REPLICAS.spec!.validations as never,
+        {},
+        { 'codemowers.io/admission-effect': 'denies' }
+      )
+    )
+  ).toBe('denies')
+  expect(
+    effectOf(
+      validating(
+        'loosened',
+        [{ expression: 'false' }],
+        {},
+        { 'codemowers.io/admission-effect': 'constrains' }
+      )
+    )
+  ).toBe('constrains')
+})
+
+it('reports a constraining policy as a requirement rather than a denial', () => {
+  const facts = toAdmissionFacts(
+    [CNPG_REPLICAS, validating('legacy', [{ expression: 'false', message: 'Legacy APIs cannot be used.' }])],
+    [bindingFor('cnpg-replicas'), bindingFor('legacy')]
+  )
+  const check = {
+    group: 'postgresql.cnpg.io',
+    resource: 'clusters',
+    operation: 'CREATE' as const,
+    namespaceLabels: SANDBOX_SCOPE
+  }
+
+  expect(admissionFor(facts, check)).toEqual({
+    denials: [{ policy: 'legacy', messages: ['Legacy APIs cannot be used.'] }],
+    constraints: [{ policy: 'cnpg-replicas', messages: ['spec.instances must be between 1 and 2.'] }]
+  })
+  expect(denialsFor(facts, check).map(denial => denial.policy)).toEqual(['legacy'])
 })

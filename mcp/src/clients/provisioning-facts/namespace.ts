@@ -3,7 +3,7 @@ import {
   summariseMatrix,
   type ProvisionTarget
 } from '../../domain/provisioning/access-facts.js'
-import { denialsFor, type AdmissionPolicyFact } from '../../domain/provisioning/admission-facts.js'
+import { admissionFor, type AdmissionPolicyFact } from '../../domain/provisioning/admission-facts.js'
 import {
   computeHeadroom,
   containerDefaults,
@@ -136,18 +136,18 @@ export async function loadNamespaceFacts(
       : target
         ? `the ${target.id} resource`
         : 'this'
-    const denials =
+    const { denials, constraints } =
       target && primary?.resource
-        ? denialsFor(input.admissionFacts, {
+        ? admissionFor(input.admissionFacts, {
             group: primary.group,
             resource: primary.resource,
             operation: 'CREATE',
             namespaceLabels: labels,
             callerGroups: input.identity?.groups
           })
-        : []
+        : { denials: [], constraints: [] }
 
-    return mayCreateVerdict(access, target, denials, what)
+    return mayCreateVerdict(access, target, denials, what, constraints)
   }
 
   const permission = verdictFor(input.target)

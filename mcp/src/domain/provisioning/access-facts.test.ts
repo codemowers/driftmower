@@ -112,3 +112,29 @@ it('an offering the cluster does not serve is unknown for that reason, not for a
     reason: 'not served'
   })
 })
+
+it('an allowing verdict carries the constraints the manifest must meet', () => {
+  const constraints = [{ policy: 'cnpg-replicas', messages: ['spec.instances must be between 1 and 2.'] }]
+  const allowed = composeCreateVerdict(
+    { verdict: 'yes', reason: null },
+    [],
+    'clusters.postgresql.cnpg.io',
+    constraints
+  )
+
+  expect(allowed.verdict).toBe('yes')
+  expect(allowed.reason).toContain('no enforced admission policy forbids it')
+  expect(allowed.reason).toContain('cnpg-replicas: spec.instances must be between 1 and 2')
+  expect(
+    composeCreateVerdict({ verdict: 'unknown', reason: 'webhook down' }, [], 'x', constraints).reason
+  ).toContain('cnpg-replicas')
+  // A denial still wins over constraints.
+  expect(
+    composeCreateVerdict(
+      { verdict: 'yes', reason: null },
+      [{ policy: 'legacy', messages: ['no'] }],
+      'x',
+      constraints
+    ).verdict
+  ).toBe('no')
+})

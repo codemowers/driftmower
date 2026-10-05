@@ -88,11 +88,10 @@ export type AdmissionPolicyFact = {
   exemptGroups: string[]
   // The ConfigMap a parameterised policy reads, so the caller knows to fetch it.
   paramRef: { name: string; namespace: string | null } | null
-  // "constrains" when the policy's author says so through the annotation
-  // below: it shapes fields of an object you may create (a name prefix, a size
-  // cap) rather than forbidding the operation. Since we do not evaluate CEL,
-  // only the author can tell us that; without it such a guard would read as
-  // "you cannot create this at all".
+  // "constrains" when the policy shapes fields of an object you may create (a
+  // name prefix, a size cap, an image source) rather than forbidding the
+  // operation. The author can say so either way through the annotation below;
+  // otherwise it is read from the CEL's shape (see effectOf).
   effect: 'denies' | 'constrains'
   // Namespace annotation keys the policy's CEL reads, e.g. a list of custom
   // domains the platform wrote onto the namespace. Noticed, not evaluated.
@@ -102,8 +101,52 @@ export type AdmissionPolicyFact = {
   anchorsOnNamespace: boolean
 }
 
-// Optional, set by a policy author. Harmless when absent.
+// Optional, set by a policy author: `constrains` or `denies`. Overrides the
+// inference in effectOf.
 export const EFFECT_ANNOTATION = 'codemowers.io/admission-effect'
+
+const OBJECT_REF = /\b(?:object|oldObject)\b/
+const VARIABLE_REF = /\bvariables\.(\w+)/g
+
+// Whether an expression reads the object under review, directly or through
+// the policy's variables.
+function readsObject(expression: string, variables: Map<string, string>, seen: Set<string> = new Set()): boolean {
+  if (OBJECT_REF.test(expression)) return true
+
+  for (const match of expression.matchAll(VARIABLE_REF)) {
+    const name = match[1]
+    const body = variables.get(name)
+
+    if (body === undefined || seen.has(name)) continue
+
+    seen.add(name)
+
+    if (readsObject(body, variables, seen)) return true
+  }
+
+  return false
+}
+
+// Still not evaluating the CEL, only reading its shape. A validation that
+// never looks at the object (`false`, or a test of the namespace or caller
+// alone) decides whether the operation may happen at all. One that reads the
+// object can be met by writing the object differently: a replica cap, an image
+// source, a name prefix. A policy constrains only when every validation is of
+// the second kind; anything else keeps denying, the conservative direction.
+export function effectOf(policy: RawAdmissionPolicy): 'denies' | 'constrains' {
+  const annotated = policy.metadata?.annotations?.[EFFECT_ANNOTATION]
+
+  if (annotated === 'constrains' || annotated === 'denies') return annotated
+
+  const validations = policy.spec?.validations ?? []
+  const variables = new Map(
+    (policy.spec?.variables ?? []).flatMap(v => (v.name ? [[v.name, v.expression ?? ''] as const] : []))
+  )
+
+  return validations.length > 0 && validations.every(v => readsObject(v.expression ?? '', variables))
+    ? 'constrains'
+    : 'denies'
+}
 
 function normaliseOperations(rule: RawResourceRule): string[] {
   const ops = rule.operations ?? []
@@ -284,7 +327,7 @@ export function toAdmissionFacts(
       namespaceNames: namespaceNamesOf(policy),
       exemptGroups: exemptGroupsOf(policy),
       paramRef: paramName ? { name: paramName, namespace: paramNamespace } : null,
-      effect: policy.metadata?.annotations?.[EFFECT_ANNOTATION] === 'constrains' ? 'constrains' : 'denies',
+      effect: effectOf(policy),
       namespaceAnnotationKeys: namespaceAnnotationKeysOf(policy),
       anchorsOnNamespace: anchorsOnNamespace(policy)
     })
@@ -389,18 +432,20 @@ export function guardMatches(
 }
 
 // Which enforced policies stand between the caller and this operation. Because
-// the CEL is not evaluated, a hit means "an admission policy governs this and
+// the CEL is not evaluated, a denial means "an admission policy governs this and
 // may reject it", never "this is definitely allowed" — so callers must treat a
-// hit as a reason to stop, and a miss as no information either way.
-export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): Denial[] {
+// denial as a reason to stop, and a miss as no information either way.
+// Constraints govern what the object looks like, not whether it may exist:
+// they are requirements to meet, reported beside an allowing verdict.
+export function admissionFor(
+  facts: AdmissionPolicyFact[],
+  check: DenialCheck
+): { denials: Denial[]; constraints: Denial[] } {
   const denials: Denial[] = []
+  const constraints: Denial[] = []
 
   for (const fact of facts) {
     if (!fact.enforced) continue
-
-    // It governs what the object looks like, not whether it may exist; the
-    // offering's sample is where those requirements are met.
-    if (fact.effect === 'constrains') continue
 
     if (!scopeApplies(fact, check.namespaceLabels)) continue
 
@@ -410,7 +455,9 @@ export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): De
     // such a caller they are blocked would be wrong.
     if (fact.exemptGroups.some(group => check.callerGroups?.includes(group))) continue
 
-    denials.push({
+    const bucket = fact.effect === 'constrains' ? constraints : denials
+
+    bucket.push({
       policy: fact.name,
       messages:
         fact.messages.length > 0
@@ -419,7 +466,11 @@ export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): De
     })
   }
 
-  return denials
+  return { denials, constraints }
+}
+
+export function denialsFor(facts: AdmissionPolicyFact[], check: DenialCheck): Denial[] {
+  return admissionFor(facts, check).denials
 }
 
 // The namespace label an enforced guard keys its tenancy on, discovered from
