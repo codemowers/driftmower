@@ -226,7 +226,7 @@ function toCard(
     id: spec.id,
     resources: [
       served
-        ? { group: spec.group, resource: served.plural }
+        ? { group: spec.group, resource: served.plural, version: served.version }
         : {
             group: spec.group,
             resource: null,

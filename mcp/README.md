@@ -1157,6 +1157,12 @@ test of the namespace or caller alone) denies. The annotation
 inference. Constraints don't change a yes; their messages are appended to
 the reason.
 
+A policy whose `matchPolicy` is `Exact` and whose rules list API versions
+governs only those versions, so the offering's verdict is checked at the
+version the cluster negotiated for its sample. Under the default
+`Equivalent`, Kubernetes converts other versions into a listed one, so the
+listed versions don't narrow anything.
+
 Namespaces where the caller may not list pods come back in `withheld`, and
 an inconclusive review is reported under `degraded`; neither reads as empty.
 

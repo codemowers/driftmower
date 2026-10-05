@@ -141,6 +141,7 @@ export async function loadNamespaceFacts(
         ? admissionFor(input.admissionFacts, {
             group: primary.group,
             resource: primary.resource,
+            version: primary.version,
             operation: 'CREATE',
             namespaceLabels: labels,
             callerGroups: input.identity?.groups

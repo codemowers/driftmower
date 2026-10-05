@@ -22,7 +22,7 @@ export type RawAdmissionPolicy = {
   spec?: {
     failurePolicy?: string
     paramKind?: { apiVersion?: string; kind?: string }
-    matchConstraints?: { resourceRules?: RawResourceRule[] }
+    matchConstraints?: { resourceRules?: RawResourceRule[]; matchPolicy?: string }
     matchConditions?: { name?: string; expression?: string }[]
     variables?: { name?: string; expression?: string }[]
     validations?: { expression?: string; message?: string; messageExpression?: string; reason?: string }[]
@@ -50,6 +50,10 @@ export type GuardedOperation = {
   group: string
   resource: string
   operations: string[]
+  // The API versions a request must use to be matched. Absent means any: with
+  // the default matchPolicy (Equivalent) Kubernetes converts a request into a
+  // listed version and matches it, so only Exact narrows by version.
+  versions?: string[]
 }
 
 export type AdmissionPolicyFact = {
@@ -154,15 +158,23 @@ function normaliseOperations(rule: RawResourceRule): string[] {
   return ops.includes('*') ? ['CREATE', 'UPDATE', 'DELETE'] : ops
 }
 
+export function exactVersionsOf(rule: RawResourceRule, matchPolicy: string | undefined): string[] | undefined {
+  const versions = rule.apiVersions ?? []
+
+  return matchPolicy === 'Exact' && versions.length > 0 && !versions.includes('*') ? versions : undefined
+}
+
 function guardsOf(policy: RawAdmissionPolicy): GuardedOperation[] {
   const guarded: GuardedOperation[] = []
+  const matchPolicy = policy.spec?.matchConstraints?.matchPolicy
 
   for (const rule of policy.spec?.matchConstraints?.resourceRules ?? []) {
     const operations = normaliseOperations(rule)
+    const versions = exactVersionsOf(rule, matchPolicy)
 
     for (const group of rule.apiGroups ?? []) {
       for (const resource of rule.resources ?? []) {
-        guarded.push({ group, resource, operations })
+        guarded.push(versions ? { group, resource, operations, versions } : { group, resource, operations })
       }
     }
   }
@@ -340,6 +352,9 @@ export type DenialCheck = {
   group: string
   resource: string
   operation: 'CREATE' | 'UPDATE' | 'DELETE'
+  // The API version the request would use, when known. Without it a policy
+  // confined to some versions is assumed to apply, the conservative reading.
+  version?: string
   // Namespace labels, so a policy scoped to one kind of namespace is not
   // applied to a namespace that is not one.
   namespaceLabels: Record<string, string>
@@ -423,12 +438,13 @@ function scopeApplies(fact: AdmissionPolicyFact, namespaceLabels: Record<string,
 
 export function guardMatches(
   guard: GuardedOperation,
-  check: Pick<DenialCheck, 'group' | 'resource' | 'operation'>
+  check: Pick<DenialCheck, 'group' | 'resource' | 'operation' | 'version'>
 ): boolean {
   const groupMatches = guard.group === '*' || guard.group === check.group
   const resourceMatches = guard.resource === '*' || guard.resource === check.resource
+  const versionMatches = !guard.versions || !check.version || guard.versions.includes(check.version)
 
-  return groupMatches && resourceMatches && guard.operations.includes(check.operation)
+  return groupMatches && resourceMatches && versionMatches && guard.operations.includes(check.operation)
 }
 
 // Which enforced policies stand between the caller and this operation. Because

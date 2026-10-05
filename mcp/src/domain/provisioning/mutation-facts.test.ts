@@ -66,3 +66,26 @@ it('marks a policy whose every binding selects namespaces as scoped', () => {
 
   expect(defaultsFor(facts, target)[0].namespaceScoped).toBe(true)
 })
+
+it('an Exact mutation confined to another API version does not rewrite the sample', () => {
+  const legacyOnly = {
+    metadata: { name: 'legacy-defaults' },
+    description: 'Defaults something on the old API only.',
+    spec: {
+      matchConstraints: {
+        matchPolicy: 'Exact',
+        resourceRules: [
+          { apiGroups: ['apps.emqx.io'], apiVersions: ['v2alpha1'], operations: ['CREATE'], resources: ['emqxes'] }
+        ]
+      }
+    }
+  }
+  const facts = toMutationFacts([legacyOnly], [{ spec: { policyName: 'legacy-defaults' } }])
+  const emqx = (version: string) => ({
+    id: 'emqx' as const,
+    resources: [{ group: 'apps.emqx.io', resource: 'emqxes', version }]
+  })
+
+  expect(defaultsFor(facts, emqx('v2beta1'))).toEqual([])
+  expect(defaultsFor(facts, emqx('v2alpha1')).map(entry => entry.policy)).toEqual(['legacy-defaults'])
+})
