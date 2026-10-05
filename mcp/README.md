@@ -1081,12 +1081,14 @@ A registry is discovered, not assumed: a Deployment in the namespace that runs
 Zot, a Service selecting its pods and an Ingress publishing that Service. For
 each, the tool suggests a `skaffold.env` to save next to `skaffold.yaml`, so a
 Skaffold build is pushed there and deployed through the namespace-qualified
-kube context, whichever context is current:
+kube context, whichever context is current. `SKAFFOLD_CLEANUP=false` keeps the
+deployment running after `skaffold dev` exits:
 
 ```
 SKAFFOLD_KUBE_CONTEXT=<cluster>/<namespace>
 SKAFFOLD_DEFAULT_REPO=<registry host>
 SKAFFOLD_NAMESPACE=<namespace>
+SKAFFOLD_CLEANUP=false
 ```
 
 Services and Ingresses are read only in namespaces where Zot runs.

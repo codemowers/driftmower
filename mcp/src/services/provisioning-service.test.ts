@@ -252,7 +252,8 @@ describe('ProvisioningService', () => {
     const env = [
       'SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/mine',
       'SKAFFOLD_DEFAULT_REPO=registry.mine.ee-lte-1.codemowers.io',
-      'SKAFFOLD_NAMESPACE=mine'
+      'SKAFFOLD_NAMESPACE=mine',
+      'SKAFFOLD_CLEANUP=false'
     ].join('\n')
 
     fixture.fact.registries = [

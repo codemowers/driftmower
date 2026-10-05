@@ -100,7 +100,8 @@ describe('skaffoldEnvFor', () => {
       [
         'SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/quake3',
         'SKAFFOLD_DEFAULT_REPO=registry.quake3.ee-lte-1.codemowers.io',
-        'SKAFFOLD_NAMESPACE=quake3'
+        'SKAFFOLD_NAMESPACE=quake3',
+        'SKAFFOLD_CLEANUP=false'
       ].join('\n')
     )
   })
