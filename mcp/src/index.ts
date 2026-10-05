@@ -107,6 +107,7 @@ async function main(): Promise<void> {
             publicUrl: appConfig.publicUrl,
             namespacesClaim: appConfig.oidc.namespacesClaim,
             jwksBearerTokenFile: appConfig.oidc.jwksBearerTokenFile,
+            allowedClientIds: appConfig.oidc.allowedClientIds,
             identityClaims: {
               username: appConfig.kubernetes.usernameClaim,
               groups: appConfig.kubernetes.groupsClaim

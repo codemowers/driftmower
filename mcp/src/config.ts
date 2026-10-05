@@ -14,6 +14,8 @@ export interface OidcConfig {
   namespacesClaim: string
   // Bearer token file for fetching the key set; null fetches anonymously.
   jwksBearerTokenFile: string | null
+  // Client ids whose tokens this server accepts; empty accepts any client.
+  allowedClientIds: string[]
 }
 
 export interface ProvisioningConfig {
@@ -443,7 +445,11 @@ function readOidcConfig(source: ConfigSource): OidcConfig {
     jwksUri: readOptionalString(source.get<string>('oidc.jwksUri')) ?? `${issuer.replace(/\/+$/, '')}/jwks`,
     audience: readOptionalString(source.get<string>('oidc.audience')),
     namespacesClaim: readString(source.get<string>('oidc.namespacesClaim'), 'namespacesClaim'),
-    jwksBearerTokenFile: readOptionalString(source.get<unknown>('oidc.jwksBearerTokenFile'))
+    jwksBearerTokenFile: readOptionalString(source.get<unknown>('oidc.jwksBearerTokenFile')),
+    allowedClientIds: (readOptionalString(source.get<unknown>('oidc.allowedClientIds')) ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
   }
 }
 

@@ -19,8 +19,8 @@ beforeAll(async () => {
   keySet = { keys: [{ ...(await exportJWK(pair.publicKey)), kid: keyId, alg: 'RS256' }] }
 })
 
-async function mintToken(audience: string) {
-  return new SignJWT({ groups: [] })
+async function mintToken(audience: string, clientId = 'mcp-client') {
+  return new SignJWT({ groups: [], client_id: clientId })
     .setProtectedHeader({ alg: 'RS256', kid: keyId })
     .setIssuer(ISSUER)
     .setAudience(audience)
@@ -30,9 +30,9 @@ async function mintToken(audience: string) {
     .sign(privateKey)
 }
 
-function authenticator(audience?: string) {
+function authenticator(audience?: string, allowedClientIds?: string[]) {
   return createBearerAuthenticator(
-    { issuer: ISSUER, jwksUri: 'unused', audience, publicUrl: PUBLIC_URL },
+    { issuer: ISSUER, jwksUri: 'unused', audience, publicUrl: PUBLIC_URL, allowedClientIds },
     RESOURCE_PATH,
     createLocalJWKSet(keySet)
   )
@@ -93,5 +93,33 @@ describe('audience', () => {
       .toMatchObject({ ok: true })
     expect(await pinned.authenticate({ authorization: `Bearer ${await mintToken(RESOURCE)}` }))
       .toMatchObject({ ok: false, error: 'invalid_token' })
+  })
+})
+
+describe('allowed clients', () => {
+  // `aud` names this server, not the client: an authorization server minting
+  // for any requested resource issues such a token to any of its clients.
+  it('accepts any client when no list is configured', async () => {
+    const outcome = await authenticator().authenticate({
+      authorization: `Bearer ${await mintToken(RESOURCE, 'someone-elses-app')}`
+    })
+
+    expect(outcome.ok).toBe(true)
+  })
+
+  it('rejects a token issued to an unlisted client even when aud matches', async () => {
+    const outcome = await authenticator(undefined, ['mcp-client']).authenticate({
+      authorization: `Bearer ${await mintToken(RESOURCE, 'someone-elses-app')}`
+    })
+
+    expect(outcome).toMatchObject({ ok: false, status: 401, error: 'invalid_token' })
+  })
+
+  it('accepts a listed client', async () => {
+    const outcome = await authenticator(undefined, ['mcp-client', 'web-ui']).authenticate({
+      authorization: `Bearer ${await mintToken(RESOURCE, 'web-ui')}`
+    })
+
+    expect(outcome.ok).toBe(true)
   })
 })
