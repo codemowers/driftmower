@@ -19,7 +19,11 @@
     },
     "oauthClientId": "MCP_OAUTH_CLIENT_ID",
     "invalidateToken": "MCP_INVALIDATE_TOKEN",
-    "invalidateAllowedSubjects": "MCP_INVALIDATE_ALLOWED_SUBJECTS"
+    "invalidateAllowedSubjects": "MCP_INVALIDATE_ALLOWED_SUBJECTS",
+    "workloadRestartEnabled": {
+      "__name": "MCP_WORKLOAD_RESTART_ENABLED",
+      "__format": "boolean"
+    }
   },
   "oidc": {
     "issuer": "OIDC_ISSUER",
@@ -113,7 +117,11 @@
     "id": "DRIFTMOWER_CLUSTER_ID",
     "apiUrl": "KUBERNETES_PUBLIC_API_URL"
   },
-  "advisory": {
-    "overrideDirectory": "ENGINEERING_ADVISORY_OVERRIDE_DIR"
+  "webUi": {
+    "enabled": {
+      "__name": "MCP_WEB_UI_ENABLED",
+      "__format": "boolean"
+    },
+    "clientId": "MCP_WEB_UI_CLIENT_ID"
   }
 }

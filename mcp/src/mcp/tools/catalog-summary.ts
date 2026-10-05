@@ -184,15 +184,15 @@ export function capabilityCatalogCsv(result: z.infer<z.ZodObject<typeof clusterC
     summary.ingressClasses === null
       ? 'Unavailable'
       : csv(
-          ['name', 'controller', 'default'],
-          summary.ingressClasses.map(item => [item.name, item.controller, item.isDefault])
+          ['name', 'controller'],
+          summary.ingressClasses.map(item => [item.name, item.controller])
         ),
     'Priority classes',
     summary.priorityClasses === null
       ? 'Unavailable'
       : csv(
-          ['name', 'description', 'value', 'default'],
-          summary.priorityClasses.map(item => [item.name, item.description, item.value, item.isDefault])
+          ['name', 'description', 'value'],
+          summary.priorityClasses.map(item => [item.name, item.description, item.value])
         ),
     ...(summary.degraded.length
       ? [

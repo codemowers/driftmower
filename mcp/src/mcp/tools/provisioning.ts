@@ -71,12 +71,12 @@ export function registerProvisioningTools(
     {
       title: 'Describe the provisioning platform',
       description:
-        'Interpreted cluster facts for provisioning: storage classes and what each implies for data, zones and ' +
+        'Use for an initial interpreted overview when planning provisioning or choosing platform capabilities. Returns cluster facts for provisioning: storage classes and what each implies for data, zones and ' +
         'schedulable nodes, priority classes, the published ingress domain and TLS advice, enforced admission ' +
         'policies and the tenant label they scope on, Kyverno policies, the network policy engine and whether ' +
         'the Prometheus operator is present. Everything is discovered from the cluster; an optional component ' +
         'that is absent degrades one fact rather than the answer. Read-only. For raw CRD and catalog listings ' +
-        'use describe_cluster_capabilities.',
+        'use list_custom_resource_definitions, list_ingress_classes, list_cluster_issuers and list_priority_classes.',
       inputSchema: {},
       outputSchema: describeProvisioningPlatformOutputShape,
       annotations: READ_ONLY_ANNOTATIONS
@@ -87,7 +87,10 @@ export function registerProvisioningTools(
       audit(auditLine(DESCRIBE_PROVISIONING_PLATFORM_TOOL_NAME, context, result.status))
 
       return result.status === 'ok'
-        ? toolResult(formatProvisioningPlatform(result), result)
+        ? toolResult(
+            formatProvisioningPlatform(result),
+            z.object(describeProvisioningPlatformOutputShape).parse(result)
+          )
         : toolResult(formatUnavailable(result), result)
     }
   )
@@ -97,7 +100,7 @@ export function registerProvisioningTools(
     {
       title: 'List provisionable offerings',
       description:
-        'Every database, cache, queue and object store this platform can provision, each with whether it is ' +
+        'Use to choose a supported database, cache, queue or object-store offering; supply offering to narrow the catalog and namespace to check creation permissions. Returns each offering with whether it is ' +
         'actually available on this cluster and, when it is not, why, plus the admission defaults that ' +
         'rewrite its resources on create, each with what its policy says it requires. With `namespace`, each offering also ' +
         'carries whether the cluster authorizer lets you create it there, checked as the verified caller for ' +
@@ -132,7 +135,7 @@ export function registerProvisioningTools(
     {
       title: 'Describe namespace readiness',
       description:
-        'For one or more namespaces: quota and remaining headroom, LimitRange defaults, network posture and ' +
+        'Use before provisioning in known namespaces to assess readiness and constraints. Pass only relevant namespaces; add offering for an offering-specific creation check. Returns quota and remaining headroom, LimitRange defaults, network posture and ' +
         'any policies that select on an exact instance name, Pod Security enforcement, the hostnames the ' +
         'namespace may claim, any container registry published from the namespace with the skaffold.env ' +
         'to build against it, and your access there as the cluster authorizer reports it (per resource type ' +
@@ -162,10 +165,10 @@ export function registerProvisioningTools(
     {
       title: 'Check one permission',
       description:
-        'Ask the cluster authorizer, as the verified caller, whether one verb on one resource is allowed: ' +
+        'Use before a specific operation to check authorization; namespace visibility alone is insufficient. Supply API group, plural resource name and verb (plus namespace/name when applicable). Asks the cluster authorizer, as the verified caller, whether the operation is allowed: ' +
         'any group and resource, cluster-scoped or in a namespace, subresources such as pods/log, a named ' +
-        'object. Enforced admission policies that govern the operation are reported alongside and outrank an ' +
-        'RBAC yes for create, update and delete. For create and update it also lists the mutating admission ' +
+        'object. Discovered enforced admission constraints are reported alongside; an ' +
+        'RBAC yes does not guarantee that create, update or delete will pass admission, including conditions this tool cannot evaluate. For create and update it also lists the mutating admission ' +
         'policies that rewrite the object, with what each says it requires, such as a Secret to provision first. ' +
         'Use it for anything outside the offering catalog. Read-only.',
       inputSchema: {

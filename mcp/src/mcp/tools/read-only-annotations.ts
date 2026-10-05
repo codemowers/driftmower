@@ -1,6 +1,5 @@
-// Nothing in this server writes. Every tool reads a Driftmower snapshot or
-// relays driftmower-ui's capability layer; the planners render text for a human
-// to apply, they never apply anything themselves.
+// Discovery, observability and advisory tools are read-only. Optional workload
+// actions declare their own mutating annotations.
 //
 // Shared so the set cannot drift per tool: a client deciding whether to
 // auto-approve a call reads these, and a tool that silently omits them reads as

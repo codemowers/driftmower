@@ -62,7 +62,8 @@ export function registerSearchWorkloadsTool(
     SEARCH_WORKLOADS_TOOL_NAME,
     {
       title: 'Search Driftmower workloads',
-      description: 'Find workloads by name in latest full-cluster Driftmower report snapshots.',
+      description:
+        'Search workload names in the latest backend Driftmower report snapshots. Use for report-backed drift investigation or finding candidates for image-update planning. Results may be stale or differently scoped from this MCP cluster; inspect snapshot scope and freshness. For what runs now and its resource relationships, prefer get_workloads when available.',
       inputSchema: {
         query: z.string().trim().min(1),
         limit: z.number().int().min(1).optional()

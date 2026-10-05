@@ -4,6 +4,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Counter, Gauge, Histogram, Registry } from '@prometheus-io/client'
 
 const routes = new Set([
+  '/ui',
+  '/ui/',
+  '/ui/config',
+  '/ui/callback',
+  '/ui/explorer.js',
   '/',
   '/mcp',
   '/.well-known/oauth-protected-resource',

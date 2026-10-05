@@ -13,7 +13,6 @@ const degradedSchema = z.object({ source: z.string(), status: z.number(), messag
 const storageClassSchema = z.object({
   name: z.string(),
   provisioner: z.string(),
-  isDefault: z.boolean(),
   bindingMode: z.enum(['Immediate', 'WaitForFirstConsumer']),
   allowExpansion: z.boolean(),
   reclaimPolicy: z.enum(['Delete', 'Retain', 'Recycle']),
@@ -159,7 +158,7 @@ const admissionFactSchema = z.object({
 const ingressSchema = z.object({
   domainSuffix: z.string().nullable(),
   domainSuffixSource: z.enum(['guard-params', 'config']).nullable(),
-  classes: z.array(z.object({ name: z.string(), controller: z.string(), isDefault: z.boolean() })),
+  classes: z.array(z.object({ name: z.string(), controller: z.string() })),
   clusterIssuers: z.array(z.string()),
   tlsAdvice: z.string()
 })
@@ -189,9 +188,7 @@ export const describeProvisioningPlatformOutputShape = {
       controlPlaneLabel: z.object({ key: z.string(), value: z.string() }).nullable()
     })
     .optional(),
-  priorityClasses: z
-    .array(z.object({ name: z.string(), value: z.number(), isDefault: z.boolean(), meaning: z.string() }))
-    .optional(),
+  priorityClasses: z.array(z.object({ name: z.string(), value: z.number(), meaning: z.string() })).optional(),
   networkPolicyEngine: z.enum(['cilium', 'native', 'none', 'unknown']).optional(),
   monitoringOperator: z.boolean().optional(),
   ingress: ingressSchema.optional(),

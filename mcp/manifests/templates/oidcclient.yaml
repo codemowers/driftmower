@@ -1,4 +1,4 @@
-# Registers driftmower-mcp with passmower as a PUBLIC client, so an MCP client
+# Registers mcp with passmower as a PUBLIC client, so an MCP client
 # (Claude Code, Cursor, a Claude custom connector) can obtain a token itself via
 # authorization code + PKCE rather than having one pasted into it.
 #
@@ -11,7 +11,7 @@
 #     passmower requires before it will accept a loopback redirect URI at all
 #     (see passmower/examples/native-app-sample-client.yaml).
 #   * The audience differs. This server verifies `aud` strictly against
-#     `https://driftmower-mcp`; a token minted for `https://driftmower-api`
+#     `https://mcp`; a token minted for `https://driftmower-api`
 #     (what every browser session already holds) must not open it.
 #
 # A client requests the audience with the RFC 8707 `resource` parameter.
@@ -41,12 +41,14 @@
 apiVersion: codemowers.cloud/v1
 kind: OIDCClient
 metadata:
-  name: driftmower-mcp
+  name: mcp
   namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    kubernetes.io/description: 'Provides cluster-specific Kubernetes discovery, resource usage and provisioning guidance through MCP, using the authenticated caller’s permissions.'
 spec:
   applicationType: native
   displayName: Driftmower MCP
-  uri: https://driftmower-mcp/
+  uri: https://mcp/
   # One entry per loopback hostname. The port shown is arbitrary and ignored at
   # match time; the hostname and path are not.
   redirectUris:

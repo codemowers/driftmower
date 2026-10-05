@@ -27,7 +27,7 @@ export function registerAccessibleNamespacesTool(
     {
       title: 'List accessible namespaces',
       description:
-        'Namespaces where the cluster authorizer lets the caller list pods, asked through SubjectAccessReview as the verified caller identity. Visibility only: being listed does not imply permission to create or change anything; ask per operation. Unknown entries could not be evaluated and are excluded, not denied.',
+        'Use to choose a namespace when the user has not specified one, or discover the scope visible to this caller. Returns namespaces where Kubernetes authorizes list pods for the verified caller. This establishes visibility only, not create/edit permission; check the intended operation separately. Unknown entries could not be evaluated and are excluded, not denied. Inspect unknown and truncated before treating the listing as complete. If a namespace is already known, query the relevant tool directly; no preliminary namespace listing is required.',
       inputSchema: {},
       outputSchema: accessibleNamespacesSchema,
       annotations: READ_ONLY_ANNOTATIONS

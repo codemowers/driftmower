@@ -6,7 +6,7 @@ metadata:
 spec:
   secretName: driftmower-mcp-tls
   dnsNames:
-    - driftmower-mcp
+    - mcp
   issuerRef:
     name: letsencrypt
     kind: ClusterIssuer

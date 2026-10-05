@@ -142,7 +142,8 @@ describe('HTTP MCP transport', () => {
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
     const html = await response.text()
 
-    expect(html).toContain('Zen of Kubernetes')
+    expect(html).toContain('<h1>Driftmower MCP</h1>')
+    expect(html).toContain('href="https://mcp.codemowers.io"')
     expect(html).toContain('claude mcp add --transport http --scope user')
     expect(html).toContain(`codex mcp add driftmower-127-0-0-1-${address.port} --url`)
     expect(html).toContain(`http://127.0.0.1:${address.port}/mcp`)

@@ -7,16 +7,18 @@ authenticated endpoint:
   driftmower-be API (`search_workloads`, `plan_image_updates`).
 - **Provisioning capabilities** — what a cluster offers a workload and what will
   bite you, discovered from Kubernetes directly, with every permission answer
-  asked of the cluster authorizer as the caller (`describe_cluster_capabilities`,
+  asked of the cluster authorizer as the caller (`list_custom_resource_definitions`,
   `describe_provisioning_platform`, `list_offerings`,
   `describe_namespace_readiness`, `check_access`), also served as JSON at
   `/api/provisioning/capabilities`.
 - **Metrics and logs** — live Prometheus metrics and Loki or Kubernetes pod logs
   (`query_metrics`, `query_logs`), authorized through Kubernetes RBAC.
 
-Everything here is read-only. The server makes non-persistent Kubernetes
-SubjectAccessReview requests to check authorization; it does not change
-workloads, backend data, or repositories.
+Discovery, observability and advisory tools are read-only. The server uses
+non-persistent Kubernetes SubjectAccessReviews for read authorization. Optional
+workload restart and standalone pod termination tools are disabled by default;
+when enabled, Kubernetes authorizes and admits them as the verified caller.
+Backend data and repositories are never changed.
 
 Published behind passmower OIDC. Results are scoped to the caller's own
 namespaces.
@@ -204,8 +206,8 @@ OIDC_ISSUER=https://passmower.example        # matched against the token `iss`
 OIDC_JWKS_URI=                               # defaults to ${OIDC_ISSUER}/jwks
 OIDC_JWKS_BEARER_TOKEN_FILE=                 # bearer token for the key set, e.g. the mounted SA token when the
                                              # issuer is a kube-apiserver with --anonymous-auth=false
-MCP_AUDIENCE=https://driftmower-mcp          # verified strictly as `aud`
-MCP_PUBLIC_URL=https://driftmower-mcp.ee-lte-1.codemowers.io
+MCP_AUDIENCE=https://mcp          # verified strictly as `aud`
+MCP_PUBLIC_URL=https://mcp.ee-lte-1.codemowers.io
 MCP_AUTH_ENABLED=true                        # false only for a server no one can reach
 
 # Provisioning facts are read from Kubernetes directly; optional knobs:
@@ -284,7 +286,7 @@ The same Kubernetes connection also exposes `list_storage_classes` and
 `metadata.annotations["kubernetes.io/description"]` value (`null` when absent).
 `list_storage_classes` also returns structured storage settings from the live
 StorageClass: `provisioner`, `filesystemType`, `parameters`, `reclaimPolicy`,
-`volumeBindingMode`, `allowVolumeExpansion`, `isDefault`, `mountOptions`, and
+`volumeBindingMode`, `allowVolumeExpansion`, `mountOptions`, and
 `allowedTopologies`. Driver parameters preserve knobs such as ZFS `recordsize`,
 `compression`, `dedup`, and `poolname`. `filesystemType` is normalized from
 `csi.storage.k8s.io/fstype`, `fsType`, or `fstype`, in that order; it is `null`
@@ -370,8 +372,11 @@ admins can query any namespace their RBAC permits, but still name one per call.
 Missing identity, denied/inconclusive reviews, and API failures fail closed.
 
 The service account in [observability-rbac.yaml](manifests/templates/observability-rbac.yaml)
-can list capability catalogs, create access reviews and get pod logs. It cannot impersonate users, read
-secrets, or modify workloads. Skaffold renders `manifests/` as a Helm chart and
+can list capability catalogs, create access reviews, get pod logs and list/watch
+workload resources. It cannot impersonate users or modify workloads. The
+inventory requests Secret and ConfigMap metadata only, but Kubernetes RBAC
+cannot constrain a `list`/`watch` grant to metadata: the service account has
+collection read permissions, including Secrets. Skaffold renders `manifests/` as a Helm chart and
 applies it with kubectl; it does not install a Helm release. The selected namespace
 (`--namespace` or the kubeconfig context namespace) is used for every app resource
 and the ClusterRoleBinding's service-account subject. No app namespace is baked
@@ -474,11 +479,10 @@ DRIFTMOWER_MCP_TRANSPORT=http DRIFTMOWER_BE_SERVICE_TOKEN=dm_svc_... \
 HTTP mode exposes:
 
 - MCP endpoint: `http://127.0.0.1:3000/mcp`
-- Public guidance document: `GET /` renders usage instructions, a Zen of Kubernetes,
-  and all bundled engineering advisory Markdown in one page. Advisory references
-  jump to sections within the document.
-  `HEAD /` returns the same headers without a body. MCP authentication still applies
-  to `/mcp`; viewing the guidance requires no sign-in.
+- Public landing page: `GET /` renders connection instructions and cluster information,
+  with a link to [mcp.codemowers.io](https://mcp.codemowers.io) for general software
+  engineering guidance. `HEAD /` returns the same headers without a body. MCP
+  authentication still applies to `/mcp`; viewing the landing page requires no sign-in.
 - Protected-resource metadata (RFC 9728, unauthenticated):
   `http://127.0.0.1:3000/.well-known/oauth-protected-resource/mcp`
 - Liveness: `http://127.0.0.1:3001/healthz`
@@ -487,6 +491,47 @@ HTTP mode exposes:
 - Prometheus metrics: `http://127.0.0.1:3001/metrics`
 
 Port 3000 is published through the Ingress; port 3001 stays cluster-internal.
+
+### Browser MCP Explorer
+
+`/ui` provides OpenID sign-in, accessible namespaces, admission policy catalogs,
+namespace-scoped CRDs, ingress classes, cluster issuers, priority classes, storage
+classes, cluster/pod resource usage and a tool explorer with JSON arguments.
+Usage views provide rate intervals, optional node/container breakdowns and
+explicit historical analysis controls. Namespace and pod arguments offer live
+combobox choices; typed names support historical queries for deleted pods.
+`list_pods` reads pod names from namespace-scoped metadata after checking the
+caller’s `list pods` permission.
+The browser uses the MCP SDK against `/mcp`; its calls follow the same bearer
+verification and caller authorization as other MCP clients.
+
+Set `MCP_WEB_UI_ENABLED=true` and `MCP_WEB_UI_CLIENT_ID` to the public browser
+client ID. The UI requires authenticated HTTP and `OIDC_ISSUER`. When disabled
+(the application default), all `/ui` routes return 404 and the landing page
+omits its explorer link. The Helm chart enables it with `webUi.enabled: true`;
+set that value to `false` to omit the browser OpenID registration and disable
+the UI. This does not change the native MCP client or `/mcp` authentication.
+
+The sign-in button starts an authorization-code popup with PKCE.
+The registered callback is `<public origin>/ui/callback`; its allowed CORS origin
+must match the page origin so the browser can read discovery, signing keys and
+exchange the code at the provider. The chart's `webUi.origin` and
+`webUi.redirectUri` values configure this registration. Short hostnames require
+an applicable hostname expansion policy; use full URLs on other clusters.
+Keep provider endpoints on the issuer origin, which the UI's CSP permits.
+
+Credentials and PKCE state live only in browser memory. The UI uses no cookies,
+localStorage or sessionStorage, sends no tokens to a server-side session store,
+requests no refresh token and performs no silent sign-in. Closing or reloading
+the tab discards credentials; a reopened or reloaded page obtains fresh
+credentials through a new sign-in. Expiry and **Forget credentials** clear the
+identity and results. The identity provider's own SSO session may still exist.
+
+`npm run build` bundles the browser client. Run `npm run test:web` with Chrome
+installed (`CHROME_PATH` can select its executable) to exercise popup OpenID,
+PKCE, real MCP requests, safe result rendering and credential cleanup against
+a local test issuer.
+
 Readiness and startup return 503 until the MCP listener has started; they never
 query backing services. Unexpected startup failures close the health listener
 and exit nonzero. SIGTERM marks the application unready, stops new connections,
@@ -593,15 +638,18 @@ no Helm release in the namespace, and no Argo CD Namespace inventory entry.
 The live namespace was not changed or deleted. For other clusters, inspect
 ownership and release inventories before migrating an existing declaration.
 
-The deployment reads from driftmower-be over the cluster network, so it needs
-no volume, no pod affinity and no particular node. The in-cluster HTTP server
-binds to `::` so Kubernetes can probe it in IPv6 or dual-stack clusters.
+The chart defaults to Kubernetes and observability tools with `backend.enabled=false`.
+It sets `DRIFTMOWER_BE_ENABLED=false`, so no backend service token is required.
+The in-cluster HTTP server binds to `::` so Kubernetes can probe it in IPv6 or
+dual-stack clusters.
 
-The pod reads its service token from the Secret `driftmower-mcp-be-auth-token`
-(key `token`), which no manifest creates: a credential does not belong in the
-repository. Mint one and register it with driftmower-be before the first
-apply — the deployment stays in `CreateContainerConfigError` until the Secret
-exists. Backend authentication errors surface when drift tools are called.
+To also enable drift-analysis tools, set `backend.enabled=true` in
+`manifests/values.yaml` and configure `backend.url`. The pod then requires the
+Secret named by `backend.serviceTokenSecret.name` (default
+`driftmower-mcp-be-auth-token`) and its `backend.serviceTokenSecret.key` (default
+`token`). No manifest creates this credential. Mint one and register it with
+driftmower-be before applying; a missing Secret prevents the container from
+starting. Backend authentication errors surface when drift tools are called.
 
 ```bash
 # The raw token is what this server sends; driftmower-be only ever holds its
@@ -708,7 +756,7 @@ Every 401 carries the pointer a client needs to discover the flow:
 
 ```
 WWW-Authenticate: Bearer error="invalid_token", error_description="...",
-                  resource_metadata="https://driftmower-mcp.ee-lte-1.codemowers.io/.well-known/oauth-protected-resource/mcp"
+                  resource_metadata="https://mcp.ee-lte-1.codemowers.io/.well-known/oauth-protected-resource/mcp"
 ```
 
 ### Connecting a client
@@ -719,7 +767,7 @@ WWW-Authenticate: Bearer error="invalid_token", error_description="...",
 
 ```bash
 claude mcp add --transport http driftmower \
-  https://driftmower-mcp.ee-lte-1.codemowers.io/mcp \
+  https://mcp.ee-lte-1.codemowers.io/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
@@ -727,13 +775,13 @@ claude mcp add --transport http driftmower \
 token, so this is for trying it out, not for a client you intend to keep.
 
 **Durable — OAuth with PKCE.** `manifests/templates/oidcclient.yaml` registers a public
-`driftmower-mcp` client. A client that lets you supply a client id does PKCE and
+`mcp` client. A client that lets you supply a client id does PKCE and
 refreshes itself:
 
 ```bash
 claude mcp add --transport http driftmower \
-  https://driftmower-mcp.ee-lte-1.codemowers.io/mcp \
-  --client-id kube-system.driftmower-mcp
+  https://mcp.ee-lte-1.codemowers.io/mcp \
+  --client-id driftmower.mcp
 ```
 
 **Pass the client id.** Without it a client falls back to whatever it uses when
@@ -754,6 +802,24 @@ loopback redirect URI, so a client picking a random port still matches. The
 **hostname** is not normalised, so `localhost`, `127.0.0.1` and `[::1]` are all
 registered; the **path** must match exactly, and a client wanting something
 other than `/callback` needs it added.
+
+For a project-local Codex configuration, set `callback_url` explicitly so the
+callback path stays `/callback` rather than acquiring a server-specific suffix:
+
+```toml
+[mcp_servers.driftmower]
+url = "https://mcp.driftmower.ee-lte-1.codemowers.io/mcp"
+
+[mcp_servers.driftmower.oauth]
+client_id = "driftmower.mcp"
+callback_port = 33418
+callback_url = "http://127.0.0.1:33418/callback"
+```
+
+The client ID uses the OIDCClient's namespace and name; adjust it for your
+deployment. See [Passmower issue #276](https://github.com/passmower/passmower/issues/276#issuecomment-5875832808).
+Passmower must advertise `authorization_response_iss_parameter_supported: true`
+for Codex to preserve this explicit callback URL.
 
 `scopes_supported` in the metadata includes `offline_access`, which is what gets
 a client a refresh token — a client requests exactly what is advertised, and
@@ -804,8 +870,9 @@ reading a local database, with no network surface.
 
 ## Tools
 
-All tools are annotated `readOnlyHint: true`, `destructiveHint: false`,
-`idempotentHint: true`, `openWorldHint: false`. Nothing here writes.
+Read-only tools are annotated `readOnlyHint: true`, `destructiveHint: false`,
+`idempotentHint: true`, `openWorldHint: false`. Optional workload actions instead
+declare `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: false`.
 
 Every tool returns both forms: a short text summary written for a human reading
 a chat, and `structuredContent` an agent can branch on, validated against the
@@ -894,6 +961,56 @@ deployment safety. Repository discovery, edits, validation, and approval remain
 the caller's responsibility.
 
 
+## Resource usage and historical analysis
+
+When Prometheus is configured, `get_pod_resource_usage` accepts `namespace`, `pod`,
+`windowSeconds` (rate interval, default 300) and `perContainer` (default true).
+`get_cluster_resource_usage` accepts `windowSeconds` and `perNode` (default false).
+These snapshot tools query `/api/v1/query` only. Pod access requires namespace
+`list pods`; cluster access requires cluster-wide `list pods` and `list nodes`.
+
+`get_pod_resource_usage_history` and `get_cluster_resource_usage_history` opt into
+historical analysis. They accept the same arguments plus `historySeconds` (default
+3600, 300–86400) and `stepSeconds` (default 60, 60–900). Each quantity reports
+average, minimum, maximum, population standard deviation, sample count and
+coverage. Statistics summarize sampled totals over time, with optional per-series
+summaries. They are sampled peaks, not guaranteed scrape-level peaks. Responses
+include requested start/end and actual first/last sample timestamps, including
+containers that no longer exist. Missing periods are omitted, never filled with
+zero. Historical series coverage changes produce warnings.
+
+Queries follow the pod CPU/memory and PVC conventions in driftmower-ui. Snapshots
+include CPU requests/limits, throttling, working set and memory usage, network
+RX/TX and container filesystem usage; PVC usage is separately associated with the
+pod. Cluster snapshots include node CPU capacity/utilization, available memory,
+cache/buffers, resource declarations, root filesystem space and network.
+TopoLVM volume-group size, available and allocated space are included when
+those metrics are exposed. Each quantity names its source metrics; root
+filesystem queries select `mountpoint="/"`, rather than summing every mount. Host exporters are
+joined to the Kubernetes node inventory, excluding unrelated monitored hosts.
+Resource declarations sum regular containers, not scheduler-effective pod
+requirements. Missing exporters or metrics return explicit nulls and warnings.
+Every metric includes its units and fixed PromQL query; arbitrary PromQL is not
+accepted by these wrappers. History responses contain summaries, not raw matrices.
+
+### `list_volumes`
+
+Read current PVC/PV inventory from Kubernetes and augment each claim with
+`kubelet_volume_stats_used_bytes`, `kubelet_volume_stats_capacity_bytes`,
+`kubelet_volume_stats_inodes` and `kubelet_volume_stats_inodes_used`.
+Specify `namespace` for namespace-scoped list PVC access; omitting it requires
+cluster-wide list PVC access. Claims include requested/provisioned Kubernetes
+storage quantities and the bound PV name. Bound PV details require caller
+`get persistentvolumes` permission for that PV. `includeUnboundPVs: true`
+additionally lists non-Bound PVs and requires cluster-wide list PV access.
+
+The Kubernetes inventory remains available without Prometheus; unavailable
+usage is null, with query failures reported separately. Statistics describe the
+entire claim, including shared volumes, and may be absent for unmounted claims
+or unsupported drivers/volume modes. CSI attributes and secret references are
+omitted. PVC filesystem capacity, LVM allocated capacity and root filesystem
+capacity are distinct measurements.
+
 ## Provisioning Tools
 
 All provisioning tools read Kubernetes directly with the server's own service
@@ -906,14 +1023,19 @@ ever read or interpreted, so the answer is exact for any authorizer. An
 unauthenticated call (stdio, `MCP_AUTH_ENABLED=false`) still gets every fact,
 with permission verdicts reported as `unknown` rather than refused.
 
-### `describe_cluster_capabilities`
+### `list_custom_resource_definitions`
 
-No arguments. Requires an authenticated caller, like the shared cluster catalogs.
-Returns CSV catalogs: CRD names and descriptions, issuer names and descriptions,
-ingress classes and priority classes. No schemas, resource status, readiness or
-duplicate API-family inventories are included. Missing optional catalogs are
-marked unavailable, with discovery errors reported separately. CRD read failures
-fail the tool. Use `get_cluster_identity` for connection identity.
+Requires an authenticated caller. Returns installed CRDs and descriptions as
+structured JSON. `scope` defaults to `Namespaced`; choose `Cluster` or `All`
+explicitly. Installed APIs do not establish operator health or caller permissions.
+Only the CRD catalog is read.
+
+### `list_ingress_classes`, `list_cluster_issuers`, `list_priority_classes`
+
+Independent authenticated catalogs with no arguments. Each reads its own resource
+catalog; issuer listing first discovers whether the ClusterIssuer API is installed.
+Returns descriptions and relevant class settings or reported issuer readiness.
+Unavailable reads return `null` with a discovery error, rather than an empty list.
 
 ### `describe_custom_resource_definition`
 
@@ -925,7 +1047,7 @@ are omitted. This is a provisioning schema, not an unmodified CRD export.
 
 ### `describe_provisioning_platform`
 
-No arguments. The interpreted counterpart of `describe_cluster_capabilities`:
+No arguments. The interpreted counterpart of `list_custom_resource_definitions`:
 storage classes with what each implies for data (node-local, zonal,
 cluster-wide; expandable; retained), zones and schedulable nodes, priority
 classes, the published ingress domain and where it came from (an enforced
@@ -1064,3 +1186,141 @@ fixture-backed integration coverage: `test/fixtures/backend/` holds rows
 recorded from a real full-cluster analysis, and `test/fake-backend.ts` serves
 them over the same HTTP path production uses, rejecting any query the real
 backend's schemas would reject.
+
+### `get_workloads`
+
+The web explorer's **Workloads** view renders this inventory as filterable
+nested YAML in collapsible sections, one per root owner. Select or enter a namespace, or clear it for all accessible namespaces,
+then refresh. Unclaimed resources appear under a namespace root. Incomplete-read
+warnings remain visible above the YAML; the raw result includes revision and
+owner identifiers.
+
+Returns a JSON workload inventory for an optional `namespace`, otherwise for
+namespaces discovered through caller RBAC. It works without a backend or
+Prometheus. Each workload includes `name`, `kind`, `apiVersion`, `uid`,
+`namespace` and nonempty `pods`, `images`, `configmaps`, `secrets`, `pvcs`,
+`services`, `ingresses` and `certificates` arrays. Owner references are matched by UID, kind and
+API group, then followed to the top-level owner; controller references take
+precedence. This includes operator resources such as CNPG `Cluster`. Dangling built-in
+owners and cycles produce warnings; custom owners are terminal references. The namespace's synthetic
+`Namespace/orphaned-workloads` entry collects unclaimed resources and standalone
+pods. Shared dependencies can appear under several workloads. Unclaimed does
+not mean safe to delete.
+
+Orphan buckets retain generating-owner references in `orphaned`, keyed by fully
+qualified kind (`Kind.api-group`) and object name. The web UI renders workload
+roots with the same kind/name nesting, and groups generated orphan resources
+inside their namespace bucket. Unowned resources remain direct lists there. The UI keeps namespace in the owner
+summary and omits redundant namespace/API version fields from the nested YAML.
+Unused `kube-root-ca.crt` ConfigMaps, reflected Secret/ConfigMap copies (`reflector.v1.k8s.emberstack.com/reflects`),
+trust bundles (`trust.cert-manager.io/bundle` label), and Helm release Secrets
+(`owner=helm` with a `sh.helm.release.v1.` name) are omitted from orphan buckets.
+These objects remain dependencies when consumed by a workload. Other generated
+application resources, including certificate Secrets, remain visible.
+
+The first authorized request initializes one paginated cluster-wide list and
+watch per built-in resource kind. Cache entries are partitioned by namespace;
+there are no per-namespace watch streams. Further requests reuse the same
+collection cache. Changes coalesce for 50 ms and rebuild cached permission
+views only in affected namespaces. Caller `list pods` permission gates each
+namespace; `list` permission on each collection filters data before ownership
+resolution. Reference names already visible in permitted specs remain visible
+when the referenced collection cannot be listed. The cache stores no caller
+credentials or bearer tokens.
+
+When the CNPG `postgresql.cnpg.io/v1` API is available, a fixed cluster-wide
+Cluster watch retains only explicit certificate Secret names and custom monitoring
+query ConfigMap/Secret names. These dependencies are read through the Kubernetes
+API by CNPG instances and need not appear in Pod volumes. Their Certificates join
+through the target Secret name. Caller `list clusters` permission gates this
+adapter; without it the CNPG root remains an owner-reference-only identity.
+
+Other custom-resource owners of Pods or built-in workload controllers are terminal
+workload identities, marked `ownerReferenceOnly: true`. A custom owner referenced
+only by auxiliary resources such as Secrets does not create a workload; those
+resources remain in the namespace bucket unless consumed by another workload. They do not trigger custom-kind watches, fetches or
+further CR ancestry traversal. Built-in owner UID/name/kind/group matching and
+recursive controller resolution still apply. cert-manager Certificates are an
+explicit exception: when API discovery establishes that the Certificate API is
+served, one cluster-wide Certificate watch retains only metadata and
+`spec.secretName`. The graph adds Certificate names to the consuming workload’s `certificates`
+array when its Pod references the target Secret or an associated Ingress uses
+that Secret in `spec.tls[].secretName`. Certificates are dependencies, not
+separate workload roots; unused Certificates join the namespace’s unclaimed
+resources. Matching works even without a Secret ownerReference. It does not traverse Certificate CR
+ancestry. Certificate collection visibility is checked against caller RBAC.
+
+Secret, ConfigMap and PVC lists request `PartialObjectMetadataList`; their watch
+streams request `PartialObjectMetadata`. There is no full-object fallback.
+Built-in specs are reduced to references, images and selector labels before
+storage. Watches require service-account `list` and `watch` permission; the
+Helm chart grants the built-in collections and Certificate adapter only, with no
+general custom-resource or wildcard grant.
+
+Clean reconnects resume from the last resourceVersion. Errors or expired
+versions clear the affected collection and relist atomically. Warnings include
+HTTP status or a bounded validation reason; they never include upstream
+resource contents. Collection watches live until shutdown. Only idle derived
+namespace views expire after ten minutes. Lists, events, object counts, view
+counts and stream counts remain bounded. `revision` is an opaque server-epoch
+change counter, not a Kubernetes resourceVersion or replay cursor.
+
+The cache exposes a transport-independent namespace subscription which emits
+revision invalidations only. There is no WebSocket endpoint yet. A future local
+GUI adapter should authenticate the connection, obtain an initial authorized
+snapshot through the same service, subscribe, and obtain a new authorized
+snapshot when notified. It must recheck identity expiry and RBAC for every
+update, close on revocation, validate browser origins, and never send raw cached
+objects. Use an initial full snapshot after reconnect; revisions currently do
+not support replay. Bound outgoing queues and coalesce updates for slow clients
+rather than retaining every event. Subscribe before reading the initial
+snapshot and compare revisions to avoid losing changes during connection setup.
+Subscription callbacks do not carry credentials or authorize a client.
+
+
+### Optional workload restart and pod termination
+
+`MCP_WORKLOAD_RESTART_ENABLED=true` registers `restart_workload` and
+`terminate_pod`. The default is false. Enabling requires authenticated HTTP
+with OIDC; anonymous and stdio callers cannot mutate. In the Helm chart, set
+`workloadRestart.enabled: true` to enable the environment flag and the service
+account's `impersonate` permission for users/groups. The account receives no
+additional resource patch/delete permissions. Each operation uses the verified
+caller's mapped Kubernetes username/groups, so the API checks their current
+RBAC and admission rules when reading and writing the object. No caller token
+is forwarded, retained or persisted. The optional impersonation grant is a
+privileged capability of the MCP service account and is absent when disabled.
+
+Use `get_workloads` to obtain exact target names, namespaces and UIDs.
+`restart_workload` also requires `kind` and `apiVersion`. It supports:
+
+| Root kind | Mechanism |
+| --- | --- |
+| Deployment, StatefulSet, DaemonSet (`apps/v1`) | Set the pod template's `kubectl.kubernetes.io/restartedAt` annotation |
+| Cluster (`postgresql.cnpg.io/v1`) | Set `kubectl.kubernetes.io/restartedAt` on the Cluster metadata; CNPG reconciles the restart |
+| Redpanda (`cluster.redpanda.com/v1alpha1` or `v1alpha2`) | Set the annotation in `spec.clusterSpec.statefulset.podTemplate.annotations`; the operator manages the rollout |
+| Dragonfly (`dragonflydb.io/v1alpha1`) | Set the annotation in `spec.annotations`; the operator manages pod recreation |
+
+Redpanda and Dragonfly adapters verify the annotation map exists in the installed, served CRD schema before patching. Redpanda OnDelete updates and suspended reconciliation are rejected.
+
+The CNPG behavior follows its [restart annotation documentation](https://cloudnative-pg.io/docs/devel/labels_annotations/).
+Jobs, CronJobs, ReplicaSets, ReplicationControllers and other operator kinds
+have no restart adapter. Paused Deployments, OnDelete updates, partitioned
+StatefulSet rollouts and owned built-in controllers are rejected rather than
+claiming an effective restart. Restart requires caller `get` and `patch` on
+the named target. Acceptance means the request was submitted; it does not
+verify rollout completion or application health.
+
+Namespace orphan buckets expose `standalonePods` with name/UID for eligible
+ownerless pods. `terminate_pod` requires caller `get` and `delete`, rechecks
+live owner references, rejects owned or static mirror pods, and deletes with
+the normal grace period. It never force deletes; no controller recreates a
+standalone pod. Both actions require the observed UID and use the freshly read
+resourceVersion as a concurrency precondition; stale/replaced objects or
+concurrent changes fail rather than affecting a different object.
+
+The web UI discovers these tools and renders **Restart** for supported roots
+and **Terminate** for eligible standalone pods only when the tools are exposed.
+Each action asks for confirmation and refreshes workload inventory after
+acceptance. The general tool explorer also confirms mutating calls. No action
+is sent automatically or retried after an uncertain result.

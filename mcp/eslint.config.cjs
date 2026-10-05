@@ -50,4 +50,18 @@ module.exports = [
             ],
         },
     },
+    {
+        files: ['src/web/**/*.ts'],
+        languageOptions: {
+            globals: {
+                document: 'readonly',
+                window: 'readonly',
+                location: 'readonly',
+                history: 'readonly',
+                crypto: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+            },
+        },
+    },
 ];

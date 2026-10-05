@@ -1,3 +1,6 @@
+import { WorkloadActions } from './workload-actions.js'
+import { createWorkloadCache } from '../clients/workload-cache.js'
+import { VolumeService } from './volume-service.js'
 import { createHttpRequester, createHttpStreamer } from '../clients/observability-http.js'
 import { createRbacWatch, rbacWatchTargets, type RbacWatch } from '../clients/rbac-watch.js'
 import { identityKey } from '../clients/cached-access.js'
@@ -17,7 +20,8 @@ export function createKubernetesServices(
   provisioning?: ProvisioningConfig | null,
   // The cluster's identity, read lazily because it is discovered after these
   // services exist (from the kubelogin Ingress they provide).
-  clusterId?: () => string | null
+  clusterId?: () => string | null,
+  workloadRestartEnabled = false
 ) {
   const kubernetes = createObservabilityKubernetes({
     url: config.url,
@@ -27,6 +31,12 @@ export function createKubernetesServices(
     stream: createHttpStreamer(config.requestTimeoutMs),
     sarCacheTtlMs: config.sarCacheTtlMs,
     scopeMaxNamespaces: tenancy?.maxNamespaces
+  })
+  const workloadCache = createWorkloadCache({
+    read: kubernetes.read,
+    watch: kubernetes.watch,
+    allowed: kubernetes.allowed,
+    namespaceScope: kubernetes.scopeResolver
   })
   const identityMapping: KubernetesIdentityMapping = {
     usernameClaim: config.usernameClaim,
@@ -98,6 +108,26 @@ export function createKubernetesServices(
     provisioningFacts: facts,
     clusterCatalog: kubernetes.catalog,
     clusterCapabilities: kubernetes.capabilities,
+    podListing: { kubernetes, identityMapping },
+    workloads: { service: workloadCache, identityMapping },
+    ...(workloadRestartEnabled
+      ? {
+          workloadActions: {
+            service: new WorkloadActions(kubernetes.callerRequest, name =>
+              kubernetes.capabilities.describeCrd(name)
+            ),
+            identityMapping
+          }
+        }
+      : {}),
+    volumes: {
+      service: new VolumeService({
+        kubernetes,
+        prometheusUrl: observability?.prometheusUrl ?? null,
+        request: createHttpRequester(config.requestTimeoutMs)
+      }),
+      identityMapping
+    },
     namespaceScope: { resolver: kubernetes.scopeResolver, identityMapping },
     tenancy: {
       policy: tenancy?.scopeSource ?? 'union',

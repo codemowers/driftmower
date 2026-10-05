@@ -66,12 +66,16 @@ export type PlatformClasses = Pick<
 >
 
 export interface ClusterCapabilitiesDiscovery {
+  listCustomResourceDefinitions(): Promise<z.infer<typeof customResourceSchema>[]>
   describeCrd(name: string): Promise<z.infer<typeof crdDetailsSchema>>
   describe(): Promise<z.infer<z.ZodObject<typeof clusterCapabilitiesShape>>>
   // Ingress classes, priority classes and (when cert-manager serves the given
   // version) cluster issuers. Shared with the provisioning facts so each is
   // read once.
-  listPlatformClasses(issuerVersion: string | null): Promise<PlatformClasses>
+  listPlatformClasses(
+    issuerVersion: string | null,
+    only?: 'ingressClasses' | 'priorityClasses' | 'clusterIssuers'
+  ): Promise<PlatformClasses>
 }
 
 // Identify API families, not controller health or permission to provision instances.
@@ -123,10 +127,21 @@ export function createClusterCapabilities(
     throw new Error('Cluster capability discovery exceeded its page limit; incomplete results discarded')
   }
 
-  async function listPlatformClasses(issuerVersion: string | null): Promise<PlatformClasses> {
+  async function listPlatformClasses(
+    issuerVersion: string | null,
+    only?: 'ingressClasses' | 'priorityClasses' | 'clusterIssuers'
+  ): Promise<PlatformClasses> {
     const degraded: { source: string; message: string }[] = []
 
     async function optional<T>(source: string, load: () => Promise<T>): Promise<T | null> {
+      const key = {
+        ingressclasses: 'ingressClasses',
+        priorityclasses: 'priorityClasses',
+        clusterissuers: 'clusterIssuers'
+      }[source]
+
+      if (only && key !== only) return null
+
       try {
         return await load()
       } catch (error) {
@@ -160,12 +175,14 @@ export function createClusterCapabilities(
               description: z.string().optional()
             })
           )
-        ).map(item => ({
-          name: item.metadata.name,
-          value: item.value,
-          isDefault: item.globalDefault === true,
-          description: item.description ?? null
-        }))
+        )
+          .map(item => ({
+            name: item.metadata.name,
+            value: item.value,
+            isDefault: item.globalDefault === true,
+            description: item.description ?? null
+          }))
+          .sort((a, b) => a.value - b.value || a.name.localeCompare(b.name))
       ),
       issuerVersion
         ? optional('clusterissuers', async () =>
@@ -177,7 +194,11 @@ export function createClusterCapabilities(
                   spec: z
                     .object({
                       acme: z
-                        .object({ solvers: z.array(z.object({ http01: z.unknown(), dns01: z.unknown() }).partial()).optional() })
+                        .object({
+                          solvers: z
+                            .array(z.object({ http01: z.unknown(), dns01: z.unknown() }).partial())
+                            .optional()
+                        })
                         .optional()
                     })
                     .optional(),
@@ -213,8 +234,26 @@ export function createClusterCapabilities(
     }
   }
 
+  async function listCustomResourceDefinitions() {
+    return (await list('/apis/apiextensions.k8s.io/v1/customresourcedefinitions', crd))
+      .map(item => ({
+        name: item.metadata.name,
+        description: item.metadata.annotations?.['kubernetes.io/description'] ?? null,
+        group: item.spec.group,
+        kind: item.spec.names.kind,
+        resource: item.spec.names.plural,
+        scope: item.spec.scope,
+        versions: item.spec.versions,
+        established:
+          item.status?.conditions?.some(c => c.type === 'Established' && c.status === 'True') ?? false,
+        terminating: Boolean(item.metadata.deletionTimestamp)
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   return {
     listPlatformClasses,
+    listCustomResourceDefinitions,
     async describeCrd(name) {
       const query = new URLSearchParams({ fieldSelector: `metadata.name=${name}`, limit: '1' })
       const response = z
@@ -227,20 +266,7 @@ export function createClusterCapabilities(
     },
     async describe() {
       // Failure here must never look like a cluster without installed CRDs.
-      const customResources = (await list('/apis/apiextensions.k8s.io/v1/customresourcedefinitions', crd))
-        .map(item => ({
-          name: item.metadata.name,
-          description: item.metadata.annotations?.['kubernetes.io/description'] ?? null,
-          group: item.spec.group,
-          kind: item.spec.names.kind,
-          resource: item.spec.names.plural,
-          scope: item.spec.scope,
-          versions: item.spec.versions,
-          established:
-            item.status?.conditions?.some(c => c.type === 'Established' && c.status === 'True') ?? false,
-          terminating: Boolean(item.metadata.deletionTimestamp)
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
+      const customResources = await listCustomResourceDefinitions()
       const issuer = customResources.find(item => item.name === 'clusterissuers.cert-manager.io')
       const issuerVersion =
         issuer?.versions.find(v => v.served && v.name === 'v1') ?? issuer?.versions.find(v => v.served)
@@ -267,12 +293,7 @@ export function createClusterCapabilities(
         priorityClasses,
         clusterIssuers,
         degraded,
-        relatedTools: [
-          'list_storage_classes',
-          'list_admission_policies',
-          'list_accessible_namespaces',
-          'get_engineering_advisory'
-        ],
+        relatedTools: ['list_storage_classes', 'list_admission_policies', 'list_accessible_namespaces'],
         note: 'CRDs describe installed APIs, not operator health, watched namespaces, or caller authorization. Issuer readiness is its reported condition. Consult storage and admission catalogs for provisioning constraints. No tenant resource instances or credentials are read.'
       }
     }

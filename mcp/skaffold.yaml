@@ -16,7 +16,11 @@ build:
 
 deploy:
   # Namespace comes from --namespace or the selected kubeconfig context.
-  kubectl: {}
+  kubectl:
+    flags:
+      # Keep labeled chart resources when Skaffold cleans up.
+      delete:
+        - --selector=skaffold.dev/keep!=true
 
 manifests:
   helm:
@@ -24,6 +28,8 @@ manifests:
       - name: driftmower-mcp
         chartPath: manifests
         skipBuildDependencies: true
+        setValues:
+          workloadRestart.enabled: true
         setValueTemplates:
           image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
 

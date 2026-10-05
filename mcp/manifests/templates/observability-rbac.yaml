@@ -27,8 +27,11 @@ rules:
   # admission guard names. The guard chooses its ConfigMap's name, so a chart
   # cannot know it in advance; set rbac.paramConfigMapNames to narrow the grant.
   - apiGroups: ['']
-    resources: [nodes, resourcequotas, limitranges]
+    resources: [nodes, resourcequotas, limitranges, pods, persistentvolumeclaims]
     verbs: [list]
+  - apiGroups: ['']
+    resources: [persistentvolumes]
+    verbs: [get, list]
   - apiGroups: ['']
     resources: [configmaps]
     verbs: [get]
@@ -80,6 +83,30 @@ rules:
   - apiGroups: [admissionregistration.k8s.io]
     resources: [validatingadmissionpolicies, mutatingadmissionpolicies, validatingadmissionpolicybindings, mutatingadmissionpolicybindings]
     verbs: [list]
+  # Workload inventory watches only metadata for Secrets, ConfigMaps, PVCs and
+  # names only. Kubernetes RBAC still grants collection reads; metadata
+  # negotiation does not constrain what this service account could request.
+  - apiGroups: ['']
+    resources: [pods, replicationcontrollers, persistentvolumeclaims, configmaps, secrets, services]
+    verbs: [list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [list, watch]
+  # Optional CNPG dependency adapter: the instance manager reads TLS/query
+  # resources through the API rather than mounting them in the Pod.
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters]
+    verbs: [list, watch]
+  # Explicit Certificate adapter retains only its target Secret name.
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [list, watch]
   # Every permission answer this server gives is a SubjectAccessReview asked as
   # the verified caller. This is a permission-probing capability: the server
   # only ever asks about the identity it just verified from the token.
@@ -87,10 +114,17 @@ rules:
     resources: [subjectaccessreviews]
     verbs: [create]
   # The application checks the caller's get pods/log access before every read.
-  # No impersonation, secrets, pod exec, or write permissions are granted.
+  # Workload writes, when enabled, use verified caller impersonation below.
   - apiGroups: ['']
     resources: [pods/log]
     verbs: [get]
+{{- if .Values.workloadRestart.enabled }}
+  # Mutations are authorized and admitted as the verified OIDC caller, not this
+  # service account. No patch/delete privileges are granted to the account.
+  - apiGroups: ['']
+    resources: [users, groups]
+    verbs: [impersonate]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

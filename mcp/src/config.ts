@@ -28,6 +28,8 @@ export interface ProvisioningConfig {
 }
 
 export interface AppConfig {
+  workloadRestartEnabled?: boolean
+  webUi: { enabled: boolean; clientId: string | null }
   backendEnabled?: boolean
   backendUrl: string
   backendServiceToken: string
@@ -41,7 +43,6 @@ export interface AppConfig {
   logLevel: 'debug' | 'info' | 'warn' | 'error'
   publicUrl: string
   cluster: ClusterIdentity
-  advisoryOverrideDirectory: string | null
   oauthClientId: string | null
   // Public URL of driftmower-ui, kept for the landing page's links. Null means
   // no link is rendered.
@@ -233,8 +234,28 @@ export function loadAppConfig(
   }
 
   const oidc = transport === 'http' && authEnabled ? readOidcConfig(source) : null
+  const webUi = {
+    enabled: readBoolean(source.get<unknown>('webUi.enabled'), false),
+    clientId: readOptionalString(source.get<unknown>('webUi.clientId'))
+  }
+
+  if (webUi.enabled && (!oidc || !webUi.clientId)) {
+    throw new Error('MCP_WEB_UI_ENABLED requires authenticated HTTP, OIDC_ISSUER and MCP_WEB_UI_CLIENT_ID')
+  }
+
+  const restartFlag = source.get<unknown>('mcp.workloadRestartEnabled')
+
+  if (restartFlag !== undefined && ![true, false, 'true', 'false'].includes(restartFlag as boolean | string))
+    throw new Error('MCP_WORKLOAD_RESTART_ENABLED must be true or false')
+
+  const workloadRestartEnabled = restartFlag === true || restartFlag === 'true'
+
+  if (workloadRestartEnabled && !oidc)
+    throw new Error('MCP_WORKLOAD_RESTART_ENABLED requires authenticated HTTP and OIDC_ISSUER')
 
   return {
+    workloadRestartEnabled,
+    webUi,
     backendEnabled,
     backendUrl: readUrl(cli.backendUrl ?? source.get<string>('backend.url'), 'backendUrl'),
     // The backend rejects an unauthenticated read, so an empty token is a
@@ -256,7 +277,6 @@ export function loadAppConfig(
     logLevel: readEnum(source.get<string>('mcp.logLevel'), 'logLevel', LOG_LEVELS),
     publicUrl,
     cluster: clusterIdentity(id, apiUrl, publicUrl),
-    advisoryOverrideDirectory: readOptionalString(source.get<unknown>('advisory.overrideDirectory')),
     oauthClientId: readOptionalString(source.get<unknown>('mcp.oauthClientId')),
     uiPublicUrl: readOptionalUrl(source.get<string>('mcp.uiPublicUrl'), 'uiPublicUrl'),
     authEnabled,

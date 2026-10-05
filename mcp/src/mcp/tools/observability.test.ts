@@ -56,8 +56,16 @@ describe('observability MCP tools', () => {
 
         expect(tools.tools.map(tool => tool.name)).toEqual(
           metrics
-            ? ['get_cluster_identity', 'get_engineering_advisory', 'query_metrics', 'query_logs']
-            : ['get_cluster_identity', 'get_engineering_advisory', 'query_logs']
+            ? [
+                'get_cluster_identity',
+                'get_pod_resource_usage',
+                'get_cluster_resource_usage',
+                'get_pod_resource_usage_history',
+                'get_cluster_resource_usage_history',
+                'query_metrics',
+                'query_logs'
+              ]
+            : ['get_cluster_identity', 'query_logs']
         )
         expect(tools.tools.every(tool => tool.annotations?.readOnlyHint)).toBe(true)
         const result = await client.callTool({

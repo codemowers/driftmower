@@ -4,11 +4,14 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY tsconfig.json tsconfig.build.json ./
+COPY scripts/build-web.mjs ./scripts/
 
 RUN npm ci
 
 COPY src ./src
 COPY config/default.json config/custom-environment-variables.json ./config/
+
+RUN npm run build:web
 
 CMD ["node", "--import", "tsx", "--watch", "src/index.ts"]
 

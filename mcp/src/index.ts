@@ -6,8 +6,6 @@ import './service-links.js'
 
 import { setTimeout, clearTimeout } from 'node:timers'
 
-import { loadEngineeringAdvisories } from './advisory/software-engineering.js'
-
 import { createBearerAuthenticator } from './auth/bearer.js'
 import { DriftmowerBackendClient } from './backend/client.js'
 import { BackendImageUpdateRepository } from './backend/image-update-repository.js'
@@ -30,7 +28,6 @@ import { WorkloadSearchService } from './services/workload-search-service.js'
 
 async function main(): Promise<void> {
   const appConfig = loadAppConfig()
-  const advisories = loadEngineeringAdvisories(appConfig.advisoryOverrideDirectory)
   const logger = createLogger(appConfig.logLevel)
   const client =
     appConfig.backendEnabled === false
@@ -59,7 +56,8 @@ async function main(): Promise<void> {
       appConfig.observability,
       appConfig.tenancy,
       appConfig.provisioning,
-      () => appConfig.cluster.id
+      () => appConfig.cluster.id,
+      appConfig.workloadRestartEnabled
     )
 
     appConfig.cluster = await discoverClusterIdentity(
@@ -83,7 +81,6 @@ async function main(): Promise<void> {
       createMcpServer({
         ...driftmower,
         cluster: appConfig.cluster,
-        advisories,
         ...kubernetesServices,
         audit: line => logger.info(line)
       })
@@ -93,7 +90,9 @@ async function main(): Promise<void> {
 
       await startStdioTransport(mcpServer)
       logger.info('Driftmower MCP server started', { transport: 'stdio' })
-      registerShutdown(() => mcpServer.close())
+      registerShutdown(async () => {
+        await Promise.all([mcpServer.close(), kubernetesServices.workloads.service.stop()])
+      })
 
       return
     }
@@ -128,8 +127,15 @@ async function main(): Promise<void> {
       metrics,
       authenticator,
       cluster: appConfig.cluster,
-      advisories,
       oauthClientId: appConfig.oauthClientId,
+      webUi:
+        appConfig.webUi.enabled && appConfig.oidc && appConfig.webUi.clientId
+          ? {
+              issuer: appConfig.oidc.issuer,
+              clientId: appConfig.webUi.clientId,
+              resource: `${appConfig.publicUrl}/mcp`
+            }
+          : undefined,
       capabilities: {
         service: kubernetesServices.provisioning.service,
         identityMapping: kubernetesServices.provisioning.identityMapping,
@@ -180,7 +186,8 @@ async function main(): Promise<void> {
       await Promise.all([
         closeHttpServer(httpServer),
         healthServer ? closeHttpServer(healthServer) : Promise.resolve(),
-        watch?.stop() ?? Promise.resolve()
+        watch?.stop() ?? Promise.resolve(),
+        kubernetesServices.workloads.service.stop()
       ])
     })
   } finally {

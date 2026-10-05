@@ -1,5 +1,4 @@
 import type { ClusterIdentity } from '../../domain/cluster-identity.js'
-import type { EngineeringAdvisory } from '../../advisory/software-engineering.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -10,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Readable } from 'node:stream'
 import type { ApplicationMetrics } from '../../http/metrics.js'
 import { renderLandingPage } from '../../http/landing.js'
+import { handleWebUiRequest, type WebUiOptions } from '../../http/web-ui.js'
 import { protectedResourceMetadataPath, writeChallenge, type BearerAuthenticator } from '../../auth/bearer.js'
 import {
   CAPABILITIES_PATH,
@@ -31,9 +31,9 @@ export const PROTECTED_RESOURCE_METADATA_ROOT_PATH = '/.well-known/oauth-protect
 export const LANDING_PATH = '/'
 
 export interface HttpTransportOptions {
+  webUi?: WebUiOptions
   metrics?: ApplicationMetrics
   cluster?: ClusterIdentity
-  advisories?: EngineeringAdvisory[]
   oauthClientId?: string | null
   host: string
   port: number
@@ -64,6 +64,21 @@ export async function startHttpTransport(
   const httpServer = createServer((request, response) => {
     options.metrics?.observe(request, response)
     const path = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`).pathname
+
+    if (options.webUi && (path === '/ui' || path.startsWith('/ui/'))) {
+      void handleWebUiRequest(request, response, path, options.webUi)
+        .then(handled => {
+          if (!handled) writeJson(response, 404, { error: 'not_found' })
+        })
+        .catch(error => {
+          options.onError?.(error)
+
+          if (!response.headersSent) writeJson(response, 500, { error: 'web_ui_unavailable' })
+          else response.end()
+        })
+
+      return
+    }
 
     if (
       options.authenticator &&

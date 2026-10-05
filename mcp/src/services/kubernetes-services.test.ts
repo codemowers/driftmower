@@ -34,16 +34,21 @@ describe('independent Kubernetes services', () => {
 
       expect(tools.map(tool => tool.name).sort()).toEqual([
         'check_access',
-        'describe_cluster_capabilities',
         'describe_custom_resource_definition',
         'describe_namespace_readiness',
         'describe_provisioning_platform',
         'get_cluster_identity',
-        'get_engineering_advisory',
+        'get_workloads',
         'list_accessible_namespaces',
         'list_admission_policies',
+        'list_cluster_issuers',
+        'list_custom_resource_definitions',
+        'list_ingress_classes',
         'list_offerings',
-        'list_storage_classes'
+        'list_pods',
+        'list_priority_classes',
+        'list_storage_classes',
+        'list_volumes'
       ])
       // The provisioning tools answer unauthenticated callers with unknown
       // verdicts rather than refusing, so they are exercised separately.
@@ -60,7 +65,11 @@ describe('independent Kubernetes services', () => {
         const result = await client.callTool({
           name: tool.name,
           arguments:
-            tool.name === 'describe_custom_resource_definition' ? { name: 'widgets.example.com' } : {}
+            tool.name === 'describe_custom_resource_definition'
+              ? { name: 'widgets.example.com' }
+              : tool.name === 'list_pods'
+                ? { namespace: 'demo' }
+                : {}
         })
 
         expect(result.isError).toBe(true)
@@ -69,6 +78,7 @@ describe('independent Kubernetes services', () => {
     } finally {
       await client.close()
       await server.close()
+      await dependencies.workloads.service.stop()
     }
   })
 })

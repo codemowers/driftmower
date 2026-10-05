@@ -44,6 +44,35 @@ function sourceWith(overrides: Record<string, unknown>) {
 }
 
 describe('loadAppConfig', () => {
+  it('disables the explorer by default and requires OpenID configuration when enabled', () => {
+    expect(loadAppConfig([], source).webUi).toEqual({ enabled: false, clientId: null })
+    expect(() => loadAppConfig([], sourceWith({ 'webUi.enabled': true }))).toThrow(
+      'MCP_WEB_UI_ENABLED requires'
+    )
+    expect(() =>
+      loadAppConfig(
+        [],
+        sourceWith({
+          'mcp.transport': 'http',
+          'oidc.issuer': 'https://auth.example',
+          'oidc.namespacesClaim': 'namespaces',
+          'webUi.enabled': true
+        })
+      )
+    ).toThrow('MCP_WEB_UI_CLIENT_ID')
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          'mcp.transport': 'http',
+          'oidc.issuer': 'https://auth.example',
+          'oidc.namespacesClaim': 'namespaces',
+          'webUi.enabled': true,
+          'webUi.clientId': 'explorer'
+        })
+      ).webUi
+    ).toEqual({ enabled: true, clientId: 'explorer' })
+  })
   it('loads config source values', () => {
     expect(loadAppConfig([], source)).toMatchObject({
       backendUrl: 'http://driftmower-be:3030',
@@ -276,7 +305,6 @@ describe('multi-cluster configuration', () => {
       sourceWith({
         'cluster.id': 'ee-west-1.codemowers.io',
         'cluster.apiUrl': 'https://api.example:6443/',
-        'advisory.overrideDirectory': '/etc/advisory',
         'mcp.oauthClientId': 'other-provider.mcp'
       })
     )
@@ -287,7 +315,6 @@ describe('multi-cluster configuration', () => {
       mcpServerName: 'driftmower-ee-west-1-codemowers-io'
     })
     expect(result.kubernetes.url).toBe('https://kubernetes.default.svc')
-    expect(result.advisoryOverrideDirectory).toBe('/etc/advisory')
     expect(result.oauthClientId).toBe('other-provider.mcp')
     expect(loadAppConfig([], source).cluster.apiUrl).toBeNull()
   })
@@ -303,5 +330,30 @@ describe('multi-cluster configuration', () => {
     ]) {
       expect(() => loadAppConfig([], sourceWith({ 'cluster.apiUrl': url }))).toThrow()
     }
+  })
+})
+
+describe('workload restart feature gate', () => {
+  it('defaults off and requires authenticated HTTP when enabled', () => {
+    expect(loadAppConfig([], sourceWith({})).workloadRestartEnabled).toBe(false)
+    expect(() => loadAppConfig([], sourceWith({ 'mcp.workloadRestartEnabled': true }))).toThrow(
+      'authenticated HTTP'
+    )
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          'mcp.workloadRestartEnabled': true,
+          'mcp.transport': 'http',
+          'oidc.issuer': 'https://auth.example',
+          'oidc.namespacesClaim': 'namespaces'
+        })
+      ).workloadRestartEnabled
+    ).toBe(true)
+  })
+  it.each(['yes', '0', 1])('rejects ambiguous gate values %s', value => {
+    expect(() => loadAppConfig([], sourceWith({ 'mcp.workloadRestartEnabled': value }))).toThrow(
+      'must be true or false'
+    )
   })
 })

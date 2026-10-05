@@ -18,7 +18,7 @@ spec:
   tls:
     - secretName: driftmower-mcp-tls
   rules:
-    - host: driftmower-mcp
+    - host: mcp
       http:
         paths:
           # One rule covers both /mcp and the RFC 9728 metadata documents under

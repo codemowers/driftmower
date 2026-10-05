@@ -10,7 +10,8 @@
     "authEnabled": true,
     "oauthClientId": "",
     "invalidateToken": "",
-    "invalidateAllowedSubjects": ""
+    "invalidateAllowedSubjects": "",
+    "workloadRestartEnabled": false
   },
   "oidc": {
     "issuer": "",
@@ -62,7 +63,8 @@
     "id": "",
     "apiUrl": ""
   },
-  "advisory": {
-    "overrideDirectory": ""
+  "webUi": {
+    "enabled": false,
+    "clientId": ""
   }
 }

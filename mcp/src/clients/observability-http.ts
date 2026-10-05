@@ -6,7 +6,7 @@ import { clearTimeout, setTimeout } from 'node:timers'
 export interface HttpRequest {
   url: URL
   method?: string
-  headers?: Record<string, string>
+  headers?: Record<string, string | string[]>
   body?: string
   ca?: string
 }
@@ -120,6 +120,8 @@ async function* readLines(
       let index = pending.indexOf('\n')
 
       while (index >= 0) {
+        if (index > 4 * 1024 * 1024) throw new Error('Watch line exceeds 4 MiB')
+
         const line = pending.slice(0, index).trim()
 
         pending = pending.slice(index + 1)
@@ -130,6 +132,8 @@ async function* readLines(
 
         index = pending.indexOf('\n')
       }
+
+      if (pending.length > 4 * 1024 * 1024) throw new Error('Watch line exceeds 4 MiB')
     }
   } catch (error) {
     // The caller ended it; that is not a failure of the stream.

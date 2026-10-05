@@ -1,3 +1,13 @@
+import {
+  getPodResourceUsageHistory,
+  getClusterResourceUsageHistory,
+  podResourceUsageHistoryInput,
+  clusterResourceUsageHistoryInput,
+  getPodResourceUsage,
+  getClusterResourceUsage,
+  podResourceUsageInput,
+  clusterResourceUsageInput
+} from './resource-usage.js'
 import { z } from 'zod'
 import type { HttpRequester } from '../clients/observability-http.js'
 import type { KubernetesIdentity, ObservabilityKubernetes } from '../clients/observability-kubernetes.js'
@@ -96,6 +106,28 @@ export class ObservabilityService {
   readonly metricsEnabled: boolean
   constructor(private readonly options: ObservabilityServiceOptions) {
     this.metricsEnabled = Boolean(options.prometheusUrl)
+  }
+
+  getPodResourceUsage(input: z.input<typeof podResourceUsageInput>, caller?: ObservabilityCaller) {
+    return getPodResourceUsage(this.options, input, caller)
+  }
+
+  getClusterResourceUsage(input: z.input<typeof clusterResourceUsageInput>, caller?: ObservabilityCaller) {
+    return getClusterResourceUsage(this.options, input, caller)
+  }
+
+  getPodResourceUsageHistory(
+    input: z.input<typeof podResourceUsageHistoryInput>,
+    caller?: ObservabilityCaller
+  ) {
+    return getPodResourceUsageHistory(this.options, input, caller)
+  }
+
+  getClusterResourceUsageHistory(
+    input: z.input<typeof clusterResourceUsageHistoryInput>,
+    caller?: ObservabilityCaller
+  ) {
+    return getClusterResourceUsageHistory(this.options, input, caller)
   }
 
   private async authorize(caller: ObservabilityCaller | undefined, ns: string, pod?: string): Promise<void> {

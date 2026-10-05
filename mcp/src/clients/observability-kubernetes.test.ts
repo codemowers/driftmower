@@ -46,6 +46,28 @@ describe('Kubernetes observability client', () => {
   const identity = { user: 'issuer#alice', groups: ['devs', 'system:authenticated'] }
   const attributes = { namespace: 'a', group: '', resource: 'pods', verb: 'list' }
 
+  it('impersonates verified identity on writes, preserves all groups and propagates API denial', async () => {
+    const { client, request } = setup()
+    const path = '/apis/apps/v1/namespaces/demo/deployments/app'
+
+    await client.callerRequest(identity, path, 'PATCH', { metadata: { resourceVersion: '10' } })
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'PATCH',
+      headers: {
+        authorization: 'Bearer service-token',
+        'impersonate-user': identity.user,
+        'impersonate-group': identity.groups,
+        'content-type': 'application/merge-patch+json'
+      },
+      body: JSON.stringify({ metadata: { resourceVersion: '10' } })
+    })
+    expect(request.mock.calls[0][0].url.pathname).toBe(path)
+    await writeFile(join(directory, 'token'), 'rotated')
+    request.mockResolvedValueOnce({ status: 403, body: 'upstream body must not leak' })
+    await expect(client.callerRequest(identity, path, 'DELETE', {})).rejects.toThrow('HTTP 403')
+    expect(request.mock.calls[1][0].headers?.authorization).toBe('Bearer rotated')
+  })
+
   it('reviews the caller, not the service account, and reloads rotated tokens', async () => {
     const { client, request } = setup()
 

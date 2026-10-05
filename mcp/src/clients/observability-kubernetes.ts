@@ -1,3 +1,4 @@
+import type { CallerRequest } from '../services/workload-actions.js'
 import { createClusterCapabilities, type ClusterCapabilitiesDiscovery } from './cluster-capabilities.js'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
@@ -58,6 +59,7 @@ export function createObservabilityKubernetes(options: {
 }): ObservabilityKubernetes & {
   kubeloginIngress(): Promise<unknown>
   read: KubernetesReader
+  callerRequest: CallerRequest
   catalog: ClusterCatalog
   capabilities: ClusterCapabilitiesDiscovery
   accessChecker: AccessChecker
@@ -65,7 +67,7 @@ export function createObservabilityKubernetes(options: {
   sarCache: SarCache
   listNamespaces(): Promise<string[]>
   invalidateNamespaceList(): void
-  watch(path: string): Promise<HttpStream>
+  watch(path: string, accept?: string): Promise<HttpStream>
   tokenReview(token: string): Promise<{ authenticated: boolean; username: string | null }>
 } {
   async function call(path: string, body?: unknown, accept = 'application/json'): Promise<string> {
@@ -124,6 +126,32 @@ export function createObservabilityKubernetes(options: {
     kubeloginIngress: async () =>
       JSON.parse(await call('/apis/networking.k8s.io/v1/namespaces/default/ingresses/kubelogin')),
     read,
+    async callerRequest(identity, path, method, body) {
+      // Only verified transport identity reaches this method. Kubernetes checks
+      // caller RBAC and admission at execution time; never authorize a write
+      // solely from the service account or a cached SubjectAccessReview.
+      const [token, ca] = await Promise.all([
+        readFile(options.tokenFile, 'utf8'),
+        readFile(options.caFile, 'utf8')
+      ])
+      const response = await options.request({
+        url: new URL(path, options.url),
+        method,
+        ca,
+        headers: {
+          authorization: `Bearer ${token.trim()}`,
+          'impersonate-user': identity.user,
+          'impersonate-group': identity.groups,
+          'content-type': method === 'PATCH' ? 'application/merge-patch+json' : 'application/json',
+          accept: 'application/json'
+        },
+        body: body === undefined ? undefined : JSON.stringify(body)
+      })
+
+      if (response.status < 200 || response.status >= 300) throw new KubernetesApiError(response.status)
+
+      return response.body
+    },
     catalog: createClusterCatalog(path => call(path)),
     capabilities: createClusterCapabilities(path => call(path)),
     accessChecker,
@@ -135,7 +163,7 @@ export function createObservabilityKubernetes(options: {
     sarCache,
     listNamespaces: () => namespaceList.get(),
     invalidateNamespaceList: () => namespaceList.invalidate(),
-    async watch(path) {
+    async watch(path, accept = 'application/json') {
       if (!options.stream) throw new Error('Streaming requests are not configured')
 
       const [token, ca] = await Promise.all([
@@ -145,7 +173,7 @@ export function createObservabilityKubernetes(options: {
 
       return options.stream({
         url: new URL(path, options.url),
-        headers: { authorization: `Bearer ${token.trim()}`, accept: 'application/json' },
+        headers: { authorization: `Bearer ${token.trim()}`, accept },
         ca
       })
     },

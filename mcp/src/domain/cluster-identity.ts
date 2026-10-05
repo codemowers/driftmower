@@ -34,7 +34,8 @@ export function clusterInstructions(cluster: ClusterIdentity): string {
           `The default/kubelogin Ingress exposes this Kubernetes API via Passmower OIDC. Set up kubectl oidc-login (kubectl krew install oidc-login) with exec apiVersion client.authentication.k8s.io/v1beta1, command kubectl, and arguments oidc-login get-token --oidc-issuer-url=${cluster.oidcIssuerUrl ?? '<confirmed OIDC issuer URL>'} --oidc-client-id=default.kubelogin --oidc-extra-scope=profile,email,groups --listen-address=127.0.0.1:27890. Preserve existing kubeconfig entries and keep credentials out of output.`
         ]
       : []),
-    'Read this connection’s get_engineering_advisory before planning changes. Its cluster overrides replace bundled guidance at the same path; do not combine conflicting advice from other clusters.',
+    'Use this connection’s cluster discovery and provisioning tools before planning changes. Verify capabilities and applicable policy bindings before relying on optional resources or defaults.',
+    'For general software engineering guidance, refer to https://mcp.codemowers.io.',
     'Live Kubernetes discovery and observability describe this cluster. Drift analysis comes from configured backend snapshots; check their scope rather than assuming that every backend workload belongs to this cluster.'
   ].join(' ')
 }

@@ -17,10 +17,6 @@ spec:
     spec:
       serviceAccountName: driftmower-mcp
       terminationGracePeriodSeconds: 30
-      # No pod affinity and no volume: the analysis is read from driftmower-be
-      # over the cluster network, so this pod can run anywhere.
-      imagePullSecrets:
-        - name: sergii-gitea-registry-secret
       containers:
         - name: driftmower-mcp
           image: {{ .Values.image | quote }}
@@ -34,8 +30,17 @@ spec:
           env:
             - name: NODE_ENV
               value: 'production'
-            - name: NODE_CONFIG_ENV
-              value: 'default'
+            - name: MCP_WORKLOAD_RESTART_ENABLED
+              value: {{ .Values.workloadRestart.enabled | quote }}
+            - name: MCP_WEB_UI_ENABLED
+              value: {{ .Values.webUi.enabled | quote }}
+            {{- if .Values.webUi.enabled }}
+            - name: MCP_WEB_UI_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-mcp-web-owner-secrets
+                  key: OIDC_CLIENT_ID
+            {{- end }}
             {{- with .Values.cluster.id }}
             - name: DRIFTMOWER_CLUSTER_ID
               value: {{ . | quote }}
@@ -47,24 +52,25 @@ spec:
             - name: MCP_OAUTH_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-driftmower-mcp-owner-secrets
+                  name: oidc-client-mcp-owner-secrets
                   key: OIDC_CLIENT_ID
             - name: DRIFTMOWER_MCP_TRANSPORT
               value: 'http'
+            - name: DRIFTMOWER_BE_ENABLED
+              value: {{ .Values.backend.enabled | quote }}
+            {{- if .Values.backend.enabled }}
             - name: DRIFTMOWER_BE_URL
-              value: 'http://driftmower-be:3030'
+              value: {{ .Values.backend.url | quote }}
+            - name: DRIFTMOWER_BE_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.serviceTokenSecret.name | quote }}
+                  key: {{ .Values.backend.serviceTokenSecret.key | quote }}
+            {{- end }}
             - name: PROMETHEUS_URL
               value: 'http://prometheus-operated.monitoring.svc.cluster.local:9090'
             - name: LOKI_URL
               value: 'http://loki.monitoring.svc.cluster.local:3100'
-            # A token driftmower-be lists in auth.serviceTokens. It
-            # authenticates as a service principal, which the backend exempts
-            # from its own tenancy scoping; this server scopes what it returns.
-            - name: DRIFTMOWER_BE_SERVICE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: driftmower-mcp-be-auth-token
-                  key: token
             # Requires Passmower 2.7.0 or later to export OIDC_CLIENT_ORIGIN.
             # Public URL of this server. Used to build the RFC 9728 resource
             # identifier and the resource_metadata pointer on every 401, which
@@ -72,7 +78,7 @@ spec:
             - name: MCP_PUBLIC_URL
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-driftmower-mcp-owner-secrets
+                  name: oidc-client-mcp-owner-secrets
                   key: OIDC_CLIENT_ORIGIN
             # MCP_AUDIENCE is deliberately unset. The server then verifies
             # `aud` against the `resource` it advertises -- MCP_PUBLIC_URL +
@@ -87,14 +93,18 @@ spec:
             - name: OIDC_ISSUER
               valueFrom:
                 secretKeyRef:
-                  name: oidc-client-driftmower-mcp-owner-secrets
+                  name: oidc-client-mcp-owner-secrets
                   key: OIDC_IDP_URI
             # Provisioning facts are read from Kubernetes directly; see the
             # PROVISIONING_* settings in the README for the optional knobs.
-            # Public URL of driftmower-ui. A person who opens this server's own
-            # hostname in a browser gets bounced there instead of a JSON 404.
+            # Browser origin exported by the OIDC owner Secret. A person who
+            # opens this server's own hostname in a browser gets bounced there
+            # instead of a JSON 404.
             - name: DRIFTMOWER_UI_PUBLIC_URL
-              value: 'https://driftmower-ui.codemowers.io'
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-mcp-owner-secrets
+                  key: OIDC_CLIENT_ORIGIN
           # Probes report local MCP readiness without contacting dependencies.
           readinessProbe:
             httpGet:

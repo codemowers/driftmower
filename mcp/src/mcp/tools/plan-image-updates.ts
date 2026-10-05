@@ -100,7 +100,7 @@ type PlanImageUpdatesResult = z.infer<typeof planImageUpdatesOutputSchema>
 const toolConfiguration = {
   title: 'Plan Driftmower image updates',
   description:
-    'Plan advisory image and Helm chart updates from the latest ready in-cluster Driftmower snapshot.',
+    'Use to propose image-tag and Helm-chart updates from the latest ready Driftmower backend snapshot. Advisory only: does not modify workloads or deploy updates. Inspect snapshot scope, warnings, manual-review actions and nextCursor before presenting a complete plan; verify candidates against live inventory when available.',
   inputSchema,
   outputSchema: planImageUpdatesOutputSchema.shape,
   annotations: READ_ONLY_ANNOTATIONS
