@@ -11,6 +11,7 @@ import {
 import { z } from 'zod'
 import type { HttpRequester } from '../clients/observability-http.js'
 import type { KubernetesIdentity, ObservabilityKubernetes } from '../clients/observability-kubernetes.js'
+import type { CallerBudget } from '../clients/backend-guard.js'
 
 const namespace = z
   .string()
@@ -66,6 +67,12 @@ export interface ObservabilityServiceOptions {
   lokiUrl: string | null
   kubernetes: ObservabilityKubernetes
   request: HttpRequester
+  // Per-caller admission for every metrics and logs call; absent = unlimited.
+  budget?: CallerBudget
+  // Resource-usage evaluation times are aligned down to this many ms, so
+  // repeated refreshes ask Prometheus the identical question and share an
+  // answer. 0 or absent = the exact current time.
+  queryTimeAlignmentMs?: number
   now?: () => number
 }
 
@@ -109,25 +116,25 @@ export class ObservabilityService {
   }
 
   getPodResourceUsage(input: z.input<typeof podResourceUsageInput>, caller?: ObservabilityCaller) {
-    return getPodResourceUsage(this.options, input, caller)
+    return this.guarded(caller, options => getPodResourceUsage(options, input, caller))
   }
 
   getClusterResourceUsage(input: z.input<typeof clusterResourceUsageInput>, caller?: ObservabilityCaller) {
-    return getClusterResourceUsage(this.options, input, caller)
+    return this.guarded(caller, options => getClusterResourceUsage(options, input, caller))
   }
 
   getPodResourceUsageHistory(
     input: z.input<typeof podResourceUsageHistoryInput>,
     caller?: ObservabilityCaller
   ) {
-    return getPodResourceUsageHistory(this.options, input, caller)
+    return this.guarded(caller, options => getPodResourceUsageHistory(options, input, caller))
   }
 
   getClusterResourceUsageHistory(
     input: z.input<typeof clusterResourceUsageHistoryInput>,
     caller?: ObservabilityCaller
   ) {
-    return getClusterResourceUsageHistory(this.options, input, caller)
+    return this.guarded(caller, options => getClusterResourceUsageHistory(options, input, caller))
   }
 
   private async authorize(caller: ObservabilityCaller | undefined, ns: string, pod?: string): Promise<void> {
@@ -147,7 +154,41 @@ export class ObservabilityService {
     }
   }
 
-  async queryMetrics(input: z.input<typeof metricsInput>, caller?: ObservabilityCaller) {
+  queryMetrics(input: z.input<typeof metricsInput>, caller?: ObservabilityCaller) {
+    return this.guarded(caller, options => this.runQueryMetrics(options.request, input, caller))
+  }
+
+  queryLogs(input: z.input<typeof logsInput>, caller?: ObservabilityCaller) {
+    return this.guarded(caller, options => this.runQueryLogs(options.request, input, caller))
+  }
+
+  // Admission for one tool call: the caller's budget is checked up front, and
+  // each backend request the call makes is charged to it.
+  private guarded<T>(
+    caller: ObservabilityCaller | undefined,
+    run: (options: ObservabilityServiceOptions) => Promise<T>
+  ): Promise<T> {
+    const budget = this.options.budget
+
+    if (!budget) return run(this.options)
+
+    return budget.admit(caller?.identity.user || 'anonymous', charge =>
+      run({
+        ...this.options,
+        request: request => {
+          charge()
+
+          return this.options.request(request)
+        }
+      })
+    )
+  }
+
+  private async runQueryMetrics(
+    request: HttpRequester,
+    input: z.input<typeof metricsInput>,
+    caller?: ObservabilityCaller
+  ) {
     const args = metricsInput.parse(input)
 
     if (!this.options.prometheusUrl) throw new Error('PROMETHEUS_URL is not configured')
@@ -196,7 +237,7 @@ export class ObservabilityService {
       url.searchParams.set('step', String(args.stepSeconds))
     }
 
-    const response = await this.options.request({ url })
+    const response = await request({ url })
 
     if (response.status !== 200) throw new Error(`Prometheus returned HTTP ${response.status}`)
 
@@ -217,7 +258,11 @@ export class ObservabilityService {
     }
   }
 
-  async queryLogs(input: z.input<typeof logsInput>, caller?: ObservabilityCaller) {
+  private async runQueryLogs(
+    request: HttpRequester,
+    input: z.input<typeof logsInput>,
+    caller?: ObservabilityCaller
+  ) {
     const args = logsInput.parse(input)
     const end = args.end ? Date.parse(args.end) : (this.options.now ?? Date.now)()
     const start = args.start ? Date.parse(args.start) : end - 3600000
@@ -226,7 +271,7 @@ export class ObservabilityService {
     await this.authorize(caller, args.namespace, args.pod)
 
     if (this.options.lokiUrl) {
-      return this.lokiLogs(args, start, end)
+      return this.lokiLogs(request, args, start, end)
     }
 
     // LOKI_URL selects the source. A configured Loki failure is not permission
@@ -278,7 +323,12 @@ export class ObservabilityService {
     }
   }
 
-  private async lokiLogs(args: z.output<typeof logsInput>, start: number, end: number) {
+  private async lokiLogs(
+    request: HttpRequester,
+    args: z.output<typeof logsInput>,
+    start: number,
+    end: number
+  ) {
     const matchers = {
       namespace: args.namespace,
       pod: args.pod,
@@ -297,7 +347,7 @@ export class ObservabilityService {
     url.searchParams.set('end', String(BigInt(end) * 1000000n))
     url.searchParams.set('limit', String(args.limit))
     url.searchParams.set('direction', 'backward')
-    const response = await this.options.request({ url })
+    const response = await request({ url })
 
     if (response.status !== 200) throw new Error(`Loki returned HTTP ${response.status}`)
 

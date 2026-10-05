@@ -147,7 +147,10 @@ async function snapshot(
 ) {
   if (!options.prometheusUrl) throw new Error('PROMETHEUS_URL is not configured')
 
-  const observedAt = new Date((options.now ?? Date.now)()).toISOString()
+  const align = options.queryTimeAlignmentMs ?? 0
+  const current = (options.now ?? Date.now)()
+  // Aligned so a refresh within the window asks Prometheus the identical query.
+  const observedAt = new Date(align > 0 ? current - (current % align) : current).toISOString()
   const end = Date.parse(observedAt) / 1000
   const start = end - (history?.historySeconds ?? 0)
   const expectedSamples = history ? Math.floor(history.historySeconds / history.stepSeconds) + 1 : 0

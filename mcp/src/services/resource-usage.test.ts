@@ -7,7 +7,8 @@ import {
   summarizeSamples
 } from './resource-usage.js'
 import type { ObservabilityKubernetes } from '../clients/observability-kubernetes.js'
-import type { ObservabilityServiceOptions } from './observability-service.js'
+import { ObservabilityService, type ObservabilityServiceOptions } from './observability-service.js'
+import { createCallerBudget } from '../clients/backend-guard.js'
 
 const caller = { identity: { user: 'alice', groups: ['team-a'] } }
 const pod = { namespace: 'team-a', pod: 'api' }
@@ -251,5 +252,54 @@ describe('resource usage snapshots', () => {
     await expect(getPodResourceUsage(options, { ...pod, pod: 'api"} or up' }, caller)).rejects.toThrow()
     await expect(getClusterResourceUsageHistory(options, { historySeconds: 86401 }, caller)).rejects.toThrow()
     expect(request).not.toHaveBeenCalled()
+  })
+})
+
+describe('denial-of-service guards on resource usage', () => {
+  it('aligns the evaluation time so refreshes within the window ask the identical query', async () => {
+    const times: string[] = []
+    const { options } = setup()
+    const request = options.request
+
+    for (const offset of [1_000, 9_000]) {
+      await getPodResourceUsage(
+        {
+          ...options,
+          queryTimeAlignmentMs: 15_000,
+          now: () => Date.parse('2026-10-04T10:00:00Z') + offset,
+          request: async input => {
+            times.push(input.url.searchParams.get('time')!)
+
+            return request(input)
+          }
+        },
+        pod,
+        caller
+      )
+    }
+
+    expect(new Set(times)).toEqual(new Set(['2026-10-04T10:00:00.000Z']))
+  })
+
+  it('charges the caller once per Prometheus query a fan-out call makes', async () => {
+    const { options } = setup()
+    const budget = createCallerBudget({ queriesPerMinute: 1000, maxConcurrentCalls: 1 })
+    let charged = 0
+    const service = new ObservabilityService({
+      ...options,
+      budget: {
+        admit: (key, call) =>
+          budget.admit(key, charge =>
+            call(() => {
+              charged += 1
+              charge()
+            })
+          )
+      }
+    })
+
+    await service.getPodResourceUsage(pod, caller)
+    expect(charged).toBe((options.request as ReturnType<typeof vi.fn>).mock.calls.length)
+    expect(charged).toBeGreaterThan(5)
   })
 })

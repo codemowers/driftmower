@@ -83,6 +83,28 @@
     "requestTimeoutMs": {
       "__name": "OBSERVABILITY_TIMEOUT_MS",
       "__format": "number"
+    },
+    "guards": {
+      "maxConcurrentRequests": {
+        "__name": "OBSERVABILITY_MAX_CONCURRENT_REQUESTS",
+        "__format": "number"
+      },
+      "maxQueuedRequests": {
+        "__name": "OBSERVABILITY_MAX_QUEUED_REQUESTS",
+        "__format": "number"
+      },
+      "queriesPerMinute": {
+        "__name": "OBSERVABILITY_QUERIES_PER_MINUTE",
+        "__format": "number"
+      },
+      "maxConcurrentCallsPerCaller": {
+        "__name": "OBSERVABILITY_MAX_CONCURRENT_CALLS_PER_CALLER",
+        "__format": "number"
+      },
+      "cacheTtlMs": {
+        "__name": "OBSERVABILITY_CACHE_TTL_MS",
+        "__format": "number"
+      }
     }
   },
   "kubernetes": {

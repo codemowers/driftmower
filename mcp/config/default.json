@@ -41,7 +41,14 @@
     "enabled": false,
     "prometheusUrl": "",
     "lokiUrl": "",
-    "requestTimeoutMs": 10000
+    "requestTimeoutMs": 10000,
+    "guards": {
+      "maxConcurrentRequests": 8,
+      "maxQueuedRequests": 32,
+      "queriesPerMinute": 120,
+      "maxConcurrentCallsPerCaller": 2,
+      "cacheTtlMs": 15000
+    }
   },
   "kubernetes": {
     "url": "https://kubernetes.default.svc",

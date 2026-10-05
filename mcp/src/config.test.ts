@@ -148,8 +148,37 @@ describe('loadAppConfig', () => {
     'kubernetes.url': 'https://kubernetes.default.svc',
     'kubernetes.tokenFile': '/token',
     'kubernetes.caFile': '/ca',
-    'observability.requestTimeoutMs': 10000
+    'observability.requestTimeoutMs': 10000,
+    'observability.guards.maxConcurrentRequests': 8,
+    'observability.guards.maxQueuedRequests': 32,
+    'observability.guards.queriesPerMinute': 120,
+    'observability.guards.maxConcurrentCallsPerCaller': 2,
+    'observability.guards.cacheTtlMs': 15000
   }
+
+  it('loads the shared-backend guards, where 0 turns the queue, rate limit and cache off', () => {
+    expect(loadAppConfig([], sourceWith(observability)).observability?.guards).toEqual({
+      maxConcurrentRequests: 8,
+      maxQueuedRequests: 32,
+      queriesPerMinute: 120,
+      maxConcurrentCallsPerCaller: 2,
+      cacheTtlMs: 15000
+    })
+    expect(
+      loadAppConfig(
+        [],
+        sourceWith({
+          ...observability,
+          'observability.guards.maxQueuedRequests': 0,
+          'observability.guards.queriesPerMinute': 0,
+          'observability.guards.cacheTtlMs': 0
+        })
+      ).observability?.guards
+    ).toMatchObject({ maxQueuedRequests: 0, queriesPerMinute: 0, cacheTtlMs: 0 })
+    expect(() =>
+      loadAppConfig([], sourceWith({ ...observability, 'observability.guards.maxConcurrentRequests': 0 }))
+    ).toThrow('OBSERVABILITY_MAX_CONCURRENT_REQUESTS')
+  })
 
   it('loads standalone observability configuration and default OIDC identity mapping', () => {
     const result = loadAppConfig(

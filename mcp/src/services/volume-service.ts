@@ -3,6 +3,7 @@ import { collect } from '../clients/kubernetes-list.js'
 import type { KubernetesReader, ObservabilityKubernetes } from '../clients/observability-kubernetes.js'
 import type { HttpRequester } from '../clients/observability-http.js'
 import type { ObservabilityCaller } from './observability-service.js'
+import type { CallerBudget } from '../clients/backend-guard.js'
 
 export const volumesInput = z
   .object({
@@ -80,12 +81,37 @@ export interface VolumeServiceOptions {
   kubernetes: Pick<ObservabilityKubernetes, 'allowed'> & { read: KubernetesReader }
   prometheusUrl: string | null
   request: HttpRequester
+  // Per-caller admission shared with the metrics and logs tools.
+  budget?: CallerBudget
   now?: () => number
 }
 
 export class VolumeService {
   constructor(private readonly options: VolumeServiceOptions) {}
-  async listVolumes(input: z.input<typeof volumesInput>, caller?: ObservabilityCaller) {
+
+  listVolumes(input: z.input<typeof volumesInput>, caller?: ObservabilityCaller) {
+    const budget = this.options.budget
+
+    if (!budget) return this.runListVolumes(this.options.request, input, caller)
+
+    return budget.admit(caller?.identity.user || 'anonymous', charge =>
+      this.runListVolumes(
+        request => {
+          charge()
+
+          return this.options.request(request)
+        },
+        input,
+        caller
+      )
+    )
+  }
+
+  private async runListVolumes(
+    request: HttpRequester,
+    input: z.input<typeof volumesInput>,
+    caller?: ObservabilityCaller
+  ) {
     const args = volumesInput.parse(input)
 
     if (!caller?.identity.user) throw new Error('Volume listing requires an authenticated caller')
@@ -217,7 +243,7 @@ export class VolumeService {
             url.searchParams.set('query', query)
             url.searchParams.set('time', observedAt)
             url.searchParams.set('limit', '10001')
-            const response = await this.options.request({ url })
+            const response = await request({ url })
 
             if (response.status !== 200) throw new Error(`Prometheus returned HTTP ${response.status}`)
 

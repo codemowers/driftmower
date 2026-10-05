@@ -57,7 +57,8 @@ async function main(): Promise<void> {
       appConfig.tenancy,
       appConfig.provisioning,
       () => appConfig.cluster.id,
-      appConfig.workloadRestartEnabled
+      appConfig.workloadRestartEnabled,
+      { onObservabilityGuard: outcome => metrics.observabilityGuard.inc({ outcome }) }
     )
 
     appConfig.cluster = await discoverClusterIdentity(
