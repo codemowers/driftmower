@@ -1,7 +1,7 @@
 "use client"
 
 import PageHeader from "../components/page-header"
-import ClusterScopePill from "../components/cluster-scope-pill"
+import ProvisioningScopePill from "./components/scope-pill"
 import { StatCaption, StatCell, StatGrid, StatValue } from "../components/stats-card"
 import AccessCard from "./components/access-card"
 import AdmissionList from "./components/admission-list"
@@ -35,7 +35,7 @@ export default function ProvisioningPage() {
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Provisioning" subtitle={SUBTITLE} accessory={<ClusterScopePill />} />
+        <PageHeader title="Provisioning" subtitle={SUBTITLE} accessory={<ProvisioningScopePill />} />
 
         {state.status === "loading" && <LoadingLine loading="cluster support" />}
 

@@ -255,7 +255,7 @@ spec:
   emqx: ({ apiVersion, namespace }) => ({
     yaml: `${head(apiVersion, "EMQX", "my-emqx", namespace)}
 spec:
-  image: emqx:5.8`,
+  image: emqx/emqx:5.8`,
     creates:
       "An MQTT broker at my-emqx-listeners:1883, with the dashboard on :18083. The default dashboard login is admin/public — change it.",
     connect: null,
