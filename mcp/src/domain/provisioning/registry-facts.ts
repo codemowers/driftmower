@@ -113,7 +113,9 @@ export function skaffoldEnvFor(input: { context: string; registryHost: string; n
   return [
     `SKAFFOLD_KUBE_CONTEXT=${input.context}`,
     `SKAFFOLD_DEFAULT_REPO=${input.registryHost}`,
-    `SKAFFOLD_NAMESPACE=${input.namespace}`
+    `SKAFFOLD_NAMESPACE=${input.namespace}`,
+    // Keep the deployment running after `skaffold dev` exits instead of deleting it.
+    'SKAFFOLD_CLEANUP=false'
   ].join('\n')
 }
 

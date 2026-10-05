@@ -240,7 +240,8 @@ describe('loadNamespaceFacts', () => {
           skaffoldEnv: [
             'SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/team-a',
             'SKAFFOLD_DEFAULT_REPO=registry.team-a.example',
-            'SKAFFOLD_NAMESPACE=team-a'
+            'SKAFFOLD_NAMESPACE=team-a',
+            'SKAFFOLD_CLEANUP=false'
           ].join('\n')
         }
       ])

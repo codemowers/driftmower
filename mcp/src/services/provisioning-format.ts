@@ -310,7 +310,7 @@ function registrySection(registry: RegistryFact): string[] {
         : ', served without TLS here, so Docker and Skaffold must be told it is an insecure registry.'),
     '',
     'To build with Skaffold, save these lines as `skaffold.env` next to `skaffold.yaml`. Skaffold reads that file on every run, ' +
-      'so builds are pushed to this registry and deployed to this namespace through its own kube context, whatever context is current. ' +
+      'so builds are pushed to this registry and deployed to this namespace through its own kube context, whatever context is current, and `skaffold dev` leaves the deployment running when it exits. ' +
       'Keep image names in `skaffold.yaml` bare (`myapp`, not a full reference): Skaffold prefixes them with the default repo. ' +
       'The file is specific to this namespace and cluster, so keep it out of version control. ' +
       'Prefer it over `skaffold config set default-repo`, which writes to global config instead of the project.',
