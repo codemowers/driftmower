@@ -21,7 +21,9 @@ export type InventoryState =
   | { status: "error"; message: string }
   | { status: "ready"; entries: ApplicationEntry[]; tenancy: TenancyState }
 
-export type ApplicationsState = { launcher: LauncherState; inventory: InventoryState }
+// domainSuffix: the cluster's hosting domain as the server configured it, or
+// null when it did not (see useDomainSuffix).
+export type ApplicationsState = { launcher: LauncherState; inventory: InventoryState; domainSuffix: string | null }
 
 // Only the inventory narrows; the launcher is personal and stays whole.
 export function scopedHosts(entries: ApplicationEntry[], namespaces: string[] | null): ApplicationEntry[] {
@@ -53,6 +55,7 @@ export function useApplications(): ApplicationsState {
   const [state, setState] = useState<ApplicationsState>({
     launcher: { status: "loading" },
     inventory: { status: "loading" },
+    domainSuffix: null,
   })
 
   useEffect(() => {
@@ -65,9 +68,10 @@ export function useApplications(): ApplicationsState {
         const inventory: InventoryState = "error" in hosts
           ? { status: "error", message: hosts.error }
           : { status: "ready", entries: [], tenancy: hosts.tenancy }
+        const domainSuffix = "error" in hosts ? null : (hosts.domainSuffix ?? null)
 
         if (!Array.isArray(registered)) {
-          setState({ launcher: registered, inventory })
+          setState({ launcher: registered, inventory, domainSuffix })
           return
         }
 
@@ -108,6 +112,7 @@ export function useApplications(): ApplicationsState {
         setState({
           launcher: { status: "ready", entries: launcher },
           inventory: "error" in hosts ? inventory : { status: "ready", entries: others, tenancy: hosts.tenancy },
+          domainSuffix,
         })
       })
       .catch((e: Error) => {
@@ -115,6 +120,7 @@ export function useApplications(): ApplicationsState {
         setState({
           launcher: { status: "error", message: e.message },
           inventory: { status: "error", message: e.message },
+          domainSuffix: null,
         })
       })
 
@@ -126,14 +132,15 @@ export function useApplications(): ApplicationsState {
   return state
 }
 
-// The app is itself deployed at `<name>.<suffix>`, so its own location carries
-// the cluster's domain suffix -- no cluster read and no extra round trip.
-// Guarded for the server render, which has no location; the launcher is still
-// loading then, so the two renders agree on what they draw either way.
-export function useDomainSuffix(): string | null {
-  const [suffix] = useState<string | null>(() =>
+// The configured suffix wins. Without one, fall back to the app's own
+// location, assuming it is deployed at `<name>.<suffix>`; that is wrong for a
+// deployment under a namespace label (dashboard.driftmower.<region>), which is
+// why clusters set DOMAIN_SUFFIX. Guarded for the server render, which has no
+// location; the launcher is still loading then, so both renders agree.
+export function useDomainSuffix(configured: string | null): string | null {
+  const [derived] = useState<string | null>(() =>
     typeof window === "undefined" ? null : suffixFromAppBaseUrl(window.location.origin),
   )
 
-  return suffix
+  return configured ?? derived
 }

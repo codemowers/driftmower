@@ -13,7 +13,9 @@ export type HostEntry = {
 // Anything but "ok" means the inventory is incomplete rather than absent.
 export type TenancyState = "ok" | "not-configured" | "no-session" | "rejected" | "unreachable"
 
-export type HostsResponse = { hosts: HostEntry[]; tenancy: TenancyState }
+// domainSuffix is the cluster's hosting domain when the deployment sets
+// DOMAIN_SUFFIX; absent or null means the page derives it from its own host.
+export type HostsResponse = { hosts: HostEntry[]; tenancy: TenancyState; domainSuffix?: string | null }
 
 export type OidcApp = {
   name: string

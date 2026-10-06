@@ -22,13 +22,13 @@ function matches(entry: ApplicationEntry, query: string): boolean {
 }
 
 export default function ApplicationsPage() {
-  const { launcher, inventory } = useApplications()
+  const { launcher, inventory, domainSuffix: configuredSuffix } = useApplications()
   const releaseScores = useClusterState(s => s.data?.rotenness.releaseScores)
   const { namespaces } = useSandboxScope()
   const seesEverything = useSeesClusterWideViews()
   const tenancyKnown = useSandboxContext(s => s.hydrated)
   const sandboxes = useSandboxContext(s => s.sandboxes)
-  const domainSuffix = useDomainSuffix()
+  const domainSuffix = useDomainSuffix(configuredSuffix)
   const [query, setQuery] = useState("")
   const [showAll, setShowAll] = useState(false)
 
