@@ -242,6 +242,8 @@ export type AdmissionFact = {
   enforcement: string
   guards: { group: string; resource: string; operations: string[] }[]
   messages: string[]
+  // The policy's kubernetes.io/description. Optional: older MCP servers omit it.
+  description?: string | null
   scopedToNamespaceLabels: Record<string, string> | null
 }
 

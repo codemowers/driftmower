@@ -9,6 +9,14 @@ import type { AdmissionFact } from "@/lib/features/provisioning/types"
 // decide whether an apply succeeds — regardless of what your role says.
 const ROW_GRID = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_110px] items-start gap-4"
 
+// The opening sentence states the purpose; the rest is rule detail. Backticks
+// are Markdown code spans in the annotation, which this row renders as text.
+function purposeOf(description: string): string {
+  const plain = description.replaceAll("`", "")
+
+  return /^.*?\.(?=\s|$)/.exec(plain)?.[0] ?? plain
+}
+
 export default function AdmissionList({ policies }: { policies: AdmissionFact[] }) {
   if (policies.length === 0) {
     return (
@@ -35,14 +43,13 @@ export default function AdmissionList({ policies }: { policies: AdmissionFact[] 
             <span className="font-mono text-xs text-muted-foreground">
               {policy.guards.map(g => `${g.resource} (${g.operations.join(", ").toLowerCase()})`).join("; ")}
             </span>
-            {/* Every message, not just the first: a policy often carries a
-                specific rule and a blanket one, and only the blanket one
-                explains why an apply failed. */}
-            {policy.messages.map(message => (
-              <span key={message} className="text-sm text-muted-foreground">
-                {message}
+            {/* Only what the policy is for: its rules are not listed, because a
+                rejected apply already carries the policy's own explanation. */}
+            {policy.description && (
+              <span className="text-sm text-muted-foreground" title={policy.description}>
+                {purposeOf(policy.description)}
               </span>
-            ))}
+            )}
           </div>
 
           <span

@@ -209,7 +209,7 @@ function Ready({
         id="admission"
         title="Admission policies"
         count={capabilities.admissionPolicies.length}
-        hint="These are checked after your permissions and can reject an apply your role otherwise allows."
+        hint="Checked after your permissions: a policy rejects an invalid apply with an explanation, even when your role allows it."
       >
         <div className="flex flex-col gap-4">
           {/* Pod Security first: it is enforced by the apiserver rather than by
