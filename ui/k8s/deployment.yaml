@@ -80,7 +80,7 @@ spec:
             # Printed in the /api/mcp/token quick-start command and in the
             # provisioning page's connection recipes.
             - name: MCP_PUBLIC_URL
-              value: "https://driftmower-mcp.ee-lte-1.codemowers.io"
+              value: "https://mcp.driftmower.ee-lte-1.codemowers.io"
             # Client id of the public `driftmower-mcp` OIDCClient
             # (driftmower-mcp/manifests/oidcclient.yaml), shown on the
             # provisioning page so a client can run the OAuth flow itself.

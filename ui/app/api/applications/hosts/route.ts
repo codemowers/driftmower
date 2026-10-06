@@ -14,9 +14,10 @@ const NO_STORE = { "Cache-Control": "no-store" }
 export async function GET() {
   const [registered, scope] = await Promise.all([fetchRegisteredApps(), fetchSandboxScope()])
   const tenancy = scope.state === "ok" ? "ok" : scope.state
+  const domainSuffix = process.env.DOMAIN_SUFFIX?.trim().replace(/^\.+|\.+$/g, "") || null
 
   if (!isInCluster()) {
-    return Response.json({ hosts: [], tenancy }, { headers: NO_STORE })
+    return Response.json({ hosts: [], tenancy, domainSuffix }, { headers: NO_STORE })
   }
 
   let entries
@@ -39,5 +40,5 @@ export async function GET() {
       ownHosts.has(entry.host) || readsEveryNamespace || (permitted?.has(entry.namespace) ?? false),
   )
 
-  return Response.json({ hosts, tenancy }, { headers: NO_STORE })
+  return Response.json({ hosts, tenancy, domainSuffix }, { headers: NO_STORE })
 }

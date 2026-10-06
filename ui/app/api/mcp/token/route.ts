@@ -53,7 +53,7 @@ export async function GET() {
     }
   }
 
-  const mcpUrl = process.env.MCP_PUBLIC_URL || "https://driftmower-mcp.ee-lte-1.codemowers.io"
+  const mcpUrl = process.env.MCP_PUBLIC_URL || "https://mcp.driftmower.ee-lte-1.codemowers.io"
 
   return Response.json(
     {
