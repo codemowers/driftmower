@@ -472,6 +472,7 @@ it('projects the client-facing fact without the server-side pointers', () => {
   )
 
   expect(Object.keys(toAdmissionFact(fact)).sort()).toEqual([
+    'description',
     'enforced',
     'enforcement',
     'guards',
@@ -479,6 +480,16 @@ it('projects the client-facing fact without the server-side pointers', () => {
     'name',
     'scopedToNamespaceLabels'
   ])
+})
+
+it('carries the policy description, whitespace-folded, or null without one', () => {
+  const described = {
+    ...INGRESS_GUARD,
+    metadata: { name: 'sandbox-ingress-guard', annotations: { 'kubernetes.io/description': 'Ingresses must use\n  the sandbox domain. ' } }
+  }
+
+  expect(toAdmissionFacts([described], [])[0].description).toBe('Ingresses must use the sandbox domain.')
+  expect(toAdmissionFacts([INGRESS_GUARD], [])[0].description).toBe(null)
 })
 
 it('a binding that selects by expression does not govern a namespace outside it', () => {

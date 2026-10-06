@@ -220,6 +220,7 @@ export type AdmissionFact = {
   enforcement: string
   guards: { group: string; resource: string; operations: string[] }[]
   messages: string[]
+  description: string | null
   scopedToNamespaceLabels: Record<string, string> | null
 }
 

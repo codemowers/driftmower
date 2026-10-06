@@ -123,8 +123,9 @@ it('an allowing verdict carries the constraints the manifest must meet', () => {
   )
 
   expect(allowed.verdict).toBe('yes')
-  expect(allowed.reason).toContain('no enforced admission policy forbids it')
-  expect(allowed.reason).toContain('cnpg-replicas: spec.instances must be between 1 and 2')
+  expect(allowed.reason).toBe(
+    'Kubernetes RBAC allows creating clusters.postgresql.cnpg.io. Enforced admission policies (cnpg-replicas) validate the manifest and reject an invalid one with an explanation.'
+  )
   expect(
     composeCreateVerdict({ verdict: 'unknown', reason: 'webhook down' }, [], 'x', constraints).reason
   ).toContain('cnpg-replicas')
