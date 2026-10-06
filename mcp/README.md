@@ -84,7 +84,7 @@ removing its leading `kube.` gives the cluster name. The MCP identity and agent
 instructions use this discovered endpoint. If the ingress is absent, unreadable,
 or has no unambiguous hostname, the configured identity and k3s advertised API
 address are retained. Ingress discovery grants `get` only for ingresses named `kubelogin` through
-the existing ClusterRole; the application reads the infra-owned ingress in `default` (included in `manifests/templates/observability-rbac.yaml`).
+the existing ClusterRole; the application reads the infra-owned ingress in `default` (included in `chart/templates/observability-rbac.yaml`).
 
 `KUBERNETES_PUBLIC_API_URL` is the fallback administrator-facing API URL found in
 kubeconfig, including its port and any proxy path. It may require a VPN. It is
@@ -412,12 +412,12 @@ them with Prometheus's `--query.timeout`, `--query.max-samples` and
 `--query.max-concurrency`, which bound every client of Prometheus, not only this
 gateway.
 
-The service account in [observability-rbac.yaml](manifests/templates/observability-rbac.yaml)
+The service account in [observability-rbac.yaml](chart/templates/observability-rbac.yaml)
 can list capability catalogs, create access reviews, get pod logs and list/watch
 workload resources. It cannot impersonate users or modify workloads. The
 inventory requests Secret and ConfigMap metadata only, but Kubernetes RBAC
 cannot constrain a `list`/`watch` grant to metadata: the service account has
-collection read permissions, including Secrets. Skaffold renders `manifests/` as a Helm chart and
+collection read permissions, including Secrets. Skaffold renders the Helm chart in `chart/` and
 applies it with kubectl; it does not install a Helm release. The selected namespace
 (`--namespace` or the kubeconfig context namespace) is used for every app resource
 and the ClusterRoleBinding's service-account subject. No app namespace is baked
@@ -678,14 +678,26 @@ curl http://127.0.0.1:3001/readyz
 
 ## Kubernetes Deployment
 
-Kubernetes manifests live in `manifests/`. They deploy the MCP server in HTTP
-mode as an internal `ClusterIP` service in the selected release namespace.
-Namespaces must already exist and remain outside application release ownership.
-The former `manifests/namespace.yaml` was removed after checking ee-west-1's
-`driftmowers` namespace: no Helm, Argo CD, Flux or Skaffold tracking metadata,
-no Helm release in the namespace, and no Argo CD Namespace inventory entry.
-The live namespace was not changed or deleted. For other clusters, inspect
-ownership and release inventories before migrating an existing declaration.
+The Helm chart lives in `chart/` and is shared by direct Helm deployments and
+Skaffold. It deploys the MCP server in HTTP mode as an internal `ClusterIP`
+service in the selected release namespace. The namespace must already exist;
+the chart does not create or own it.
+
+Deploy the image published by GitHub Actions to an existing namespace:
+
+```bash
+helm upgrade --install driftmower-mcp ./chart --namespace driftmowers
+```
+
+The default image is `ghcr.io/codemowers/driftmower-mcp:latest`. To deploy a Git-tagged
+image, add `--set-string image=ghcr.io/codemowers/driftmower-mcp:<tag>`.
+The chart omits `imagePullSecrets`; the cluster admission policy supplies registry
+credentials for this deployment. Skaffold uses the same chart and overrides its
+image with the artifact it builds locally.
+
+The chart requires the Certificate and OIDCClient APIs and their controllers.
+Its PodMonitor is rendered only when the monitoring API is available. Configure
+full public hostnames on clusters without hostname expansion policies.
 
 The chart defaults to Kubernetes and observability tools with `backend.enabled=false`.
 It sets `DRIFTMOWER_BE_ENABLED=false`, so no backend service token is required.
@@ -693,7 +705,7 @@ The in-cluster HTTP server binds to `::` so Kubernetes can probe it in IPv6 or
 dual-stack clusters.
 
 To also enable drift-analysis tools, set `backend.enabled=true` in
-`manifests/values.yaml` and configure `backend.url`. The pod then requires the
+`chart/values.yaml` and configure `backend.url`. The pod then requires the
 Secret named by `backend.serviceTokenSecret.name` (default
 `driftmower-mcp-be-auth-token`) and its `backend.serviceTokenSecret.key` (default
 `token`). No manifest creates this credential. Mint one and register it with
@@ -727,8 +739,8 @@ kubectl -n driftmowers port-forward deploy/driftmower-mcp 3000:3000 3001:3001
 After forwarding, Codex can use `http://127.0.0.1:3000/mcp` and readiness is
 available at `http://127.0.0.1:3001/readyz`.
 
-The Ingress, its certificate and the OIDC client are in `manifests/templates/ingress.yaml`,
-`manifests/templates/certificate.yaml` and `manifests/templates/oidcclient.yaml`. See
+The Ingress, its certificate and the OIDC client are in `chart/templates/ingress.yaml`,
+`chart/templates/certificate.yaml` and `chart/templates/oidcclient.yaml`. See
 **Authentication** below before changing any of them.
 
 ## Skaffold Quickstart
@@ -823,7 +835,7 @@ claude mcp add --transport http driftmower \
 **The token expires in about an hour.** passmower issues no longer-lived access
 token, so this is for trying it out, not for a client you intend to keep.
 
-**Durable — OAuth with PKCE.** `manifests/templates/oidcclient.yaml` registers a public
+**Durable — OAuth with PKCE.** `chart/templates/oidcclient.yaml` registers a public
 `mcp` client. A client that lets you supply a client id does PKCE and
 refreshes itself:
 
@@ -1207,7 +1219,7 @@ A fact the capability layer could not read arrives as a `degraded` entry and is
 rendered under "Facts that could not be read", never as an absent or passing
 one. A refused read that looks like an empty result is the single failure mode
 this layer exists to prevent. The service account needs the read-only rules in
-[observability-rbac.yaml](manifests/templates/observability-rbac.yaml): nodes,
+[observability-rbac.yaml](chart/templates/observability-rbac.yaml): nodes,
 deployments, resourcequotas, limitranges, networkpolicies, ciliumnetworkpolicies,
 services and ingresses (for registries), kyverno clusterpolicies and `get` on ConfigMaps (narrow it with the Helm value
 `rbac.paramConfigMapNames`), on top of the catalogs and `subjectaccessreviews`.

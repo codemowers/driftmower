@@ -1,4 +1,5 @@
-# Production image; Skaffold overrides this with its built artifact.
+# GitHub Actions publishes latest from main/master and image tags from Git tags.
+# Skaffold overrides this with its built artifact for local development.
 image: ghcr.io/codemowers/driftmower-mcp:latest
 
 # Optional explicit cluster identity. Leave empty to use runtime discovery.

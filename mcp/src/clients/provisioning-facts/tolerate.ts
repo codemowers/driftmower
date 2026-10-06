@@ -23,7 +23,7 @@ export function rbacDenied(source: string): Unknown {
     reason: 'rbac',
     detail:
       `Not authorized to read ${source} (403). The driftmower-mcp ServiceAccount needs get/list on ${source}; ` +
-      'add the rule to manifests/templates/observability-rbac.yaml and redeploy.'
+      'add the rule to chart/templates/observability-rbac.yaml and redeploy.'
   }
 }
 
