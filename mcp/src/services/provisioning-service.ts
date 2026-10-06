@@ -86,7 +86,7 @@ export interface AccessCheck {
   admission: Denial[]
   // Enforced policies that only shape the object: the operation is allowed if
   // the manifest meets them.
-  admissionConstraints: Denial[]
+  admissionConstraints: { policy: string }[]
   // Mutating policies that rewrite the object on CREATE or UPDATE, with what
   // each says it sets and requires.
   admissionDefaults: AdmissionDefault[]
@@ -296,7 +296,7 @@ export class ProvisioningService {
           reason: `The call carried no verified caller, so permission was not checked. Run \`kubectl auth can-i ${input.verb} ${what}\`.`,
           rbac: { verdict: 'unknown', reason: 'no verified caller' },
           admission,
-          admissionConstraints,
+          admissionConstraints: admissionConstraints.map(({ policy }) => ({ policy })),
           admissionDefaults,
           identity: null
         }
@@ -333,7 +333,7 @@ export class ProvisioningService {
         reason: composed.reason,
         rbac,
         admission,
-        admissionConstraints,
+        admissionConstraints: admissionConstraints.map(({ policy }) => ({ policy })),
         admissionDefaults,
         identity
       }

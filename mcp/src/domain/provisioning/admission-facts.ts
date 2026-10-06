@@ -66,6 +66,8 @@ export type AdmissionPolicyFact = {
   guards: GuardedOperation[]
   // The policy's own message strings: written for a human hitting the denial.
   messages: string[]
+  // What the policy is for, from its kubernetes.io/description annotation.
+  description: string | null
   // The labels a binding scopes on. Null means it applies everywhere.
   scopedToNamespaceLabels: Record<string, string> | null
   // Every namespace label key the denying binding's selector mentions, whether
@@ -291,6 +293,10 @@ function messagesOf(policy: RawAdmissionPolicy): string[] {
   return [...new Set(messages)]
 }
 
+function descriptionOf(policy: RawAdmissionPolicy): string | null {
+  return policy.metadata?.annotations?.['kubernetes.io/description']?.replace(/\s+/g, ' ').trim() || null
+}
+
 export function toAdmissionFacts(
   policies: RawAdmissionPolicy[],
   bindings: RawAdmissionBinding[]
@@ -332,6 +338,7 @@ export function toAdmissionFacts(
       enforcement,
       guards: guardsOf(policy),
       messages: messagesOf(policy),
+      description: descriptionOf(policy),
       scopedToNamespaceLabels: scoping && Object.keys(scoping).length > 0 ? scoping : null,
       bindingLabelKeys,
       bindingSelectors: denying.map(binding => binding.spec?.matchResources?.namespaceSelector ?? {}),
@@ -518,6 +525,7 @@ export function toAdmissionFact(fact: AdmissionPolicyFact): {
   enforcement: string
   guards: GuardedOperation[]
   messages: string[]
+  description: string | null
   scopedToNamespaceLabels: Record<string, string> | null
 } {
   return {
@@ -526,6 +534,7 @@ export function toAdmissionFact(fact: AdmissionPolicyFact): {
     enforcement: fact.enforcement,
     guards: fact.guards,
     messages: fact.messages,
+    description: fact.description,
     scopedToNamespaceLabels: fact.scopedToNamespaceLabels
   }
 }

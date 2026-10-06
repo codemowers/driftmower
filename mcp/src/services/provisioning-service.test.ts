@@ -547,9 +547,9 @@ describe('ProvisioningService', () => {
 
     expect(await subject.checkAccess(identity, { ...cluster, verb: 'create' })).toMatchObject({
       verdict: 'yes',
-      reason: expect.stringContaining('cnpg-replicas: spec.instances must be between 1 and 2'),
+      reason: expect.not.stringContaining('spec.instances'),
       admission: [],
-      admissionConstraints: [{ policy: 'cnpg-replicas', messages: ['spec.instances must be between 1 and 2.'] }]
+      admissionConstraints: [{ policy: 'cnpg-replicas' }]
     })
     expect(await subject.checkAccess(identity, { ...cluster, verb: 'update' })).toMatchObject({
       verdict: 'yes',

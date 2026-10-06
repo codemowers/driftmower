@@ -159,6 +159,7 @@ const admissionFactSchema = z.object({
     })
   ),
   messages: z.array(z.string()),
+  description: z.string().nullable(),
   scopedToNamespaceLabels: z.record(z.string(), z.string()).nullable()
 })
 
@@ -244,7 +245,9 @@ export const checkAccessOutputShape = {
   reason: z.string().optional(),
   rbac: z.object({ verdict: verdictSchema, reason: z.string().nullable() }).optional(),
   admission: z.array(z.object({ policy: z.string(), messages: z.array(z.string()) })).optional(),
-  admissionConstraints: z.array(z.object({ policy: z.string(), messages: z.array(z.string()) })).optional(),
+  // Names only: the policies explain their own rejections, so their rules are
+  // not repeated here.
+  admissionConstraints: z.array(z.object({ policy: z.string() })).optional(),
   admissionDefaults: z.array(admissionDefaultSchema).optional(),
   identity: z
     .object({ user: z.string(), groups: z.array(z.string()) })

@@ -140,7 +140,7 @@ export function composeCreateVerdict(
         verdict: 'yes',
         reason:
           constraints.length > 0
-            ? `Kubernetes RBAC allows creating ${what}, and no enforced admission policy forbids it. ${constraintSentence(constraints)}`
+            ? `Kubernetes RBAC allows creating ${what}. ${constraintSentence(constraints)}`
             : `Kubernetes RBAC allows creating ${what}, and no enforced admission policy governs it.`
       }
     case 'no':
@@ -155,13 +155,12 @@ export function composeCreateVerdict(
   }
 }
 
-// Requirements the manifest itself must meet, in the policies' own words.
+// Policies that check the manifest itself. Their rules are not repeated: a
+// rejected apply carries the policy's own explanation.
 export function constraintSentence(constraints: Denial[]): string {
-  const rules = constraints.map(
-    constraint => `${constraint.policy}: ${constraint.messages.map(message => message.replace(/\.$/, '')).join('. ')}`
-  )
+  const names = constraints.map(constraint => constraint.policy).join(', ')
 
-  return `Enforced admission policies still check the manifest (${rules.join('; ')}).`
+  return `Enforced admission policies (${names}) validate the manifest and reject an invalid one with an explanation.`
 }
 
 // The verdict for an offering in a namespace: every resource its sample would
