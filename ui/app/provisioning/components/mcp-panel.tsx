@@ -5,7 +5,7 @@ import { KeyRound } from "lucide-react"
 
 import CopyButton from "@/app/components/copy-button"
 import { readApiError } from "@/lib/utils/read-api-error"
-import { mcpQuickstarts, type Snippet } from "@/lib/features/provisioning/mcp-quickstarts"
+import { mcpQuickstarts, type Quickstart } from "@/lib/features/provisioning/mcp-quickstarts"
 
 // Connect a coding agent to the MCP gateway.
 //
@@ -94,24 +94,27 @@ export default function McpPanel() {
       </div>
 
       {mcpQuickstarts(config).map(quickstart => (
-        <SnippetBlock key={quickstart.id} snippet={quickstart} />
+        <QuickstartBlock key={quickstart.id} quickstart={quickstart} />
       ))}
     </div>
   )
 }
 
-function SnippetBlock({ snippet }: { snippet: Snippet }) {
+function QuickstartBlock({ quickstart }: { quickstart: Quickstart }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium text-foreground">{snippet.heading}</p>
-      <div className="relative">
-        <span className="absolute right-3 top-2 z-10">
-          <CopyButton value={snippet.text} />
-        </span>
-        <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">
-          {snippet.text}
-        </pre>
-      </div>
+      <p className="text-sm font-medium text-foreground">{quickstart.heading}</p>
+      {quickstart.caption && <p className="-mt-1 text-sm text-muted-foreground">{quickstart.caption}</p>}
+      {quickstart.blocks.map(block => (
+        <div key={block} className="relative">
+          <span className="absolute right-3 top-2 z-10">
+            <CopyButton value={block} />
+          </span>
+          <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">
+            {block}
+          </pre>
+        </div>
+      ))}
     </div>
   )
 }
