@@ -69,12 +69,19 @@ function logOAuthFailure(what: string, error: unknown): boolean {
   return rejected
 }
 
-export async function getValidAccessToken(session: IronSession<SessionData>): Promise<string | null> {
+// `fresh` skips the cached token and always runs a refresh grant. The
+// namespaces claim is fixed when a token is minted, so a token issued before
+// the user got a new sandbox does not cover it for up to an hour; passmower
+// asks platform-manager again on every grant, refreshes included.
+export async function getValidAccessToken(
+  session: IronSession<SessionData>,
+  { fresh = false }: { fresh?: boolean } = {},
+): Promise<string | null> {
   if (!session.accessToken) {
     return null
   }
 
-  if (!isAccessTokenExpired(session)) {
+  if (!fresh && !isAccessTokenExpired(session)) {
     return session.accessToken
   }
 
@@ -93,8 +100,13 @@ export async function getValidAccessToken(session: IronSession<SessionData>): Pr
 
     return session.accessToken ?? null
   } catch (error) {
-    if (logOAuthFailure("token refresh", error)) await session.destroy()
-    return null
+    if (logOAuthFailure("token refresh", error)) {
+      await session.destroy()
+      return null
+    }
+    // An unreachable IdP is no reason to fail a request the cached token
+    // still covers; only an optional refresh lands here with one.
+    return isAccessTokenExpired(session) ? null : session.accessToken
   }
 }
 

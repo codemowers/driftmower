@@ -14,7 +14,11 @@ const triggerAgent = new Agent({
 
 export async function POST(req: Request) {
   const session = await getSession()
-  const accessToken = await getValidAccessToken(session)
+  // A fresh token, so the analysis covers every namespace the user holds now.
+  // A cached one predates any sandbox created since it was minted, and the
+  // backend scopes the scan to the token's namespaces claim: the new sandbox
+  // would be missing from the report, or the scan would find no containers.
+  const accessToken = await getValidAccessToken(session, { fresh: true })
   if (!accessToken) {
     return Response.json({ error: "not authenticated" }, { status: 401 })
   }
