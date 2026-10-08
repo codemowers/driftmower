@@ -142,6 +142,19 @@ export default function SandboxDetailPage() {
           shows the hostname it may claim, which storage classes exist, how much quota is left, and the
           admission rules that will reject a deployment here.
         </p>
+        {sandbox.registryEnabled && (
+          <p className="text-sm text-muted-foreground">
+            This sandbox runs its own container registry. Its{" "}
+            <PrefetchLink
+              href={`${linkTo("/provisioning", { drop: ["focus"] })}#registry`}
+              className="text-brand-label underline decoration-dotted underline-offset-2 hover:text-brand"
+            >
+              Container registry
+            </PrefetchLink>{" "}
+            section has the <code className="font-mono text-xs">docker login</code>, a ready{" "}
+            <code className="font-mono text-xs">skaffold.env</code> and a pull example.
+          </p>
+        )}
       </main>
     </div>
   )

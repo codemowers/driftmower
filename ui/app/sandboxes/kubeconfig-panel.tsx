@@ -143,6 +143,10 @@ kubectl config use-context ${context}`
 
         {state.status === "ready" && (
           <>
+            <p className="text-xs text-muted-foreground">
+              Scoped to this sandbox&rsquo;s namespace. Access is bound to the sandbox&rsquo;s owners, so
+              this file works for each of them and for nobody else.
+            </p>
             <pre className="overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs text-foreground">
               {state.yaml}
             </pre>
