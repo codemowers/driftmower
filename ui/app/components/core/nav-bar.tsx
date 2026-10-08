@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/session"
 import { useSandboxContext } from "@/lib/tenancy/sandbox-context"
 import { noteNavigation } from "@/lib/browser/in-app-history"
+import { setActivePageSection, usePageSectionsStore } from "@/lib/hooks/use-page-sections"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
@@ -63,6 +64,7 @@ export default function NavBar({
   const { isConnected, connectionError, clusterName, reportId } = useClusterState()
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
+  const pageSections = usePageSectionsStore()
 
   // Resolved on the server, so a hidden item never flashes in on first paint.
   const visibleItems = navItems.filter(item => seesClusterWideViews || !item.clusterWide)
@@ -172,10 +174,43 @@ export default function NavBar({
                 </Link>
               )
 
+              // The open page's own sections, nested under its entry.
+              const sections =
+                isExpanded && active && pageSections.href === item.href ? pageSections.sections : []
+
               return (
                 <li key={item.href} className="w-full">
                   {isExpanded ? (
-                    link
+                    <>
+                      {link}
+                      {sections.length > 0 && (
+                        <ul
+                          aria-label={`${item.name} sections`}
+                          className="mb-1 ml-9 mt-1 flex flex-col border-l border-border"
+                        >
+                          {sections.map(section => {
+                            const current = section.id === pageSections.active
+                            return (
+                              <li key={section.id}>
+                                <a
+                                  href={`#${section.id}`}
+                                  aria-current={current ? "location" : undefined}
+                                  onClick={() => setActivePageSection(section.id)}
+                                  className={cn(
+                                    "-ml-px block border-l py-1.5 pl-3 pr-2 text-sm transition-colors",
+                                    current
+                                      ? "border-brand font-medium text-brand"
+                                      : "border-transparent text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  {section.title}
+                                </a>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </>
                   ) : (
                     <Tooltip>
                       <TooltipTrigger asChild>
