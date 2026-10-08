@@ -12,7 +12,7 @@ import PodSecurityCard from "./components/pod-security-card"
 import RegistryCard from "./components/registry-card"
 import Section from "./components/section"
 import StorageList from "./components/storage-list"
-import TableOfContents, { type TocEntry } from "./components/table-of-contents"
+import { usePageSections, type PageSection } from "@/lib/hooks/use-page-sections"
 import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
 import { useSandboxContext, useSandboxScope, type SandboxInfo } from "@/lib/tenancy/sandbox-context"
 import type { CapabilityResponse } from "@/lib/features/provisioning/types"
@@ -71,9 +71,9 @@ function Ready({
   const zones = capabilities.topology.zones.filter(z => z.zone !== "(no zone label)")
   const enforced = capabilities.admissionPolicies.filter(p => p.enforced)
 
-  // Mirrors the render conditions below so the list never links to a section
-  // that is not on the page.
-  const toc: TocEntry[] = [
+  // Listed under Provisioning in the nav bar. Mirrors the render conditions
+  // below so the list never links to a section that is not on the page.
+  const sections: PageSection[] = [
     ...(capabilities.degraded.length > 0 ? [{ id: "not-checked", title: "Not checked" }] : []),
     ...(scoped ? [{ id: "access", title: "Your access" }] : []),
     { id: "coding-agent", title: "Connect a coding agent" },
@@ -83,11 +83,10 @@ function Ready({
     { id: "storage", title: "Storage" },
     { id: "admission", title: "Admission policies" },
   ]
+  usePageSections("/provisioning", sections)
 
   return (
-    <div className="flex flex-col gap-8 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:items-start xl:gap-x-10">
-      <TableOfContents entries={toc} />
-      <div className="flex min-w-0 flex-col gap-8">
+    <div className="flex min-w-0 flex-col gap-8">
       <StatGrid>
         <StatCell label="Operators installed">
           <StatValue>{runningOfferings.length}</StatValue>
@@ -219,7 +218,6 @@ function Ready({
           <AdmissionList policies={capabilities.admissionPolicies} />
         </div>
       </Section>
-      </div>
     </div>
   )
 }
