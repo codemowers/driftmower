@@ -3,11 +3,25 @@ import "server-only"
 import * as oidc from "openid-client"
 import type { IronSession } from "iron-session"
 
+import { createDeadTokenRegistry, isDeadTokenError } from "./dead-refresh-tokens"
 import { getOidcConfig, getOidcRuntimeConfig } from "./oidc"
 import type { SessionData } from "./session"
 import { causeOf } from "@/lib/server/error-response"
 
 const EXPIRY_SKEW_SECONDS = 60
+
+const deadRefreshTokens = createDeadTokenRegistry()
+
+// A Server Component may not write cookies, and getPlatformManagerToken is
+// reached from the root layout. There the session cannot be ended; the dead
+// token is remembered instead, and the next route handler ends it.
+async function destroySessionIfWritable(session: IronSession<SessionData>): Promise<void> {
+  try {
+    await session.destroy()
+  } catch {
+    // Not writable from here.
+  }
+}
 
 type TokenResponse = oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers
 
@@ -81,6 +95,14 @@ export async function getValidAccessToken(
     return null
   }
 
+  // Found dead by a platform-manager grant: the cached access token would
+  // still work, but the session cannot outlive it, so end it now rather than
+  // leave the user with half the app failing until it expires.
+  if (deadRefreshTokens.has(session.refreshToken)) {
+    await destroySessionIfWritable(session)
+    return null
+  }
+
   if (!fresh && !isAccessTokenExpired(session)) {
     return session.accessToken
   }
@@ -100,6 +122,7 @@ export async function getValidAccessToken(
 
     return session.accessToken ?? null
   } catch (error) {
+    if (isDeadTokenError(error)) deadRefreshTokens.mark(session.refreshToken)
     if (logOAuthFailure("token refresh", error)) {
       await session.destroy()
       return null
@@ -129,11 +152,16 @@ const pmTokenCache = new Map<string, { token: string; expiresAt: number }>()
 // Second resource-scoped access token for the platform-manager API, minted
 // from the same refresh token but with its own resource indicator (RFC 8707).
 //
-// Unlike getValidAccessToken, a refresh failure here does not destroy the
-// session — the driftmower-api token may still be perfectly valid, so the
+// Only a dead refresh token ends the session here. Any other failure leaves
+// it alone — the driftmower-api token may still be perfectly valid, so the
 // caller just answers 401 for the platform-manager routes.
 export async function getPlatformManagerToken(session: IronSession<SessionData>): Promise<string | null> {
   if (!session.refreshToken) {
+    return null
+  }
+
+  if (deadRefreshTokens.has(session.refreshToken)) {
+    await destroySessionIfWritable(session)
     return null
   }
 
@@ -171,6 +199,10 @@ export async function getPlatformManagerToken(session: IronSession<SessionData>)
     return tokens.access_token
   } catch (error) {
     logOAuthFailure("platform-manager token grant", error)
+    if (isDeadTokenError(error)) {
+      deadRefreshTokens.mark(session.refreshToken)
+      await destroySessionIfWritable(session)
+    }
     return null
   }
 }
