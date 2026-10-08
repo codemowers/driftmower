@@ -1,12 +1,14 @@
 import { mcpAudience } from "@/lib/auth/mcp-audience"
 import { getSession } from "@/lib/auth/session"
 import { mintMcpToken } from "@/lib/server/mcp-token"
-import { claudeCodePasteCommand } from "@/lib/features/provisioning/mcp-quickstarts"
+import { claudeCodeTokenCommand } from "@/lib/features/provisioning/mcp-quickstarts"
 
 // Mints an MCP-audience access token for the signed-in user, so they can paste
 // one into an MCP client and be connected in a minute.
 //
-// This is the quick start, not the durable path. The token lasts about an hour
+// The provisioning page no longer links here -- it offers only the OAuth flow --
+// but the route stays for fetching a token with curl. It is not the durable
+// path. The token lasts about an hour
 // (passmower's resourceIndicators accessTokenTTL) and this route has no way to
 // give a client a refresh token, so a client configured with a static header
 // will start failing after that. The durable path is OAuth + PKCE against the
@@ -63,12 +65,9 @@ export async function GET() {
       // The caveat travels with the token, so nobody wires this into a client
       // expecting it to keep working.
       caveat: `This token expires in about ${Math.round(result.expiresIn / 60)} minutes. For a connection that keeps working, use the OAuth flow instead of a pasted token.`,
-      // Built by the same function the provisioning panel renders, so a curl
-      // user and the page cannot be told different things.
-      command: claudeCodePasteCommand({
+      command: claudeCodeTokenCommand({
         mcpUrl: `${mcpUrl.replace(/\/+$/, "")}/mcp`,
         token: result.accessToken,
-        clientId: null,
       }),
     },
     { headers: NO_STORE }

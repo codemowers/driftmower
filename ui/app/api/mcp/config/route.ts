@@ -2,9 +2,8 @@ import { mcpAudience } from "@/lib/auth/mcp-audience"
 
 // What the provisioning page needs to render the MCP connection recipes.
 //
-// Carries no secret, so the page can show the commands — with a placeholder
-// where the token goes — before anyone asks for a token. Minting one is a
-// separate, deliberate click against /api/mcp/token.
+// Carries no secret: the page shows OAuth commands only, and a public client's
+// id travels in every authorize URL anyway.
 //
 // Still behind the session gate: proxy.ts exempts only
 // /api/provisioning/capabilities, and only when a bearer is present.
@@ -22,8 +21,8 @@ export type McpConfigResponse = {
   mcpUrl: string | null
   audience: string
   // The public `driftmower-mcp` OIDC client. Null when unconfigured, and the
-  // page then omits the OAuth flow rather than offering a dead end — passmower
-  // has no dynamic client registration, so no client can discover this itself.
+  // page then explains instead of offering commands — passmower has no dynamic
+  // client registration, so no client can discover this itself.
   clientId: string | null
 }
 
