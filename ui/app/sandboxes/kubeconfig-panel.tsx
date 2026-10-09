@@ -10,6 +10,19 @@ import { readContext } from "@/lib/features/sandboxes/kubeconfig"
 
 const KREW_INSTALL_URL = "https://krew.sigs.k8s.io/docs/user-guide/setup/install/"
 
+// The bash/zsh recipe from the krew install docs, plus the PATH line it asks
+// you to add to your shell rc (exported here so the current shell sees krew).
+const KREW_INSTALL_SCRIPT = `(
+  set -x; cd "$(mktemp -d)" &&
+  OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+  ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\\(arm\\)\\(64\\)\\?.*/\\1\\2/' -e 's/aarch64$/arm64/')" &&
+  KREW="krew-\${OS}_\${ARCH}" &&
+  curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/\${KREW}.tar.gz" &&
+  tar zxvf "\${KREW}.tar.gz" &&
+  ./"\${KREW}" install krew
+)
+export PATH="\${KREW_ROOT:-$HOME/.krew}/bin:$PATH"`
+
 type FetchState =
   | { status: "loading" }
   | { status: "error"; message: string }
@@ -151,17 +164,29 @@ kubectl config use-context ${context}`
               {state.yaml}
             </pre>
             <p className="text-xs text-muted-foreground">
-              Needs kubectl plus the kubelogin plugin. Install{" "}
+              Needs kubectl plus the kubelogin plugin, installed through krew. No krew yet? With git
+              installed, run this in bash or zsh, and add the <code className="font-mono">export PATH=…</code> line to
+              your <code className="font-mono">~/.bashrc</code> or{" "}
+              <code className="font-mono">~/.zshrc</code> so it sticks (fish and Windows: see the{" "}
               <a
                 href={KREW_INSTALL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-brand-label underline underline-offset-2"
               >
-                krew
-              </a>{" "}
-              first, then <code className="font-mono">kubectl krew install oidc-login</code>. On
-              macOS <code className="font-mono">brew install int128/kubelogin/kubelogin</code> works
+                krew install docs
+              </a>
+              ):
+            </p>
+            <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-muted p-3">
+              <pre className="overflow-x-auto font-mono text-xs text-foreground">
+                {KREW_INSTALL_SCRIPT}
+              </pre>
+              <CopyButton value={KREW_INSTALL_SCRIPT} className="shrink-0" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Then <code className="font-mono">kubectl krew install oidc-login</code>. On macOS{" "}
+              <code className="font-mono">brew install int128/kubelogin/kubelogin</code> works
               without krew.
             </p>
             <p className="text-xs text-muted-foreground">
