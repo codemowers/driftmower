@@ -8,6 +8,7 @@ import type { SandboxInfo } from "@/lib/tenancy/sandbox-context"
 
 const ROBOT_SECRET = "registry-robot"
 const PULL_SECRET = "registry-pull"
+const SKAFFOLD_DOCS_URL = "https://skaffold.dev/docs/"
 
 function loginCommand(namespace: string, host: string): string {
   return `kubectl -n ${namespace} get secret ${ROBOT_SECRET} -o jsonpath='{.data.password}' | base64 -d | \\
@@ -119,7 +120,15 @@ function RegistryDetails({ namespace, registry }: { namespace: string; registry:
         value={skaffoldEnvCommand(registry.skaffoldEnv)}
       />
       <p className="mt-2 text-sm text-muted-foreground">
-        skaffold reads this file on every run, so builds are pushed to this registry and deployed to {namespace}
+        <a
+          href={SKAFFOLD_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand-label underline underline-offset-2"
+        >
+          skaffold
+        </a>{" "}
+        reads this file on every run, so builds are pushed to this registry and deployed to {namespace}
         {" "}through its own kube-context, whichever context is current. Keep image names in
         <code className="mx-1 font-mono text-xs text-brand-label">skaffold.yaml</code>
         bare (<code className="font-mono text-xs text-brand-label">myapp</code>): skaffold prefixes them with
