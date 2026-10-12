@@ -7,6 +7,7 @@ import './service-links.js'
 import { setTimeout, clearTimeout } from 'node:timers'
 
 import { createBearerAuthenticator } from './auth/bearer.js'
+import { withServiceAccountAuthentication } from './auth/service-account.js'
 import { DriftmowerBackendClient } from './backend/client.js'
 import { BackendImageUpdateRepository } from './backend/image-update-repository.js'
 import { BackendReportSnapshotRepository } from './backend/report-snapshot-repository.js'
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
       return
     }
 
-    const authenticator = appConfig.oidc
+    let authenticator = appConfig.oidc
       ? createBearerAuthenticator(
           {
             issuer: appConfig.oidc.issuer,
@@ -116,6 +117,14 @@ async function main(): Promise<void> {
           MCP_PATH
         )
       : undefined
+
+    if (authenticator && appConfig.serviceAccountAuthEnabled) {
+      authenticator = withServiceAccountAuthentication(
+        authenticator,
+        kubernetesServices.tokenReview,
+        `${appConfig.publicUrl.replace(/\/+$/, '')}${MCP_PATH}`
+      )
+    }
 
     if (!authenticator) {
       logger.warn(

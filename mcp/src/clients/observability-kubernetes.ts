@@ -68,7 +68,10 @@ export function createObservabilityKubernetes(options: {
   listNamespaces(): Promise<string[]>
   invalidateNamespaceList(): void
   watch(path: string, accept?: string): Promise<HttpStream>
-  tokenReview(token: string): Promise<{ authenticated: boolean; username: string | null }>
+  tokenReview(
+    token: string,
+    audiences?: string[]
+  ): Promise<{ authenticated: boolean; username: string | null; groups: string[]; audiences: string[] }>
 } {
   async function call(path: string, body?: unknown, accept = 'application/json'): Promise<string> {
     // Read on every call so projected service-account token rotation works.
@@ -177,18 +180,26 @@ export function createObservabilityKubernetes(options: {
         ca
       })
     },
-    async tokenReview(token) {
+    async tokenReview(token, audiences) {
       const response = JSON.parse(
         await call('/apis/authentication.k8s.io/v1/tokenreviews', {
           apiVersion: 'authentication.k8s.io/v1',
           kind: 'TokenReview',
-          spec: { token }
+          spec: { token, ...(audiences ? { audiences } : {}) }
         })
-      ) as { status?: { authenticated?: boolean; user?: { username?: string } } }
+      ) as {
+        status?: {
+          authenticated?: boolean
+          audiences?: string[]
+          user?: { username?: string; groups?: string[] }
+        }
+      }
 
       return {
         authenticated: response.status?.authenticated === true,
-        username: response.status?.user?.username ?? null
+        username: response.status?.user?.username ?? null,
+        groups: response.status?.user?.groups ?? [],
+        audiences: response.status?.audiences ?? []
       }
     },
     allowed,

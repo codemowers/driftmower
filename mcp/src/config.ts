@@ -30,6 +30,7 @@ export interface ProvisioningConfig {
 }
 
 export interface AppConfig {
+  serviceAccountAuthEnabled?: boolean
   workloadRestartEnabled?: boolean
   webUi: { enabled: boolean; clientId: string | null }
   backendEnabled?: boolean
@@ -250,6 +251,11 @@ export function loadAppConfig(
   }
 
   const oidc = transport === 'http' && authEnabled ? readOidcConfig(source) : null
+  const serviceAccountAuthEnabled = readBoolean(source.get<unknown>('mcp.serviceAccountAuthEnabled'), false)
+
+  if (serviceAccountAuthEnabled && !oidc)
+    throw new Error('MCP_SERVICE_ACCOUNT_AUTH_ENABLED requires authenticated HTTP')
+
   const webUi = {
     enabled: readBoolean(source.get<unknown>('webUi.enabled'), false),
     clientId: readOptionalString(source.get<unknown>('webUi.clientId'))
@@ -271,6 +277,7 @@ export function loadAppConfig(
 
   return {
     workloadRestartEnabled,
+    serviceAccountAuthEnabled,
     webUi,
     backendEnabled,
     backendUrl: readUrl(cli.backendUrl ?? source.get<string>('backend.url'), 'backendUrl'),
@@ -448,7 +455,7 @@ function readOidcConfig(source: ConfigSource): OidcConfig {
     jwksBearerTokenFile: readOptionalString(source.get<unknown>('oidc.jwksBearerTokenFile')),
     allowedClientIds: (readOptionalString(source.get<unknown>('oidc.allowedClientIds')) ?? '')
       .split(',')
-      .map((id) => id.trim())
+      .map(id => id.trim())
       .filter(Boolean)
   }
 }

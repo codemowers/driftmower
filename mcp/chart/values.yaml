@@ -13,6 +13,10 @@ rbac:
   # set it to narrow the grant to those names.
   paramConfigMapNames: []
 
+# Optional machine authentication; audience-bound TokenReview, then caller RBAC.
+serviceAccountAuth:
+  enabled: false
+
 # Enable drift-analysis tools only when a backend and service token are provisioned.
 backend:
   enabled: false

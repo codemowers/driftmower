@@ -18,6 +18,7 @@
       "__format": "boolean"
     },
     "oauthClientId": "MCP_OAUTH_CLIENT_ID",
+    "serviceAccountAuthEnabled": { "__name": "MCP_SERVICE_ACCOUNT_AUTH_ENABLED", "__format": "boolean" },
     "invalidateToken": "MCP_INVALIDATE_TOKEN",
     "invalidateAllowedSubjects": "MCP_INVALIDATE_ALLOWED_SUBJECTS",
     "workloadRestartEnabled": {

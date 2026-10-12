@@ -17,8 +17,8 @@ rules:
   - apiGroups: [rbac.authorization.k8s.io]
     resources: [roles, rolebindings, clusterroles, clusterrolebindings]
     verbs: [list, watch]
-  # Optional: lets a ServiceAccount token (e.g. Argo CD's) call the cache
-  # invalidation webhook, gated by MCP_INVALIDATE_ALLOWED_SUBJECTS.
+  # Reviews audience-bound ServiceAccount tokens for optional MCP machine auth,
+  # and tokens for cache invalidation gated by MCP_INVALIDATE_ALLOWED_SUBJECTS.
   - apiGroups: [authentication.k8s.io]
     resources: [tokenreviews]
     verbs: [create]

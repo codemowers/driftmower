@@ -34,6 +34,19 @@ export function kubernetesIdentityFor(
     return { ok: false, reason: 'unauthenticated', detail: 'The call carries no verified caller identity' }
   }
 
+  // This field is attached only after audience-bound Kubernetes TokenReview.
+  // Machine subjects already use Kubernetes names and must not gain OIDC prefixes.
+  const machine = extra.kubernetesIdentity as KubernetesIdentity | undefined
+
+  if (
+    machine &&
+    /^system:serviceaccount:[^:]+:[^:]+$/.test(machine.user) &&
+    Array.isArray(machine.groups) &&
+    machine.groups.every(group => typeof group === 'string')
+  ) {
+    return { ok: true, identity: { user: machine.user, groups: [...machine.groups] } }
+  }
+
   const claims = readIdentityClaims(extra.identityClaims)
   // Older transports (and tests) put only sub/groups in `extra`; the default
   // mapping reads exactly those, so fall back rather than refuse.

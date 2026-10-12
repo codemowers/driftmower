@@ -32,6 +32,8 @@ spec:
               value: 'production'
             - name: MCP_WORKLOAD_RESTART_ENABLED
               value: {{ .Values.workloadRestart.enabled | quote }}
+            - name: MCP_SERVICE_ACCOUNT_AUTH_ENABLED
+              value: {{ .Values.serviceAccountAuth.enabled | quote }}
             - name: MCP_WEB_UI_ENABLED
               value: {{ .Values.webUi.enabled | quote }}
             {{- if .Values.webUi.enabled }}
