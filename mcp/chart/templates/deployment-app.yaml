@@ -38,6 +38,7 @@ spec:
               value: {{ .Values.webUi.enabled | quote }}
             {{- if .Values.webUi.enabled }}
             - name: MCP_WEB_UI_CLIENT_ID
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: oidc-client-mcp-web-owner-secrets
@@ -52,6 +53,7 @@ spec:
               value: {{ . | quote }}
             {{- end }}
             - name: MCP_OAUTH_CLIENT_ID
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: oidc-client-mcp-owner-secrets
@@ -64,6 +66,7 @@ spec:
             - name: DRIFTMOWER_BE_URL
               value: {{ .Values.backend.url | quote }}
             - name: DRIFTMOWER_BE_SERVICE_TOKEN
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.backend.serviceTokenSecret.name | quote }}
@@ -78,21 +81,20 @@ spec:
             # identifier and the resource_metadata pointer on every 401, which
             # is how an OAuth-capable MCP client discovers the flow.
             - name: MCP_PUBLIC_URL
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: oidc-client-mcp-owner-secrets
                   key: OIDC_CLIENT_ORIGIN
-            # MCP_AUDIENCE is deliberately unset. The server then verifies
-            # `aud` against the `resource` it advertises -- MCP_PUBLIC_URL +
-            # /mcp -- which is the only indicator a conformant client can end
-            # up asking for. Set it only to follow something upstream that
-            # mints for a different one, and never to driftmower-be's
-            # OIDC_AUDIENCE: a token for the API is not a token for this
-            # server.
+            # Clear a legacy literal audience during adoption of existing Deployments.
+            # The server derives its audience from OIDC_CLIENT_ORIGIN plus /mcp.
+            - name: MCP_AUDIENCE
+              value: ""
             # passmower's public URL, matched against the token `iss` claim.
             # JWKS is fetched from ${OIDC_ISSUER}/jwks unless OIDC_JWKS_URI is
             # set. Read the issuer from this application's owner Secret.
             - name: OIDC_ISSUER
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: oidc-client-mcp-owner-secrets
@@ -103,6 +105,7 @@ spec:
             # opens this server's own hostname in a browser gets bounced there
             # instead of a JSON 404.
             - name: DRIFTMOWER_UI_PUBLIC_URL
+              value: ""
               valueFrom:
                 secretKeyRef:
                   name: oidc-client-mcp-owner-secrets
