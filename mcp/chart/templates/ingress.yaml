@@ -15,8 +15,6 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   ingressClassName: traefik
-  tls:
-    - secretName: driftmower-mcp-tls
   rules:
     - host: mcp
       http:
