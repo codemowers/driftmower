@@ -6,29 +6,67 @@ import { type ClusterCapabilitiesDiscovery } from '../../clients/cluster-capabil
 import { clusterCapabilitiesShape, customResourceSchema } from '../../clients/cluster-capabilities.js'
 import { omitDefaultFlag } from './catalog-fields.js'
 import { READ_ONLY_ANNOTATIONS } from './read-only-annotations.js'
+import { kubernetesIdentityFor, type KubernetesIdentityMapping } from '../../auth/kubernetes-identity.js'
+import type { ProvisioningService } from '../../services/provisioning-service.js'
+import { mapWithConcurrency } from '../../clients/concurrency.js'
 
 export function registerClusterCapabilitiesTool(
   server: McpServer,
   discovery: ClusterCapabilitiesDiscovery,
-  cluster: ClusterIdentity
+  cluster: ClusterIdentity,
+  creation?: {
+    service: Pick<ProvisioningService, 'checkAccess'>
+    identityMapping: KubernetesIdentityMapping
+  }
 ): void {
   server.registerTool(
     'list_custom_resource_definitions',
     {
       title: `List custom resource definitions (${cluster.id ?? 'identity unconfigured'})`,
       description:
-        'Use to discover which custom-resource APIs are installed before planning resources. Returns API identities and operator-authored descriptions, not existing CR instances or workloads. Defaults to Namespaced APIs; choose Cluster or All explicitly to include cluster-scoped APIs. Installed APIs do not establish operator health or caller authorization. Use describe_custom_resource_definition for a selected CRD schema; use get_workloads when available for existing workload roots.',
-      inputSchema: { scope: z.enum(['Namespaced', 'Cluster', 'All']).default('Namespaced') },
+        'Use to discover which custom-resource APIs are installed before planning resources. Returns an array of API identities and operator-authored descriptions, without permission fields. Defaults to Namespaced APIs; choose Cluster or All explicitly to include cluster-scoped APIs. ' +
+        (creation
+          ? 'Supply the intended namespace to return only APIs the verified caller can create there; cluster-scoped APIs are checked without a namespace. Omit namespace only for installed-API discovery, which does not establish authorization. '
+          : 'Installed APIs do not establish caller authorization. ') +
+        'API existence does not establish operator health. Use describe_custom_resource_definition for a selected CRD schema; use get_workloads when available for existing workload roots.',
+      inputSchema: {
+        scope: z.enum(['Namespaced', 'Cluster', 'All']).default('Namespaced'),
+        ...(creation ? { namespace: z.string().trim().min(1).max(63).optional() } : {})
+      },
       outputSchema: { customResources: z.array(customResourceSchema) },
       annotations: READ_ONLY_ANNOTATIONS
     },
-    async ({ scope }, context) => {
+    async ({ scope, namespace }, context) => {
       if (typeof context.authInfo?.extra?.sub !== 'string' || !context.authInfo.extra.sub)
         throw new Error('CRD discovery requires an authenticated caller')
 
-      const customResources = (await discovery.listCustomResourceDefinitions()).filter(
+      let customResources = (await discovery.listCustomResourceDefinitions()).filter(
         item => scope === 'All' || item.scope === scope
       )
+
+      if (creation && namespace) {
+        const caller = kubernetesIdentityFor(context.authInfo, creation.identityMapping)
+
+        if (!caller.ok) throw new Error(caller.detail)
+
+        const creatable = await mapWithConcurrency(customResources, 8, async item => {
+          const result = await creation.service.checkAccess(caller.identity, {
+            verb: 'create',
+            group: item.group,
+            resource: item.resource,
+            ...(item.scope === 'Namespaced' ? { namespace } : {})
+          })
+
+          if (result.status !== 'ok' || result.verdict === 'unknown') {
+            throw new Error(`Could not determine creation access for ${item.name}`)
+          }
+
+          return result.verdict === 'yes'
+        })
+
+        customResources = customResources.filter((_item, index) => creatable[index])
+      }
+
       const result = { customResources }
 
       return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] }

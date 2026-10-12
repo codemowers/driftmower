@@ -1,6 +1,7 @@
 // PURE. The descriptive half of the catalog: what each offering IS, which kind
-// its operator serves, and where that operator lives. The manifest-rendering
-// half (presets, companions, notes) lands alongside this per offering.
+// its operator serves, and where that operator lives. Presets describe sizing
+// intent only; they do not establish effective replica counts, placement,
+// persistence or configured backups on a discovered cluster.
 //
 // Titles are the product a user has heard of ("PostgreSQL"), never the operator
 // ("cnpg"). The operator is an implementation detail shown on a `via` line.
@@ -38,7 +39,7 @@ export type OfferingSpec = {
 const STANDARD_PRESETS = (dev: string, small: string, ha: string) => [
   { id: 'dev' as PresetId, label: 'Dev', summary: dev },
   { id: 'small' as PresetId, label: 'Small', summary: small },
-  { id: 'ha' as PresetId, label: 'Highly available', summary: ha }
+  { id: 'ha' as PresetId, label: 'Resilience planning', summary: ha }
 ]
 
 export const OFFERINGS: OfferingSpec[] = [
@@ -60,7 +61,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'cnpg.io/cluster',
     storageClassPreference: ['postgres'],
-    presets: STANDARD_PRESETS('1 instance, 2Gi', '1 instance, 20Gi', '3 instances, 20Gi each, backed up'),
+    presets: STANDARD_PRESETS(
+      'Development database with a small data volume',
+      'Application database with storage sized for its data',
+      'Plan database replication, failure-domain placement, backups and tested recovery; none are established by this preset'
+    ),
     needs: [
       'The CloudNativePG operator',
       'A storage class for the data volume',
@@ -86,7 +91,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [{ group: '', resource: 'secrets' }],
     instanceLabelKey: 'app',
     storageClassPreference: ['redis'],
-    presets: STANDARD_PRESETS('1 replica, in memory', '1 replica, 2Gi', '3 replicas'),
+    presets: STANDARD_PRESETS(
+      'Development cache in memory',
+      'Application cache with memory sized for its working set',
+      'Plan cache replication and failure-domain placement; persistence and recovery require separate configuration'
+    ),
     needs: ['The Dragonfly operator', 'A generated password secret'],
     stateful: false
   },
@@ -113,7 +122,11 @@ export const OFFERINGS: OfferingSpec[] = [
     ],
     instanceLabelKey: 'app',
     storageClassPreference: ['mongo'],
-    presets: STANDARD_PRESETS('1 member, 2Gi', '1 member, 20Gi', '3-member replica set'),
+    presets: STANDARD_PRESETS(
+      'Development document database with small data and log volumes',
+      'Application document database with storage sized for its data and logs',
+      'Plan replica-set membership, quorum, failure-domain placement, backups and recovery'
+    ),
     needs: [
       'The MongoDB Community operator',
       'A ServiceAccount, Role and RoleBinding named mongodb-database in the namespace — without them the pods never start',
@@ -165,7 +178,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'app.kubernetes.io/name',
     storageClassPreference: [],
-    presets: STANDARD_PRESETS('1 node, 2Gi', '1 node, 10Gi', '3 nodes, 10Gi each'),
+    presets: STANDARD_PRESETS(
+      'Development broker with a small data volume',
+      'Application broker with storage sized for queued messages',
+      'Plan broker replication, queue durability, quorum and failure-domain placement'
+    ),
     needs: [
       'The RabbitMQ Cluster operator',
       'For queues and users as manifests, the separate messaging-topology-operator'
@@ -191,8 +208,12 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'app.kubernetes.io/instance',
     storageClassPreference: [],
-    presets: STANDARD_PRESETS('1 broker, 10Gi', '1 broker, 20Gi', '3 brokers, 20Gi each'),
-    needs: ['The Redpanda operator', 'At least 3 zones before the highly-available preset makes sense'],
+    presets: STANDARD_PRESETS(
+      'Development event stream with a small data volume',
+      'Application event stream with storage sized for retention',
+      'Plan broker count, topic replication, quorum and failure-domain placement'
+    ),
+    needs: ['The Redpanda operator'],
     stateful: true
   },
   {
@@ -216,7 +237,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'opster.io/opensearch-cluster',
     storageClassPreference: [],
-    presets: STANDARD_PRESETS('1 node, 10Gi', '1 node, 20Gi', '3 nodes, 20Gi each'),
+    presets: STANDARD_PRESETS(
+      'Development search engine with a small data volume',
+      'Application search engine with storage sized for its indexes',
+      'Plan node roles, shard replication, quorum, failure-domain placement and index recovery'
+    ),
     needs: [
       'The OpenSearch operator',
       'More memory than a small namespace quota allows; check the namespace headroom before choosing this'
@@ -241,7 +266,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'elasticsearch.k8s.elastic.co/cluster-name',
     storageClassPreference: [],
-    presets: STANDARD_PRESETS('1 node, 10Gi', '1 node, 20Gi', '3 nodes, 20Gi each'),
+    presets: STANDARD_PRESETS(
+      'Development search engine with a small data volume',
+      'Application search engine with storage sized for its indexes',
+      'Plan node roles, shard replication, quorum, failure-domain placement and index recovery'
+    ),
     needs: [
       'The ECK operator',
       "Awareness of Elastic's licence tiers for anything beyond the basic features"
@@ -266,7 +295,11 @@ export const OFFERINGS: OfferingSpec[] = [
     alsoRequires: [],
     instanceLabelKey: 'apps.emqx.io/instance',
     storageClassPreference: [],
-    presets: STANDARD_PRESETS('1 node', '1 node, 2Gi', '3 core nodes'),
+    presets: STANDARD_PRESETS(
+      'Development MQTT broker',
+      'Application MQTT broker with memory sized for connections and messages',
+      'Plan core and replicant roles, failure-domain placement, session durability and recovery'
+    ),
     needs: ['The EMQX operator'],
     stateful: false
   }

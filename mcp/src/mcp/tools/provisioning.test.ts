@@ -1,7 +1,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ProvisioningService } from '../../services/provisioning-service.js'
+import type { NamespaceReadiness, ProvisioningService } from '../../services/provisioning-service.js'
+import { summariseMatrix, VERBS, type Verb, type Verdict } from '../../domain/provisioning/access-facts.js'
+import { z } from 'zod'
+import { describeNamespaceReadinessOutputShape } from './provisioning-schemas.js'
 import { createMcpServer } from '../create-server.js'
 import {
   CHECK_ACCESS_TOOL_NAME,
@@ -56,6 +59,32 @@ describe('provisioning tools', () => {
     for (const name of PROVISIONING_TOOLS) expect(names).not.toContain(name)
 
     expect(names).toEqual(expect.arrayContaining(['search_workloads', 'plan_image_updates']))
+  })
+
+  it('provides provisioning discovery steps at connection, resource and identity boundaries', async () => {
+    const service = stubService()
+    const client = await connect(service)
+    const instructions = client.getInstructions()!
+
+    for (const name of PROVISIONING_TOOLS) expect(instructions).toContain(name)
+
+    expect(instructions.indexOf('start with describe_provisioning_platform')).toBeLessThan(
+      instructions.indexOf('then list_offerings')
+    )
+    expect(instructions).toContain('Supply offering and the intended namespace when known')
+    expect(instructions).toContain('authorization does not guarantee admission')
+    const guide = await client.readResource({ uri: 'driftmower://cluster/discovery-guide' })
+
+    expect(guide.contents[0]).toMatchObject({ text: instructions })
+    const identity = await client.callTool({ name: 'get_cluster_identity', arguments: {} })
+    const content = identity.structuredContent as Record<string, unknown>
+
+    for (const name of PROVISIONING_TOOLS) expect(content.discoveryInstructions).toContain(name)
+
+    expect(service.describeProvisioningPlatform).not.toHaveBeenCalled()
+    expect(service.listOfferings).not.toHaveBeenCalled()
+    expect(service.describeNamespaceReadiness).not.toHaveBeenCalled()
+    expect(service.checkAccess).not.toHaveBeenCalled()
   })
 
   it('registers every provisioning tool as read-only and non-destructive', async () => {
@@ -122,6 +151,69 @@ describe('provisioning tools', () => {
     expect(JSON.stringify(result.content)).toContain('expected array to have <=3 items')
   })
 
+  it('returns only creatable names without permission rows and preserves service facts', async () => {
+    const service = stubService()
+    const row = Object.fromEntries(VERBS.map(verb => [verb, 'yes'])) as Record<Verb, Verdict>
+    const access = summariseMatrix(
+      {
+        'example.com/allowed': row,
+        'example.com/denied': { ...row, create: 'no' },
+        'example.com/uncertain': { ...row, create: 'unknown' }
+      },
+      []
+    )
+    const facts: NamespaceReadiness = {
+      status: 'ok',
+      requested: ['team-a'],
+      withheld: [],
+      degraded: [],
+      hostRules: [],
+      namespaces: [
+        {
+          namespace: 'team-a',
+          tenant: null,
+          sandbox: null,
+          quota: null,
+          headroom: null,
+          limitRange: null,
+          podSecurity: null,
+          registries: [],
+          offerings: {},
+          network: { ingress: 'unknown', egress: 'unknown', selectors: [], ciliumAvailable: false },
+          access,
+          mayCreate: 'unknown',
+          mayCreateReason: 'No offering selected'
+        }
+      ]
+    }
+
+    vi.mocked(service.describeNamespaceReadiness).mockResolvedValue(facts)
+    const client = await connect(service)
+    const result = await client.callTool({
+      name: DESCRIBE_NAMESPACE_READINESS_TOOL_NAME,
+      arguments: { namespaces: ['team-a'] }
+    })
+    const parsed = z.object(describeNamespaceReadinessOutputShape).parse(result.structuredContent)
+
+    expect(parsed.namespaces?.[0].creatableResources).toEqual(['example.com/allowed'])
+    expect(parsed.namespaces?.[0]).not.toHaveProperty('access')
+    expect(JSON.stringify(result.structuredContent)).not.toContain('matrix')
+    expect(JSON.stringify(result.content)).not.toContain('Access (from the cluster authorizer)')
+    expect(facts.namespaces[0].access).toBe(access)
+    expect(Object.keys(access.matrix)).toHaveLength(3)
+
+    facts.namespaces[0].access = null
+    const unchecked = await client.callTool({
+      name: DESCRIBE_NAMESPACE_READINESS_TOOL_NAME,
+      arguments: { namespaces: ['team-a'] }
+    })
+
+    expect(
+      z.object(describeNamespaceReadinessOutputShape).parse(unchecked.structuredContent).namespaces?.[0]
+        .creatableResources
+    ).toBeNull()
+  })
+
   it('asks one exact permission question and reports the verdict', async () => {
     const service = stubService()
     const client = await connect(service)
@@ -168,16 +260,14 @@ function stubService(): ProvisioningService {
       degraded: []
     }),
     listOfferings: vi.fn().mockResolvedValue({ status: 'ok', offerings: [], withheld: [], degraded: [] }),
-    describeNamespaceReadiness: vi
-      .fn()
-      .mockResolvedValue({
-        status: 'ok',
-        requested: [],
-        namespaces: [],
-        hostRules: [],
-        withheld: [],
-        degraded: []
-      }),
+    describeNamespaceReadiness: vi.fn().mockResolvedValue({
+      status: 'ok',
+      requested: [],
+      namespaces: [],
+      hostRules: [],
+      withheld: [],
+      degraded: []
+    }),
     checkAccess: vi.fn().mockResolvedValue({
       status: 'ok',
       verdict: 'no',

@@ -230,7 +230,13 @@ export const describeNamespaceReadinessOutputShape = {
   status: z.enum(['ok', 'unavailable']),
   ...unavailableFields,
   requested: z.array(z.string()).optional(),
-  namespaces: z.array(namespaceFactSchema).optional(),
+  namespaces: z
+    .array(
+      namespaceFactSchema
+        .omit({ access: true })
+        .extend({ creatableResources: z.array(z.string()).nullable() })
+    )
+    .optional(),
   hostRules: z.array(hostRuleSchema).optional(),
   // Requested but not returned. Distinct from an empty result: it means the
   // namespace was withheld, not that it is empty.

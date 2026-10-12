@@ -60,6 +60,17 @@ export interface ServerDependencies {
 export function createMcpServer(dependencies: ServerDependencies): McpServer {
   const cluster = dependencies.cluster ?? { id: null, apiUrl: null, mcpServerName: SERVER_NAME }
   const usageInstructions = [
+    dependencies.provisioning &&
+      'When planning an application or provisioning resources, start with describe_provisioning_platform for discovered platform facts, then list_offerings for relevant databases, caches, queues or object stores. Supply offering and the intended namespace when known. Before drafting manifests, use describe_namespace_readiness for the target namespaces and selected offering; use check_access for operations outside the offering catalog. Read structuredContent and warnings: unavailable or unknown facts are not evidence that a capability is absent, and authorization does not guarantee admission.',
+    dependencies.provisioning &&
+      'Offering presets describe sizing intent, not effective configuration or established high availability. Derive managed replica counts and fields to omit from applicable policy descriptions and bindings; a permitted range is not a configured count. Verify placement, storage behavior, persistence, backups and recovery separately before claiming resilience. Use namespace readiness to account for quota, LimitRange defaults, Pod Security and network constraints before deployment; choose explicit workload resources when defaults cannot support the application. Reuse facts already gathered for the same target; repeat discovery when relevant state changes or a fact is missing. Namespace readiness lists creatable resource names; use check_access for one specific operation.',
+    dependencies.clusterCapabilities &&
+      'Use list_custom_resource_definitions to discover installed custom-resource APIs beyond the offering catalog, then describe_custom_resource_definition for the selected API before drafting its manifest. Discover ingress classes, cluster issuers and priority classes with the corresponding list tools only when needed. Installed APIs and catalog entries do not establish controller health or permission to use them.',
+    dependencies.clusterCapabilities &&
+      dependencies.provisioning &&
+      'Supply the target namespace to list_custom_resource_definitions to list only custom-resource APIs the caller can create there, without a permission matrix.',
+    dependencies.clusterCatalog &&
+      'Use list_admission_policies to discover policies and their bindings for the intended resource and namespace before relying on admission defaults or requirements. Use list_storage_classes when selecting volume storage. Keep each resource or policy’s own defaults and requirements separate; do not assume optional components or redirect to an alternative whose availability has not been discovered.',
     dependencies.workloads &&
       'For applications, workload discovery, what runs in a namespace, and resource relationships, start with get_workloads. Use a specified namespace directly; omit namespace only for an overview. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness.',
     dependencies.namespaceScope &&
@@ -75,12 +86,25 @@ export function createMcpServer(dependencies: ServerDependencies): McpServer {
   ]
     .filter(Boolean)
     .join(' ')
+  const instructions = [clusterInstructions(cluster), usageInstructions].join(' ')
   const server = new McpServer(
     {
       name: cluster.mcpServerName,
       version: SERVER_VERSION
     },
-    { instructions: [clusterInstructions(cluster), usageInstructions].join(' ') }
+    { instructions }
+  )
+
+  server.registerResource(
+    'cluster-discovery-guide',
+    'driftmower://cluster/discovery-guide',
+    {
+      title: 'Cluster identity and discovery workflow',
+      description:
+        'Start here for this connection’s cluster identity and enabled discovery, provisioning and observability tool workflow. Live facts come from the listed tools.',
+      mimeType: 'text/plain'
+    },
+    async uri => ({ contents: [{ uri: uri.href, mimeType: 'text/plain', text: instructions }] })
   )
 
   if (dependencies.workloads)
@@ -100,18 +124,31 @@ export function createMcpServer(dependencies: ServerDependencies): McpServer {
       description:
         'Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting backend report scope. Match that URL against local kubeconfig before selecting an explicit kubectl context. Null values mean unconfigured identity; ask rather than guessing.',
       inputSchema: {},
-      outputSchema: { cluster: clusterIdentitySchema, contextSelection: z.string() },
+      outputSchema: {
+        cluster: clusterIdentitySchema,
+        contextSelection: z.string(),
+        discoveryInstructions: z.string()
+      },
       annotations: READ_ONLY_ANNOTATIONS
     },
     async () => {
-      const result = { cluster, contextSelection: clusterInstructions(cluster) }
+      const result = {
+        cluster,
+        contextSelection: clusterInstructions(cluster),
+        discoveryInstructions: usageInstructions
+      }
 
       return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] }
     }
   )
 
   if (dependencies.clusterCapabilities)
-    registerClusterCapabilitiesTool(server, dependencies.clusterCapabilities, cluster)
+    registerClusterCapabilitiesTool(
+      server,
+      dependencies.clusterCapabilities,
+      cluster,
+      dependencies.provisioning
+    )
 
   if (dependencies.clusterCatalog) registerClusterCatalogTools(server, dependencies.clusterCatalog)
 

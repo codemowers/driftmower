@@ -154,7 +154,8 @@ function admissionDefaultLines(defaults: AdmissionDefault[]): string[] {
     ...defaults.map(
       entry =>
         `- **${entry.policy}** on \`${entry.resource}\`${entry.namespaceScoped ? ' (only in namespaces its binding selects)' : ''}: ` +
-        (entry.description ?? 'it carries no kubernetes.io/description; read its mutations with list_admission_policies.')
+        (entry.description ??
+          'it carries no kubernetes.io/description; read its mutations with list_admission_policies.')
     )
   ]
 }
@@ -188,7 +189,8 @@ export function formatOfferings(result: OfferingsListing): string {
       )
     }
 
-    if (offering.admissionDefaults.length > 0) lines.push('', ...admissionDefaultLines(offering.admissionDefaults))
+    if (offering.admissionDefaults.length > 0)
+      lines.push('', ...admissionDefaultLines(offering.admissionDefaults))
 
     if (offering.mayCreate) {
       lines.push('')
@@ -211,7 +213,10 @@ export function formatOfferings(result: OfferingsListing): string {
   return [...lines, ...degradedSection(result.degraded)].join('\n')
 }
 
-export function formatNamespaceReadiness(result: NamespaceReadiness): string {
+export function formatNamespaceReadiness(
+  result: NamespaceReadiness,
+  options: { includeAccessSummary?: boolean } = {}
+): string {
   const lines: string[] = [
     `## Namespace readiness — ${result.namespaces.length} of ${result.requested.length} namespace(s) reported`,
     ''
@@ -230,8 +235,12 @@ export function formatNamespaceReadiness(result: NamespaceReadiness): string {
       `### ${fact.namespace}${fact.tenant ? ` (\`${fact.tenant.labelKey}=${fact.tenant.id}\`)` : ''}`
     )
     lines.push('')
-    lines.push(accessSentence(fact))
-    lines.push('')
+
+    if (options.includeAccessSummary !== false) {
+      lines.push(accessSentence(fact))
+      lines.push('')
+    }
+
     lines.push(
       `Permission to create the requested offering here: **${fact.mayCreate}** — ${fact.mayCreateReason}`
     )
@@ -339,8 +348,8 @@ function availabilitySummary(offering: OfferingCard): string {
 }
 
 // Never the whole matrix: counts and the derived tiers, plus the per-offering
-// verdicts. The full matrix travels in structuredContent for anything that
-// wants a specific cell.
+// verdicts. MCP responses omit this summary and expose creatable names only;
+// the full reviews remain internal to the service.
 function accessSentence(fact: NamespaceFact): string {
   const access = fact.access
 

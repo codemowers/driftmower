@@ -102,7 +102,7 @@ export function registerProvisioningTools(
       description:
         'Use to choose a supported database, cache, queue or object-store offering; supply offering to narrow the catalog and namespace to check creation permissions. Returns each offering with whether it is ' +
         'actually available on this cluster and, when it is not, why, plus the admission defaults that ' +
-        'rewrite its resources on create, each with what its policy says it requires. With `namespace`, each offering also ' +
+        'rewrite its resources on create, each with what its policy says it requires. Presets describe sizing intent, not configured replica counts, placement or backups; discover applicable policies before selecting those settings. With `namespace`, each offering also ' +
         'carries whether the cluster authorizer lets you create it there, checked as the verified caller for ' +
         'every resource the offering needs, with enforced admission policies considered. Read-only.',
       inputSchema: {
@@ -139,7 +139,7 @@ export function registerProvisioningTools(
         'any policies that select on an exact instance name, Pod Security enforcement, the hostnames the ' +
         'namespace may claim, any container registry published from the namespace with the skaffold.env ' +
         'to build against it, and your access there as the cluster authorizer reports it (per resource type ' +
-        'and verb, summarised; the full matrix is in the structured content). With `offering`, whether you ' +
+        'as a plain creatableResources array, without a permission matrix). With `offering`, whether you ' +
         'may create that offering there. Namespaces where you may not list pods are withheld, not empty. ' +
         'Read-only.',
       inputSchema: {
@@ -154,9 +154,25 @@ export function registerProvisioningTools(
 
       audit(auditLine(DESCRIBE_NAMESPACE_READINESS_TOOL_NAME, context, result.status, namespaces.join(',')))
 
-      return result.status === 'ok'
-        ? toolResult(formatNamespaceReadiness(result), result)
-        : toolResult(formatUnavailable(result), result)
+      if (result.status !== 'ok') return toolResult(formatUnavailable(result), result)
+
+      // Keep the internal reviews for offering checks, but expose only names
+      // the caller can create. Do not modify shared/cached service results.
+      const text = formatNamespaceReadiness(result, { includeAccessSummary: false })
+      const structuredContent = {
+        ...result,
+        namespaces: result.namespaces.map(({ access, ...fact }) => ({
+          ...fact,
+          creatableResources: access
+            ? Object.entries(access.matrix)
+                .filter(([, row]) => row.create === 'yes')
+                .map(([name]) => name)
+                .sort()
+            : null
+        }))
+      }
+
+      return toolResult(text, structuredContent)
     }
   )
 

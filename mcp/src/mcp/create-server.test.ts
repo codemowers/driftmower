@@ -35,6 +35,39 @@ describe('createMcpServer', () => {
     await Promise.all(closeCallbacks.splice(0).map(close => close()))
   })
 
+  it('supports resource discovery and publishes the connection guide without reading cluster data', async () => {
+    const searchWorkloads = vi.fn()
+    const planImageUpdates = vi.fn()
+    const { client } = await connectClient(searchWorkloads, planImageUpdates)
+
+    expect(client.getServerCapabilities()?.resources).toBeDefined()
+    const { resources } = await client.listResources()
+
+    expect(resources).toContainEqual(
+      expect.objectContaining({
+        name: 'cluster-discovery-guide',
+        uri: 'driftmower://cluster/discovery-guide',
+        mimeType: 'text/plain'
+      })
+    )
+    expect(await client.listResourceTemplates()).toEqual({ resourceTemplates: [] })
+    const guide = await client.readResource({ uri: resources[0].uri })
+    const guideText = 'text' in guide.contents[0] ? guide.contents[0].text : undefined
+
+    expect(guideText).toBe(client.getInstructions())
+    expect(guideText).not.toContain('start with describe_provisioning_platform')
+    expect(guideText).not.toContain('Use list_admission_policies')
+    expect(searchWorkloads).not.toHaveBeenCalled()
+    expect(planImageUpdates).not.toHaveBeenCalled()
+
+    const identity = await client.callTool({ name: 'get_cluster_identity', arguments: {} })
+
+    const content = identity.structuredContent as Record<string, unknown>
+
+    expect(content.discoveryInstructions).toContain('search_workloads')
+    expect(content.discoveryInstructions).not.toContain('list_offerings')
+  })
+
   it('registers search_workloads and returns text plus structured content', async () => {
     const result = { query: 'api', matches: [], scope: { scoped: false, namespaces: null, note: null } }
     const searchWorkloads = vi.fn().mockResolvedValue(result)

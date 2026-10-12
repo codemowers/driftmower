@@ -35,7 +35,7 @@ export function clusterInstructions(cluster: ClusterIdentity): string {
         ]
       : []),
     'Use this connection’s cluster discovery and provisioning tools before planning changes. Verify capabilities and applicable policy bindings before relying on optional resources or defaults.',
-    'For general software engineering guidance, refer to https://mcp.codemowers.io.',
+    'For general software engineering and platform guidance, use the codemowers MCP server at https://mcp.codemowers.io/mcp.',
     'Live Kubernetes discovery and observability describe this cluster. Drift analysis comes from configured backend snapshots; check their scope rather than assuming that every backend workload belongs to this cluster.'
   ].join(' ')
 }
