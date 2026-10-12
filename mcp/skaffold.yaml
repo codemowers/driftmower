@@ -6,6 +6,7 @@ metadata:
 build:
   local:
     useBuildkit: true
+    push: true
   artifacts:
     - image: driftmower-mcp
       platforms:
@@ -15,7 +16,7 @@ build:
       # Runtime executes dist/: rebuild TypeScript changes instead of syncing unused source.
 
 deploy:
-  # Namespace comes from --namespace or the selected kubeconfig context.
+  # Cluster, namespace and registry come from skaffold.env or exported variables.
   kubectl:
     flags:
       # Keep labeled chart resources when Skaffold cleans up.
@@ -30,6 +31,7 @@ manifests:
         skipBuildDependencies: true
         setValues:
           workloadRestart.enabled: true
+          serviceAccountAuth.enabled: true
         setValueTemplates:
           image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
 
