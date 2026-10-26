@@ -5,6 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
+import { clearInterval, setInterval } from 'node:timers'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Readable } from 'node:stream'
 import type { ApplicationMetrics } from '../../http/metrics.js'
@@ -29,6 +30,9 @@ export const PROTECTED_RESOURCE_METADATA_PATH = protectedResourceMetadataPath(MC
 // prefix, so both spellings are served.
 export const PROTECTED_RESOURCE_METADATA_ROOT_PATH = '/.well-known/oauth-protected-resource'
 export const LANDING_PATH = '/'
+// Most clients never send DELETE, so a session nobody has used for this long
+// is presumed abandoned and closed; the client re-initializes if it returns.
+export const DEFAULT_SESSION_IDLE_MS = 30 * 60_000
 
 export interface HttpTransportOptions {
   webUi?: WebUiOptions
@@ -47,6 +51,7 @@ export interface HttpTransportOptions {
   capabilities?: Omit<CapabilitiesRouteDependencies, 'authenticator'>
   // The cache invalidation webhook; its own credentials, not the MCP bearer.
   invalidate?: InvalidateRouteDependencies
+  sessionIdleMs?: number
 }
 
 export interface AuditEntry {
@@ -60,6 +65,23 @@ export async function startHttpTransport(
   options: HttpTransportOptions
 ): Promise<Server> {
   const sessions = new Map<string, HttpSession>()
+  const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS
+  const evictionTimer = setInterval(
+    () => {
+      const now = Date.now()
+
+      for (const [sessionId, session] of sessions) {
+        if (session.active > 0 || now - session.lastActive < sessionIdleMs) continue
+
+        sessions.delete(sessionId)
+        options.metrics?.openSessions.dec()
+        void session.server.close()
+      }
+    },
+    Math.min(sessionIdleMs, 60_000)
+  )
+
+  evictionTimer.unref()
 
   const httpServer = createServer((request, response) => {
     options.metrics?.observe(request, response)
@@ -161,10 +183,13 @@ export async function startHttpTransport(
   })
 
   httpServer.on('close', () => {
+    clearInterval(evictionTimer)
+
     for (const session of sessions.values()) {
       void session.server.close()
     }
 
+    options.metrics?.openSessions.dec(sessions.size)
     sessions.clear()
   })
 
@@ -181,6 +206,10 @@ interface HttpSession {
   // without this binding, anyone who learned one would inherit the tenancy of
   // the caller who created it.
   subject: string | null
+  // Responses still open, including long-lived SSE streams; a session is only
+  // idle once all of them have closed.
+  active: number
+  lastActive: number
 }
 
 async function handleMcpRequest(
@@ -225,6 +254,12 @@ async function handleMcpRequest(
       return
     }
 
+    session.active += 1
+    response.once('close', () => {
+      session.active -= 1
+      session.lastActive = Date.now()
+    })
+
     await session.transport.handleRequest(withAuth(request, authInfo), response)
 
     return
@@ -248,8 +283,9 @@ async function handleMcpRequest(
   const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
     sessionIdGenerator: randomUUID,
     onsessioninitialized: initializedSessionId => {
-      sessions.set(initializedSessionId, { transport, server, subject })
+      sessions.set(initializedSessionId, { transport, server, subject, active: 0, lastActive: Date.now() })
       options.metrics?.sessions.inc()
+      options.metrics?.openSessions.inc()
     }
   })
 
@@ -258,7 +294,8 @@ async function handleMcpRequest(
     const initializedSessionId = transport.sessionId
 
     if (initializedSessionId) {
-      sessions.delete(initializedSessionId)
+      // Already gone when the idle sweep closed it.
+      if (sessions.delete(initializedSessionId)) options.metrics?.openSessions.dec()
     }
   }
 

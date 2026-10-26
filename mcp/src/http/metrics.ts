@@ -25,6 +25,11 @@ export class ApplicationMetrics {
     help: 'MCP sessions initialized.',
     registers: [this.registry]
   })
+  readonly openSessions = new Gauge({
+    name: 'driftmower_mcp_sessions_open',
+    help: 'MCP sessions held in memory, until closed by the client or evicted as idle.',
+    registers: [this.registry]
+  })
   readonly invalidations = new Counter({
     name: 'driftmower_mcp_sar_cache_invalidations_total',
     help: 'SubjectAccessReview cache invalidations by source.',

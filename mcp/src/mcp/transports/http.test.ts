@@ -2,10 +2,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { AddressInfo } from 'node:net'
 import type { Server } from 'node:http'
+import { setTimeout } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMcpServer } from '../create-server.js'
 import { startHttpTransport } from './http.js'
 import { UNRESTRICTED_SCOPE } from '../../domain/tenancy.js'
+import { ApplicationMetrics } from '../../http/metrics.js'
 
 describe('HTTP MCP transport', () => {
   let httpServer: Server | undefined
@@ -175,5 +177,70 @@ describe('HTTP MCP transport', () => {
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not_found' })
+  })
+
+  it('closes sessions left idle and keeps sessions in use', async () => {
+    const searchWorkloads = vi.fn().mockResolvedValue({
+      query: 'api',
+      matches: [],
+      scope: { scoped: false, namespaces: null, note: null }
+    })
+
+    const metrics = new ApplicationMetrics()
+
+    httpServer = await startHttpTransport(
+      () =>
+        createMcpServer({
+          workloadSearchService: { searchWorkloads },
+          imageUpdatePlanningService: { planImageUpdates: vi.fn() }
+        }),
+      {
+        host: '127.0.0.1',
+        port: 0,
+        sessionIdleMs: 200,
+        metrics
+      }
+    )
+    const address = httpServer.address() as AddressInfo
+    const endpoint = new URL(`http://127.0.0.1:${address.port}/mcp`)
+    const busyClient = new Client({ name: 'busy-http-test-client', version: '1.0.0' })
+    const headers = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }
+
+    clients.push(busyClient)
+
+    await busyClient.connect(new StreamableHTTPClientTransport(endpoint))
+
+    // A client that initializes and then disappears without sending DELETE.
+    const initialized = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'gone', version: '1' } }
+      })
+    })
+    const abandonedSessionId = initialized.headers.get('mcp-session-id')!
+
+    await initialized.text()
+    expect(await metrics.registry.metrics()).toContain('driftmower_mcp_sessions_open 2\n')
+
+    for (let elapsed = 0; elapsed < 600; elapsed += 100) {
+      await busyClient.callTool({ name: 'search_workloads', arguments: { query: 'api' } })
+      await setTimeout(100)
+    }
+
+    const reused = await fetch(endpoint, {
+      method: 'POST',
+      headers: { ...headers, 'mcp-session-id': abandonedSessionId },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
+    })
+
+    expect(reused.status).toBe(400)
+    expect(await metrics.registry.metrics()).toContain('driftmower_mcp_sessions_open 1\n')
+    await expect(
+      busyClient.callTool({ name: 'search_workloads', arguments: { query: 'api' } })
+    ).resolves.toMatchObject({ structuredContent: { query: 'api' } })
   })
 })
