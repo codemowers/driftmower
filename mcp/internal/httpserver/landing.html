@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driftmower MCP</title>
+<style>
+:root { color-scheme: light dark; --paper: #f6f4ed; --ink: #222c29; --muted: #65716a; --accent: #287258; --line: #d5dcd2; --panel: #eaece4; font-family: system-ui, sans-serif; line-height: 1.75; background: var(--paper); color: var(--ink); }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 880px; padding: 5rem 1.5rem 2rem; }
+header { padding-bottom: 1rem; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; }
+h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(2.8rem, 7vw, 4.8rem); letter-spacing: -.055em; margin: 0 0 1rem; }
+h2 { margin: 0 0 2rem; font-size: 1.8rem; letter-spacing: -.035em; }
+h3 { margin: 2rem 0 1rem; font-size: 1.2rem; }
+section { border-top: 1px solid var(--line); margin-top: 3.5rem; padding-top: 3rem; }
+li { margin-block: .7rem; padding-left: .2rem; }
+li::marker { color: var(--accent); }
+a { color: var(--accent); text-underline-offset: .25em; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: 2px; }
+article { scroll-margin-top: 2rem; padding-bottom: 1rem; }
+article + article { border-top: 1px dashed var(--line); padding-top: 1rem; margin-top: 1rem; }
+code { font-size: .88em; background: var(--panel); padding: .15em .35em; border-radius: .25rem; overflow-wrap: anywhere; }
+pre { padding: 1.25rem; background: var(--panel); border: 1px solid var(--line); border-radius: .65rem; overflow-x: auto; line-height: 1.6; }
+pre code { padding: 0; background: none; overflow-wrap: normal; }
+blockquote { border-left: 3px solid var(--accent); margin-left: 0; padding-left: 1.5rem; color: var(--muted); }
+table { display: block; overflow-x: auto; border-collapse: collapse; }
+th, td { padding: .6rem 1rem; border: 1px solid var(--line); text-align: left; }
+footer { display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+footer a { display: inline-flex; align-items: center; gap: .6rem; overflow-wrap: anywhere; }
+footer svg { flex-shrink: 0; }
+@media (prefers-color-scheme: dark) { :root { --paper: #151d19; --ink: #e0e6dc; --muted: #a4b1a7; --accent: #9dcca9; --line: #34443a; --panel: #202c25; } }
+@media (max-width: 540px) { body { padding: 2.5rem 1rem 1.5rem; } }
+@media print { :root { --paper: white; --ink: black; --muted: #444; --accent: #333; --line: #ccc; --panel: #eee; } body { max-width: none; padding: 0; } h2, h3 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<header><h1>Driftmower MCP</h1>
+<p>Driftmower MCP connects AI assistants to this Kubernetes cluster through the Model Context Protocol (MCP). Its tools discover available resources and admission policies, inspect workloads and resource usage, and provide provisioning guidance based on the cluster’s live configuration and your permissions.</p>
+<p><a href="https://mcp.codemowers.io">mcp.codemowers.io</a> provides general software engineering guidance for building and deploying applications. Use it alongside this server when you need both development guidance and facts about the target cluster.</p>
+</header>
+{{if .WebUI}}<section><h2>MCP Explorer</h2><p><a href="/ui">Open the explorer</a> to sign in and inspect accessible namespaces, workloads, resource usage and cluster catalogs.</p></section>{{end}}
+<section><h2>Using this server</h2>
+<p>Cluster: <code>{{.ClusterID}}</code><br>
+Kubernetes API: <code>{{.APIURL}}</code></p>
+<h3>Claude Code</h3>
+<pre><code>{{.Claude}}</code></pre>
+{{if .Authenticated}}<p>Run <code>/mcp</code> in Claude Code and select this server to sign in.</p>{{end}}
+<h3>Codex</h3>
+<pre><code>{{.Codex}}</code></pre>
+{{if and .Authenticated .ClientID}}<h3>Codex project config — .codex/config.toml</h3><pre><code>{{.CodexProject}}</code></pre><p>Set <code>callback_url</code> explicitly to match the registered loopback callback path. See <a href="https://github.com/passmower/passmower/issues/276#issuecomment-5875832808">Passmower’s Codex callback guidance</a>.</p>{{end}}
+<h3>Claude Code project config — .mcp.json</h3>
+<pre><code>{{.MCPJSON}}</code></pre>
+<h3>Other MCP clients</h3>
+<pre><code>{{.OtherClients}}</code></pre>
+</section>
+<footer>
+<a href="https://github.com/codemowers/driftmower-mcp" aria-label="Source on GitHub: codemowers/driftmower-mcp">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297C5.37.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.084 1.838 1.237 1.838 1.237 1.07 1.835 2.807 1.305 3.492.998.108-.776.42-1.305.763-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.469-2.381 1.236-3.221-.123-.303-.536-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.52 11.52 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.655 1.652.243 2.873.12 3.176.77.84 1.235 1.911 1.235 3.221 0 4.61-2.805 5.625-5.478 5.921.431.372.816 1.102.816 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.597 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+codemowers/driftmower-mcp</a></footer>
+</body>
+</html>

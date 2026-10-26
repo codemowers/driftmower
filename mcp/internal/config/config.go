@@ -106,9 +106,13 @@ type Provisioning struct {
 }
 
 type Kubernetes struct {
-	URL       string
-	TokenFile string
-	CAFile    string
+	// A kubeconfig file to use instead of the in-cluster settings below, for
+	// running outside the cluster during development. Its current context is
+	// used.
+	Kubeconfig string
+	URL        string
+	TokenFile  string
+	CAFile     string
 	// Mirror kube-apiserver's OIDC mapping: --oidc-username-claim,
 	// --oidc-username-prefix, --oidc-groups-claim, --oidc-groups-prefix.
 	UsernameClaim  string
@@ -422,6 +426,7 @@ func (r *reader) oidc() *OIDC {
 
 func (r *reader) kubernetes(oidc *OIDC) Kubernetes {
 	k := Kubernetes{
+		Kubeconfig:       r.value("KUBECONFIG"),
 		URL:              r.url("KUBERNETES_API_URL", "https://kubernetes.default.svc", true),
 		TokenFile:        r.string("KUBERNETES_TOKEN_FILE", "/var/run/secrets/kubernetes.io/serviceaccount/token"),
 		CAFile:           r.string("KUBERNETES_CA_FILE", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),

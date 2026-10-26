@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/codemowers/driftmower-mcp/internal/config"
 )
@@ -39,6 +40,14 @@ func RESTConfig(c config.Kubernetes) *rest.Config {
 
 func NewClients(c config.Kubernetes) (*Clients, error) {
 	base := RESTConfig(c)
+	if c.Kubeconfig != "" {
+		loaded, err := clientcmd.BuildConfigFromFlags("", c.Kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("load kubeconfig: %w", err)
+		}
+		loaded.UserAgent, loaded.QPS, loaded.Burst = base.UserAgent, base.QPS, base.Burst
+		base = loaded
+	}
 
 	bounded := rest.CopyConfig(base)
 	bounded.Timeout = c.RequestTimeout
