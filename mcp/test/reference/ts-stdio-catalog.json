@@ -1,0 +1,3981 @@
+{
+  "initialize": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {
+      "resources": {
+        "listChanged": true
+      },
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "serverInfo": {
+      "name": "driftmower-127-0-0-1-3000",
+      "version": "dev"
+    },
+    "instructions": "This MCP connection identifies cluster null; its external Kubernetes API URL is null. Use get_cluster_identity to inspect this identity. A server registration name or kubeconfig context name is only a hint, not proof of cluster identity. Before using kubectl, compare this API URL with the server URLs in the local kubeconfig. Do not print credentials or use kubectl config view --raw. For every namespace the user wants to work with, use a separate kubeconfig context named <cluster>/<namespace>, with its context.namespace explicitly set to that namespace. Use the cluster name null for the kubeconfig cluster entry. Never use a namespace-less context, including for Skaffold; set Skaffold deploy.kubeContext to this exact namespace-qualified context. Before creating a context, verify the API URL and reuse the intended existing credentials. Create it with kubectl config set-context <cluster>/<namespace> --cluster=<cluster> --user=<verified-user> --namespace=<namespace>. Do not overwrite an existing context that points elsewhere. Use an explicit --context on every kubectl command that accesses the cluster. If identity is missing, URLs do not match, or the credential choice is ambiguous, ask the user to identify the context or credentials. Multiple namespaces on the same verified cluster are expected. Never assume the current context or switch it implicitly. Use this connection’s cluster discovery and provisioning tools before planning changes. Verify capabilities and applicable policy bindings before relying on optional resources or defaults. For general software engineering and platform guidance, use the codemowers MCP server at https://mcp.codemowers.io/mcp. Live Kubernetes discovery and observability describe this cluster. Drift analysis comes from configured backend snapshots; check their scope rather than assuming that every backend workload belongs to this cluster. When planning an application or provisioning resources, start with describe_provisioning_platform for discovered platform facts, then list_offerings for relevant databases, caches, queues or object stores. Supply offering and the intended namespace when known. Before drafting manifests, use describe_namespace_readiness for the target namespaces and selected offering; use check_access for operations outside the offering catalog. Read structuredContent and warnings: unavailable or unknown facts are not evidence that a capability is absent, and authorization does not guarantee admission. Offering presets describe sizing intent, not effective configuration or established high availability. Derive managed replica counts and fields to omit from applicable policy descriptions and bindings; a permitted range is not a configured count. Verify placement, storage behavior, persistence, backups and recovery separately before claiming resilience. Use namespace readiness to account for quota, LimitRange defaults, Pod Security and network constraints before deployment; choose explicit workload resources when defaults cannot support the application. Reuse facts already gathered for the same target; repeat discovery when relevant state changes or a fact is missing. Namespace readiness lists creatable resource names; use check_access for one specific operation. Use list_custom_resource_definitions to discover installed custom-resource APIs beyond the offering catalog, then describe_custom_resource_definition for the selected API before drafting its manifest. Discover ingress classes, cluster issuers and priority classes with the corresponding list tools only when needed. Installed APIs and catalog entries do not establish controller health or permission to use them. Supply the target namespace to list_custom_resource_definitions to list only custom-resource APIs the caller can create there, without a permission matrix. Use list_admission_policies to discover policies and their bindings for the intended resource and namespace before relying on admission defaults or requirements. Use list_storage_classes when selecting volume storage. Keep each resource or policy’s own defaults and requirements separate; do not assume optional components or redirect to an alternative whose availability has not been discovered. For applications, workload discovery, what runs in a namespace, and resource relationships, start with get_workloads. Use a specified namespace directly; omit namespace only for an overview. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness. Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission. search_workloads reads backend report snapshots and may be stale or differently scoped; use live workload inventory when available for what is running now. Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories."
+  },
+  "tools": [
+    {
+      "name": "get_workloads",
+      "title": "Get live workloads",
+      "description": "Start here for questions about applications, workloads, what runs in a namespace, or which resources belong together. Specify namespace when known; omit it only for a cross-namespace overview of namespaces visible to the caller. Returns current root owners with pods, images, ConfigMaps, Secrets, PVCs, Services, Ingresses and Certificates; shared dependencies may appear under several roots. Includes scaled-to-zero built-in controllers. Built-in controller ancestry is resolved recursively; custom roots are terminal owner references marked ownerReferenceOnly unless a fixed adapter verifies them. When the CNPG API is available and the caller can list Clusters, a fixed adapter associates explicit TLS Secret and monitoring query references; it does not verify health or traverse further custom ancestry. Certificates join consumers through pod Secret references or associated Ingress TLS. Namespace/orphaned-workloads holds unclaimed resources; its orphaned mapping groups auxiliary generating owners by Kind.api-group and name. Unused kube-root-ca.crt ConfigMaps, reflected copies, trust-manager bundles and Helm release records are excluded from orphan buckets; consumed copies remain workload dependencies. Orphaned does not mean safe to delete. Namespace orphan buckets also include standalonePods name/UID pairs for ownerless, non-static pods. Empty lists and empty orphan buckets are omitted. Read workloads in structuredContent; the text content is only a count and warning summary. Requires authenticated list pods permission; each collection is additionally filtered by caller list permission. Warnings identify incomplete inventory: missing objects or dependencies must not be treated as confirmed absent. Secret and ConfigMap contents are never returned. Watch-backed cached snapshot with opaque revision; no resource-usage or historical analysis.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "workloads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "apiVersion": {
+                  "type": "string"
+                },
+                "uid": {
+                  "type": "string"
+                },
+                "ownerReferenceOnly": {
+                  "type": "boolean"
+                },
+                "pods": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "configmaps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "secrets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "pvcs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "services": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ingresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "certificates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "standalonePods": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "uid": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "uid"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "orphaned": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "apiVersion": {
+                          "type": "string"
+                        },
+                        "uid": {
+                          "type": "string"
+                        },
+                        "ownerReferenceOnly": {
+                          "type": "boolean"
+                        },
+                        "pods": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "configmaps": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "secrets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "pvcs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "services": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "ingresses": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "certificates": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "apiVersion",
+                        "uid",
+                        "ownerReferenceOnly"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "kind",
+                "namespace"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workloads"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_cluster_identity",
+      "title": "Identify this cluster",
+      "description": "Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting backend report scope. Match that URL against local kubeconfig before selecting an explicit kubectl context. Null values mean unconfigured identity; ask rather than guessing.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "cluster": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "apiUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mcpServerName": {
+                "type": "string"
+              },
+              "authentication": {
+                "type": "string",
+                "const": "passmower-oidc"
+              },
+              "oidcIssuerUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "apiUrl",
+              "mcpServerName"
+            ],
+            "additionalProperties": false
+          },
+          "contextSelection": {
+            "type": "string"
+          },
+          "discoveryInstructions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster",
+          "contextSelection",
+          "discoveryInstructions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_custom_resource_definitions",
+      "title": "List custom resource definitions (identity unconfigured)",
+      "description": "Use to discover which custom-resource APIs are installed before planning resources. Returns an array of API identities and operator-authored descriptions, without permission fields. Defaults to Namespaced APIs; choose Cluster or All explicitly to include cluster-scoped APIs. Supply the intended namespace to return only APIs the verified caller can create there; cluster-scoped APIs are checked without a namespace. Omit namespace only for installed-API discovery, which does not establish authorization. API existence does not establish operator health. Use describe_custom_resource_definition for a selected CRD schema; use get_workloads when available for existing workload roots.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "scope": {
+            "default": "Namespaced",
+            "type": "string",
+            "enum": [
+              "Namespaced",
+              "Cluster",
+              "All"
+            ]
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "customResources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "group": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "resource": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "Namespaced",
+                    "Cluster"
+                  ]
+                },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "served": {
+                        "type": "boolean"
+                      },
+                      "storage": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "served",
+                      "storage"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "established": {
+                  "type": "boolean"
+                },
+                "terminating": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "group",
+                "kind",
+                "resource",
+                "scope",
+                "versions",
+                "established",
+                "terminating"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "customResources"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_ingress_classes",
+      "title": "list ingress classes",
+      "description": "Use to choose an installed ingressClassName. Returns ingress classes and their controllers; class existence does not verify controller health, routing, DNS or TLS.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "ingressClasses": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "controller": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "controller"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "ingressClasses",
+          "degraded"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_cluster_issuers",
+      "title": "list cluster issuers",
+      "description": "Use to discover available cluster-scoped cert-manager issuers before selecting one for a Certificate. Returns their own descriptions, reported readiness and ACME solver types when the API is installed. Null means the catalog is unavailable; an empty list means none were found. Do not infer namespace-scoped Issuer availability from this catalog.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "clusterIssuers": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "ready": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "acme": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "http01": {
+                              "type": "boolean"
+                            },
+                            "dns01": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "http01",
+                            "dns01"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description",
+                    "ready",
+                    "acme"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "clusterIssuers",
+          "degraded"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_priority_classes",
+      "title": "list priority classes",
+      "description": "Use to choose an installed priorityClassName. Returns classes sorted by ascending numeric priority, with values and descriptions. Larger values have higher scheduling priority; class existence does not authorize its use or guarantee capacity.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "priorityClasses": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value",
+                    "description"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "priorityClasses",
+          "degraded"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "describe_custom_resource_definition",
+      "title": "Describe a custom resource definition",
+      "description": "Use after selecting a CRD from list_custom_resource_definitions to inspect its writable fields before drafting a custom resource. Supply the full CRD name (plural.group), not Kind.group or an object name. Returns served API versions and writable resource schemas; excludes status, controller metadata and CEL code.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]*$"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "Namespaced",
+              "Cluster"
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "schema"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "group",
+          "kind",
+          "resource",
+          "scope",
+          "versions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_storage_classes",
+      "title": "List storage classes",
+      "description": "Use to choose storageClassName and understand volume binding, expansion and reclaim behavior. Lists live Kubernetes StorageClasses with provisioning guidance from kubernetes.io/description and structured settings: provisioner, filesystemType, driver parameters, reclaimPolicy, volumeBindingMode, allowVolumeExpansion, mountOptions, and allowedTopologies. Missing descriptions and unspecified filesystem types are null. Cluster-wide capability metadata for authenticated callers.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "storageClasses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provisioner": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "filesystemType": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "reclaimPolicy": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "volumeBindingMode": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "allowVolumeExpansion": {
+                  "type": "boolean"
+                },
+                "mountOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "allowedTopologies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "matchLabelExpressions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "values"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "matchLabelExpressions"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "provisioner",
+                "filesystemType",
+                "parameters",
+                "reclaimPolicy",
+                "volumeBindingMode",
+                "allowVolumeExpansion",
+                "mountOptions",
+                "allowedTopologies"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "storageClasses"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_admission_policies",
+      "title": "List admission policies",
+      "description": "Use before planning resource changes to discover admission requirements and applicable bindings. Returns a CSV catalog of admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions. No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. bindings=null means discovery is unavailable; [] means no bindings. Match resource rules and binding scope to the intended resource; targets are candidates, not a prediction of effective admission behavior. This catalog does not evaluate policy conditions or replace an authorization check.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "list_accessible_namespaces",
+      "title": "List accessible namespaces",
+      "description": "Use to choose a namespace when the user has not specified one, or discover the scope visible to this caller. Returns namespaces where Kubernetes authorizes list pods for the verified caller. This establishes visibility only, not create/edit permission; check the intended operation separately. Unknown entries could not be evaluated and are excluded, not denied. Inspect unknown and truncated before treating the listing as complete. If a namespace is already known, query the relevant tool directly; no preliminary namespace listing is required.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespaces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clusterWide": {
+            "type": "boolean"
+          },
+          "unknown": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "identity": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "string"
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "user",
+              "groups"
+            ],
+            "additionalProperties": false
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespaces",
+          "clusterWide",
+          "unknown",
+          "truncated",
+          "identity",
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "search_workloads",
+      "title": "Search Driftmower workloads",
+      "description": "Search workload names in the latest backend Driftmower report snapshots. Use for report-backed drift investigation or finding candidates for image-update planning. Results may be stale or differently scoped from this MCP cluster; inspect snapshot scope and freshness. For what runs now and its resource relationships, prefer get_workloads when available.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workloadId": {
+                  "type": "string"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cluster": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "namespace": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "analysis": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "helm": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "releaseName": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "releaseNamespace": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "chartName": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedChartVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "latestKnownChartVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "appVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "releaseName",
+                            "releaseNamespace",
+                            "chartName",
+                            "observedChartVersion",
+                            "latestKnownChartVersion",
+                            "appVersion"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "registry": {
+                            "type": "string"
+                          },
+                          "repository": {
+                            "type": "string"
+                          },
+                          "observedTag": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "latestKnownTag": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "versionStatus": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "registry",
+                          "repository",
+                          "observedTag",
+                          "latestKnownTag",
+                          "status",
+                          "versionStatus"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "helm",
+                    "images"
+                  ],
+                  "additionalProperties": false
+                },
+                "snapshot": {
+                  "type": "object",
+                  "properties": {
+                    "reportId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reportId",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "workloadId",
+                "name",
+                "kind",
+                "cluster",
+                "namespace",
+                "analysis",
+                "snapshot"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "scoped": {
+                "type": "boolean"
+              },
+              "namespaces": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "scoped",
+              "namespaces",
+              "note"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "query",
+          "matches",
+          "scope"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plan_image_updates",
+      "title": "Plan Driftmower image updates",
+      "description": "Use to propose image-tag and Helm-chart updates from the latest ready Driftmower backend snapshot. Advisory only: does not modify workloads or deploy updates. Inspect snapshot scope, warnings, manual-review actions and nextCursor before presenting a complete plan; verify candidates against live inventory when available.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versionStatuses": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "major_behind",
+                "minor_behind",
+                "patch_behind",
+                "behind"
+              ]
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_ready_report"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "namespace": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "versionStatuses": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "major_behind",
+                    "minor_behind",
+                    "patch_behind",
+                    "behind"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "namespace",
+              "versionStatuses"
+            ],
+            "additionalProperties": false
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "reportId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reportId",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "uniqueImageCandidates": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalActions": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "imageTagUpdates": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "helmChartUpdates": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "manualReviews": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "uniqueImageCandidates",
+              "totalActions",
+              "imageTagUpdates",
+              "helmChartUpdates",
+              "manualReviews"
+            ],
+            "additionalProperties": false
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "actionId": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "image_tag_update"
+                    },
+                    "versionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "major_behind",
+                        "minor_behind",
+                        "patch_behind",
+                        "behind"
+                      ]
+                    },
+                    "workload": {
+                      "type": "object",
+                      "properties": {
+                        "groupKey": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "namespace": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "groupKey",
+                        "kind",
+                        "namespace",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "containerName": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "currentImage": {
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "type": "string"
+                        },
+                        "registry": {
+                          "type": "string"
+                        },
+                        "repository": {
+                          "type": "string"
+                        },
+                        "tag": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reference",
+                        "registry",
+                        "repository",
+                        "tag"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "proposedImage": {
+                      "type": "object",
+                      "properties": {
+                        "reference": {
+                          "type": "string"
+                        },
+                        "registry": {
+                          "type": "string"
+                        },
+                        "repository": {
+                          "type": "string"
+                        },
+                        "tag": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reference",
+                        "registry",
+                        "repository",
+                        "tag"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "actionId",
+                    "type",
+                    "versionStatus",
+                    "workload",
+                    "containerName",
+                    "currentImage",
+                    "proposedImage"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "actionId": {
+                      "type": "string"
+                    },
+                    "versionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "major_behind",
+                        "minor_behind",
+                        "patch_behind",
+                        "behind"
+                      ]
+                    },
+                    "releaseGroupKey": {
+                      "type": "string"
+                    },
+                    "releaseName": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "releaseNamespace": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "chartName": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "imageEvidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "workload": {
+                            "type": "object",
+                            "properties": {
+                              "groupKey": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "namespace": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "groupKey",
+                              "kind",
+                              "namespace",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "containerName": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "currentImage": {
+                            "type": "object",
+                            "properties": {
+                              "reference": {
+                                "type": "string"
+                              },
+                              "registry": {
+                                "type": "string"
+                              },
+                              "repository": {
+                                "type": "string"
+                              },
+                              "tag": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "reference",
+                              "registry",
+                              "repository",
+                              "tag"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "proposedImage": {
+                            "type": "object",
+                            "properties": {
+                              "reference": {
+                                "type": "string"
+                              },
+                              "registry": {
+                                "type": "string"
+                              },
+                              "repository": {
+                                "type": "string"
+                              },
+                              "tag": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "reference",
+                              "registry",
+                              "repository",
+                              "tag"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "versionStatus": {
+                            "type": "string",
+                            "enum": [
+                              "major_behind",
+                              "minor_behind",
+                              "patch_behind",
+                              "behind"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "workload",
+                          "containerName",
+                          "currentImage",
+                          "proposedImage",
+                          "versionStatus"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "totalImageCandidates": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "omittedImageCandidates": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "helm_chart_update"
+                    },
+                    "observedChartVersion": {
+                      "type": "string"
+                    },
+                    "latestKnownChartVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actionId",
+                    "versionStatus",
+                    "releaseGroupKey",
+                    "releaseName",
+                    "releaseNamespace",
+                    "chartName",
+                    "imageEvidence",
+                    "totalImageCandidates",
+                    "omittedImageCandidates",
+                    "type",
+                    "observedChartVersion",
+                    "latestKnownChartVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "actionId": {
+                      "type": "string"
+                    },
+                    "versionStatus": {
+                      "type": "string",
+                      "enum": [
+                        "major_behind",
+                        "minor_behind",
+                        "patch_behind",
+                        "behind"
+                      ]
+                    },
+                    "releaseGroupKey": {
+                      "type": "string"
+                    },
+                    "releaseName": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "releaseNamespace": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "chartName": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "imageEvidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "workload": {
+                            "type": "object",
+                            "properties": {
+                              "groupKey": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "namespace": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "groupKey",
+                              "kind",
+                              "namespace",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "containerName": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "currentImage": {
+                            "type": "object",
+                            "properties": {
+                              "reference": {
+                                "type": "string"
+                              },
+                              "registry": {
+                                "type": "string"
+                              },
+                              "repository": {
+                                "type": "string"
+                              },
+                              "tag": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "reference",
+                              "registry",
+                              "repository",
+                              "tag"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "proposedImage": {
+                            "type": "object",
+                            "properties": {
+                              "reference": {
+                                "type": "string"
+                              },
+                              "registry": {
+                                "type": "string"
+                              },
+                              "repository": {
+                                "type": "string"
+                              },
+                              "tag": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "reference",
+                              "registry",
+                              "repository",
+                              "tag"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "versionStatus": {
+                            "type": "string",
+                            "enum": [
+                              "major_behind",
+                              "minor_behind",
+                              "patch_behind",
+                              "behind"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "workload",
+                          "containerName",
+                          "currentImage",
+                          "proposedImage",
+                          "versionStatus"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "totalImageCandidates": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "omittedImageCandidates": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "manual_review"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "missing_chart_candidate",
+                        "chart_candidate_not_distinct"
+                      ]
+                    },
+                    "observedChartVersion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "latestKnownChartVersion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "actionId",
+                    "versionStatus",
+                    "releaseGroupKey",
+                    "releaseName",
+                    "releaseNamespace",
+                    "chartName",
+                    "imageEvidence",
+                    "totalImageCandidates",
+                    "omittedImageCandidates",
+                    "type",
+                    "reason",
+                    "observedChartVersion",
+                    "latestKnownChartVersion"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "scoped": {
+                "type": "boolean"
+              },
+              "namespaces": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "scoped",
+              "namespaces",
+              "note"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "status",
+          "filters",
+          "snapshot",
+          "summary",
+          "actions",
+          "nextCursor",
+          "warnings",
+          "scope"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_volumes",
+      "title": "List PVCs, PVs and volume usage",
+      "description": "Use for storage inventory, PVC-to-PV bindings, allocation and volume space or inode usage. Specify namespace when known; omitting it requires cluster-wide list PVC permission. Kubernetes supplies PVC/PV metadata; Prometheus augments claims with kubelet used/capacity bytes and total/used inodes when configured. Bound PV details require get permission for each PV. Set includeUnboundPVs only when investigating Available, Released or other non-Bound PVs; it requires cluster-wide list PV permission. Missing usage is null, not zero. Includes source metrics and exact queries; never exports CSI attributes or secret references. For which workload consumes a PVC, use get_workloads when available.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+          },
+          "includeUnboundPVs": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "list_pods",
+      "title": "List pod names",
+      "description": "Use when only current pod names in a known namespace are needed, such as choosing a pod for logs or resource usage. For application inventory, owner relationships and dependencies, prefer get_workloads when available. Requires authenticated list pods permission and reads metadata only. Returns sorted names; no pod status, containers or ownership. Deleted pods are absent; a known deleted pod name may still have resource usage history. An incomplete listing is an error.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+          }
+        },
+        "required": [
+          "namespace"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "pods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "namespace",
+          "pods"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "describe_provisioning_platform",
+      "title": "Describe the provisioning platform",
+      "description": "Use for an initial interpreted overview when planning provisioning or choosing platform capabilities. Returns cluster facts for provisioning: storage classes and what each implies for data, zones and schedulable nodes, priority classes, the published ingress domain and TLS advice, enforced admission policies and the tenant label they scope on, Kyverno policies, the network policy engine and whether the Prometheus operator is present. Everything is discovered from the cluster; an optional component that is absent degrades one fact rather than the answer. Read-only. For raw CRD and catalog listings use list_custom_resource_definitions, list_ingress_classes, list_cluster_issuers and list_priority_classes.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "kubernetes_unreachable"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "storageClasses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "provisioner": {
+                  "type": "string"
+                },
+                "bindingMode": {
+                  "type": "string",
+                  "enum": [
+                    "Immediate",
+                    "WaitForFirstConsumer"
+                  ]
+                },
+                "allowExpansion": {
+                  "type": "boolean"
+                },
+                "reclaimPolicy": {
+                  "type": "string",
+                  "enum": [
+                    "Delete",
+                    "Retain",
+                    "Recycle"
+                  ]
+                },
+                "topology": {
+                  "type": "string",
+                  "enum": [
+                    "node-local",
+                    "zonal",
+                    "cluster-wide",
+                    "unknown"
+                  ]
+                },
+                "implies": {
+                  "type": "string"
+                },
+                "replicaSafe": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "provisioner",
+                "bindingMode",
+                "allowExpansion",
+                "reclaimPolicy",
+                "topology",
+                "implies",
+                "replicaSafe"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "topology": {
+            "type": "object",
+            "properties": {
+              "zones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "zone": {
+                      "type": "string"
+                    },
+                    "nodes": {
+                      "type": "number"
+                    },
+                    "allocatable": {
+                      "type": "object",
+                      "properties": {
+                        "cpuMillis": {
+                          "type": "number"
+                        },
+                        "memoryBytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "cpuMillis",
+                        "memoryBytes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "zone",
+                    "nodes",
+                    "allocatable"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "schedulableNodes": {
+                "type": "number"
+              },
+              "controlPlaneLabel": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "zones",
+              "schedulableNodes",
+              "controlPlaneLabel"
+            ],
+            "additionalProperties": false
+          },
+          "priorityClasses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "value",
+                "meaning"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "networkPolicyEngine": {
+            "type": "string",
+            "enum": [
+              "cilium",
+              "native",
+              "none",
+              "unknown"
+            ]
+          },
+          "monitoringOperator": {
+            "type": "boolean"
+          },
+          "ingress": {
+            "type": "object",
+            "properties": {
+              "domainSuffix": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "domainSuffixSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "guard-params",
+                      "config"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "classes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "controller": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "controller"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "clusterIssuers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "tlsAdvice": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "domainSuffix",
+              "domainSuffixSource",
+              "classes",
+              "clusterIssuers",
+              "tlsAdvice"
+            ],
+            "additionalProperties": false
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "engine": {
+                  "type": "string",
+                  "const": "kyverno"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "Enforce",
+                    "Audit"
+                  ]
+                },
+                "touches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "engine",
+                "name",
+                "mode",
+                "touches",
+                "meaning"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "admissionPolicies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "enforced": {
+                  "type": "boolean"
+                },
+                "enforcement": {
+                  "type": "string"
+                },
+                "guards": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "group": {
+                        "type": "string"
+                      },
+                      "resource": {
+                        "type": "string"
+                      },
+                      "operations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "versions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "group",
+                      "resource",
+                      "operations"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scopedToNamespaceLabels": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "enforced",
+                "enforcement",
+                "guards",
+                "messages",
+                "description",
+                "scopedToNamespaceLabels"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "tenantLabelKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offeringsReady": {
+            "type": "number"
+          },
+          "offeringsTotal": {
+            "type": "number"
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "number"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "status",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_offerings",
+      "title": "List provisionable offerings",
+      "description": "Use to choose a supported database, cache, queue or object-store offering; supply offering to narrow the catalog and namespace to check creation permissions. Returns each offering with whether it is actually available on this cluster and, when it is not, why, plus the admission defaults that rewrite its resources on create, each with what its policy says it requires. Presets describe sizing intent, not configured replica counts, placement or backups; discover applicable policies before selecting those settings. With `namespace`, each offering also carries whether the cluster authorizer lets you create it there, checked as the verified caller for every resource the offering needs, with enforced admission policies considered. Read-only.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "offering": {
+            "type": "string",
+            "enum": [
+              "postgres",
+              "dragonfly",
+              "mongodb",
+              "rabbitmq",
+              "redpanda",
+              "opensearch",
+              "elasticsearch",
+              "emqx",
+              "bucket"
+            ]
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "kubernetes_unreachable"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "offerings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "purpose": {
+                  "type": "string"
+                },
+                "what": {
+                  "type": "string"
+                },
+                "goodFor": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "operator": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "vendor": {
+                          "type": "string"
+                        },
+                        "docsHref": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "vendor",
+                        "docsHref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "resource": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "apiVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "availability": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "const": "ready"
+                        },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "watchedNamespaces": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "version",
+                        "watchedNamespaces"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "const": "degraded"
+                        },
+                        "version": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "version",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "const": "crds-only"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "const": "not-installed"
+                        },
+                        "installHref": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "installHref"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "presets": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "needs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "admissionDefaults": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "policy": {
+                        "type": "string"
+                      },
+                      "resource": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "namespaceScoped": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "policy",
+                      "resource",
+                      "description",
+                      "namespaceScoped"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "mayCreate": {
+                  "type": "string",
+                  "enum": [
+                    "yes",
+                    "no",
+                    "unknown"
+                  ]
+                },
+                "mayCreateReason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "purpose",
+                "what",
+                "goodFor",
+                "operator",
+                "resource",
+                "apiVersion",
+                "availability",
+                "presets",
+                "needs",
+                "admissionDefaults"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "withheld": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "number"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "status",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "describe_namespace_readiness",
+      "title": "Describe namespace readiness",
+      "description": "Use before provisioning in known namespaces to assess readiness and constraints. Pass only relevant namespaces; add offering for an offering-specific creation check. Returns quota and remaining headroom, LimitRange defaults, network posture and any policies that select on an exact instance name, Pod Security enforcement, the hostnames the namespace may claim, any container registry published from the namespace with the skaffold.env to build against it, and your access there as the cluster authorizer reports it (per resource type as a plain creatableResources array, without a permission matrix). With `offering`, whether you may create that offering there. Namespaces where you may not list pods are withheld, not empty. Read-only.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "namespaces": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            }
+          },
+          "offering": {
+            "type": "string",
+            "enum": [
+              "postgres",
+              "dragonfly",
+              "mongodb",
+              "rabbitmq",
+              "redpanda",
+              "opensearch",
+              "elasticsearch",
+              "emqx",
+              "bucket"
+            ]
+          }
+        },
+        "required": [
+          "namespaces"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "kubernetes_unreachable"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "requested": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "namespaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string"
+                },
+                "tenant": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "labelKey": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "labelKey",
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sandbox": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "quota": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "used": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "hard": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "used",
+                        "hard"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "headroom": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "cpuMillis": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "memoryBytes": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "storageBytes": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pvcCount": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pods": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cpuMillis",
+                        "memoryBytes",
+                        "storageBytes",
+                        "pvcCount",
+                        "pods"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "limitRange": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "defaultRequest": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "default": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "defaultRequest",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "network": {
+                  "type": "object",
+                  "properties": {
+                    "ingress": {
+                      "type": "string",
+                      "enum": [
+                        "default-deny",
+                        "open",
+                        "unknown"
+                      ]
+                    },
+                    "egress": {
+                      "type": "string",
+                      "enum": [
+                        "default-deny",
+                        "open",
+                        "unknown"
+                      ]
+                    },
+                    "selectors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "policy": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "NetworkPolicy",
+                              "CiliumNetworkPolicy"
+                            ]
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "Ingress",
+                              "Egress"
+                            ]
+                          },
+                          "labelKey": {
+                            "type": "string"
+                          },
+                          "labelValue": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "admits": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "policy",
+                          "kind",
+                          "direction",
+                          "labelKey",
+                          "labelValue",
+                          "admits"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ciliumAvailable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ingress",
+                    "egress",
+                    "selectors",
+                    "ciliumAvailable"
+                  ],
+                  "additionalProperties": false
+                },
+                "mayCreate": {
+                  "type": "string",
+                  "enum": [
+                    "yes",
+                    "no",
+                    "unknown"
+                  ]
+                },
+                "mayCreateReason": {
+                  "type": "string"
+                },
+                "offerings": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "verdict": {
+                        "type": "string",
+                        "enum": [
+                          "yes",
+                          "no",
+                          "unknown"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "verdict",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "registries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "zot"
+                      },
+                      "host": {
+                        "type": "string"
+                      },
+                      "tls": {
+                        "type": "boolean"
+                      },
+                      "deployment": {
+                        "type": "string"
+                      },
+                      "service": {
+                        "type": "string"
+                      },
+                      "ingress": {
+                        "type": "string"
+                      },
+                      "skaffoldEnv": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "host",
+                      "tls",
+                      "deployment",
+                      "service",
+                      "ingress",
+                      "skaffoldEnv"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "podSecurity": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "enforce": {
+                          "type": "string",
+                          "enum": [
+                            "privileged",
+                            "baseline",
+                            "restricted"
+                          ]
+                        },
+                        "requires": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "summary": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "enforce",
+                        "requires",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "creatableResources": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "namespace",
+                "tenant",
+                "sandbox",
+                "quota",
+                "headroom",
+                "limitRange",
+                "network",
+                "mayCreate",
+                "mayCreateReason",
+                "offerings",
+                "registries",
+                "podSecurity",
+                "creatableResources"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hostRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string"
+                },
+                "tenantId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sandboxId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "exactHost": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "labelledPattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "enforcedBy": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "enforcedMessage": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "customDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "namespace",
+                "tenantId",
+                "sandboxId",
+                "exactHost",
+                "labelledPattern",
+                "enforcedBy",
+                "enforcedMessage",
+                "customDomains",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "withheld": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "number"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source",
+                "status",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "check_access",
+      "title": "Check one permission",
+      "description": "Use before a specific operation to check authorization; namespace visibility alone is insufficient. Supply API group, plural resource name and verb (plus namespace/name when applicable). Asks the cluster authorizer, as the verified caller, whether the operation is allowed: any group and resource, cluster-scoped or in a namespace, subresources such as pods/log, a named object. Discovered enforced admission constraints are reported alongside; an RBAC yes does not guarantee that create, update or delete will pass admission, including conditions this tool cannot evaluate. For create and update it also lists the mutating admission policies that rewrite the object, with what each says it requires, such as a Secret to provision first. Use it for anything outside the offering catalog. Read-only.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "verb": {
+            "type": "string",
+            "enum": [
+              "get",
+              "list",
+              "watch",
+              "create",
+              "update",
+              "patch",
+              "delete",
+              "deletecollection",
+              "proxy"
+            ]
+          },
+          "group": {
+            "default": "",
+            "type": "string",
+            "maxLength": 253
+          },
+          "resource": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "subresource": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "verb",
+          "resource"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "unknown"
+            ]
+          },
+          "rbac": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no",
+                  "unknown"
+                ]
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "verdict",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "admission": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "policy": {
+                  "type": "string"
+                },
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "policy",
+                "messages"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "admissionConstraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "policy": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "admissionDefaults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "policy": {
+                  "type": "string"
+                },
+                "resource": {
+                  "type": "string"
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "namespaceScoped": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "policy",
+                "resource",
+                "description",
+                "namespaceScoped"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "identity": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string"
+                  },
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "user",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "driftmower://cluster/discovery-guide",
+      "name": "cluster-discovery-guide",
+      "title": "Cluster identity and discovery workflow",
+      "description": "Start here for this connection’s cluster identity and enabled discovery, provisioning and observability tool workflow. Live facts come from the listed tools.",
+      "mimeType": "text/plain"
+    }
+  ]
+}
