@@ -21,6 +21,7 @@ import (
 
 	"github.com/codemowers/driftmower-mcp/internal/auth"
 	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower-mcp/internal/catalog"
 	"github.com/codemowers/driftmower-mcp/internal/cluster"
 	"github.com/codemowers/driftmower-mcp/internal/config"
 	"github.com/codemowers/driftmower-mcp/internal/httpserver"
@@ -28,6 +29,8 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/logging"
 	"github.com/codemowers/driftmower-mcp/internal/mcpserver"
 	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
+	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
 )
 
 // version is set at build time with -ldflags "-X main.version=<revision>".
@@ -74,6 +77,10 @@ type services struct {
 	namespaces *kube.NamespaceLister
 	scope      *authz.ScopeResolver
 	mapping    auth.Mapping
+	clusterID  *string
+	catalog    *catalog.Catalog
+	facts      *facts.Facts
+	service    *service.Service
 }
 
 func newServices(cfg *config.Config) (*services, error) {
@@ -83,14 +90,32 @@ func newServices(cfg *config.Config) (*services, error) {
 	}
 	reviews := authz.NewCachedReviewer(authz.NewSubjectAccessReviewer(clients.Kubernetes.AuthorizationV1()), cfg.Kubernetes.SARCacheTTL, nil)
 	namespaces := kube.NewNamespaceLister(clients.Kubernetes)
+	judge := authz.NewChecker(reviews)
+	cat := catalog.New(clients.Kubernetes, clients.Dynamic)
+	svc := &services{}
+	f := facts.New(facts.Options{
+		Kubernetes:          clients.Kubernetes,
+		Dynamic:             clients.Dynamic,
+		Catalog:             cat,
+		Judge:               judge,
+		IngressDomainSuffix: cfg.Provisioning.IngressDomainSuffix,
+		ClusterFactTTL:      cfg.Provisioning.ClusterFactTTL,
+		TopologyTTL:         cfg.Provisioning.TopologyTTL,
+		OperatorTTL:         cfg.Provisioning.OperatorTTL,
+		// The identity is discovered after these facts are built.
+		ClusterID: func() *string { return svc.clusterID },
+	})
 
-	return &services{
+	*svc = services{
 		clients:    clients,
 		reviews:    reviews,
 		namespaces: namespaces,
+		catalog:    cat,
+		facts:      f,
+		service:    service.New(f, judge, cfg.Provisioning.MaxNamespaces),
 		scope: &authz.ScopeResolver{
 			ListNamespaces: namespaces.List,
-			Judge:          authz.NewChecker(reviews),
+			Judge:          judge,
 			MaxNamespaces:  cfg.Tenancy.MaxNamespaces,
 		},
 		mapping: auth.Mapping{
@@ -99,7 +124,9 @@ func newServices(cfg *config.Config) (*services, error) {
 			UsernamePrefix: cfg.Kubernetes.UsernamePrefix,
 			GroupsPrefix:   cfg.Kubernetes.GroupsPrefix,
 		},
-	}, nil
+	}
+
+	return svc, nil
 }
 
 func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
@@ -134,14 +161,17 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		checkAuthorizer(probeCtx, svc, logger)
 	}
 	cancel()
+	svc.clusterID = identity.ID
 
 	server := mcpserver.New(mcpserver.Deps{
-		Cluster: identity,
-		Version: version,
-		Logger:  logger,
-		Metrics: m,
-		Mapping: svc.mapping,
-		Scope:   svc.scope,
+		Cluster:      identity,
+		Version:      version,
+		Logger:       logger,
+		Metrics:      m,
+		Mapping:      svc.mapping,
+		Scope:        svc.scope,
+		Catalog:      svc.catalog,
+		Provisioning: svc.service,
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -162,9 +192,12 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Auth:          authenticator,
 		SessionIdle:   cfg.SessionIdle,
 		Invalidate:    newInvalidator(cfg, svc, m, logger),
-		WebUI:         cfg.WebUI.Enabled,
-		Metrics:       m,
-		Logger:        logger,
+		Capabilities: &httpserver.Capabilities{
+			Service: svc.service, Mapping: svc.mapping, Authenticated: authenticator != nil, Logger: logger,
+		},
+		WebUI:   cfg.WebUI.Enabled,
+		Metrics: m,
+		Logger:  logger,
 	}))
 	if err != nil {
 		return err
@@ -260,6 +293,7 @@ func newInvalidator(cfg *config.Config, svc *services, m *metrics.Metrics, logge
 		ClearReviews:        svc.reviews.Clear,
 		InvalidateNamespace: svc.reviews.InvalidateNamespace,
 		InvalidateUser:      svc.reviews.InvalidateUser,
+		InvalidateFacts:     svc.service.Invalidate,
 		Metrics:             m,
 		Logger:              logger,
 	}
@@ -278,7 +312,7 @@ func watchHooks(svc *services, m *metrics.Metrics) authz.WatchHooks {
 			invalidated.Inc()
 		},
 		NamespacesChanged: svc.namespaces.Invalidate,
-		DiscoveryChanged:  func() {},
+		DiscoveryChanged:  svc.service.Invalidate,
 	}
 }
 

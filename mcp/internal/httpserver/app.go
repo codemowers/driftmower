@@ -27,6 +27,9 @@ type AppOptions struct {
 	SessionIdle time.Duration
 	// Nil answers /api/cache/invalidate with 404.
 	Invalidate http.Handler
+	// Nil answers /api/provisioning/capabilities with 404. Authenticated
+	// like /mcp.
+	Capabilities http.Handler
 	// Links the landing page to /ui.
 	WebUI   bool
 	Metrics *metrics.Metrics
@@ -49,7 +52,11 @@ func NewApp(opts AppOptions) http.Handler {
 	)
 
 	mux := http.NewServeMux()
+	capabilities := opts.Capabilities
 	if opts.Auth != nil {
+		if capabilities != nil {
+			capabilities = opts.Auth.Middleware(opts.PublicURL)(capabilities)
+		}
 		// Every MCP request is authenticated, and a session belongs to the
 		// subject that opened it.
 		mcpHandler = opts.Auth.Middleware(opts.PublicURL)(mcpHandler)
@@ -59,6 +66,9 @@ func NewApp(opts AppOptions) http.Handler {
 	}
 	mux.Handle("/mcp", mcpHandler)
 	mux.HandleFunc("GET /{$}", a.serveLanding)
+	if capabilities != nil {
+		mux.Handle(capabilitiesPath, capabilities)
+	}
 	if opts.Invalidate != nil {
 		mux.Handle(invalidatePath, opts.Invalidate)
 	}

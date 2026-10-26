@@ -11,9 +11,11 @@ import (
 
 	"github.com/codemowers/driftmower-mcp/internal/auth"
 	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower-mcp/internal/catalog"
 	"github.com/codemowers/driftmower-mcp/internal/cluster"
 	"github.com/codemowers/driftmower-mcp/internal/logging"
 	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
 )
 
 // Deps are the services behind the tools. A nil service leaves its tools
@@ -27,6 +29,10 @@ type Deps struct {
 	Mapping auth.Mapping
 	// Enables list_accessible_namespaces.
 	Scope *authz.ScopeResolver
+	// Enables the cluster catalog tools.
+	Catalog *catalog.Catalog
+	// Enables the provisioning tools.
+	Provisioning *service.Service
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -61,8 +67,14 @@ func New(d Deps) *mcp.Server {
 	})
 
 	addClusterIdentityTool(s, d.Cluster, usage)
+	if d.Catalog != nil {
+		addCatalogTools(s, d.Catalog, d.Cluster, d.Provisioning, d.Mapping)
+	}
 	if d.Scope != nil {
 		addAccessibleNamespacesTool(s, d.Scope, d.Mapping)
+	}
+	if d.Provisioning != nil {
+		addProvisioningTools(s, d.Provisioning, d.Mapping, d.Logger)
 	}
 
 	return s
@@ -78,6 +90,19 @@ func usageInstructions(d Deps) string {
 		}
 	}
 
+	add(d.Provisioning != nil, "When planning an application or provisioning resources, start with describe_provisioning_platform for discovered platform facts, then list_offerings for relevant databases, caches, queues or object stores. "+
+		"Supply offering and the intended namespace when known. Before drafting manifests, use describe_namespace_readiness for the target namespaces and selected offering; use check_access for operations outside the offering catalog. "+
+		"Read structuredContent and warnings: unavailable or unknown facts are not evidence that a capability is absent, and authorization does not guarantee admission.")
+	add(d.Provisioning != nil, "Offering presets describe sizing intent, not effective configuration or established high availability. "+
+		"Derive managed replica counts and fields to omit from applicable policy descriptions and bindings; a permitted range is not a configured count. "+
+		"Verify placement, storage behavior, persistence, backups and recovery separately before claiming resilience. "+
+		"Use namespace readiness to account for quota, LimitRange defaults, Pod Security and network constraints before deployment; choose explicit workload resources when defaults cannot support the application. "+
+		"Reuse facts already gathered for the same target; repeat discovery when relevant state changes or a fact is missing. Namespace readiness lists creatable resource names; use check_access for one specific operation.")
+	add(d.Catalog != nil, "Use list_custom_resource_definitions to discover installed custom-resource APIs beyond the offering catalog, then describe_custom_resource_definition for the selected API before drafting its manifest. "+
+		"Discover ingress classes, cluster issuers and priority classes with the corresponding list tools only when needed. Installed APIs and catalog entries do not establish controller health or permission to use them.")
+	add(d.Catalog != nil && d.Provisioning != nil, "Supply the target namespace to list_custom_resource_definitions to list only custom-resource APIs the caller can create there, without a permission matrix.")
+	add(d.Catalog != nil, "Use list_admission_policies to discover policies and their bindings for the intended resource and namespace before relying on admission defaults or requirements. "+
+		"Use list_storage_classes when selecting volume storage. Keep each resource or policy’s own defaults and requirements separate; do not assume optional components or redirect to an alternative whose availability has not been discovered.")
 	add(d.Scope != nil, "Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission.")
 	add(true, "Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories.")
 

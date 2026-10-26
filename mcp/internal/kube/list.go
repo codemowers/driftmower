@@ -2,9 +2,12 @@ package kube
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 // ListOptions bounds a paged listing.
@@ -50,4 +53,33 @@ func Collect[T any](ctx context.Context, page PageFunc[T], opts ListOptions) ([]
 	}
 
 	return nil, fmt.Errorf("%s exceeds %d pages; refusing to return an incomplete list", what, maxPages)
+}
+
+// ListUnstructured pages through a dynamic collection, decoding each item into
+// T through JSON. namespace "" lists cluster-wide.
+func ListUnstructured[T any](ctx context.Context, client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, opts ListOptions) ([]T, error) {
+	return Collect(ctx, func(ctx context.Context, lo metav1.ListOptions) ([]T, string, error) {
+		var res dynamic.ResourceInterface = client.Resource(gvr)
+		if namespace != "" {
+			res = client.Resource(gvr).Namespace(namespace)
+		}
+		list, err := res.List(ctx, lo)
+		if err != nil {
+			return nil, "", err
+		}
+		items := make([]T, 0, len(list.Items))
+		for _, item := range list.Items {
+			raw, err := json.Marshal(item.Object)
+			if err != nil {
+				return nil, "", err
+			}
+			var v T
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return nil, "", fmt.Errorf("decode %s %s: %w", gvr.Resource, item.GetName(), err)
+			}
+			items = append(items, v)
+		}
+
+		return items, list.GetContinue(), nil
+	}, opts)
 }

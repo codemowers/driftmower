@@ -5,6 +5,7 @@ package kube
 import (
 	"fmt"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
@@ -17,6 +18,8 @@ import (
 type Clients struct {
 	// Kubernetes bounds every request by the configured timeout.
 	Kubernetes kubernetes.Interface
+	// Dynamic reads optional and custom resources, bounded like Kubernetes.
+	Dynamic dynamic.Interface
 	// Metadata has no overall timeout, because informers hold long-lived
 	// watches on it.
 	Metadata metadata.Interface
@@ -55,10 +58,14 @@ func NewClients(c config.Kubernetes) (*Clients, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kubernetes client: %w", err)
 	}
+	d, err := dynamic.NewForConfig(bounded)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes dynamic client: %w", err)
+	}
 	m, err := metadata.NewForConfig(base)
 	if err != nil {
 		return nil, fmt.Errorf("kubernetes metadata client: %w", err)
 	}
 
-	return &Clients{Kubernetes: k, Metadata: m}, nil
+	return &Clients{Kubernetes: k, Dynamic: d, Metadata: m}, nil
 }
