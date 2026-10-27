@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driftmower crawler</title>
+<style>
+:root {
+  --bg: #0d1210;
+  --panel: #141c18;
+  --line: #24312b;
+  --text: #d6e4dc;
+  --muted: #7f948a;
+  --accent: #5fd38d;
+  --critical: #ff5c5c;
+  --high: #ff9b45;
+  --medium: #e8c547;
+  --low: #7fb3ff;
+  --possible: #a98be8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font: 12px ui-monospace, monospace; }
+
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+header h1 { margin: 0; font-size: 16px; }
+.stats { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); }
+.stats b { color: var(--text); }
+.controls { display: flex; gap: 10px; margin-left: auto; align-items: center; }
+.controls input[type=search] { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 6px 10px; border-radius: 6px; width: 260px; }
+.controls label { color: var(--muted); user-select: none; }
+
+main { padding: 16px 20px; }
+.source { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; }
+.source > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; }
+.source > summary::-webkit-details-marker { display: none; }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.name small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+.latest { color: var(--muted); white-space: nowrap; }
+.badges { display: flex; gap: 6px; }
+.badge { padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #111; white-space: nowrap; }
+.badge.critical { background: var(--critical); }
+.badge.high { background: var(--high); }
+.badge.medium { background: var(--medium); }
+.badge.low, .badge.unknown { background: var(--low); }
+.badge.possible { background: var(--possible); }
+.badge.error { background: transparent; color: var(--critical); border: 1px solid var(--critical); }
+.badge.pending { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+
+.body { padding: 4px 14px 14px; border-top: 1px solid var(--line); }
+.meta { color: var(--muted); margin: 8px 0; }
+table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; }
+.behind { font-variant-numeric: tabular-nums; }
+.behind.far { color: var(--high); }
+.findings { display: flex; flex-wrap: wrap; gap: 6px; }
+.finding { border-left: 3px solid var(--low); padding: 0 6px; }
+.finding.critical { border-color: var(--critical); }
+.finding.high { border-color: var(--high); }
+.finding.medium { border-color: var(--medium); }
+.finding.possible { border-style: dashed; }
+.errors { color: var(--critical); }
+.advisories li { margin: 4px 0; }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+
+@media (max-width: 700px) {
+  header, main { padding-left: 12px; padding-right: 12px; }
+  .controls { margin-left: 0; width: 100%; }
+  .controls input[type=search] { flex: 1; width: auto; }
+  .source > summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .latest { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Driftmower crawler</h1>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <input type="search" id="filter" placeholder="Filter sources, versions, advisories">
+    <label><input type="checkbox" id="affected"> Affected only</label>
+  </div>
+</header>
+<main id="sources"><div class="empty">Loading…</div></main>
+<script>
+const severities = ['critical', 'high', 'medium', 'low', 'unknown']
+const open = new Set()
+let data = null
+
+const el = (tag, attrs = {}, ...children) => {
+  const node = document.createElement(tag)
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'class') node.className = value
+    else node.setAttribute(key, value)
+  }
+  for (const child of children.flat()) if (child != null) node.append(child)
+  return node
+}
+
+const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text)
+
+const ago = value => {
+  if (!value) return 'never'
+  const seconds = (Date.now() - new Date(value)) / 1000
+  const future = seconds < 0
+  const abs = Math.abs(seconds)
+  const text = abs < 90 ? `${Math.round(abs)}s` : abs < 5400 ? `${Math.round(abs / 60)}m` : abs < 129600 ? `${Math.round(abs / 3600)}h` : `${Math.round(abs / 86400)}d`
+  return future ? `in ${text}` : `${text} ago`
+}
+
+const shortName = url => url.replace(/^https:\/\//, '').replace(/^github\.com\//, '')
+
+const findings = source => source.deployed.flatMap(d => d.findings ?? [])
+
+const severityCounts = source => {
+  const counts = {}
+  for (const f of findings(source)) {
+    const key = f.confidence === 'possible' ? 'possible' : (severities.includes(f.severity) ? f.severity : 'unknown')
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return counts
+}
+
+const rank = source => {
+  const counts = severityCounts(source)
+  const order = [...severities, 'possible']
+  const worst = order.findIndex(key => counts[key])
+  return worst < 0 ? order.length : worst
+}
+
+const matches = (source, text) => {
+  if (!text) return true
+  const haystack = [source.url, ...source.deployed.flatMap(d => [d.version, ...d.images]),
+    ...(source.advisories ?? []).flatMap(a => [a.id, ...(a.aliases ?? []), a.summary ?? ''])].join(' ').toLowerCase()
+  return text.toLowerCase().split(/\s+/).every(word => haystack.includes(word))
+}
+
+function badges(source) {
+  const counts = severityCounts(source)
+  const out = [...severities, 'possible'].filter(key => counts[key]).map(key => el('span', { class: `badge ${key}` }, `${counts[key]} ${key}`))
+  if (!source.checkedAt) out.push(el('span', { class: 'badge pending' }, 'pending'))
+  else if (source.errors?.length) out.push(el('span', { class: 'badge error' }, `${source.errors.length} error${source.errors.length > 1 ? 's' : ''}`))
+  return el('span', { class: 'badges' }, out)
+}
+
+function renderSource(source) {
+  const advisories = new Map((source.advisories ?? []).map(a => [a.id, a]))
+  const details = el('details', { class: 'source' })
+  details.open = open.has(source.url)
+  details.addEventListener('toggle', () => details.open ? open.add(source.url) : open.delete(source.url))
+  const deployed = source.deployed.map(d => d.version).join(', ')
+  details.append(el('summary', {},
+    el('span', { class: 'name', title: source.url }, shortName(source.url), deployed ? el('small', {}, deployed) : null),
+    el('span', { class: 'latest' }, source.latest ? `latest ${source.latest.tag}` : ''),
+    badges(source)))
+
+  const body = el('div', { class: 'body' })
+  body.append(el('div', { class: 'meta' }, link(source.url, source.url),
+    ` · crawled ${ago(source.checkedAt)}`, source.nextCrawl ? ` · next ${ago(source.nextCrawl)}` : '',
+    source.latest ? [' · latest ', link(source.latest.url || source.url, source.latest.tag)] : ''))
+  if (source.errors?.length) body.append(el('ul', { class: 'errors' }, source.errors.map(e => el('li', {}, e))))
+
+  if (source.deployed.length) {
+    const rows = source.deployed.map(d => el('tr', {},
+      el('td', {}, el('code', {}, d.version)),
+      el('td', { class: `behind${d.behind > 3 ? ' far' : ''}` }, d.behind < 0 ? 'unknown' : String(d.behind)),
+      el('td', {}, d.latestOnLine ?? ''),
+      el('td', {}, el('div', { class: 'findings' }, (d.findings ?? []).map(f => {
+        const advisory = advisories.get(f.advisory)
+        const label = [f.advisory, f.fixedIn ? `→ ${f.fixedIn}` : ''].filter(Boolean).join(' ')
+        return el('span', { class: `finding ${f.severity ?? ''} ${f.confidence}`, title: `${f.severity ?? 'unknown'}, ${f.confidence}${advisory?.summary ? `: ${advisory.summary}` : ''}` },
+          advisory?.url ? link(advisory.url, label) : label)
+      }))),
+      el('td', {}, d.images.map(image => el('div', {}, el('code', {}, image))))))
+    body.append(el('table', {},
+      el('thead', {}, el('tr', {}, ['Deployed', 'Behind', 'Latest on line', 'Findings', 'Images'].map(h => el('th', {}, h)))),
+      el('tbody', {}, rows)))
+  } else {
+    body.append(el('div', { class: 'meta' }, 'No in-use images with a version.'))
+  }
+
+  if (advisories.size) {
+    body.append(el('h4', {}, 'Advisories'), el('ul', { class: 'advisories' }, [...advisories.values()].map(a => el('li', {},
+      el('span', { class: `badge ${severities.includes(a.severity) ? a.severity : 'unknown'}` }, a.severity || 'unknown'), ' ',
+      a.url ? link(a.url, a.id) : a.id,
+      a.aliases?.length ? ` (${a.aliases.join(', ')})` : '',
+      ` ${a.summary ?? ''} `, el('small', {}, `· ${a.origin}`),
+      el('div', {}, (a.ranges ?? []).map(r => el('div', {}, el('code', {}, `${r.package ?? ''} ${r.range}${r.patched?.length ? ` · patched ${r.patched.join(', ')}` : ''}`))))))))
+  }
+  details.append(body)
+  return details
+}
+
+function render() {
+  if (!data) return
+  const text = document.getElementById('filter').value.trim()
+  const affectedOnly = document.getElementById('affected').checked
+  const sources = data.sources
+    .filter(s => matches(s, text) && (!affectedOnly || findings(s).length))
+    .sort((a, b) => rank(a) - rank(b) || shortName(a.url).localeCompare(shortName(b.url)))
+
+  const crawled = data.sources.filter(s => s.checkedAt).length
+  const affected = data.sources.filter(s => findings(s).some(f => f.confidence === 'affected')).length
+  const gh = data.github
+  const stats = document.getElementById('stats')
+  stats.replaceChildren(
+    el('span', {}, el('b', {}, String(data.sources.length)), ' sources'),
+    el('span', {}, el('b', {}, String(crawled)), ' crawled'),
+    el('span', {}, el('b', {}, String(affected)), ' affected'),
+    el('span', { title: gh.reset ? `resets ${new Date(gh.reset).toLocaleTimeString()}` : '' },
+      'GitHub ', el('b', {}, gh.remaining < 0 ? '?' : String(gh.remaining)), ` left${gh.token ? '' : ' (no token)'}`, gh.reset && gh.remaining >= 0 ? `, resets ${ago(gh.reset)}` : ''),
+    data.synced ? '' : el('span', {}, 'loading cluster data…'))
+
+  const main = document.getElementById('sources')
+  main.replaceChildren(...(sources.length ? sources.map(renderSource) : [el('div', { class: 'empty' }, 'No matching sources.')]))
+}
+
+async function load() {
+  try {
+    const response = await fetch('api/sources')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    data = await response.json()
+    render()
+  } catch (error) {
+    document.getElementById('stats').replaceChildren(el('span', { class: 'errors' }, `Refresh failed: ${error.message}`))
+  }
+}
+
+document.getElementById('filter').addEventListener('input', render)
+document.getElementById('affected').addEventListener('change', render)
+load()
+setInterval(load, 30000)
+</script>
+</body>
+</html>

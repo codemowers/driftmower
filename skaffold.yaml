@@ -1,0 +1,31 @@
+apiVersion: skaffold/v3
+kind: Config
+metadata:
+  name: driftmower-operator
+
+build:
+  local:
+    useBuildkit: true
+    push: true
+  artifacts:
+    - image: driftmower-operator
+      platforms:
+        - linux/amd64
+      docker:
+        dockerfile: Dockerfile
+
+deploy:
+  # Cluster, namespace and registry come from skaffold.env or exported variables.
+  kubectl: {}
+
+manifests:
+  helm:
+    releases:
+      - name: driftmower-operator
+        chartPath: chart
+        skipBuildDependencies: true
+        setValues:
+          # The development image is built for amd64 only.
+          nodeSelector.kubernetes\.io/arch: amd64
+        setValueTemplates:
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"

@@ -1,0 +1,35 @@
+# A hotfix for GHSA-8rvj-mm4h-c258 on cert-manager v1.20.0, as the operator
+# proposes it. A namespace administrator activates it by setting state to
+# Active; the operator then evicts the affected Pods so they are recreated
+# with the rewritten image, and retires the rule once the workloads declare a
+# fixed version themselves.
+apiVersion: codemowers.io/v1alpha1
+kind: ImageRewriteRule
+metadata:
+  name: cert-manager-controller-v1-20-3
+  namespace: cert-manager
+spec:
+  state: Proposed
+  repository: quay.io/jetstack/cert-manager-controller
+  match:
+    # Exact image strings as Pod specs carry them, including mirror forms.
+    references:
+      - quay.io/jetstack/cert-manager-controller:v1.20.0
+  rewrite:
+    # Same repository, pinned by digest.
+    reference: quay.io/jetstack/cert-manager-controller:v1.20.3@sha256:6c13d61e0348a5bc3477f8ea9a928624300b30d19b1c72a7d2b90372fc713db4
+  reason:
+    advisories:
+      - GHSA-8rvj-mm4h-c258
+    sourceRepository: cert-manager-c311baa7dd
+  # The permanent fix in the GitOps repository, once an Agent opened it.
+  followUp: https://github.com/<org>/<gitops repo>/pull/<number>
+status:
+  conditions:
+    - type: TargetVerified   # digest resolves, every node architecture present, scanned
+      status: "True"
+    - type: RolledOut        # no Pod of a matched workload runs a matched reference
+      status: "False"
+  pods:
+    rewritten: 1
+    pending: 2

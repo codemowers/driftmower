@@ -1,0 +1,117 @@
+# Applies Active ImageRewriteRules to Pods at creation. Each rule is a
+# parameter object: the namespaced binding evaluates every rule in the Pod's
+# own namespace, the cluster binding every ClusterImageRewriteRule. Only Pods
+# of ReplicaSets, StatefulSets, DaemonSets and Jobs are rewritten; Pods of
+# other controllers, such as database operators, compare their Pods' images
+# with their own specs and are reported instead.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: driftmower-image-rewrite
+spec:
+  # A rewrite is a fix, not a gate: an unavailable policy never blocks Pods.
+  failurePolicy: Ignore
+  reinvocationPolicy: IfNeeded
+  paramKind:
+    apiVersion: codemowers.io/v1alpha1
+    kind: ImageRewriteRule
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: active
+      expression: params.spec.?state.orValue('') == 'Active'
+    - name: controlled
+      expression: >-
+        object.metadata.?ownerReferences.orValue([]).exists(o, o.?controller.orValue(false) &&
+          o.apiVersion in ['apps/v1', 'batch/v1'] && o.kind in ['ReplicaSet', 'StatefulSet', 'DaemonSet', 'Job'])
+    - name: matches
+      expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).exists(c, c.image in params.spec.match.references)
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            metadata: Object.metadata{annotations: {'codemowers.io/image-rewrite': params.metadata.name}},
+            spec: Object.spec{
+              ?containers: object.spec.containers.exists(c, c.image in params.spec.match.references)
+                ? optional.of(object.spec.containers.filter(c, c.image in params.spec.match.references).map(c,
+                    Object.spec.containers{name: c.name, image: params.spec.rewrite.reference, imagePullPolicy: 'IfNotPresent'}))
+                : optional.none(),
+              ?initContainers: object.spec.?initContainers.orValue([]).exists(c, c.image in params.spec.match.references)
+                ? optional.of(object.spec.initContainers.filter(c, c.image in params.spec.match.references).map(c,
+                    Object.spec.initContainers{name: c.name, image: params.spec.rewrite.reference, imagePullPolicy: 'IfNotPresent'}))
+                : optional.none()
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: driftmower-image-rewrite
+spec:
+  policyName: driftmower-image-rewrite
+  paramRef:
+    # Every rule; for namespaced rules, those of the Pod's namespace.
+    selector: {}
+    parameterNotFoundAction: Allow
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: driftmower-cluster-image-rewrite
+spec:
+  # A rewrite is a fix, not a gate: an unavailable policy never blocks Pods.
+  failurePolicy: Ignore
+  reinvocationPolicy: IfNeeded
+  paramKind:
+    apiVersion: codemowers.io/v1alpha1
+    kind: ClusterImageRewriteRule
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: active
+      expression: params.spec.?state.orValue('') == 'Active'
+    - name: controlled
+      expression: >-
+        object.metadata.?ownerReferences.orValue([]).exists(o, o.?controller.orValue(false) &&
+          o.apiVersion in ['apps/v1', 'batch/v1'] && o.kind in ['ReplicaSet', 'StatefulSet', 'DaemonSet', 'Job'])
+    - name: matches
+      expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).exists(c, c.image in params.spec.match.references)
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            metadata: Object.metadata{annotations: {'codemowers.io/image-rewrite': params.metadata.name}},
+            spec: Object.spec{
+              ?containers: object.spec.containers.exists(c, c.image in params.spec.match.references)
+                ? optional.of(object.spec.containers.filter(c, c.image in params.spec.match.references).map(c,
+                    Object.spec.containers{name: c.name, image: params.spec.rewrite.reference, imagePullPolicy: 'IfNotPresent'}))
+                : optional.none(),
+              ?initContainers: object.spec.?initContainers.orValue([]).exists(c, c.image in params.spec.match.references)
+                ? optional.of(object.spec.initContainers.filter(c, c.image in params.spec.match.references).map(c,
+                    Object.spec.initContainers{name: c.name, image: params.spec.rewrite.reference, imagePullPolicy: 'IfNotPresent'}))
+                : optional.none()
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: driftmower-cluster-image-rewrite
+spec:
+  policyName: driftmower-cluster-image-rewrite
+  paramRef:
+    # Every rule; for namespaced rules, those of the Pod's namespace.
+    selector: {}
+    parameterNotFoundAction: Allow
