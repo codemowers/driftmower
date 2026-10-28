@@ -38,11 +38,16 @@ func session(t *testing.T) *mcp.ClientSession {
 		ClusterFactTTL: time.Minute, TopologyTTL: time.Minute, OperatorTTL: time.Minute})
 	id := "bravo.example.com"
 	mapping := auth.Mapping{UsernameClaim: "sub", GroupsClaim: "groups", UsernamePrefix: "issuer#"}
-	server := New(Deps{
+
+	return connectTo(t, New(Deps{
 		Cluster: cluster.NewIdentity(&id, nil, ""), Version: "test", Logger: logger, Mapping: mapping,
 		Catalog: cat, Provisioning: service.New(f, allowAll{}, 20),
-	})
+	}))
+}
 
+// connectTo serves server with every request authenticated as alice.
+func connectTo(t *testing.T, server *mcp.Server) *mcp.ClientSession {
+	t.Helper()
 	caller := &auth.Caller{Sub: "alice", IdentityClaims: auth.IdentityClaims{Username: "alice"}}
 	verify := func(context.Context, string, *http.Request) (*sdkauth.TokenInfo, error) {
 		return auth.NewTokenInfo(caller, nil, time.Now().Add(time.Hour)), nil

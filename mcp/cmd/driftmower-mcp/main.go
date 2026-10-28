@@ -31,6 +31,7 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/metrics"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower-mcp/internal/workloads"
 )
 
 // version is set at build time with -ldflags "-X main.version=<revision>".
@@ -81,6 +82,7 @@ type services struct {
 	catalog    *catalog.Catalog
 	facts      *facts.Facts
 	service    *service.Service
+	judge      authz.Judge
 }
 
 func newServices(cfg *config.Config) (*services, error) {
@@ -112,6 +114,7 @@ func newServices(cfg *config.Config) (*services, error) {
 		namespaces: namespaces,
 		catalog:    cat,
 		facts:      f,
+		judge:      judge,
 		service:    service.New(f, judge, cfg.Provisioning.MaxNamespaces),
 		scope: &authz.ScopeResolver{
 			ListNamespaces: namespaces.List,
@@ -172,6 +175,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Scope:        svc.scope,
 		Catalog:      svc.catalog,
 		Provisioning: svc.service,
+		Workloads:    newWorkloads(gctx, cfg, svc, logger),
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -240,6 +244,27 @@ func serve(g *errgroup.Group, addr string, h http.Handler) (*http.Server, error)
 	})
 
 	return srv, nil
+}
+
+// newWorkloads starts the watch-backed inventory. Its watches begin on first
+// use and stop with ctx.
+func newWorkloads(ctx context.Context, cfg *config.Config, svc *services, logger *slog.Logger) *mcpserver.Workloads {
+	c := &workloads.Cache{
+		Kubernetes: svc.clients.Watch,
+		Metadata:   svc.clients.Metadata,
+		Dynamic:    svc.clients.WatchDynamic,
+		Discovery:  svc.clients.Kubernetes.Discovery(),
+		Judge:      svc.judge,
+		Scope:      svc.scope,
+		Logger:     logger,
+	}
+	c.Start(ctx)
+	w := &mcpserver.Workloads{Cache: c, Metadata: svc.clients.Metadata, Judge: svc.judge}
+	if cfg.WorkloadRestartEnabled {
+		w.Actions = &workloads.Actions{Config: svc.clients.Config, Catalog: svc.catalog}
+	}
+
+	return w
 }
 
 func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {

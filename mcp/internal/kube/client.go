@@ -20,9 +20,14 @@ type Clients struct {
 	Kubernetes kubernetes.Interface
 	// Dynamic reads optional and custom resources, bounded like Kubernetes.
 	Dynamic dynamic.Interface
-	// Metadata has no overall timeout, because informers hold long-lived
-	// watches on it.
-	Metadata metadata.Interface
+	// Metadata, Watch and WatchDynamic have no overall timeout, because
+	// informers hold long-lived watches on them.
+	Metadata     metadata.Interface
+	Watch        kubernetes.Interface
+	WatchDynamic dynamic.Interface
+	// Config is the bounded configuration, for clients built per request
+	// such as impersonating ones.
+	Config *rest.Config
 }
 
 // RESTConfig returns the base configuration for the API server, without a
@@ -66,6 +71,14 @@ func NewClients(c config.Kubernetes) (*Clients, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kubernetes metadata client: %w", err)
 	}
+	w, err := kubernetes.NewForConfig(base)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes watch client: %w", err)
+	}
+	wd, err := dynamic.NewForConfig(base)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes dynamic watch client: %w", err)
+	}
 
-	return &Clients{Kubernetes: k, Dynamic: d, Metadata: m}, nil
+	return &Clients{Kubernetes: k, Dynamic: d, Metadata: m, Watch: w, WatchDynamic: wd, Config: bounded}, nil
 }

@@ -33,6 +33,8 @@ type Deps struct {
 	Catalog *catalog.Catalog
 	// Enables the provisioning tools.
 	Provisioning *service.Service
+	// Enables the live workload tools.
+	Workloads *Workloads
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -66,6 +68,9 @@ func New(d Deps) *mcp.Server {
 		}}, nil
 	})
 
+	if d.Workloads != nil {
+		addWorkloadTools(s, d.Workloads, d.Mapping)
+	}
 	addClusterIdentityTool(s, d.Cluster, usage)
 	if d.Catalog != nil {
 		addCatalogTools(s, d.Catalog, d.Cluster, d.Provisioning, d.Mapping)
@@ -103,7 +108,11 @@ func usageInstructions(d Deps) string {
 	add(d.Catalog != nil && d.Provisioning != nil, "Supply the target namespace to list_custom_resource_definitions to list only custom-resource APIs the caller can create there, without a permission matrix.")
 	add(d.Catalog != nil, "Use list_admission_policies to discover policies and their bindings for the intended resource and namespace before relying on admission defaults or requirements. "+
 		"Use list_storage_classes when selecting volume storage. Keep each resource or policy’s own defaults and requirements separate; do not assume optional components or redirect to an alternative whose availability has not been discovered.")
+	add(d.Workloads != nil, "For applications, workload discovery, what runs in a namespace, and resource relationships, start with get_workloads. "+
+		"Use a specified namespace directly; omit namespace only for an overview. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness.")
 	add(d.Scope != nil, "Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission.")
+	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload and terminate_pod mutate resources. "+
+		"Use only for an explicit user request, using UID from current workload inventory; never treat them as diagnostic probes or automatically retry uncertain results.")
 	add(true, "Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories.")
 
 	return strings.Join(parts, " ")
