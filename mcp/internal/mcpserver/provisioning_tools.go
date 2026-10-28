@@ -85,8 +85,9 @@ func addProvisioningTools(s *mcp.Server, svc *service.Service, m auth.Mapping, l
 	p := provisioningTools{svc: svc, mapping: m, logger: logger}
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "describe_provisioning_platform",
-		Title: "Describe the provisioning platform",
+		Name:        "describe_provisioning_platform",
+		Title:       "Describe the provisioning platform",
+		InputSchema: noArguments(),
 		Description: "Use for an initial interpreted overview when planning provisioning or choosing platform capabilities. Returns cluster facts for provisioning: storage classes and what each implies for data, zones and " +
 			"schedulable nodes, priority classes, the published ingress domain and TLS advice, enforced admission " +
 			"policies and the tenant label they scope on, Kyverno policies, the network policy engine and whether " +

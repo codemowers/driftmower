@@ -138,11 +138,11 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 			"Operators manage pod recreation. Jobs, CronJobs, ReplicaSets and unknown operators are unsupported. Paused, OnDelete and partitioned rollouts are rejected. " +
 			"Executes as the verified Kubernetes caller: requires get and patch on the exact target, and admission still applies. UID/resourceVersion guard against stale inventory and concurrent changes. " +
 			"Returns request acceptance, not completed rollout or verified health. Can interrupt service; do not automatically retry an uncertain outcome.",
-		InputSchema: inputSchema[restartInput](func(props map[string]*jsonschema.Schema) {
+		InputSchema: strict(inputSchema[restartInput](func(props map[string]*jsonschema.Schema) {
 			targetProperties(props)
 			props["apiVersion"].Enum = []any{"apps/v1", "postgresql.cnpg.io/v1", "cluster.redpanda.com/v1alpha1", "cluster.redpanda.com/v1alpha2", "dragonflydb.io/v1alpha1"}
 			props["kind"].Enum = []any{"Deployment", "StatefulSet", "DaemonSet", "Cluster", "Redpanda", "Dragonfly"}
-		}),
+		})),
 		Annotations: mutating,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in restartInput) (*mcp.CallToolResult, *workloads.ActionResult, error) {
 		id, err := callerIdentity(req, m)
@@ -166,7 +166,7 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 			"Requires get and delete pods as the verified caller. Rechecks live ownerReferences and rejects owned pods (including Job/CronJob pods) and static mirror pods. " +
 			"Deletes with UID/resourceVersion preconditions and the normal grace period; never force deletes. A standalone pod has no controller to recreate it. " +
 			"Returns termination acceptance, not completed deletion. Do not automatically retry an uncertain outcome.",
-		InputSchema: inputSchema[terminateInput](targetProperties),
+		InputSchema: strict(inputSchema[terminateInput](targetProperties)),
 		Annotations: mutating,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in terminateInput) (*mcp.CallToolResult, *workloads.ActionResult, error) {
 		id, err := callerIdentity(req, m)

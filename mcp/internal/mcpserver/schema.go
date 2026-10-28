@@ -72,15 +72,31 @@ func nullableMaps(s *jsonschema.Schema) {
 }
 
 // inputSchema infers T's schema and lets the caller add constraints the Go
-// type cannot express.
+// type cannot express. Unknown arguments are ignored rather than rejected, so
+// an agent passing a stray argument still gets an answer; wrap the schema in
+// strict where an unexpected argument must fail the call.
 func inputSchema[T any](constrain func(props map[string]*jsonschema.Schema)) *jsonschema.Schema {
 	s, err := jsonschema.For[T](nil)
 	if err != nil {
 		panic(err)
 	}
+	s.AdditionalProperties = nil
 	if constrain != nil {
 		constrain(s.Properties)
 	}
+
+	return s
+}
+
+// noArguments is the input schema of a tool that takes no arguments; like
+// inputSchema, it ignores any that are passed.
+func noArguments() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "object"}
+}
+
+// strict rejects arguments the schema does not name.
+func strict(s *jsonschema.Schema) *jsonschema.Schema {
+	s.AdditionalProperties = &jsonschema.Schema{Not: &jsonschema.Schema{}}
 
 	return s
 }

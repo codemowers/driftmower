@@ -77,6 +77,12 @@ func assertObjectSchemas(t *testing.T, s *mcp.ClientSession) {
 		t.Fatal(err)
 	}
 	for _, tool := range tools.Tools {
+		// Unknown arguments are ignored, as the TypeScript server did, except
+		// where an unexpected argument must fail the call.
+		input, _ := tool.InputSchema.(map[string]any)
+		if _, rejects := input["additionalProperties"]; rejects != strictTools[tool.Name] {
+			t.Errorf("%s input rejects unknown arguments = %v, want %v", tool.Name, rejects, strictTools[tool.Name])
+		}
 		for name, schema := range map[string]any{"input": tool.InputSchema, "output": tool.OutputSchema} {
 			if schema == nil {
 				continue
@@ -86,6 +92,13 @@ func assertObjectSchemas(t *testing.T, s *mcp.ClientSession) {
 			}
 		}
 	}
+}
+
+var strictTools = map[string]bool{
+	"get_pod_resource_usage": true, "get_cluster_resource_usage": true,
+	"get_pod_resource_usage_history": true, "get_cluster_resource_usage_history": true,
+	"query_metrics": true, "query_logs": true, "list_volumes": true,
+	"restart_workload": true, "terminate_pod": true,
 }
 
 type bearer struct{}
@@ -145,6 +158,10 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	if _, leaked := ns["access"]; leaked || ns["creatableResources"] == nil {
 		t.Errorf("readiness namespace = %v", ns)
 	}
+
+	// A stray argument is ignored, with or without declared arguments.
+	call(t, s, "list_storage_classes", map[string]any{"limit": 5})
+	call(t, s, "list_offerings", map[string]any{"namespace": "team-a", "verbose": true})
 
 	res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "describe_namespace_readiness", Arguments: map[string]any{"namespaces": []string{}}})
 	if err != nil || !res.IsError {

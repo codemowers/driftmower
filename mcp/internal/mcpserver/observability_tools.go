@@ -62,12 +62,6 @@ func clusterProperties(p map[string]*jsonschema.Schema) {
 	p["perNode"].Default = defaultValue(false)
 }
 
-func strict(s *jsonschema.Schema) *jsonschema.Schema {
-	s.AdditionalProperties = &jsonschema.Schema{Not: &jsonschema.Schema{}}
-
-	return s
-}
-
 // requireIdentity maps the caller; observability has no anonymous access.
 func requireIdentity(req *mcp.CallToolRequest, m auth.Mapping) (authz.Identity, error) {
 	id, err := callerIdentity(req, m)

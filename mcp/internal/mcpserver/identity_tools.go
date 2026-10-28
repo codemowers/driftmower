@@ -22,8 +22,9 @@ type clusterIdentityOutput struct {
 
 func addClusterIdentityTool(s *mcp.Server, c cluster.Identity, usage string) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_cluster_identity",
-		Title: "Identify this cluster",
+		Name:        "get_cluster_identity",
+		Title:       "Identify this cluster",
+		InputSchema: noArguments(),
 		Description: "Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting backend report scope. " +
 			"Match that URL against local kubeconfig before selecting an explicit kubectl context. Null values mean unconfigured identity; ask rather than guessing.",
 		Annotations: readOnly("Identify this cluster"),
@@ -47,8 +48,9 @@ type accessibleNamespacesOutput struct {
 
 func addAccessibleNamespacesTool(s *mcp.Server, resolver *authz.ScopeResolver, m auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_accessible_namespaces",
-		Title: "List accessible namespaces",
+		Name:        "list_accessible_namespaces",
+		Title:       "List accessible namespaces",
+		InputSchema: noArguments(),
 		Description: "Use to choose a namespace when the user has not specified one, or discover the scope visible to this caller. " +
 			"Returns namespaces where Kubernetes authorizes list pods for the verified caller. This establishes visibility only, not create/edit permission; check the intended operation separately. " +
 			"Unknown entries could not be evaluated and are excluded, not denied. Inspect unknown and truncated before treating the listing as complete. " +

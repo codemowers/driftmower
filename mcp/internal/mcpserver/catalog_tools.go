@@ -168,10 +168,11 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:         "list_ingress_classes",
-		Title:        "list ingress classes",
+		Title:        "List ingress classes",
+		InputSchema:  noArguments(),
 		Description:  "Use to choose an installed ingressClassName. Returns ingress classes and their controllers; class existence does not verify controller health, routing, DNS or TLS.",
 		OutputSchema: schemaFor[ingressClassesOutput](),
-		Annotations:  readOnly("list ingress classes"),
+		Annotations:  readOnly("List ingress classes"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, ingressClassesOutput, error) {
 		if err := requireCaller(req); err != nil {
 			return nil, ingressClassesOutput{}, err
@@ -189,12 +190,13 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_cluster_issuers",
-		Title: "list cluster issuers",
+		Name:        "list_cluster_issuers",
+		Title:       "List cluster issuers",
+		InputSchema: noArguments(),
 		Description: "Use to discover available cluster-scoped cert-manager issuers before selecting one for a Certificate. Returns their own descriptions, reported readiness and ACME solver types when the API is installed. " +
 			"Null means the catalog is unavailable; an empty list means none were found. Do not infer namespace-scoped Issuer availability from this catalog.",
 		OutputSchema: schemaFor[clusterIssuersOutput](),
-		Annotations:  readOnly("list cluster issuers"),
+		Annotations:  readOnly("List cluster issuers"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, clusterIssuersOutput, error) {
 		if err := requireCaller(req); err != nil {
 			return nil, clusterIssuersOutput{}, err
@@ -209,12 +211,13 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_priority_classes",
-		Title: "list priority classes",
+		Name:        "list_priority_classes",
+		Title:       "List priority classes",
+		InputSchema: noArguments(),
 		Description: "Use to choose an installed priorityClassName. Returns classes sorted by ascending numeric priority, with values and descriptions. " +
 			"Larger values have higher scheduling priority; class existence does not authorize its use or guarantee capacity.",
 		OutputSchema: schemaFor[priorityClassesOutput](),
-		Annotations:  readOnly("list priority classes"),
+		Annotations:  readOnly("List priority classes"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, priorityClassesOutput, error) {
 		if err := requireCaller(req); err != nil {
 			return nil, priorityClassesOutput{}, err
@@ -250,8 +253,9 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_storage_classes",
-		Title: "List storage classes",
+		Name:        "list_storage_classes",
+		Title:       "List storage classes",
+		InputSchema: noArguments(),
 		Description: "Use to choose storageClassName and understand volume binding, expansion and reclaim behavior. Lists live Kubernetes StorageClasses with provisioning guidance from kubernetes.io/description and structured settings: " +
 			"provisioner, filesystemType, driver parameters, reclaimPolicy, volumeBindingMode, allowVolumeExpansion, mountOptions, and allowedTopologies. " +
 			"Missing descriptions and unspecified filesystem types are null. Cluster-wide capability metadata for authenticated callers.",
@@ -267,8 +271,9 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_admission_policies",
-		Title: "List admission policies",
+		Name:        "list_admission_policies",
+		Title:       "List admission policies",
+		InputSchema: noArguments(),
 		Description: "Use before planning resource changes to discover admission requirements and applicable bindings. Returns admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions, " +
 			"as structured content and a CSV summary. No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. " +
 			"bindings=null means discovery is unavailable; [] means no bindings. Match resource rules and binding scope to the intended resource; targets are candidates, not a prediction of effective admission behavior. " +
