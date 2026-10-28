@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -107,5 +108,63 @@ func TestCRDDetailsOnly(t *testing.T) {
 	}
 	if d.Versions[0].Name != "v2alpha1" || len(d.Versions) != 2 {
 		t.Error("Only changed its receiver")
+	}
+}
+
+func TestCRDDetailsFocus(t *testing.T) {
+	obj := func(props map[string]any) map[string]any {
+		return map[string]any{"type": "object", "properties": props}
+	}
+	str := map[string]any{"type": "string", "description": "kept"}
+	schema := obj(map[string]any{
+		"spec": obj(map[string]any{
+			"containers": map[string]any{"type": "array", "items": obj(map[string]any{
+				"image": str,
+				"env":   map[string]any{"type": "array", "items": obj(map[string]any{"name": str, "value": str})},
+			})},
+			"labels": map[string]any{"type": "object", "additionalProperties": obj(map[string]any{"text": str})},
+		}),
+	})
+	d := CRDDetails{Name: "things.example.com", Versions: []CRDSchemaVersion{{Name: "v1", Storage: true, Schema: schema}}}
+
+	at := func(s map[string]any, path ...string) map[string]any {
+		for _, p := range path {
+			s, _ = s[p].(map[string]any)
+		}
+
+		return s
+	}
+	got, err := d.Focus("", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := at(got.Versions[0].Schema, "properties", "spec", "properties", "containers", "items")
+	if _, kept := items["properties"]; kept || fmt.Sprint(items["elidedFields"]) != "[env image]" {
+		t.Errorf("depth 2 containers.items = %v", items)
+	}
+
+	got, err = d.Focus("spec.containers", 1)
+	if err != nil || got.Path != "spec.containers" {
+		t.Fatalf("focus = %+v %v", got, err)
+	}
+	image := at(got.Versions[0].Schema, "items", "properties", "image")
+	env := at(got.Versions[0].Schema, "items", "properties", "env", "items")
+	if image["description"] != "kept" || fmt.Sprint(env["elidedFields"]) != "[name value]" {
+		t.Errorf("spec.containers depth 1 = %v", got.Versions[0].Schema)
+	}
+	for path, want := range map[string]string{"spec.containers.env.value": "string", "spec.labels.text": "string"} {
+		if got, err := d.Focus(path, 0); err != nil || got.Versions[0].Schema["type"] != want {
+			t.Errorf("Focus(%s) = %v %v", path, got.Versions, err)
+		}
+	}
+
+	if _, err := d.Focus("spec.contaners", 0); err == nil || !strings.Contains(err.Error(), `no field "contaners" under spec; fields there: containers, labels`) {
+		t.Errorf("misspelt path = %v", err)
+	}
+	if _, err := d.Focus("spec.containers.image.tag", 0); err == nil || !strings.Contains(err.Error(), "spec.containers.image has no fields") {
+		t.Errorf("path through a scalar = %v", err)
+	}
+	if _, ok := at(schema, "properties", "spec", "properties", "containers", "items")["properties"]; !ok {
+		t.Error("Focus changed the schema it was given")
 	}
 }

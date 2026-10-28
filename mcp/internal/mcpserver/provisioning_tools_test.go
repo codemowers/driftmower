@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -186,6 +187,10 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	if versions := out["versions"].([]any); len(versions) != 1 || versions[0].(map[string]any)["storage"] != true || len(out["servedVersions"].([]any)) != 1 {
 		t.Errorf("versions = %v served = %v", out["versions"], out["servedVersions"])
 	}
+	_, focused := call(t, s, "describe_custom_resource_definition", map[string]any{"name": "clusters.postgresql.cnpg.io", "path": "spec", "depth": 1})
+	if focused["path"] != "spec" || focused["versions"].([]any)[0].(map[string]any)["schema"].(map[string]any)["type"] != "object" {
+		t.Errorf("focused on spec = %v", focused)
+	}
 	res, err = s.CallTool(context.Background(), &mcp.CallToolParams{Name: "describe_custom_resource_definition",
 		Arguments: map[string]any{"name": "clusters.postgresql.cnpg.io", "version": "v9"}})
 	if err != nil || !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "served versions: v1") {
@@ -237,5 +242,33 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	// CSV only: the JSON form of a large catalog outgrows client limits.
 	if out != nil {
 		t.Errorf("admission catalog returned structured content: %v", out)
+	}
+}
+
+func TestDescribedSchemaFitsBudget(t *testing.T) {
+	wide := func(n int, child map[string]any) map[string]any {
+		props := map[string]any{}
+		for i := range n {
+			props[fmt.Sprintf("f%d", i)] = child
+		}
+
+		return map[string]any{"type": "object", "properties": props}
+	}
+	// Forty fields of forty fields of long strings: tens of kilobytes at
+	// depth 3, a few hundred bytes at depth 1.
+	leaf := map[string]any{"type": "string", "description": strings.Repeat("x", 40)}
+	schema := map[string]any{"type": "object", "properties": map[string]any{"spec": wide(40, wide(40, leaf))}}
+	d := catalog.CRDDetails{Name: "wides.example.com", Versions: []catalog.CRDSchemaVersion{{Name: "v1", Storage: true, Schema: schema}}}
+
+	got, err := focusWithinBudget(d, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(got)
+	if got.Depth >= catalog.DefaultSchemaDepth || len(b) > crdSchemaBudget {
+		t.Errorf("depth %d, %d bytes", got.Depth, len(b))
+	}
+	if got, _ := focusWithinBudget(d, "spec.f0"); got.Depth != catalog.DefaultSchemaDepth {
+		t.Errorf("narrow path depth = %d", got.Depth)
 	}
 }

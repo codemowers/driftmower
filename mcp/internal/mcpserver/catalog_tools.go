@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -43,6 +44,8 @@ type crdListOutput struct {
 type crdDescribeInput struct {
 	Name    string `json:"name"`
 	Version string `json:"version,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Depth   int    `json:"depth,omitempty"`
 }
 
 type admissionPoliciesInput struct {
@@ -244,11 +247,16 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		Title: "Describe a custom resource definition",
 		Description: "Use after selecting a CRD from list_custom_resource_definitions to inspect its writable fields before drafting a custom resource. " +
 			"Supply the full CRD name (plural.group), not Kind.group or an object name. Returns every served API version and the writable resource schema of one: the storage version unless version names another served one. " +
+			"The schema starts at path (the whole object when omitted) and keeps depth levels of fields; deeper objects list their fields under elidedFields, so pass that object's path to read them. " +
 			"Excludes status, controller metadata and CEL code.",
 		InputSchema: inputSchema[crdDescribeInput](func(props map[string]*jsonschema.Schema) {
 			props["name"].Pattern = `^[a-z0-9][a-z0-9.-]*$`
 			props["version"].Description = "Served version whose schema to return, e.g. v1beta1. Defaults to the storage version."
 			props["version"].Pattern = `^v[0-9]+((alpha|beta)[0-9]+)?$`
+			props["path"].Description = "Dot-separated field path to start the schema at, e.g. spec.template.spec. Array items and map values are passed through, so spec.containers.image is a container's image."
+			props["path"].Pattern = `^[A-Za-z0-9_$-]+(\.[A-Za-z0-9_$-]+)*$`
+			props["depth"].Description = "Levels of fields to keep below path. When omitted, the deepest level up to 3 whose schema stays small enough to read inline."
+			props["depth"].Minimum, props["depth"].Maximum = jsonschema.Ptr(1.0), jsonschema.Ptr(8.0)
 		}),
 		Annotations: readOnly("Describe a custom resource definition"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in crdDescribeInput) (*mcp.CallToolResult, catalog.CRDDetails, error) {
@@ -259,7 +267,16 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		if err != nil {
 			return nil, catalog.CRDDetails{}, err
 		}
-		d, err = d.Only(in.Version)
+		if d, err = d.Only(in.Version); err != nil {
+			return nil, catalog.CRDDetails{}, err
+		}
+		if in.Depth > 0 {
+			d, err = d.Focus(in.Path, in.Depth)
+
+			return nil, d, err
+		}
+
+		d, err = focusWithinBudget(d, in.Path)
 
 		return nil, d, err
 	})
@@ -504,4 +521,25 @@ func policyCatalogCSV(c policyCatalogOutput) string {
 	}
 
 	return out
+}
+
+// crdSchemaBudget bounds a described schema chosen without an explicit depth;
+// wide schemas such as an operator's whole cluster spec run to megabytes.
+const crdSchemaBudget = 32 << 10
+
+// focusWithinBudget keeps the deepest level, up to the default, whose JSON
+// fits the budget, and one level when none does.
+func focusWithinBudget(d catalog.CRDDetails, path string) (catalog.CRDDetails, error) {
+	var focused catalog.CRDDetails
+	for depth := catalog.DefaultSchemaDepth; depth >= 1; depth-- {
+		var err error
+		if focused, err = d.Focus(path, depth); err != nil {
+			return catalog.CRDDetails{}, err
+		}
+		if b, err := json.Marshal(focused); err == nil && len(b) <= crdSchemaBudget {
+			break
+		}
+	}
+
+	return focused, nil
 }

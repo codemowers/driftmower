@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -119,6 +120,10 @@ type CRDServedVersion struct {
 }
 
 type CRDDetails struct {
+	// Path is the field path the schemas start at; empty for the whole object.
+	Path string `json:"path,omitempty"`
+	// Depth is how many levels of fields the schemas keep below Path.
+	Depth          int                `json:"depth,omitempty"`
 	Name           string             `json:"name"`
 	Description    *string            `json:"description"`
 	Group          string             `json:"group"`
@@ -201,6 +206,121 @@ func (c *Catalog) DescribeCRD(ctx context.Context, name string) (CRDDetails, err
 	}
 
 	return d, nil
+}
+
+// DefaultSchemaDepth is how many levels of fields Focus keeps when not told.
+const DefaultSchemaDepth = 3
+
+// Focus narrows each version's schema to the field at path (dot-separated,
+// e.g. spec.template; empty for the whole object) and keeps depth levels of
+// fields below it. Deeper objects keep their own keywords but list their
+// fields by name under elidedFields, so a caller can ask for that path next.
+// Array items and map values are passed through, so spec.containers.image
+// names the image of a container.
+func (d CRDDetails) Focus(path string, depth int) (CRDDetails, error) {
+	if depth <= 0 {
+		depth = DefaultSchemaDepth
+	}
+	versions := make([]CRDSchemaVersion, len(d.Versions))
+	for i, v := range d.Versions {
+		node, err := schemaAt(v.Schema, path)
+		if err != nil {
+			return CRDDetails{}, fmt.Errorf("CRD %s version %s: %w", d.Name, v.Name, err)
+		}
+		v.Schema, _ = elide(node, depth).(map[string]any)
+		versions[i] = v
+	}
+	d.Path, d.Depth, d.Versions = path, depth, versions
+
+	return d, nil
+}
+
+// fieldsOf returns the object schema whose properties name a value's fields,
+// looking through array items and map values.
+func fieldsOf(node map[string]any) map[string]any {
+	for node != nil {
+		if props, ok := node["properties"].(map[string]any); ok {
+			return props
+		}
+		next, _ := node["items"].(map[string]any)
+		if next == nil {
+			next, _ = node["additionalProperties"].(map[string]any)
+		}
+		node = next
+	}
+
+	return nil
+}
+
+func schemaAt(root map[string]any, path string) (map[string]any, error) {
+	if path == "" {
+		return root, nil
+	}
+	node := root
+	walked := []string{}
+	for _, field := range strings.Split(path, ".") {
+		props := fieldsOf(node)
+		child, ok := props[field].(map[string]any)
+		if !ok {
+			at := strings.Join(walked, ".")
+			if at == "" {
+				at = "the root"
+			}
+			names := slices.Sorted(maps.Keys(props))
+			if len(names) == 0 {
+				return nil, fmt.Errorf("%s has no fields to select %q from", at, field)
+			}
+
+			return nil, fmt.Errorf("no field %q under %s; fields there: %s", field, at, strings.Join(names, ", "))
+		}
+		node = child
+		walked = append(walked, field)
+	}
+
+	return node, nil
+}
+
+// elide copies a schema, keeping depth levels of properties and naming the
+// fields of anything deeper.
+func elide(value any, depth int) any {
+	switch v := value.(type) {
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = elide(item, depth)
+		}
+
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, child := range v {
+			switch key {
+			case "properties":
+				props, ok := child.(map[string]any)
+				if !ok {
+					out[key] = child
+
+					continue
+				}
+				if depth <= 0 {
+					out["elidedFields"] = slices.Sorted(maps.Keys(props))
+
+					continue
+				}
+				kept := make(map[string]any, len(props))
+				for name, s := range props {
+					kept[name] = elide(s, depth-1)
+				}
+				out[key] = kept
+			default:
+				out[key] = elide(child, depth)
+			}
+		}
+
+		return out
+	default:
+		return v
+	}
 }
 
 // cleanSchema keeps the schema's structure but omits server-owned status and
