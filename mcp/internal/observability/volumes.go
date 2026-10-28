@@ -3,6 +3,7 @@ package observability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"slices"
@@ -143,7 +144,11 @@ func (s *Service) ListVolumes(ctx context.Context, id authz.Identity, namespace 
 	var result *Volumes
 	err := s.admit(id, func(backend Requester) error {
 		if s.Judge.MayPerform(ctx, id, authz.Attributes{Namespace: namespace, Resource: "persistentvolumeclaims", Verb: "list"}).Verdict != authz.Yes {
-			return errors.New("Kubernetes RBAC denied list persistentvolumeclaims; specify a namespace for scoped access") //nolint:staticcheck // Kubernetes is a proper noun.
+			if namespace != "" {
+				return fmt.Errorf("Kubernetes RBAC denied list persistentvolumeclaims in namespace %s", namespace) //nolint:staticcheck // Kubernetes is a proper noun.
+			}
+
+			return errors.New("Kubernetes RBAC denied cluster-wide list persistentvolumeclaims; specify a namespace for scoped access") //nolint:staticcheck // Kubernetes is a proper noun.
 		}
 		if includeUnbound && s.Judge.MayPerform(ctx, id, authz.Attributes{Resource: "persistentvolumes", Verb: "list"}).Verdict != authz.Yes {
 			return errors.New("Kubernetes RBAC denied cluster-wide list persistentvolumes") //nolint:staticcheck // Kubernetes is a proper noun.

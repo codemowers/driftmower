@@ -104,9 +104,12 @@ func (r CustomResource) PreferredServedVersion() string {
 	return first
 }
 
+// CRDSchemaVersion is one served version; Storage marks the version objects
+// are persisted as.
 type CRDSchemaVersion struct {
-	Name   string         `json:"name"`
-	Schema map[string]any `json:"schema"`
+	Name    string         `json:"name"`
+	Storage bool           `json:"storage"`
+	Schema  map[string]any `json:"schema"`
 }
 
 type CRDDetails struct {
@@ -153,7 +156,7 @@ func (c *Catalog) DescribeCRD(ctx context.Context, name string) (CRDDetails, err
 		if !v.Served {
 			continue
 		}
-		version := CRDSchemaVersion{Name: v.Name}
+		version := CRDSchemaVersion{Name: v.Name, Storage: v.Storage}
 		if v.Schema != nil {
 			version.Schema, _ = cleanSchema(v.Schema.OpenAPIV3Schema).(map[string]any)
 		}

@@ -270,30 +270,31 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		return nil, storageClassesOutput{StorageClasses: classes}, err
 	})
 
+	// The catalog is returned as CSV only: on a cluster with a hundred
+	// policies the JSON form alone outgrows what MCP clients accept inline.
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_admission_policies",
 		Title:       "List admission policies",
 		InputSchema: noArguments(),
-		Description: "Use before planning resource changes to discover admission requirements and applicable bindings. Returns admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions, " +
-			"as structured content and a CSV summary. No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. " +
+		Description: "Use before planning resource changes to discover admission requirements and applicable bindings. Returns a CSV catalog of admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions. " +
+			"No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. " +
 			"bindings=null means discovery is unavailable; [] means no bindings. Match resource rules and binding scope to the intended resource; targets are candidates, not a prediction of effective admission behavior. " +
 			"This catalog does not evaluate policy conditions or replace an authorization check.",
-		OutputSchema: schemaFor[policyCatalogOutput](),
-		Annotations:  readOnly("List admission policies"),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, policyCatalogOutput, error) {
+		Annotations: readOnly("List admission policies"),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, any, error) {
 		if err := requireCaller(req); err != nil {
-			return nil, policyCatalogOutput{}, err
+			return nil, nil, err
 		}
 		policies, err := cat.AdmissionPolicies(ctx)
 		if err != nil {
-			return nil, policyCatalogOutput{}, err
+			return nil, nil, err
 		}
 		out := policyCatalogOutput{Policies: []policySummary{}, UnavailableKinds: policies.UnavailableKinds}
 		for _, p := range policies.Policies {
 			out.Policies = append(out.Policies, summarizePolicy(p))
 		}
 
-		return text(policyCatalogCSV(out)), out, nil
+		return text(policyCatalogCSV(out)), nil, nil
 	})
 }
 

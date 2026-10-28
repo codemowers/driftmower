@@ -183,6 +183,9 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	}
 
 	_, out = call(t, s, "describe_custom_resource_definition", map[string]any{"name": "clusters.postgresql.cnpg.io"})
+	if out["versions"].([]any)[0].(map[string]any)["storage"] != true {
+		t.Errorf("version lacks storage: %v", out["versions"])
+	}
 	schema := out["versions"].([]any)[0].(map[string]any)["schema"].(map[string]any)
 	props := schema["properties"].(map[string]any)
 	if _, ok := props["status"]; ok || schema["required"].([]any)[0] != "spec" {
@@ -217,7 +220,8 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 		!strings.Contains(text, "Unavailable policy APIs: MutatingAdmissionPolicy") {
 		t.Errorf("policy CSV =\n%s", text)
 	}
-	if policies := out["policies"].([]any); len(policies) != 1 {
-		t.Errorf("policies = %v", out)
+	// CSV only: the JSON form of a large catalog outgrows client limits.
+	if out != nil {
+		t.Errorf("admission catalog returned structured content: %v", out)
 	}
 }

@@ -125,8 +125,11 @@ func TestVolumesWithoutPVPermission(t *testing.T) {
 func TestVolumesRefuseUnauthorizedListing(t *testing.T) {
 	svc, k, j, b := volumeFixture()
 	j.answer = deny
-	if _, err := svc.ListVolumes(context.Background(), alice, "team", false); err == nil {
-		t.Error("listing allowed")
+	if _, err := svc.ListVolumes(context.Background(), alice, "team", false); err == nil || !strings.Contains(err.Error(), "in namespace team") {
+		t.Errorf("listing allowed or denial unnamed: %v", err)
+	}
+	if _, err := svc.ListVolumes(context.Background(), alice, "", false); err == nil || !strings.Contains(err.Error(), "specify a namespace") {
+		t.Errorf("cluster-wide denial = %v", err)
 	}
 	if len(k.Actions()) != 0 || b.calls() != 0 {
 		t.Errorf("reads %v, queries %d", reads(k), b.calls())
