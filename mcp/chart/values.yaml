@@ -8,6 +8,9 @@ cluster:
   apiUrl: ""
 
 rbac:
+  # Name of the cluster-scoped ClusterRole and ClusterRoleBinding. A second
+  # release in another namespace needs its own, or it rebinds this one.
+  clusterRoleName: driftmower-mcp-observability
   # Names of the ConfigMaps admission guards read their parameters from. Empty
   # grants `get` on every ConfigMap (needed because a guard names its own);
   # set it to narrow the grant to those names.

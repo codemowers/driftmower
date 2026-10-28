@@ -36,8 +36,16 @@ var typeSchemas = map[reflect.Type]*jsonschema.Schema{
 
 // schemaFor infers T's schema. Go maps marshal as null when nil, so map-typed
 // objects also accept null.
+//
+// A pointer output is described by its element type, as the SDK does: MCP
+// requires an output schema of type "object", and clients reject a nullable
+// root.
 func schemaFor[T any]() *jsonschema.Schema {
-	s, err := jsonschema.For[T](&jsonschema.ForOptions{TypeSchemas: typeSchemas})
+	rt := reflect.TypeFor[T]()
+	if rt.Kind() == reflect.Pointer {
+		rt = rt.Elem()
+	}
+	s, err := jsonschema.ForType(rt, &jsonschema.ForOptions{TypeSchemas: typeSchemas})
 	if err != nil {
 		panic(err)
 	}

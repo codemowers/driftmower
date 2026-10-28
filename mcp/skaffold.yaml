@@ -44,3 +44,41 @@ portForward:
     resourceName: driftmower-mcp
     port: 3001
     localPort: 3001
+
+profiles:
+  # The Go implementation as a secondary release for side-by-side testing.
+  # Deploy it to its own namespace: the chart's namespaced names are fixed,
+  # and the ClusterRole below keeps it from rebinding the primary release's.
+  #   skaffold run -p go --namespace driftmower-go
+  - name: go
+    build:
+      local:
+        useBuildkit: true
+        push: true
+      artifacts:
+        - image: driftmower-mcp-go
+          platforms:
+            - linux/amd64
+          docker:
+            dockerfile: go.Dockerfile
+    manifests:
+      helm:
+        releases:
+          - name: driftmower-mcp-go
+            chartPath: chart
+            skipBuildDependencies: true
+            setValues:
+              workloadRestart.enabled: true
+              serviceAccountAuth.enabled: true
+              rbac.clusterRoleName: driftmower-mcp-go-observability
+            setValueTemplates:
+              image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp_go}}"
+    portForward:
+      - resourceType: deployment
+        resourceName: driftmower-mcp
+        port: 3000
+        localPort: 3100
+      - resourceType: deployment
+        resourceName: driftmower-mcp
+        port: 3001
+        localPort: 3101

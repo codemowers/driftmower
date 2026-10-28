@@ -35,6 +35,33 @@ For authenticated HTTP, set `DRIFTMOWER_MCP_TRANSPORT=http`, `MCP_PUBLIC_URL`
 and `OIDC_ISSUER`. Configure the Kubernetes token and CA files for the target
 cluster.
 
+## Go implementation (preview)
+
+A Go rewrite lives beside the TypeScript server in `cmd/` and `internal/`. It
+serves the same tools, routes, ports, environment variables and metric names,
+and renders the `/ui` explorer on the server instead of in the browser. The
+TypeScript server remains the primary image; the Go server is published as a
+secondary image, `ghcr.io/codemowers/driftmower-mcp-go`, for side-by-side
+testing.
+
+```bash
+go test -race ./cmd/... ./internal/...
+go run ./cmd/driftmower-mcp            # same environment as the TypeScript server
+docker compose --profile go run --build --rm test-go   # smoke test against the Go image
+```
+
+`KUBECONFIG` points a local Go server at a cluster. To deploy it beside the
+primary release, use its own namespace; the chart's ClusterRole name is a
+value so the two releases do not rebind each other:
+
+```bash
+skaffold run -p go --namespace driftmower-go
+```
+
+Differences from the TypeScript server: `MCP_SESSION_IDLE_MS` sets the MCP
+session idle timeout (default 30 minutes); booleans accept only `true` or
+`false`; `DRIFTMOWER_UI_PUBLIC_URL` and `--backend-url` are not read.
+
 ## Environment variables
 
 Defaults are defined in `config/default.json`; environment mappings are in

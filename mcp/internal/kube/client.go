@@ -4,6 +4,7 @@ package kube
 
 import (
 	"fmt"
+	"os"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -34,10 +35,21 @@ type Clients struct {
 // request timeout. client-go rereads the token file periodically, which
 // follows projected-token rotation; the CA file is read once.
 func RESTConfig(c config.Kubernetes) *rest.Config {
+	// Outside a pod, as in Compose, there is no token or CA file: requests go
+	// unauthenticated against system roots, and Kubernetes reads fail per
+	// request rather than at startup.
+	caFile, tokenFile := c.CAFile, c.TokenFile
+	if _, err := os.Stat(caFile); err != nil {
+		caFile = ""
+	}
+	if _, err := os.Stat(tokenFile); err != nil {
+		tokenFile = ""
+	}
+
 	return &rest.Config{
 		Host:            c.URL,
-		BearerTokenFile: c.TokenFile,
-		TLSClientConfig: rest.TLSClientConfig{CAFile: c.CAFile},
+		BearerTokenFile: tokenFile,
+		TLSClientConfig: rest.TLSClientConfig{CAFile: caFile},
 		UserAgent:       "driftmower-mcp",
 		// Access sweeps fan out to many SubjectAccessReviews at once; the
 		// client-side default of 5 QPS would serialise them.

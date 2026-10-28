@@ -63,8 +63,29 @@ func connectTo(t *testing.T, server *mcp.Server) *mcp.ClientSession {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
+	assertObjectSchemas(t, s)
 
 	return s
+}
+
+// assertObjectSchemas checks what MCP clients require of every tool: input
+// and output schemas whose root type is exactly "object".
+func assertObjectSchemas(t *testing.T, s *mcp.ClientSession) {
+	t.Helper()
+	tools, err := s.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range tools.Tools {
+		for name, schema := range map[string]any{"input": tool.InputSchema, "output": tool.OutputSchema} {
+			if schema == nil {
+				continue
+			}
+			if root, _ := schema.(map[string]any); root == nil || root["type"] != "object" {
+				t.Errorf("%s %s schema root = %v, want type object", tool.Name, name, schema)
+			}
+		}
+	}
 }
 
 type bearer struct{}
