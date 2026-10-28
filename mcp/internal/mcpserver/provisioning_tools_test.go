@@ -183,8 +183,13 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	}
 
 	_, out = call(t, s, "describe_custom_resource_definition", map[string]any{"name": "clusters.postgresql.cnpg.io"})
-	if out["versions"].([]any)[0].(map[string]any)["storage"] != true {
-		t.Errorf("version lacks storage: %v", out["versions"])
+	if versions := out["versions"].([]any); len(versions) != 1 || versions[0].(map[string]any)["storage"] != true || len(out["servedVersions"].([]any)) != 1 {
+		t.Errorf("versions = %v served = %v", out["versions"], out["servedVersions"])
+	}
+	res, err = s.CallTool(context.Background(), &mcp.CallToolParams{Name: "describe_custom_resource_definition",
+		Arguments: map[string]any{"name": "clusters.postgresql.cnpg.io", "version": "v9"}})
+	if err != nil || !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "served versions: v1") {
+		t.Errorf("unserved version = %+v %v", res, err)
 	}
 	schema := out["versions"].([]any)[0].(map[string]any)["schema"].(map[string]any)
 	props := schema["properties"].(map[string]any)
@@ -220,6 +225,15 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 		!strings.Contains(text, "Unavailable policy APIs: MutatingAdmissionPolicy") {
 		t.Errorf("policy CSV =\n%s", text)
 	}
+	text, _ = call(t, s, "list_admission_policies", map[string]any{"resource": "ingresses.networking.k8s.io"})
+	if !strings.Contains(text, "tenant-ingress-hosts,") || !strings.Contains(text, "Filtered to 1 of 1 policies") {
+		t.Errorf("filtered to ingresses =\n%s", text)
+	}
+	text, _ = call(t, s, "list_admission_policies", map[string]any{"resource": "pods"})
+	if strings.Contains(text, "tenant-ingress-hosts,") || !strings.Contains(text, "Filtered to 0 of 1 policies") {
+		t.Errorf("filtered to pods =\n%s", text)
+	}
+
 	// CSV only: the JSON form of a large catalog outgrows client limits.
 	if out != nil {
 		t.Errorf("admission catalog returned structured content: %v", out)

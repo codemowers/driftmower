@@ -248,3 +248,25 @@ func toRules(rules []Rule) []provisioning.ResourceRule {
 
 	return out
 }
+
+// Targets reports whether the policy's own match constraints could select
+// resource in group; an empty group stands for any group. A policy without
+// resource rules matches every resource. Bindings may narrow this further,
+// and match conditions are not evaluated, so a match is a candidate only.
+func (p AdmissionPolicy) Targets(group, resource string, anyGroup bool) bool {
+	m := p.Spec.MatchConstraints
+	if m == nil || len(m.ResourceRules) == 0 {
+		return true
+	}
+	matches := func(rules []Rule, wildcard bool) bool {
+		return slices.ContainsFunc(rules, func(r Rule) bool {
+			groupOK := anyGroup || slices.Contains(r.APIGroups, group) || (wildcard && slices.Contains(r.APIGroups, "*"))
+			resourceOK := slices.Contains(r.Resources, resource) || (wildcard && slices.Contains(r.Resources, "*"))
+
+			return groupOK && resourceOK
+		})
+	}
+
+	// An exclusion removes the resource only when it names it outright.
+	return matches(m.ResourceRules, true) && !matches(m.ExcludeResourceRules, false)
+}

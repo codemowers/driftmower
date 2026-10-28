@@ -41,7 +41,12 @@ type crdListOutput struct {
 }
 
 type crdDescribeInput struct {
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+}
+
+type admissionPoliciesInput struct {
+	Resource string `json:"resource,omitempty"`
 }
 
 type ingressClass struct {
@@ -238,9 +243,12 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		Name:  "describe_custom_resource_definition",
 		Title: "Describe a custom resource definition",
 		Description: "Use after selecting a CRD from list_custom_resource_definitions to inspect its writable fields before drafting a custom resource. " +
-			"Supply the full CRD name (plural.group), not Kind.group or an object name. Returns served API versions and writable resource schemas; excludes status, controller metadata and CEL code.",
+			"Supply the full CRD name (plural.group), not Kind.group or an object name. Returns every served API version and the writable resource schema of one: the storage version unless version names another served one. " +
+			"Excludes status, controller metadata and CEL code.",
 		InputSchema: inputSchema[crdDescribeInput](func(props map[string]*jsonschema.Schema) {
 			props["name"].Pattern = `^[a-z0-9][a-z0-9.-]*$`
+			props["version"].Description = "Served version whose schema to return, e.g. v1beta1. Defaults to the storage version."
+			props["version"].Pattern = `^v[0-9]+((alpha|beta)[0-9]+)?$`
 		}),
 		Annotations: readOnly("Describe a custom resource definition"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in crdDescribeInput) (*mcp.CallToolResult, catalog.CRDDetails, error) {
@@ -248,6 +256,10 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 			return nil, catalog.CRDDetails{}, err
 		}
 		d, err := cat.DescribeCRD(ctx, in.Name)
+		if err != nil {
+			return nil, catalog.CRDDetails{}, err
+		}
+		d, err = d.Only(in.Version)
 
 		return nil, d, err
 	})
@@ -273,15 +285,20 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	// The catalog is returned as CSV only: on a cluster with a hundred
 	// policies the JSON form alone outgrows what MCP clients accept inline.
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_admission_policies",
-		Title:       "List admission policies",
-		InputSchema: noArguments(),
+		Name:  "list_admission_policies",
+		Title: "List admission policies",
+		InputSchema: inputSchema[admissionPoliciesInput](func(props map[string]*jsonschema.Schema) {
+			props["resource"].Description = "Plural resource name, optionally qualified by API group (ingresses.networking.k8s.io; core resources take no group). " +
+				"Keeps policies whose own resource rules could match it; unqualified, any group matches. Omit for the whole catalog."
+			props["resource"].Pattern = `^[a-z0-9][a-z0-9.-]*$`
+		}),
 		Description: "Use before planning resource changes to discover admission requirements and applicable bindings. Returns a CSV catalog of admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions. " +
+			"Pass resource to keep only policies that could target it; a large catalog may otherwise be too long to read inline. " +
 			"No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. " +
 			"bindings=null means discovery is unavailable; [] means no bindings. Match resource rules and binding scope to the intended resource; targets are candidates, not a prediction of effective admission behavior. " +
 			"This catalog does not evaluate policy conditions or replace an authorization check.",
 		Annotations: readOnly("List admission policies"),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in admissionPoliciesInput) (*mcp.CallToolResult, any, error) {
 		if err := requireCaller(req); err != nil {
 			return nil, nil, err
 		}
@@ -289,12 +306,19 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		if err != nil {
 			return nil, nil, err
 		}
+		resource, group, qualified := strings.Cut(in.Resource, ".")
 		out := policyCatalogOutput{Policies: []policySummary{}, UnavailableKinds: policies.UnavailableKinds}
 		for _, p := range policies.Policies {
-			out.Policies = append(out.Policies, summarizePolicy(p))
+			if in.Resource == "" || p.Targets(group, resource, !qualified) {
+				out.Policies = append(out.Policies, summarizePolicy(p))
+			}
+		}
+		csv := policyCatalogCSV(out)
+		if in.Resource != "" {
+			csv += fmt.Sprintf("\nFiltered to %d of %d policies whose own rules could target %s; bindings may narrow them further.\n", len(out.Policies), len(policies.Policies), in.Resource)
 		}
 
-		return text(policyCatalogCSV(out)), nil, nil
+		return text(csv), nil, nil
 	})
 }
 

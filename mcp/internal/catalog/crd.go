@@ -112,14 +112,49 @@ type CRDSchemaVersion struct {
 	Schema  map[string]any `json:"schema"`
 }
 
+// CRDServedVersion names a served version without its schema.
+type CRDServedVersion struct {
+	Name    string `json:"name"`
+	Storage bool   `json:"storage"`
+}
+
 type CRDDetails struct {
-	Name        string             `json:"name"`
-	Description *string            `json:"description"`
-	Group       string             `json:"group"`
-	Kind        string             `json:"kind"`
-	Resource    string             `json:"resource"`
-	Scope       string             `json:"scope"`
-	Versions    []CRDSchemaVersion `json:"versions"`
+	Name           string             `json:"name"`
+	Description    *string            `json:"description"`
+	Group          string             `json:"group"`
+	Kind           string             `json:"kind"`
+	Resource       string             `json:"resource"`
+	Scope          string             `json:"scope"`
+	ServedVersions []CRDServedVersion `json:"servedVersions"`
+	Versions       []CRDSchemaVersion `json:"versions"`
+}
+
+// Only keeps the schema of one served version: the named one, or the storage
+// version when version is empty. A large CRD's schemas for every version can
+// outgrow what MCP clients accept inline.
+func (d CRDDetails) Only(version string) (CRDDetails, error) {
+	i := slices.IndexFunc(d.Versions, func(v CRDSchemaVersion) bool {
+		if version == "" {
+			return v.Storage
+		}
+
+		return v.Name == version
+	})
+	if i < 0 && version == "" && len(d.Versions) > 0 {
+		// Every served version is listed; storage may be one no longer served.
+		i = 0
+	}
+	if i < 0 {
+		names := make([]string, len(d.ServedVersions))
+		for j, v := range d.ServedVersions {
+			names[j] = v.Name
+		}
+
+		return CRDDetails{}, fmt.Errorf("CRD %s does not serve version %q; served versions: %s", d.Name, version, strings.Join(names, ", "))
+	}
+	d.Versions = []CRDSchemaVersion{d.Versions[i]}
+
+	return d, nil
 }
 
 // DescribeCRD returns the served versions and writable schemas of one CRD.
@@ -144,13 +179,14 @@ func (c *Catalog) DescribeCRD(ctx context.Context, name string) (CRDDetails, err
 	}
 
 	d := CRDDetails{
-		Name:        obj.Metadata.Name,
-		Description: obj.Metadata.description(),
-		Group:       obj.Spec.Group,
-		Kind:        obj.Spec.Names.Kind,
-		Resource:    obj.Spec.Names.Plural,
-		Scope:       obj.Spec.Scope,
-		Versions:    []CRDSchemaVersion{},
+		Name:           obj.Metadata.Name,
+		Description:    obj.Metadata.description(),
+		Group:          obj.Spec.Group,
+		Kind:           obj.Spec.Names.Kind,
+		Resource:       obj.Spec.Names.Plural,
+		Scope:          obj.Spec.Scope,
+		ServedVersions: []CRDServedVersion{},
+		Versions:       []CRDSchemaVersion{},
 	}
 	for _, v := range obj.Spec.Versions {
 		if !v.Served {
@@ -161,6 +197,7 @@ func (c *Catalog) DescribeCRD(ctx context.Context, name string) (CRDDetails, err
 			version.Schema, _ = cleanSchema(v.Schema.OpenAPIV3Schema).(map[string]any)
 		}
 		d.Versions = append(d.Versions, version)
+		d.ServedVersions = append(d.ServedVersions, CRDServedVersion{Name: v.Name, Storage: v.Storage})
 	}
 
 	return d, nil
