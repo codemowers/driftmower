@@ -94,8 +94,14 @@ func (c *Catalog) AdmissionPolicies(ctx context.Context) (AdmissionPolicies, err
 		return AdmissionPolicies{}, err
 	}
 
+	// Only the policy and binding resources count towards completion; the
+	// group also serves webhook configurations, which would otherwise end the
+	// search before an older version is checked for a kind.
+	wanted := map[string]bool{}
+	for _, res := range policyResources {
+		wanted[res.name], wanted[res.bindingName] = true, true
+	}
 	versionOf := map[string]string{}
-	wanted := len(policyResources) * 2
 	for _, version := range []string{"v1", "v1beta1", "v1alpha1"} {
 		if !slices.Contains(served, version) {
 			continue
@@ -105,11 +111,11 @@ func (c *Catalog) AdmissionPolicies(ctx context.Context) (AdmissionPolicies, err
 			return AdmissionPolicies{}, err
 		}
 		for _, r := range list.APIResources {
-			if _, ok := versionOf[r.Name]; !ok && slices.Contains(r.Verbs, "list") {
+			if _, ok := versionOf[r.Name]; !ok && wanted[r.Name] && slices.Contains(r.Verbs, "list") {
 				versionOf[r.Name] = version
 			}
 		}
-		if len(versionOf) >= wanted {
+		if len(versionOf) == len(wanted) {
 			break
 		}
 	}
