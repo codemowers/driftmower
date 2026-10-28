@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -216,22 +217,24 @@ func (l *RowLoader) fetch(ctx context.Context, reportID string) (*ReportRows, er
 	// boundary must fall in the same place on every request.
 	var usages []ImageUsage
 	var scores []releaseScore
-	errs := make(chan error, 2)
-	go func() {
+	// The group cancels the sibling read on the first failure and waits for
+	// it, so no read outlives the call.
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
 		var err error
-		usages, err = findAll[ImageUsage](ctx, l.Client, "image-usages",
+		usages, err = findAll[ImageUsage](gctx, l.Client, "image-usages",
 			Query{}.Set("reportId", reportID).Select(imageUsageColumns...).Sort("id", 1), 0, false)
-		errs <- err
-	}()
-	go func() {
+
+		return err
+	})
+	g.Go(func() error {
 		var err error
-		scores, err = findAll[releaseScore](ctx, l.Client, "release-scores", Query{}.Set("reportId", reportID).Sort("groupKey", 1), 0, false)
-		errs <- err
-	}()
-	for range 2 {
-		if err := <-errs; err != nil {
-			return nil, err
-		}
+		scores, err = findAll[releaseScore](gctx, l.Client, "release-scores", Query{}.Set("reportId", reportID).Sort("groupKey", 1), 0, false)
+
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	rows := &ReportRows{ImageUsages: usages, ReleaseInfo: map[string]*string{}}
