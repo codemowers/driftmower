@@ -165,6 +165,11 @@ func reduceMeta(m metav1.ObjectMeta) metav1.ObjectMeta {
 // Project reduces a watched object to a Node before it is cached, so no env
 // values, commands, Secret data or arbitrary custom-resource specs are kept.
 func Project(src Source, obj any) (*Node, error) {
+	// Informers may run the transform again on an object already reduced,
+	// e.g. when a relist replaces the store.
+	if n, ok := obj.(*Node); ok && n.Kind == src.Kind {
+		return n, nil
+	}
 	n := &Node{APIVersion: src.APIVersion(), Kind: src.Kind}
 	// Secret and ConfigMap data must never enter the cache.
 	if _, ok := obj.(*metav1.PartialObjectMetadata); src.MetadataOnly && !ok {

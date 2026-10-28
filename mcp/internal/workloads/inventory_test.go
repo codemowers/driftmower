@@ -470,3 +470,23 @@ func TestProjectRejectsIncompleteObjects(t *testing.T) {
 			Spec: corev1.PodSpec{Containers: []corev1.Container{{Image: "cron:1"}}}}}}}})
 	eq(t, "cronjob images", n.Spec.Pod.Images, []string{"cron:1"})
 }
+
+func TestProjectIsIdempotent(t *testing.T) {
+	for _, kind := range []string{"Pod", "Secret"} {
+		var obj any = &corev1.Pod{ObjectMeta: objMeta(kind, "p", opts{})}
+		if kind == "Secret" {
+			obj = &metav1.PartialObjectMetadata{ObjectMeta: objMeta(kind, "s", opts{})}
+		}
+		first, err := Project(sourceFor(t, kind), obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A relist can hand the transform an object it already reduced.
+		if again, err := Project(sourceFor(t, kind), first); err != nil || again != first {
+			t.Errorf("%s re-projected = %v %v", kind, again, err)
+		}
+	}
+	if _, err := Project(sourceFor(t, "Secret"), project(t, "Pod", &corev1.Pod{ObjectMeta: objMeta("Pod", "p", opts{})})); err == nil {
+		t.Error("a Pod node accepted for the Secret source")
+	}
+}
