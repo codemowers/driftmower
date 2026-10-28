@@ -21,6 +21,7 @@ import (
 
 	"github.com/codemowers/driftmower-mcp/internal/auth"
 	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower-mcp/internal/backend"
 	"github.com/codemowers/driftmower-mcp/internal/catalog"
 	"github.com/codemowers/driftmower-mcp/internal/cluster"
 	"github.com/codemowers/driftmower-mcp/internal/config"
@@ -32,6 +33,7 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/observability"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower-mcp/internal/tenancy"
 	"github.com/codemowers/driftmower-mcp/internal/workloads"
 )
 
@@ -178,6 +180,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Provisioning:  svc.service,
 		Workloads:     newWorkloads(gctx, cfg, svc, logger),
 		Observability: newObservability(cfg, svc, m),
+		Backend:       newBackend(cfg, svc, logger),
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -297,6 +300,22 @@ func newObservability(cfg *config.Config, svc *services, m *metrics.Metrics) *ob
 	o.OnRefused = outcome
 
 	return o
+}
+
+// newBackend reads persisted analysis from driftmower-be, confined to each
+// caller's tenancy.
+func newBackend(cfg *config.Config, svc *services, logger *slog.Logger) *mcpserver.Backend {
+	if !cfg.Backend.Enabled {
+		return nil
+	}
+	client := &backend.Client{BaseURL: cfg.Backend.URL, Token: cfg.Backend.ServiceToken, Timeout: cfg.Backend.Timeout}
+	rows := &backend.RowLoader{Client: client}
+
+	return &mcpserver.Backend{
+		Searcher: &backend.Searcher{Client: client, Rows: rows, DefaultLimit: cfg.Search.DefaultLimit, MaximumLimit: cfg.Search.MaximumLimit},
+		Planner:  &backend.Planner{Client: client, Rows: rows, DefaultLimit: cfg.Search.DefaultLimit, MaximumLimit: cfg.Search.MaximumLimit},
+		Tenancy:  &mcpserver.Tenancy{Policy: tenancy.Policy(cfg.Tenancy.ScopeSource), Resolver: svc.scope, Mapping: svc.mapping, Logger: logger},
+	}
 }
 
 func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {
