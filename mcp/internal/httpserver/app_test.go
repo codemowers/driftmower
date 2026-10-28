@@ -123,7 +123,7 @@ func TestUnauthenticatedServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 200 || !strings.Contains(string(body), "http://"+strings.TrimPrefix(f.url, "http://")+"/mcp") ||
 		strings.Contains(string(body), "--client-id") || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "default-src 'none'") {
 		t.Errorf("landing = %d %s", resp.StatusCode, body)
@@ -131,7 +131,7 @@ func TestUnauthenticatedServer(t *testing.T) {
 
 	resp, _ = http.Get(f.url + "/nope")
 	body, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 404 || strings.TrimSpace(string(body)) != `{"error":"not_found"}` {
 		t.Errorf("unknown path = %d %s", resp.StatusCode, body)
 	}
@@ -143,7 +143,7 @@ func TestUnauthenticatedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	tools, err := s.ListTools(context.Background(), nil)
 	if err != nil {
@@ -193,7 +193,7 @@ func TestAuthenticatedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 401 || resp.Header.Get("WWW-Authenticate") != `Bearer resource_metadata="`+f.url+auth.MetadataPath+`"` {
 		t.Errorf("no token = %d %q", resp.StatusCode, resp.Header.Get("WWW-Authenticate"))
 	}
@@ -201,14 +201,14 @@ func TestAuthenticatedServer(t *testing.T) {
 	resp, _ = http.Get(f.url + auth.MetadataPath)
 	var meta map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&meta)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if meta["resource"] != resource || !slices.Contains(meta["scopes_supported"].([]any), any("offline_access")) {
 		t.Errorf("metadata = %+v", meta)
 	}
 
 	resp, _ = http.Get(f.url + "/")
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if !strings.Contains(string(body), "--client-id &#39;claude&#39;") || !strings.Contains(string(body), "Codex project config") {
 		t.Errorf("authenticated landing lacks client ID: %s", body)
 	}
@@ -223,7 +223,7 @@ func TestAuthenticatedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	res, out := callJSON(t, s, "list_accessible_namespaces")
 	if res.IsError {
@@ -243,7 +243,7 @@ func TestAuthenticatedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("hijacked session = %d", resp.StatusCode)
 	}

@@ -6,7 +6,6 @@ package backend
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -113,7 +112,7 @@ func findPage[T any](ctx context.Context, c *Client, path string, q Query) (page
 	if err != nil {
 		return page[T]{}, &RequestError{Message: fmt.Sprintf("Request to %s failed: %v", u, err)}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return page[T]{}, &RequestError{Message: fmt.Sprintf("Request to %s failed: %v", u, err)}
@@ -150,9 +149,6 @@ func findPage[T any](ctx context.Context, c *Client, path string, q Query) (page
 
 	return p, nil
 }
-
-// errPageLimit is returned when a full read would need more than maxPages.
-var errPageLimit = errors.New("page limit reached")
 
 // findAll reads every page by $skip. An empty page ends the scan even when
 // the total disagrees, and the skip advances by what actually came back, so

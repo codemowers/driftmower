@@ -52,7 +52,7 @@ func HTTPRequester(timeout time.Duration) Requester {
 		if err != nil {
 			return Response{}, err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 		if err != nil {
 			return Response{}, err

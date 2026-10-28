@@ -60,7 +60,7 @@ func (b browser) get(path string) (int, string) {
 	if err != nil {
 		b.t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 
 	return resp.StatusCode, string(body)
@@ -72,7 +72,7 @@ func (b browser) post(path string, form url.Values) (int, string) {
 	if err != nil {
 		b.t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 
 	return resp.StatusCode, string(body)
@@ -154,7 +154,7 @@ func TestExplorerSignInAndPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	page, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if csp := resp.Header.Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'none'") || strings.Contains(csp, "script-src") {
 		t.Errorf("CSP = %q", csp)
 	}

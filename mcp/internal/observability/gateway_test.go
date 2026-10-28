@@ -272,7 +272,9 @@ func TestBudgetCapsCallsInFlight(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	close(release)
-	<-done
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 
 	boom := errors.New("backend down")
 	if err := b.Admit("alice", func(func()) error { return boom }); !errors.Is(err, boom) {
@@ -300,7 +302,9 @@ func TestBudgetNeverForgetsBusyCaller(t *testing.T) {
 		t.Errorf("err = %v; a caller with a call in flight was forgotten", err)
 	}
 	close(release)
-	<-done
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestHTTPRequesterDoesNotFollowRedirects(t *testing.T) {

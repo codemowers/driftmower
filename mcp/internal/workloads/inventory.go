@@ -365,7 +365,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 	// A Pod with no controller is an unclaimed namespace object.
 	for i := len(withOrphans) - 1; i >= 0; i-- {
 		w := withOrphans[i]
-		if w.Kind != "Pod" && !(w.Kind == "Certificate" && groupOf(w.APIVersion) == "cert-manager.io") {
+		if w.Kind != "Pod" && (w.Kind != "Certificate" || groupOf(w.APIVersion) != "cert-manager.io") {
 			continue
 		}
 		if pod := byUID[w.UID]; w.Kind == "Pod" && pod != nil && pod.Kind == "Pod" && len(pod.OwnerReferences) == 0 {

@@ -177,9 +177,9 @@ func cleanSchema(value any) any {
 	case map[string]any:
 		out := make(map[string]any, len(v))
 		for key, child := range v {
-			switch {
-			case key == "x-kubernetes-validations":
-			case key == "properties":
+			switch key {
+			case "x-kubernetes-validations":
+			case "properties":
 				if props, ok := child.(map[string]any); ok {
 					cleaned := make(map[string]any, len(props))
 					for name, s := range props {
@@ -191,7 +191,7 @@ func cleanSchema(value any) any {
 				} else {
 					out[key] = cleanSchema(child)
 				}
-			case key == "required":
+			case "required":
 				if names, ok := child.([]any); ok {
 					out[key] = slices.DeleteFunc(slices.Clone(names), func(n any) bool { return n == "status" })
 				} else {
