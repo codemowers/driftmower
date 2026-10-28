@@ -15,6 +15,7 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/cluster"
 	"github.com/codemowers/driftmower-mcp/internal/logging"
 	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower-mcp/internal/observability"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
 )
 
@@ -35,6 +36,9 @@ type Deps struct {
 	Provisioning *service.Service
 	// Enables the live workload tools.
 	Workloads *Workloads
+	// Enables list_volumes, and the metrics and logs tools it is configured
+	// for.
+	Observability *observability.Service
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -78,6 +82,9 @@ func New(d Deps) *mcp.Server {
 	if d.Scope != nil {
 		addAccessibleNamespacesTool(s, d.Scope, d.Mapping)
 	}
+	if d.Observability != nil {
+		addObservabilityTools(s, d.Observability, d.Mapping)
+	}
 	if d.Provisioning != nil {
 		addProvisioningTools(s, d.Provisioning, d.Mapping, d.Logger)
 	}
@@ -111,6 +118,8 @@ func usageInstructions(d Deps) string {
 	add(d.Workloads != nil, "For applications, workload discovery, what runs in a namespace, and resource relationships, start with get_workloads. "+
 		"Use a specified namespace directly; omit namespace only for an overview. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness.")
 	add(d.Scope != nil, "Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission.")
+	add(d.Observability != nil && d.Observability.MetricsEnabled(), "For current resource usage, prefer get_pod_resource_usage or get_cluster_resource_usage. "+
+		"Use their history endpoints only for trends, past usage, peaks or statistics. Use query_metrics for specific metrics outside those fixed summaries. Missing metrics or low coverage are not evidence of zero usage.")
 	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload and terminate_pod mutate resources. "+
 		"Use only for an explicit user request, using UID from current workload inventory; never treat them as diagnostic probes or automatically retry uncertain results.")
 	add(true, "Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories.")

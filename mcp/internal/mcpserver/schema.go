@@ -6,11 +6,14 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/codemowers/driftmower-mcp/internal/observability"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning"
 )
 
 // Types with custom JSON need their wire schema spelled out.
 var typeSchemas = map[reflect.Type]*jsonschema.Schema{
+	// A [timestamp, "value"] pair.
+	reflect.TypeFor[observability.PromSample](): {Type: "array", MinItems: jsonschema.Ptr(2), MaxItems: jsonschema.Ptr(2)},
 	reflect.TypeFor[provisioning.WatchedNamespaces](): {AnyOf: []*jsonschema.Schema{
 		{Type: "array", Items: &jsonschema.Schema{Type: "string"}},
 		{Type: "string", Enum: []any{"all"}},

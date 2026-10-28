@@ -29,6 +29,7 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/logging"
 	"github.com/codemowers/driftmower-mcp/internal/mcpserver"
 	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower-mcp/internal/observability"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
 	"github.com/codemowers/driftmower-mcp/internal/workloads"
@@ -167,15 +168,16 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	svc.clusterID = identity.ID
 
 	server := mcpserver.New(mcpserver.Deps{
-		Cluster:      identity,
-		Version:      version,
-		Logger:       logger,
-		Metrics:      m,
-		Mapping:      svc.mapping,
-		Scope:        svc.scope,
-		Catalog:      svc.catalog,
-		Provisioning: svc.service,
-		Workloads:    newWorkloads(gctx, cfg, svc, logger),
+		Cluster:       identity,
+		Version:       version,
+		Logger:        logger,
+		Metrics:       m,
+		Mapping:       svc.mapping,
+		Scope:         svc.scope,
+		Catalog:       svc.catalog,
+		Provisioning:  svc.service,
+		Workloads:     newWorkloads(gctx, cfg, svc, logger),
+		Observability: newObservability(cfg, svc, m),
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -265,6 +267,36 @@ func newWorkloads(ctx context.Context, cfg *config.Config, svc *services, logger
 	}
 
 	return w
+}
+
+// newObservability guards the shared Prometheus and Loki: a server-wide
+// concurrency ceiling, identical-query sharing and caching, and a per-caller
+// budget. Without observability configuration only list_volumes is offered,
+// without usage figures.
+func newObservability(cfg *config.Config, svc *services, m *metrics.Metrics) *observability.Service {
+	o := &observability.Service{Kubernetes: svc.clients.Kubernetes, Judge: svc.judge}
+	c := cfg.Observability
+	if c == nil {
+		return o
+	}
+	outcome := func(o string) { m.ObservabilityGuard.WithLabelValues(o).Inc() }
+	o.PrometheusURL, o.LokiURL, o.LogsEnabled = c.PrometheusURL, c.LokiURL, true
+	o.Backend = observability.NewGateway(observability.GatewayOptions{
+		Next:          observability.HTTPRequester(c.RequestTimeout),
+		PrometheusURL: c.PrometheusURL,
+		MaxConcurrent: c.MaxConcurrentRequests,
+		MaxQueued:     c.MaxQueuedRequests,
+		QueueWait:     c.RequestTimeout,
+		CacheTTL:      c.CacheTTL,
+		// Prometheus stops evaluating just before this server stops waiting.
+		PrometheusTimeout: c.RequestTimeout - time.Second,
+		OnOutcome:         outcome,
+	})
+	o.Budget = &observability.Budget{QueriesPerMinute: c.QueriesPerMinute, MaxConcurrentCalls: c.MaxConcurrentCallsPerCaller}
+	o.Alignment = c.CacheTTL
+	o.OnRefused = outcome
+
+	return o
 }
 
 func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {
