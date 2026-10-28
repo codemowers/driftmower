@@ -100,7 +100,7 @@ func (a *app) serveLanding(w http.ResponseWriter, r *http.Request) {
 	if a.opts.Auth == nil {
 		endpoint = "http://" + r.Host + "/mcp"
 	}
-	page := newLandingPage(a.opts.Auth != nil, endpoint, a.opts.OAuthClientID, a.opts.Cluster, a.opts.WebUI)
+	page := newLandingPage(a.opts.Auth != nil, endpoint, a.opts.OAuthClientID, a.opts.Cluster, a.opts.UI != nil)
 
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")

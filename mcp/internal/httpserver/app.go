@@ -30,8 +30,8 @@ type AppOptions struct {
 	// Nil answers /api/provisioning/capabilities with 404. Authenticated
 	// like /mcp.
 	Capabilities http.Handler
-	// Links the landing page to /ui.
-	WebUI   bool
+	// Serves /ui and links the landing page to it; nil disables it.
+	UI      http.Handler
 	Metrics *metrics.Metrics
 	Logger  *slog.Logger
 }
@@ -66,6 +66,10 @@ func NewApp(opts AppOptions) http.Handler {
 	}
 	mux.Handle("/mcp", mcpHandler)
 	mux.HandleFunc("GET /{$}", a.serveLanding)
+	if opts.UI != nil {
+		mux.Handle("/ui", opts.UI)
+		mux.Handle("/ui/", opts.UI)
+	}
 	if capabilities != nil {
 		mux.Handle(capabilitiesPath, capabilities)
 	}

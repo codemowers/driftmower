@@ -34,6 +34,7 @@ import (
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
 	"github.com/codemowers/driftmower-mcp/internal/tenancy"
+	"github.com/codemowers/driftmower-mcp/internal/ui"
 	"github.com/codemowers/driftmower-mcp/internal/workloads"
 )
 
@@ -169,6 +170,8 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	cancel()
 	svc.clusterID = identity.ID
 
+	live := newWorkloads(gctx, cfg, svc, logger)
+	obs := newObservability(cfg, svc, m)
 	server := mcpserver.New(mcpserver.Deps{
 		Cluster:       identity,
 		Version:       version,
@@ -178,8 +181,8 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Scope:         svc.scope,
 		Catalog:       svc.catalog,
 		Provisioning:  svc.service,
-		Workloads:     newWorkloads(gctx, cfg, svc, logger),
-		Observability: newObservability(cfg, svc, m),
+		Workloads:     live,
+		Observability: obs,
 		Backend:       newBackend(cfg, svc, logger),
 	})
 
@@ -204,7 +207,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Capabilities: &httpserver.Capabilities{
 			Service: svc.service, Mapping: svc.mapping, Authenticated: authenticator != nil, Logger: logger,
 		},
-		WebUI:   cfg.WebUI.Enabled,
+		UI:      newExplorer(cfg, svc, identity, live, obs, authenticator, logger),
 		Metrics: m,
 		Logger:  logger,
 	}))
@@ -316,6 +319,37 @@ func newBackend(cfg *config.Config, svc *services, logger *slog.Logger) *mcpserv
 		Planner:  &backend.Planner{Client: client, Rows: rows, DefaultLimit: cfg.Search.DefaultLimit, MaximumLimit: cfg.Search.MaximumLimit},
 		Tenancy:  &mcpserver.Tenancy{Policy: tenancy.Policy(cfg.Tenancy.ScopeSource), Resolver: svc.scope, Mapping: svc.mapping, Logger: logger},
 	}
+}
+
+// newExplorer serves the browser explorer when enabled. It signs in with the
+// explorer's public OIDC client and verifies the access token exactly as /mcp
+// does.
+func newExplorer(cfg *config.Config, svc *services, identity cluster.Identity, live *mcpserver.Workloads,
+	obs *observability.Service, authenticator *auth.Authenticator, logger *slog.Logger) http.Handler {
+	if !cfg.WebUI.Enabled || authenticator == nil {
+		return nil
+	}
+	u := &ui.UI{
+		PublicURL: cfg.PublicURL,
+		Issuer:    cfg.OIDC.Issuer,
+		ClientID:  cfg.WebUI.ClientID,
+		Verify: func(ctx context.Context, raw string) (*auth.Caller, error) {
+			caller, _, err := authenticator.OIDC.Verify(ctx, raw)
+
+			return caller, err
+		},
+		Mapping:       svc.mapping,
+		Cluster:       identity,
+		Scope:         svc.scope,
+		Workloads:     live.Cache,
+		Actions:       live.Actions,
+		Catalog:       svc.catalog,
+		Provisioning:  svc.service,
+		Observability: obs,
+		Logger:        logger,
+	}
+
+	return u.Handler()
 }
 
 func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {
