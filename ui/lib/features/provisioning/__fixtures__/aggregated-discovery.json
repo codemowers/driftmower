@@ -1,0 +1,291 @@
+{
+  "kind": "APIGroupDiscoveryList",
+  "apiVersion": "apidiscovery.k8s.io/v2",
+  "items": [
+    {
+      "metadata": {
+        "name": "apps"
+      },
+      "versions": [
+        {
+          "version": "v1",
+          "resources": [
+            {
+              "resource": "controllerrevisions",
+              "responseKind": {
+                "group": "",
+                "version": "",
+                "kind": "ControllerRevision"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "daemonsets",
+              "responseKind": {
+                "group": "",
+                "version": "",
+                "kind": "DaemonSet"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "deployments",
+              "responseKind": {
+                "group": "",
+                "version": "",
+                "kind": "Deployment"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "replicasets",
+              "responseKind": {
+                "group": "",
+                "version": "",
+                "kind": "ReplicaSet"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "statefulsets",
+              "responseKind": {
+                "group": "",
+                "version": "",
+                "kind": "StatefulSet"
+              },
+              "scope": "Namespaced"
+            }
+          ],
+          "freshness": "Current"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "codemowers.cloud"
+      },
+      "versions": [
+        {
+          "version": "v1",
+          "resources": [
+            {
+              "resource": "oidcclients",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "OIDCClient"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcmiddlewareclients",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "OIDCMiddlewareClient"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcorganizations",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "OIDCOrganization"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcusereventhooks",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "OIDCUserEventHook"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcusers",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "OIDCUser"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "scimconnections",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "SCIMConnection"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "scimgroups",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "SCIMGroup"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "scimsubjects",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1",
+                "kind": "SCIMSubject"
+              },
+              "scope": "Namespaced"
+            }
+          ],
+          "freshness": "Current"
+        },
+        {
+          "version": "v1beta1",
+          "resources": [
+            {
+              "resource": "oidcclients",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1beta1",
+                "kind": "OIDCClient"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcmiddlewareclients",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1beta1",
+                "kind": "OIDCMiddlewareClient"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "oidcusers",
+              "responseKind": {
+                "group": "codemowers.cloud",
+                "version": "v1beta1",
+                "kind": "OIDCUser"
+              },
+              "scope": "Namespaced"
+            }
+          ],
+          "freshness": "Current"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "monitoring.coreos.com"
+      },
+      "versions": [
+        {
+          "version": "v1",
+          "resources": [
+            {
+              "resource": "alertmanagers",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "Alertmanager"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "podmonitors",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "PodMonitor"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "probes",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "Probe"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "prometheuses",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "Prometheus"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "prometheusrules",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "PrometheusRule"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "servicemonitors",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "ServiceMonitor"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "thanosrulers",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1",
+                "kind": "ThanosRuler"
+              },
+              "scope": "Namespaced"
+            }
+          ],
+          "freshness": "Current"
+        },
+        {
+          "version": "v1alpha1",
+          "resources": [
+            {
+              "resource": "alertmanagerconfigs",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1alpha1",
+                "kind": "AlertmanagerConfig"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "prometheusagents",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1alpha1",
+                "kind": "PrometheusAgent"
+              },
+              "scope": "Namespaced"
+            },
+            {
+              "resource": "scrapeconfigs",
+              "responseKind": {
+                "group": "monitoring.coreos.com",
+                "version": "v1alpha1",
+                "kind": "ScrapeConfig"
+              },
+              "scope": "Namespaced"
+            }
+          ],
+          "freshness": "Current"
+        }
+      ]
+    }
+  ]
+}
