@@ -1,1 +1,5 @@
 skaffold.env
+# Go binaries built in place
+/driftmower-operator
+/driftmower-crawler
+/driftmower-mcp

@@ -1,0 +1,109 @@
+# One module per component. `skaffold dev` runs them all; `-m operator`,
+# `-m mcp` or `-m ui` runs one. Cluster, namespace and registry come from
+# skaffold.env (see skaffold.env.example) or exported variables.
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: operator
+
+build:
+  local:
+    useBuildkit: true
+    push: true
+  artifacts:
+    - image: driftmower-operator
+      platforms:
+        - linux/amd64
+      # The repository root, where go.mod is.
+      context: .
+      docker:
+        dockerfile: operator/Dockerfile
+
+manifests:
+  helm:
+    releases:
+      - name: driftmower-operator
+        chartPath: operator/chart
+        skipBuildDependencies: true
+        setValues:
+          # The development image is built for amd64 only.
+          nodeSelector.kubernetes\.io/arch: amd64
+        setValueTemplates:
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"
+
+deploy:
+  kubectl: {}
+---
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: mcp
+
+build:
+  local:
+    useBuildkit: true
+    push: true
+  artifacts:
+    - image: driftmower-mcp
+      platforms:
+        - linux/amd64
+      context: .
+      docker:
+        dockerfile: mcp/Dockerfile
+
+manifests:
+  helm:
+    releases:
+      - name: driftmower-mcp
+        chartPath: mcp/chart
+        skipBuildDependencies: true
+        setValues:
+          workloadRestart.enabled: true
+          serviceAccountAuth.enabled: true
+        setValueTemplates:
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
+
+deploy:
+  kubectl:
+    flags:
+      # Keep labeled chart resources when Skaffold cleans up.
+      delete:
+        - --selector=skaffold.dev/keep!=true
+
+portForward:
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3000
+    localPort: 3000
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3001
+    localPort: 3001
+---
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: ui
+
+build:
+  artifacts:
+    - image: driftmower-ui
+      platforms:
+        - linux/amd64
+      context: ui
+      docker:
+        dockerfile: Dockerfile
+
+# These manifests target the driftmowers namespace and ee-lte-1 hosts; see
+# ui/README.md before deploying them elsewhere.
+manifests:
+  rawYaml:
+    - ui/k8s/oidcclient.yaml
+    - ui/k8s/rbac.yaml
+    - ui/k8s/deployment.yaml
+    - ui/k8s/service.yaml
+    - ui/k8s/ingress.yaml
+    - ui/k8s/certificate.yaml
+
+deploy:
+  kubectl: {}
