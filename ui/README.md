@@ -7,7 +7,8 @@ reports from driftmower-be.
 ## Deploy
 
 The manifests are in [k8s/](k8s/) and [skaffold](https://skaffold.dev) deploys them. Which cluster, namespace and
-registry to use lives in your own config, not in the repo. Run everything from the repo root.
+registry to use lives in your own config, not in the repo. Run everything from the repository root, one level
+above this directory: the `ui` Skaffold module builds and deploys only this app.
 
 ### Before you start
 
@@ -27,21 +28,21 @@ cp skaffold.env.example skaffold.env
 skaffold config set default-repo zot.registry.ee-lte-1.codemowers.io/<your user> --kube-context ee-lte-1.codemowers.io
 ```
 
-`skaffold.env` tells skaffold which kubeconfig context and namespace to deploy to; edit it if you deploy
-elsewhere. The second command saves the registry the image is pushed to for that context, in
+`skaffold.env` tells skaffold which kubeconfig context and namespace to deploy to. The example names the
+`driftmower` namespace; these manifests expect `driftmowers` unless you change them as in step 2. The second command saves the registry the image is pushed to for that context, in
 `~/.skaffold/config`. Both stay on your machine.
 
 ### 2. Point the manifests at your host
 
 ```bash
 export HOST=driftmower.example.com
-sed -i "s#driftmower.ee#$HOST#g" k8s/deployment.yaml k8s/oidcclient.yaml k8s/ingress.yaml k8s/certificate.yaml
+sed -i "s#driftmower.ee#$HOST#g" ui/k8s/deployment.yaml ui/k8s/oidcclient.yaml ui/k8s/ingress.yaml ui/k8s/certificate.yaml
 ```
 
 Outside the `driftmowers` namespace, also fix the two ClusterRoleBinding subjects, which skaffold cannot set:
 
 ```bash
-sed -i "s#namespace: driftmowers#namespace: <your namespace>#" k8s/rbac.yaml
+sed -i "s#namespace: driftmowers#namespace: <your namespace>#" ui/k8s/rbac.yaml
 ```
 
 If your registry is public, delete the two `imagePullSecrets` lines from [k8s/deployment.yaml](k8s/deployment.yaml).
@@ -63,7 +64,7 @@ optional features are created under [Optional features](#optional-features).
 ### 4. Deploy
 
 ```bash
-skaffold run
+skaffold run -m ui
 ```
 
 This builds the image, pushes it to your registry and applies the manifests into your namespace.

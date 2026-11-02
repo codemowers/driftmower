@@ -18,55 +18,32 @@ port: `/healthz`, `/readyz`, `/startupz` and `/metrics`.
 
 ## Development
 
+The server is part of the `github.com/codemowers/driftmower` Go module; run
+these from the repository root:
+
 ```bash
-npm ci
-npm run build
-npm test
-npm run typecheck
-npm run lint
+go test -race ./mcp/...
+go vet ./mcp/...
+golangci-lint run ./mcp/...
+go run ./mcp/cmd/driftmower-mcp
 ```
 
-Run `npm run dev` to build the explorer and start the TypeScript server, or
-`npm start` to run the compiled server. Configuration defaults to stdio with
-the backend enabled, which requires `DRIFTMOWER_BE_SERVICE_TOKEN`. Set
-`DRIFTMOWER_BE_ENABLED=false` to run without backend analysis.
+Configuration defaults to stdio with the backend enabled, which requires
+`DRIFTMOWER_BE_SERVICE_TOKEN`. Set `DRIFTMOWER_BE_ENABLED=false` to run
+without backend analysis. `KUBECONFIG` points a local server at a cluster.
 
 For authenticated HTTP, set `DRIFTMOWER_MCP_TRANSPORT=http`, `MCP_PUBLIC_URL`
 and `OIDC_ISSUER`. Configure the Kubernetes token and CA files for the target
 cluster.
 
-## Go implementation (preview)
-
-A Go rewrite lives beside the TypeScript server in `cmd/` and `internal/`. It
-serves the same tools, routes, ports, environment variables and metric names,
-and renders the `/ui` explorer on the server instead of in the browser. The
-TypeScript server remains the primary image; the Go server is published as a
-secondary image, `ghcr.io/codemowers/driftmower-mcp-go`, for side-by-side
-testing.
-
-```bash
-go test -race ./cmd/... ./internal/...
-go run ./cmd/driftmower-mcp            # same environment as the TypeScript server
-docker compose --profile go run --build --rm test-go   # smoke test against the Go image
-```
-
-`KUBECONFIG` points a local Go server at a cluster. To deploy it beside the
-primary release, use its own namespace; the chart's ClusterRole name is a
-value so the two releases do not rebind each other:
-
-```bash
-skaffold run -p go --namespace driftmower-go
-```
-
-Differences from the TypeScript server: `MCP_SESSION_IDLE_MS` sets the MCP
-session idle timeout (default 30 minutes); booleans accept only `true` or
-`false`; `DRIFTMOWER_UI_PUBLIC_URL` and `--backend-url` are not read.
+`skaffold dev -m mcp` from the repository root builds the image and deploys
+the chart in `chart/`.
 
 ## Environment variables
 
-Defaults are defined in `config/default.json`; environment mappings are in
-`config/custom-environment-variables.json`. Empty optional values mean unset.
-Durations below are milliseconds. `--backend-url` overrides `DRIFTMOWER_BE_URL`.
+Defaults are defined in `internal/config/config.go`. Empty optional values
+mean unset. Durations below are milliseconds. Booleans accept only `true` or
+`false`.
 
 ### Server and authentication
 
@@ -78,8 +55,8 @@ Durations below are milliseconds. `--backend-url` overrides `DRIFTMOWER_BE_URL`.
 | `DRIFTMOWER_MCP_HEALTH_PORT` | `3001` | Health and metrics port. |
 | `DRIFTMOWER_MCP_LOG_LEVEL` | `info` | debug, info, warn or error. |
 | `MCP_PUBLIC_URL` | `http://127.0.0.1:3000` | Public server base URL; advertised resource is this URL plus /mcp. |
-| `DRIFTMOWER_UI_PUBLIC_URL` | `unset` | Optional external UI link on the landing page. |
 | `MCP_AUTH_ENABLED` | `true` | Verify HTTP bearer tokens. |
+| `MCP_SESSION_IDLE_MS` | `1800000` | Close MCP sessions with no open response for this long. |
 | `MCP_OAUTH_CLIENT_ID` | `unset` | Registered client ID advertised for OAuth discovery. |
 | `MCP_SERVICE_ACCOUNT_AUTH_ENABLED` | `false` | Enable audience-bound ServiceAccount authentication alongside OIDC. |
 | `MCP_INVALIDATE_TOKEN` | `unset` | Shared bearer token for POST /api/cache/invalidate. |
