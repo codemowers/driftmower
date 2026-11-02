@@ -1,0 +1,481 @@
+[
+  {
+    "id": "postgres",
+    "name": "PostgreSQL",
+    "purpose": "relational",
+    "what": "A relational database with tables, SQL and transactions.",
+    "goodFor": [
+      "application data",
+      "orders and users",
+      "anything you would reach for SQL to query"
+    ],
+    "group": "postgresql.cnpg.io",
+    "kind": "Cluster",
+    "versions": [
+      "v1"
+    ],
+    "operator": {
+      "name": "CloudNativePG",
+      "vendor": "cloudnative-pg",
+      "docsHref": "https://cloudnative-pg.io/documentation/current/"
+    },
+    "operatorRef": {
+      "deployment": "cnpg",
+      "labels": {
+        "app.kubernetes.io/name": "cloudnative-pg"
+      }
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "cnpg.io/cluster",
+    "storageClassPreference": [
+      "postgres"
+    ],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development database with a small data volume"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application database with storage sized for its data"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan database replication, failure-domain placement, backups and tested recovery; none are established by this preset"
+      }
+    ],
+    "needs": [
+      "The CloudNativePG operator",
+      "A storage class for the data volume",
+      "Under default-deny networking: apiserver egress, and node-sourced ingress on port 8000 for health probes"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "dragonfly",
+    "name": "Dragonfly",
+    "purpose": "cache",
+    "what": "An in-memory cache that speaks the Redis protocol.",
+    "goodFor": [
+      "caching",
+      "sessions",
+      "queues and rate limits"
+    ],
+    "group": "dragonflydb.io",
+    "kind": "Dragonfly",
+    "versions": [
+      "v1alpha1"
+    ],
+    "operator": {
+      "name": "Dragonfly operator",
+      "vendor": "dragonflydb",
+      "docsHref": "https://www.dragonflydb.io/docs/managing-dragonfly/operator/installation"
+    },
+    "operatorRef": {
+      "deployment": "dragonfly-operator"
+    },
+    "alsoRequires": [
+      {
+        "group": "",
+        "resource": "secrets"
+      }
+    ],
+    "instanceLabelKey": "app",
+    "storageClassPreference": [
+      "redis"
+    ],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development cache in memory"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application cache with memory sized for its working set"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan cache replication and failure-domain placement; persistence and recovery require separate configuration"
+      }
+    ],
+    "needs": [
+      "The Dragonfly operator",
+      "A generated password secret"
+    ],
+    "stateful": false
+  },
+  {
+    "id": "mongodb",
+    "name": "MongoDB",
+    "purpose": "document",
+    "what": "A document database that stores JSON-like records instead of rows.",
+    "goodFor": [
+      "documents with varying shapes",
+      "event and audit logs"
+    ],
+    "group": "mongodbcommunity.mongodb.com",
+    "kind": "MongoDBCommunity",
+    "versions": [
+      "v1"
+    ],
+    "operator": {
+      "name": "MongoDB Community operator",
+      "vendor": "mongodb",
+      "docsHref": "https://www.mongodb.com/docs/kubernetes-operator/current/"
+    },
+    "operatorRef": {
+      "deployment": "mongodb-kubernetes-operator"
+    },
+    "alsoRequires": [
+      {
+        "group": "",
+        "resource": "secrets"
+      },
+      {
+        "group": "",
+        "resource": "serviceaccounts"
+      },
+      {
+        "group": "rbac.authorization.k8s.io",
+        "resource": "roles"
+      },
+      {
+        "group": "rbac.authorization.k8s.io",
+        "resource": "rolebindings"
+      }
+    ],
+    "instanceLabelKey": "app",
+    "storageClassPreference": [
+      "mongo"
+    ],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development document database with small data and log volumes"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application document database with storage sized for its data and logs"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan replica-set membership, quorum, failure-domain placement, backups and recovery"
+      }
+    ],
+    "needs": [
+      "The MongoDB Community operator",
+      "A ServiceAccount, Role and RoleBinding named mongodb-database in the namespace — without them the pods never start",
+      "Two volumes per member (data and logs), so it costs two PVCs against the quota"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "bucket",
+    "name": "S3 bucket",
+    "purpose": "object-store",
+    "what": "Object storage for files, addressed over the S3 API.",
+    "goodFor": [
+      "uploads",
+      "backups",
+      "static assets and exports"
+    ],
+    "group": "s3.onyxia.sh",
+    "kind": "Bucket",
+    "versions": [
+      "v1alpha1"
+    ],
+    "operator": {
+      "name": "s3-operator",
+      "vendor": "inseefrlab",
+      "docsHref": "https://github.com/InseeFrLab/s3-operator"
+    },
+    "operatorRef": {
+      "deployment": "s3-operator"
+    },
+    "alsoRequires": [
+      {
+        "group": "s3.onyxia.sh",
+        "resource": "s3users"
+      }
+    ],
+    "instanceLabelKey": "app",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "1 bucket"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "1 bucket with a scoped user"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "1 bucket with a scoped user"
+      }
+    ],
+    "needs": [
+      "The s3-operator",
+      "An S3Instance for it to create the bucket in",
+      "Bucket names and access keys are global on the object store, so a tenant guard may require a prefix"
+    ],
+    "stateful": false
+  },
+  {
+    "id": "rabbitmq",
+    "name": "RabbitMQ",
+    "purpose": "queue",
+    "what": "A message broker that hands work between services.",
+    "goodFor": [
+      "background jobs",
+      "decoupling services",
+      "retries"
+    ],
+    "group": "rabbitmq.com",
+    "kind": "RabbitmqCluster",
+    "versions": [
+      "v1beta1"
+    ],
+    "operator": {
+      "name": "RabbitMQ Cluster operator",
+      "vendor": "rabbitmq",
+      "docsHref": "https://www.rabbitmq.com/kubernetes/operator/operator-overview"
+    },
+    "operatorRef": {
+      "deployment": "rabbitmq-cluster-operator"
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "app.kubernetes.io/name",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development broker with a small data volume"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application broker with storage sized for queued messages"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan broker replication, queue durability, quorum and failure-domain placement"
+      }
+    ],
+    "needs": [
+      "The RabbitMQ Cluster operator",
+      "For queues and users as manifests, the separate messaging-topology-operator"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "redpanda",
+    "name": "Redpanda",
+    "purpose": "stream",
+    "what": "An event stream that speaks the Kafka protocol.",
+    "goodFor": [
+      "event streams",
+      "change feeds",
+      "high-volume ingest"
+    ],
+    "group": "cluster.redpanda.com",
+    "kind": "Redpanda",
+    "versions": [
+      "v1alpha2",
+      "v1alpha1"
+    ],
+    "operator": {
+      "name": "Redpanda operator",
+      "vendor": "redpanda-data",
+      "docsHref": "https://docs.redpanda.com/current/deploy/deployment-option/self-hosted/kubernetes/k-deployment-overview/"
+    },
+    "operatorRef": {
+      "deployment": "redpanda-controller"
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "app.kubernetes.io/instance",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development event stream with a small data volume"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application event stream with storage sized for retention"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan broker count, topic replication, quorum and failure-domain placement"
+      }
+    ],
+    "needs": [
+      "The Redpanda operator"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "opensearch",
+    "name": "OpenSearch",
+    "purpose": "search",
+    "what": "A search engine and log store you query with full-text queries.",
+    "goodFor": [
+      "full-text search",
+      "log analytics",
+      "dashboards"
+    ],
+    "group": "opensearch.org",
+    "kind": "OpenSearchCluster",
+    "versions": [
+      "v1"
+    ],
+    "operator": {
+      "name": "OpenSearch operator",
+      "vendor": "opensearch-project",
+      "docsHref": "https://opensearch.org/docs/latest/tools/k8s-operator/"
+    },
+    "operatorRef": {
+      "deployment": "opensearch-operator"
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "opster.io/opensearch-cluster",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development search engine with a small data volume"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application search engine with storage sized for its indexes"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan node roles, shard replication, quorum, failure-domain placement and index recovery"
+      }
+    ],
+    "needs": [
+      "The OpenSearch operator",
+      "More memory than a small namespace quota allows; check the namespace headroom before choosing this"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "elasticsearch",
+    "name": "Elasticsearch",
+    "purpose": "search",
+    "what": "A search engine and log store, in the Elastic distribution.",
+    "goodFor": [
+      "full-text search",
+      "log analytics",
+      "Kibana dashboards"
+    ],
+    "group": "elasticsearch.k8s.elastic.co",
+    "kind": "Elasticsearch",
+    "versions": [
+      "v1"
+    ],
+    "operator": {
+      "name": "Elastic Cloud on Kubernetes",
+      "vendor": "elastic",
+      "docsHref": "https://www.elastic.co/guide/en/cloud-on-k8s/current/index.html"
+    },
+    "operatorRef": {
+      "deployment": "elastic-operator"
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "elasticsearch.k8s.elastic.co/cluster-name",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development search engine with a small data volume"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application search engine with storage sized for its indexes"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan node roles, shard replication, quorum, failure-domain placement and index recovery"
+      }
+    ],
+    "needs": [
+      "The ECK operator",
+      "Awareness of Elastic's licence tiers for anything beyond the basic features"
+    ],
+    "stateful": true
+  },
+  {
+    "id": "emqx",
+    "name": "EMQX",
+    "purpose": "mqtt",
+    "what": "An MQTT broker for device and sensor messages.",
+    "goodFor": [
+      "IoT devices",
+      "telemetry",
+      "pub/sub over MQTT"
+    ],
+    "group": "apps.emqx.io",
+    "kind": "EMQX",
+    "versions": [
+      "v2beta1",
+      "v2alpha1"
+    ],
+    "operator": {
+      "name": "EMQX operator",
+      "vendor": "emqx",
+      "docsHref": "https://docs.emqx.com/en/emqx-operator/latest/"
+    },
+    "operatorRef": {
+      "deployment": "emqx-operator"
+    },
+    "alsoRequires": [],
+    "instanceLabelKey": "apps.emqx.io/instance",
+    "storageClassPreference": [],
+    "presets": [
+      {
+        "id": "dev",
+        "label": "Dev",
+        "summary": "Development MQTT broker"
+      },
+      {
+        "id": "small",
+        "label": "Small",
+        "summary": "Application MQTT broker with memory sized for connections and messages"
+      },
+      {
+        "id": "ha",
+        "label": "Resilience planning",
+        "summary": "Plan core and replicant roles, failure-domain placement, session durability and recovery"
+      }
+    ],
+    "needs": [
+      "The EMQX operator"
+    ],
+    "stateful": false
+  }
+]

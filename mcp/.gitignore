@@ -1,0 +1,13 @@
+.env
+node_modules
+dist/
+
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+*.log
+*.swp
+*.swo
+.DS_Store
+/driftmower-mcp

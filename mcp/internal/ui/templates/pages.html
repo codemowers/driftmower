@@ -1,0 +1,98 @@
+{{define "namespaces"}}{{template "head" .}}
+<h1>Namespaces</h1>
+<p class="muted">Namespaces where Kubernetes lets you list pods. Seeing a namespace does not mean you may change anything in it.</p>
+{{with .Data}}
+{{if .ClusterWide}}<p class="notice">You may list pods in every namespace.</p>{{end}}
+{{if .Unknown}}<p class="warn">Access to {{len .Unknown}} namespace(s) could not be evaluated; they are excluded, not denied.</p>{{end}}
+{{if .Truncated}}<p class="warn">The cluster has more namespaces than were checked; open a namespace by URL if it is missing.</p>{{end}}
+{{if .Namespaces}}<ul>{{range .Namespaces}}<li><a href="/ui/namespaces/{{.}}">{{.}}</a></li>{{end}}</ul>
+{{else}}<p>Kubernetes grants you list-pods access in no namespace.</p>{{end}}
+{{end}}
+{{template "foot" .}}{{end}}
+
+{{define "deps"}}{{if .}}<ul>{{range .}}<li><code>{{.}}</code></li>{{end}}</ul>{{end}}{{end}}
+
+{{define "namespace"}}{{template "head" .}}
+{{$csrf := .CSRF}}
+{{with .Data}}
+<h1>{{.Namespace}}</h1>
+<p>{{if .Readiness}}<a href="/ui/namespaces/{{.Namespace}}/readiness">Provisioning readiness</a>{{end}}</p>
+{{range .Warnings}}<p class="warn">{{.}}</p>{{end}}
+<h2>Workloads</h2>
+<p class="muted">Root owners with what they use. The namespace row holds unclaimed resources; unclaimed does not mean safe to delete.</p>
+<div class="table-wrap"><table>
+<tr><th>Workload</th><th>Pods</th><th>Images</th><th>Config</th><th>Network</th><th></th></tr>
+{{range .Rows}}<tr>
+<td><span class="tag">{{.Kind}}</span> {{.Name}}{{if .OwnerReferenceOnly}} <span class="tag">unverified owner</span>{{end}}</td>
+<td>{{template "deps" .Pods}}</td>
+<td>{{template "deps" .Images}}</td>
+<td>{{if .ConfigMaps}}ConfigMaps{{template "deps" .ConfigMaps}}{{end}}{{if .Secrets}}Secrets{{template "deps" .Secrets}}{{end}}{{if .PVCs}}PVCs{{template "deps" .PVCs}}{{end}}</td>
+<td>{{if .Services}}Services{{template "deps" .Services}}{{end}}{{if .Ingresses}}Ingresses{{template "deps" .Ingresses}}{{end}}{{if .Certificates}}Certificates{{template "deps" .Certificates}}{{end}}</td>
+<td>{{if and $.Data.Actions .Restartable}}<form method="post" action="/ui/namespaces/{{.Namespace}}/restart">
+<input type="hidden" name="csrf" value="{{$csrf}}"><input type="hidden" name="name" value="{{.Name}}"><input type="hidden" name="uid" value="{{.UID}}">
+<input type="hidden" name="apiVersion" value="{{.APIVersion}}"><input type="hidden" name="kind" value="{{.Kind}}">
+<button type="submit" class="danger">Restart</button></form>{{end}}
+{{if and $.Data.Actions .StandalonePods}}{{range .StandalonePods}}<form method="post" action="/ui/namespaces/{{$.Data.Namespace}}/terminate">
+<input type="hidden" name="csrf" value="{{$csrf}}"><input type="hidden" name="name" value="{{.Name}}"><input type="hidden" name="uid" value="{{.UID}}">
+<button type="submit" class="danger">Terminate {{.Name}}</button></form>{{end}}{{end}}</td>
+</tr>{{else}}<tr><td colspan="6">No workloads.</td></tr>{{end}}
+</table></div>
+{{if and .Usage .Pods}}<h2>Pod resource usage</h2>
+<ul>{{range .Pods}}<li><a href="/ui/namespaces/{{$.Data.Namespace}}/pods/{{.}}">{{.}}</a></li>{{end}}</ul>{{end}}
+{{end}}
+{{template "foot" .}}{{end}}
+
+{{define "readiness"}}{{template "head" .}}
+{{with .Data}}<h1>Readiness of {{.Namespace}}</h1>
+{{with .Readiness}}
+{{range .Withheld}}<p class="warn">Facts for <code>{{.}}</code> were withheld: you may not list pods there, or Kubernetes could not say.</p>{{end}}
+{{range .Namespaces}}
+{{if .Tenant}}<p>Tenant <code>{{.Tenant.LabelKey}}={{.Tenant.ID}}</code></p>{{end}}
+<h2>Budget</h2>
+{{if .Quota}}<p>ResourceQuota <code>{{.Quota.Name}}</code>{{with .Headroom}}: {{millis .CPUMillis}} CPU, {{quantity "bytes" .MemoryBytes}} memory, {{quantity "bytes" .StorageBytes}} storage still free{{end}}.</p>
+{{else}}<p>No ResourceQuota applies here.</p>{{end}}
+{{with .LimitRange}}<p>Containers that set no resources get limits {{range $k, $v := .Default}}<code>{{$k}}={{$v}}</code> {{end}}and requests {{range $k, $v := .DefaultRequest}}<code>{{$k}}={{$v}}</code> {{end}}from a LimitRange.</p>{{end}}
+<h2>Network and security</h2>
+<p>Ingress {{.Network.Ingress}}, egress {{.Network.Egress}}{{if .Network.CiliumAvailable}}, Cilium policies available{{end}}.</p>
+{{with .PodSecurity}}<p>Pod Security enforces <strong>{{.Enforce}}</strong>: {{.Summary}}{{if .Requires}} Pods must set {{join .Requires ", "}}.{{end}}</p>{{end}}
+{{range .Registries}}<p>Container registry <code>{{.Host}}</code>{{if not .TLS}} (no TLS){{end}}.</p>{{end}}
+{{end}}
+{{range .HostRules}}<h2>Hostnames</h2><p>{{if .ExactHost}}<code>{{deref .ExactHost}}</code>{{if .LabelledPattern}} or <code>{{deref .LabelledPattern}}</code>{{end}}. {{end}}{{.Note}}</p>{{end}}
+{{range .Degraded}}<p class="warn">{{.Source}}: {{.Message}}</p>{{end}}
+{{end}}
+{{end}}
+{{template "foot" .}}{{end}}
+
+{{define "usage"}}{{template "head" .}}
+{{with .Data}}<h1>{{if .Pod}}{{.Namespace}}/{{.Pod}}{{else}}Cluster resource usage{{end}}</h1>
+{{with .Usage}}<p class="muted">Observed {{.ObservedAt}}. Unavailable figures are missing, not zero.</p>
+<div class="table-wrap"><table><tr><th>Metric</th><th>Value</th><th>Notes</th></tr>
+{{range metricRow .Metrics}}<tr><td>{{.Name}}</td><td>{{if .Unusable}}<span class="muted">{{.Value}}</span>{{else}}{{.Value}}{{end}}</td><td class="muted">{{.Notes}}</td></tr>{{end}}
+</table></div>
+{{range .Notes}}<p class="muted">{{.}}</p>{{end}}
+{{end}}{{end}}
+{{template "foot" .}}{{end}}
+
+{{define "catalog"}}{{template "head" .}}
+<h1>Cluster catalog</h1>
+{{with .Data}}
+{{range .Errors}}<p class="warn">{{.}}</p>{{end}}
+<h2>Admission policies</h2>
+<p class="muted">Policies can reject what your role allows. Targets are candidates; conditions are not evaluated here.</p>
+<div class="table-wrap"><table><tr><th>Policy</th><th>Kind</th><th>Description</th><th>Bindings</th></tr>
+{{range .Policies}}<tr><td>{{.Name}}</td><td>{{.Kind}}</td><td>{{deref .Description}}</td><td>{{if unavailable .Bindings}}unavailable{{else}}{{range .Bindings}}<code>{{.Name}}</code> {{if .Spec.ValidationActions}}[{{join .Spec.ValidationActions "|"}}]{{end}} {{else}}none{{end}}{{end}}</td></tr>
+{{else}}<tr><td colspan="4">None.</td></tr>{{end}}</table></div>
+<h2>Storage classes</h2>
+<div class="table-wrap"><table><tr><th>Name</th><th>Provisioner</th><th>Binding</th><th>Expansion</th><th>Description</th></tr>
+{{range .StorageClasses}}<tr><td>{{.Name}}{{if .IsDefault}} <span class="tag">default</span>{{end}}</td><td>{{deref .Provisioner}}</td><td>{{deref .VolumeBindingMode}}</td><td>{{.AllowVolumeExpansion}}</td><td>{{deref .Description}}</td></tr>{{end}}</table></div>
+<h2>Ingress classes</h2>
+<ul>{{range .Classes.IngressClasses}}<li><code>{{.Name}}</code> — {{.Controller}}{{if .IsDefault}} <span class="tag">default</span>{{end}}</li>{{else}}<li>None.</li>{{end}}</ul>
+<h2>Cluster issuers</h2>
+<ul>{{range .Classes.ClusterIssuers}}<li><code>{{.Name}}</code>{{with .ACME}} — ACME{{if .HTTP01}} HTTP-01{{end}}{{if .DNS01}} DNS-01{{end}}{{end}}{{if .Description}} — {{deref .Description}}{{end}}</li>{{else}}<li>None.</li>{{end}}</ul>
+<h2>Priority classes</h2>
+<ul>{{range .Classes.PriorityClasses}}<li><code>{{.Name}}</code> ({{.Value}}){{if .IsDefault}} <span class="tag">default</span>{{end}}{{if .Description}} — {{deref .Description}}{{end}}</li>{{else}}<li>None.</li>{{end}}</ul>
+<h2>Custom resource definitions</h2>
+<p class="muted">Installed namespaced APIs. An installed API does not mean its operator is healthy or that you may use it.</p>
+<ul>{{range .CRDs}}<li><code>{{.Name}}</code>{{if .Description}} — {{deref .Description}}{{end}}</li>{{else}}<li>None.</li>{{end}}</ul>
+{{end}}
+{{template "foot" .}}{{end}}

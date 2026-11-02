@@ -1,0 +1,40 @@
+# GitHub Actions publishes latest from main/master and image tags from Git tags.
+# Skaffold overrides this with its built artifact for local development.
+image: ghcr.io/codemowers/driftmower-mcp:latest
+
+# Optional explicit cluster identity. Leave empty to use runtime discovery.
+cluster:
+  id: ""
+  apiUrl: ""
+
+rbac:
+  # Name of the cluster-scoped ClusterRole and ClusterRoleBinding. A second
+  # release in another namespace needs its own, or it rebinds this one.
+  clusterRoleName: driftmower-mcp-observability
+  # Names of the ConfigMaps admission guards read their parameters from. Empty
+  # grants `get` on every ConfigMap (needed because a guard names its own);
+  # set it to narrow the grant to those names.
+  paramConfigMapNames: []
+
+# Optional machine authentication; audience-bound TokenReview, then caller RBAC.
+serviceAccountAuth:
+  enabled: false
+
+# Enable drift-analysis tools only when a backend and service token are provisioned.
+backend:
+  enabled: false
+  url: "http://driftmower-be:3030"
+  serviceTokenSecret:
+    name: driftmower-mcp-be-auth-token
+    key: token
+
+# Public browser client: authorization code + PKCE, credentials only in tab memory.
+webUi:
+  enabled: true
+  # Set full URLs on clusters without hostname expansion policies.
+  origin: "https://mcp"
+  redirectUri: "https://mcp/ui/callback"
+
+# Optional caller-authorized workload mutations. Disabled by default.
+workloadRestart:
+  enabled: false

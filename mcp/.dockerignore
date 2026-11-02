@@ -1,0 +1,30 @@
+# Deny by default: only application build inputs enter the Docker context.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!scripts/
+!scripts/build-web.mjs
+!src/
+!src/**/
+!src/**/*.ts
+!src/advisory/content/**/*.md
+!config/
+!config/default.json
+!config/custom-environment-variables.json
+
+# Go build inputs, for builders that ignore go.Dockerfile.dockerignore.
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+
+# Tests and declarations generated outside the build are not image inputs.
+src/**/*.test.ts
+src/**/*.spec.ts
+src/**/*.d.ts
+**/*_test.go
+internal/testutil/
