@@ -6,7 +6,7 @@ package facts
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
 )
 
 // unknown is a fact that could not be read. "absent" means the API does not

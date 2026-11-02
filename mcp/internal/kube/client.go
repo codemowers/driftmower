@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/codemowers/driftmower-mcp/internal/config"
+	"github.com/codemowers/driftmower/mcp/internal/config"
 )
 
 // Clients holds the server's Kubernetes clients.

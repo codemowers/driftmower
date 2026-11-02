@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
-	"github.com/codemowers/driftmower-mcp/internal/observability"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
 )
 
 // Types with custom JSON need their wire schema spelled out.

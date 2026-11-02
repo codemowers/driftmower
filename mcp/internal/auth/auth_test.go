@@ -26,7 +26,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 const (

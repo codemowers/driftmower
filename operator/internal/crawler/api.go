@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-operator/internal/authz"
+	"github.com/codemowers/driftmower/operator/internal/authz"
 )
 
 // API serves source reports to the callers it allows, authenticated by

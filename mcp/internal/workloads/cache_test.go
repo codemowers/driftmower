@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	metadatafake "k8s.io/client-go/metadata/fake"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 type judgeFunc func(authz.Identity, authz.Attributes) authz.Verdict

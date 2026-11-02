@@ -7,9 +7,9 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
 )
 
 type podUsageInput struct {

@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/backend"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/fakebackend"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/backend"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/fakebackend"
 )
 
 func TestBackendTools(t *testing.T) {

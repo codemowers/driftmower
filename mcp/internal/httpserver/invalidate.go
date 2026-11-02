@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
 )
 
 const invalidatePath = "/api/cache/invalidate"

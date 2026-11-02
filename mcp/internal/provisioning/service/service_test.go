@@ -14,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/kubetest"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/facts"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/kubetest"
 )
 
 type judgeFunc func(authz.Identity, authz.Attributes) authz.Verdict

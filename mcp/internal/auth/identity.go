@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 // Mapping reproduces kube-apiserver's OIDC mapping: --oidc-username-claim,

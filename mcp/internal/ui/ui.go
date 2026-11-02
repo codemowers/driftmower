@@ -20,13 +20,13 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/observability"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower-mcp/internal/workloads"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
 
 // UI is the explorer. Nil services hide their pages.

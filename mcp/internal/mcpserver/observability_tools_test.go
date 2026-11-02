@@ -16,9 +16,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
 )
 
 // fakeBackend answers every Prometheus instant query with one sample, every

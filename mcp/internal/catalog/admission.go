@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/codemowers/driftmower-mcp/internal/kube"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
 )
 
 // The admission policy specs as served. This is inspection, not CEL

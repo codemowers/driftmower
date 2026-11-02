@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
 )
 
 func TestHealthHandler(t *testing.T) {

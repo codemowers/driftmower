@@ -16,11 +16,11 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/kube"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
-	"github.com/codemowers/driftmower-mcp/internal/ttlcache"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
 // DomainSuffix is the ingress domain and where it came from: "guard-params"

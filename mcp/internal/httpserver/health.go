@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
 )
 
 // HealthHandler serves liveness, readiness, startup and metrics on the health

@@ -1,14 +1,14 @@
-# Go build of driftmower-mcp. Replaces the Node Dockerfile at cutover.
+# Build context: the repository root, where go.mod is.
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY cmd ./cmd
-COPY internal ./internal
+COPY mcp/cmd ./mcp/cmd
+COPY mcp/internal ./mcp/internal
 
 ARG BUILD_REVISION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${BUILD_REVISION}" -o /out/driftmower-mcp ./cmd/driftmower-mcp
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${BUILD_REVISION}" -o /out/driftmower-mcp ./mcp/cmd/driftmower-mcp
 
 FROM gcr.io/distroless/static-debian12:nonroot
 

@@ -14,12 +14,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
 )
 
 var errCatalogCaller = errors.New("cluster catalog requires an authenticated caller")

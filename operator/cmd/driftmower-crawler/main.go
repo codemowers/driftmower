@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/codemowers/driftmower-operator/internal/authz"
-	"github.com/codemowers/driftmower-operator/internal/crawler"
+	"github.com/codemowers/driftmower/operator/internal/authz"
+	"github.com/codemowers/driftmower/operator/internal/crawler"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"

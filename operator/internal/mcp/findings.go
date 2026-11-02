@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codemowers/driftmower-operator/internal/authz"
-	"github.com/codemowers/driftmower-operator/internal/crawler"
-	"github.com/codemowers/driftmower-operator/internal/findings"
+	"github.com/codemowers/driftmower/operator/internal/authz"
+	"github.com/codemowers/driftmower/operator/internal/crawler"
+	"github.com/codemowers/driftmower/operator/internal/findings"
 )
 
 var findingsTools = []map[string]any{{

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
 )
 
 //go:embed landing.html

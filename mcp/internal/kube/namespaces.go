@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/codemowers/driftmower-mcp/internal/ttlcache"
+	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
 // namespaceListTTL bounds staleness when no namespace watch refreshes the list.

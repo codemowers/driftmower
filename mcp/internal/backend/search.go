@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
 )
 
 // inScope confines rows to the caller's namespaces. Rows without a workload

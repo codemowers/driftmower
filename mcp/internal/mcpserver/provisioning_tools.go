@@ -10,10 +10,10 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
 )
 
 // Identity comes only from the verified transport context. An

@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/kubetest"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/facts"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/kubetest"
 )
 
 func TestCapabilitiesRoute(t *testing.T) {

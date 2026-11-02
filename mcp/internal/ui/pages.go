@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/observability"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower-mcp/internal/workloads"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
 
 var funcs = template.FuncMap{

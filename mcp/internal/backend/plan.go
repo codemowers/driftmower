@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
 )
 
 // ActionableStatuses are the version statuses an update plan acts on, riskiest

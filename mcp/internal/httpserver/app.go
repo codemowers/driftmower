@@ -8,10 +8,10 @@ import (
 	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/logging"
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/logging"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
 )
 
 // AppOptions configure the main port.

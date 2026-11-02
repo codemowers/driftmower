@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 func rbac(namespaces ...string) authz.RBACScope {

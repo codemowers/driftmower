@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
 )
 
 type usageOpts struct {

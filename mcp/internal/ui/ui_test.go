@@ -22,15 +22,15 @@ import (
 	metadatafake "k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/rest"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/facts"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/kubetest"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/oidctest"
-	"github.com/codemowers/driftmower-mcp/internal/workloads"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/facts"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/kubetest"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/oidctest"
+	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
 
 type judgeFunc func(authz.Identity, authz.Attributes) authz.Verdict

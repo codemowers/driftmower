@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/codemowers/driftmower-mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/kube"
 )
 
 type Catalog struct {

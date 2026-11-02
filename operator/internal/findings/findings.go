@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codemowers/driftmower-operator/internal/crawler"
+	"github.com/codemowers/driftmower/operator/internal/crawler"
 )
 
 const cacheTTL = 30 * time.Second

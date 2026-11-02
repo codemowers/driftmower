@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 // Statistics summarise a sampled history. stddev is the population standard

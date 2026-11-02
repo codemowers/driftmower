@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 var (

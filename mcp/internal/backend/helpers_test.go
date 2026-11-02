@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/testutil/fakebackend"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/fakebackend"
 )
 
 type Row = fakebackend.Row

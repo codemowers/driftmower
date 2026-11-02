@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 // Source says why a scope is what it is. Each needs its own sentence: an

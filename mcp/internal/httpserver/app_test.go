@@ -16,12 +16,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/mcpserver"
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/oidctest"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/mcpserver"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/oidctest"
 )
 
 var logger = slog.New(slog.DiscardHandler)

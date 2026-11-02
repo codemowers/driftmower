@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 // The sandbox-stack bundle, transcribed from its networkpolicy.yaml.

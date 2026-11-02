@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
 )
 
 const reportID = "report-1"

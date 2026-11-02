@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
 )
 
 type Transport string

@@ -10,10 +10,10 @@ import (
 
 	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
 )
 
 const capabilitiesPath = "/api/provisioning/capabilities"

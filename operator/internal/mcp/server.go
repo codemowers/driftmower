@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/codemowers/driftmower-operator/internal/authz"
-	"github.com/codemowers/driftmower-operator/internal/findings"
-	"github.com/codemowers/driftmower-operator/internal/workloads"
+	"github.com/codemowers/driftmower/operator/internal/authz"
+	"github.com/codemowers/driftmower/operator/internal/findings"
+	"github.com/codemowers/driftmower/operator/internal/workloads"
 )
 
 const protocolVersion = "2025-06-18"

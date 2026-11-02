@@ -1,0 +1,10 @@
+# Deny by default: only the MCP server's Go build inputs enter the Docker context.
+**
+!go.mod
+!go.sum
+!mcp/cmd/
+!mcp/cmd/**
+!mcp/internal/
+!mcp/internal/**
+**/*_test.go
+mcp/internal/testutil/

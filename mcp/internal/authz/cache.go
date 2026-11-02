@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/codemowers/driftmower-mcp/internal/ttlcache"
+	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
 // CachedReviewer is the one cache under every review this server sends.

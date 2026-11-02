@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/codemowers/driftmower-mcp/internal/ttlcache"
+	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
 // Response is a backend answer. Status is not checked here; callers decide.

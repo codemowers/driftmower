@@ -9,14 +9,14 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/codemowers/driftmower-mcp/internal/auth"
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/catalog"
-	"github.com/codemowers/driftmower-mcp/internal/cluster"
-	"github.com/codemowers/driftmower-mcp/internal/logging"
-	"github.com/codemowers/driftmower-mcp/internal/metrics"
-	"github.com/codemowers/driftmower-mcp/internal/observability"
-	"github.com/codemowers/driftmower-mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/auth"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/catalog"
+	"github.com/codemowers/driftmower/mcp/internal/cluster"
+	"github.com/codemowers/driftmower/mcp/internal/logging"
+	"github.com/codemowers/driftmower/mcp/internal/metrics"
+	"github.com/codemowers/driftmower/mcp/internal/observability"
+	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
 )
 
 // Deps are the services behind the tools. A nil service leaves its tools

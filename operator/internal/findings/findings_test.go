@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/codemowers/driftmower-operator/internal/crawler"
+	"github.com/codemowers/driftmower/operator/internal/crawler"
 )
 
 func TestKeys(t *testing.T) {

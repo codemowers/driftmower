@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
-	"github.com/codemowers/driftmower-mcp/internal/tenancy"
-	"github.com/codemowers/driftmower-mcp/internal/testutil/fakebackend"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/tenancy"
+	"github.com/codemowers/driftmower/mcp/internal/testutil/fakebackend"
 )
 
 // These drive the services against rows recorded from a real full-cluster

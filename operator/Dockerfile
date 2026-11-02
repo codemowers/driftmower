@@ -1,16 +1,17 @@
+# Build context: the repository root, where go.mod is.
 FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-COPY cmd cmd
-COPY internal internal
-RUN go test ./...
+COPY operator/cmd operator/cmd
+COPY operator/internal operator/internal
+RUN go test ./operator/...
 ARG VERSION=dev
 RUN CGO_ENABLED=0 \
     go build -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" \
     -tags 'netgo osusergo' \
-    -o . ./cmd/...
+    -o . ./operator/cmd/...
 
 # Both commands share the image; the crawler runs with its own command.
 FROM scratch

@@ -11,7 +11,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/codemowers/driftmower-mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
 // Service answers observability questions as a verified caller. Every
