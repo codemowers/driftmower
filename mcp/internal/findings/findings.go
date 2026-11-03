@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codemowers/driftmower/operator/internal/crawler"
+	"github.com/codemowers/driftmower/internal/crawler"
 )
 
 const cacheTTL = 30 * time.Second
@@ -50,7 +50,7 @@ func (c *Client) Reports(ctx context.Context) ([]crawler.SourceReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("crawler: HTTP %d", resp.StatusCode)
 	}

@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/codemowers/driftmower/internal/crawler"
 	"github.com/codemowers/driftmower/operator/internal/authz"
-	"github.com/codemowers/driftmower/operator/internal/crawler"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -78,7 +78,15 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 		return err
 	}
 	c := crawler.New(cfg, dynamicClient, log)
-	api := &crawler.API{Crawler: c, Authorizer: authz.New(clientset, audience), Allowed: allowed}
+	authorizer := authz.New(clientset, audience)
+	authenticate := func(ctx context.Context, token string) (string, error) {
+		id, err := authorizer.Authenticate(ctx, token)
+		if err != nil {
+			return "", err
+		}
+		return id.User, nil
+	}
+	api := &crawler.API{Crawler: c, Authenticate: authenticate, Allowed: allowed}
 
 	health := http.NewServeMux()
 	health.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })

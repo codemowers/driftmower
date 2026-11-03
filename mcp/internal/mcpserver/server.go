@@ -41,6 +41,9 @@ type Deps struct {
 	Observability *observability.Service
 	// Enables search_workloads and plan_image_updates.
 	Backend *Backend
+	// Enables get_source_findings and get_workload_findings, which also need
+	// Workloads.
+	Findings FindingsSource
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -87,6 +90,9 @@ func New(d Deps) *mcp.Server {
 	if d.Backend != nil {
 		addBackendTools(s, d.Backend)
 	}
+	if d.Findings != nil && d.Workloads != nil {
+		addFindingsTools(s, d.Findings, d.Workloads, d.Mapping)
+	}
 	if d.Observability != nil {
 		addObservabilityTools(s, d.Observability, d.Mapping)
 	}
@@ -125,6 +131,8 @@ func usageInstructions(d Deps) string {
 	add(d.Scope != nil, "Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission.")
 	add(d.Observability != nil && d.Observability.MetricsEnabled(), "For current resource usage, prefer get_pod_resource_usage or get_cluster_resource_usage. "+
 		"Use their history endpoints only for trends, past usage, peaks or statistics. Use query_metrics for specific metrics outside those fixed summaries. Missing metrics or low coverage are not evidence of zero usage.")
+	add(d.Findings != nil && d.Workloads != nil, "For version drift and security advisories, use get_workload_findings for a workload or namespace and get_source_findings across sources. "+
+		"Findings are crawled every few hours; absence of findings is not proof of absence.")
 	add(d.Backend != nil, "search_workloads reads backend report snapshots and may be stale or differently scoped; use live workload inventory when available for what is running now.")
 	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload and terminate_pod mutate resources. "+
 		"Use only for an explicit user request, using UID from current workload inventory; never treat them as diagnostic probes or automatically retry uncertain results.")

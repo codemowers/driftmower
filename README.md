@@ -6,12 +6,12 @@ it. Every component lives in this repository:
 
 | Directory | Component | Image |
 | --- | --- | --- |
-| [operator/](operator/) | Drift, advisory and image-scan operator built on nodestatd's image facts; see [operator/spec.md](operator/spec.md) | `ghcr.io/codemowers/driftmower/operator` |
-| [mcp/](mcp/) | MCP server for cluster discovery, provisioning guidance, workloads and observability | `ghcr.io/codemowers/driftmower/mcp` |
+| [operator/](operator/) | Crawler of releases and security advisories for the sources nodestatd finds, and the operator built on it; see [operator/spec.md](operator/spec.md) | `ghcr.io/codemowers/driftmower/operator` |
+| [mcp/](mcp/) | The MCP server: cluster discovery, provisioning guidance, workloads, observability, and the crawler's drift and advisory findings | `ghcr.io/codemowers/driftmower/mcp` |
 | [ui/](ui/) | Next.js dashboard | `ghcr.io/codemowers/driftmower/ui` |
 
-The operator is meant to take over the MCP server's tools one by one; see
-"MCP" in the operator spec.
+Code shared by the operator and the MCP server, such as the crawler's report
+types, lives in [internal/](internal/).
 
 ## Development
 

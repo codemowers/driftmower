@@ -7,3 +7,6 @@
 !operator/internal/
 !operator/internal/**/*.go
 !operator/internal/**/*.html
+!internal/
+!internal/**/*.go
+!internal/**/*.html

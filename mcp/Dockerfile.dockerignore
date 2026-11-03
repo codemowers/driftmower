@@ -6,5 +6,7 @@
 !mcp/cmd/**
 !mcp/internal/
 !mcp/internal/**
+!internal/
+!internal/**
 **/*_test.go
 mcp/internal/testutil/

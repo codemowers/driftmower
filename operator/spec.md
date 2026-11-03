@@ -15,28 +15,29 @@ open the permanent fix as a pull request.
 
 Reports are living data and stay in memory: workloads from informers,
 releases, advisories and scan findings from the operator's own crawls. They
-reach Agents and humans through the operator's MCP endpoint, never through
-the Kubernetes API. Only what admission and humans act on is stored as
+reach Agents and humans through driftmower-mcp, never through the Kubernetes
+API. Only what admission and humans act on is stored as
 resources: rewrite rules and upgrade policies, API group
 `codemowers.io/v1alpha1`, shared with nodestatd. A restart rebuilds the
 model from the API, forges and OSV and rescans images at a bounded rate.
 
 ## MCP
 
-The operator serves MCP at `/mcp` of its Service to callers presenting a
-projected ServiceAccount token for `driftmower-operator.<namespace>`. It
-authenticates them with TokenReview and answers each request only with what
-SubjectAccessReview lets the caller list, so a shared in-memory model never
-widens access. The chart advertises it to codemowers/agent workers as a
-ClusterMCPServer.
+driftmower-mcp (`mcp/`) is the one MCP server. It already holds the live
+workload inventory, OIDC and ServiceAccount authentication and per-caller
+SubjectAccessReview filtering, so the operator's findings are served as its
+tools instead of from a second server:
 
-It replaces driftmower-mcp tool by tool. `get_workloads`, the root workload
-inventory, is the first; the operator's own findings follow as tools that
-cross-reference workloads: which root workloads run a deployed version,
-which advisories and scan findings apply to a workload, and which rules
-rewrite it. driftmower-mcp's remaining tools (pods, volumes, capabilities,
-admission policies, CRD schemas, RBAC roles, logs, metrics and workload
-actions) move once the inventory is in production.
+- `get_source_findings`: per source, the deployed versions, how far each is
+  behind, applicable advisories and the root workloads running them.
+- `get_workload_findings`: the same per root workload the caller may list.
+
+driftmower-mcp reads the crawler's reports over HTTP with a projected
+ServiceAccount token for `driftmower-crawler.<namespace>`; the crawler
+admits only the ServiceAccounts in its `allowedCallers`. Callers who may list
+ContainerImages see every source, others only the versions their visible
+workloads run. Scan findings and rewrite rules become further tools the same
+way.
 
 ## Inputs
 
@@ -254,8 +255,6 @@ goes the same way on the Agent's own schedule, through the MCP tools.
 
 ## Acceptance criteria
 
-- `get_workloads` returns what driftmower-mcp's does for the same caller,
-  filtered by that caller's list permissions.
 - For every SourceRepository with releases, MCP lists deployed versions with
   their root workloads, how far each is behind and applicable advisories;
   cert-manager v1.20.0 on ee-lte-1 shows GHSA-8rvj-mm4h-c258 fixed in 1.20.3.

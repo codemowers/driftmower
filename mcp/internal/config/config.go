@@ -57,6 +57,7 @@ type Config struct {
 
 	Cluster       cluster.Identity
 	Backend       Backend
+	Crawler       Crawler
 	Search        Search
 	Provisioning  Provisioning
 	Kubernetes    Kubernetes
@@ -86,6 +87,15 @@ type Backend struct {
 	// whenever the backend is enabled.
 	ServiceToken string
 	Timeout      time.Duration
+}
+
+// Crawler is driftmower-crawler, which serves version drift and advisory
+// findings. An empty URL leaves the findings tools unregistered.
+type Crawler struct {
+	URL string
+	// A projected ServiceAccount token for the crawler's audience, reread on
+	// every request as the kubelet rotates it.
+	TokenFile string
 }
 
 type Search struct {
@@ -356,6 +366,11 @@ func (r *reader) load() *Config {
 		if c.Backend.ServiceToken == "" {
 			r.fail("DRIFTMOWER_BE_SERVICE_TOKEN is required when DRIFTMOWER_BE_ENABLED is true")
 		}
+	}
+
+	c.Crawler = Crawler{
+		URL:       r.url("CRAWLER_URL", "", false),
+		TokenFile: r.string("CRAWLER_TOKEN_FILE", "/var/run/secrets/driftmower/crawler/token"),
 	}
 
 	c.Search.MaximumLimit = r.int("DRIFTMOWER_MCP_MAX_LIMIT", 100, 1, 0)
