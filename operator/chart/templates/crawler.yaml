@@ -63,7 +63,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: driftmower-crawler
-          image: {{ .Values.image | default (printf "ghcr.io/codemowers/driftmower-operator:%s" .Chart.AppVersion) | quote }}
+          image: {{ .Values.image | default (printf "ghcr.io/codemowers/driftmower:%s" .Chart.AppVersion) | quote }}
           command: ["/driftmower-crawler"]
           securityContext:
             readOnlyRootFilesystem: true

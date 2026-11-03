@@ -1,4 +1,4 @@
-# Defaults to ghcr.io/codemowers/driftmower-operator tagged with the chart's
+# Defaults to ghcr.io/codemowers/driftmower tagged with the chart's
 # appVersion. Skaffold overrides this with its built artifact.
 image: ""
 
