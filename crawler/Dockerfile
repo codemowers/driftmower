@@ -3,16 +3,16 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-COPY operator/cmd operator/cmd
-COPY operator/internal operator/internal
+COPY crawler/cmd crawler/cmd
+COPY crawler/internal crawler/internal
 COPY internal internal
-RUN go test ./operator/... ./internal/...
+RUN go test ./crawler/... ./internal/...
 ARG VERSION=dev
 RUN CGO_ENABLED=0 \
     go build -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" \
     -tags 'netgo osusergo' \
-    -o . ./operator/cmd/...
+    -o . ./crawler/cmd/...
 
 FROM scratch
 COPY --from=builder /app/driftmower-crawler /

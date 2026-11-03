@@ -1,6 +1,6 @@
 // Command driftmower-crawler fetches releases and security advisories for
 // the source repositories of images on the cluster and serves them, matched
-// against deployed versions, to the driftmower operator. It is the only
+// against deployed versions, to driftmower-mcp. It is the only
 // driftmower component with internet egress and holds no Secret access.
 package main
 
@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/codemowers/driftmower/crawler/internal/authz"
 	"github.com/codemowers/driftmower/internal/crawler"
-	"github.com/codemowers/driftmower/operator/internal/authz"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
