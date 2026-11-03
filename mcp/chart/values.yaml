@@ -28,7 +28,7 @@ backend:
     name: driftmower-mcp-be-auth-token
     key: token
 
-# driftmower-crawler (operator/chart) for get_source_findings and
+# driftmower-crawler (crawler/chart) for get_source_findings and
 # get_workload_findings. An empty url leaves both tools off. The crawler must
 # list this release's ServiceAccount in its allowedCallers.
 crawler:

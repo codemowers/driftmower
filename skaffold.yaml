@@ -1,35 +1,35 @@
-# One module per component. `skaffold dev` runs them all; `-m operator`,
+# One module per component. `skaffold dev` runs them all; `-m crawler`,
 # `-m mcp` or `-m ui` runs one. Cluster, namespace and registry come from
 # skaffold.env (see skaffold.env.example) or exported variables.
 apiVersion: skaffold/v4beta13
 kind: Config
 metadata:
-  name: operator
+  name: crawler
 
 build:
   local:
     useBuildkit: true
     push: true
   artifacts:
-    - image: driftmower-operator
+    - image: driftmower
       platforms:
         - linux/amd64
       # The repository root, where go.mod is.
       context: .
       docker:
-        dockerfile: operator/Dockerfile
+        dockerfile: crawler/Dockerfile
 
 manifests:
   helm:
     releases:
-      - name: driftmower-operator
-        chartPath: operator/chart
+      - name: driftmower-crawler
+        chartPath: crawler/chart
         skipBuildDependencies: true
         setValues:
           # The development image is built for amd64 only.
           nodeSelector.kubernetes\.io/arch: amd64
         setValueTemplates:
-          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower}}"
 
 deploy:
   kubectl: {}
@@ -60,7 +60,7 @@ manifests:
         setValues:
           workloadRestart.enabled: true
           serviceAccountAuth.enabled: true
-          # The operator module's crawler; findings report it unreachable
+          # The crawler module; findings report it unreachable
           # when that module is not deployed.
           crawler.url: http://driftmower-crawler:8080
         setValueTemplates:
