@@ -96,7 +96,9 @@ Version handling is tolerant and explicit about doubt:
 
 - Versions parse as semver after dropping a leading `v`; suffixes such as
   `-alpine` are kept for display but ignored for ordering. A version that
-  does not parse is reported as unknown, never as drift.
+  does not parse is reported as unknown, never as drift. So is a version
+  with no known stable release on its own tag prefix, as before a source's
+  first successful crawl: no releases is not the same as current.
 - Advisory ranges come from GitHub's reviewed global advisory database when
   it has the advisory: one range per release branch, constraints joined by
   commas and ANDed, with a first patched version. Otherwise from OSV's
@@ -260,6 +262,9 @@ goes the same way on the Agent's own schedule, through the MCP tools.
   cert-manager v1.20.0 on ee-lte-1 shows GHSA-8rvj-mm4h-c258 fixed in 1.20.3.
 - An unparsable version or range is shown as unknown or possibly applicable,
   never as drift or as an applicable advisory.
+- Until a source is crawled without errors, as after a crawler restart, its
+  versions show as unknown and every finding about them names the gap; none
+  is reported as current and clean.
 - Every in-use platform manifest is scanned once by a Pod on a node already
   holding it, without a registry pull, and its findings are served over MCP.
 - A proposed rule changes no Pod. An activated rule rewrites new Pods of the

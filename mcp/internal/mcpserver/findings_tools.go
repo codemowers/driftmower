@@ -82,6 +82,10 @@ type imageFindings struct {
 	LatestOnLine string            `json:"latestOnLine,omitempty"`
 	Latest       string            `json:"latest,omitempty"`
 	Findings     []advisoryFinding `json:"findings,omitempty"`
+	// The source's last crawl, and what it could not fetch. Without
+	// CheckedAt, or with errors, the absence of findings means nothing.
+	CheckedAt time.Time `json:"checkedAt,omitzero"`
+	Errors    []string  `json:"errors,omitempty"`
 }
 
 type workloadFindings struct {
@@ -114,6 +118,12 @@ func affected(deployed *crawler.DeployedVersion) bool {
 	return slices.ContainsFunc(deployed.Findings, func(f crawler.Finding) bool { return f.Confidence == crawler.Affected })
 }
 
+// unchecked reports whether a source has not been fully crawled: never, or
+// with errors, so its drift and advisories may be missing.
+func unchecked(report *crawler.SourceReport) bool {
+	return report.CheckedAt.IsZero() || len(report.Errors) > 0
+}
+
 func latestTag(report *crawler.SourceReport) string {
 	if report.Latest != nil {
 		return report.Latest.Tag
@@ -130,7 +140,8 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 			"the newest release on its own major.minor line, the security advisories that apply (severity, confidence, the version " +
 			"that fixes it, summary and link) and the root workloads running it. Confidence affected means a well-formed range or OSV " +
 			"matched the version; possible means a free-text range admits a reading that includes it. Behind -1 means the version " +
-			"cannot be compared. Advisories come from GitHub repository advisories, GitHub's reviewed advisory database and OSV; " +
+			"cannot be compared: it does not parse, or no release on its line is known yet. A source without checkedAt, or with errors, " +
+			"was not fully crawled, and the absence of findings for it means nothing. Advisories come from GitHub repository advisories, GitHub's reviewed advisory database and OSV; " +
 			"sources off GitHub get no repository advisories, and OSV by version covers Go modules only, so absence of findings is " +
 			"not proof of absence. Callers who may list ContainerImages see every source; others see the versions their visible " +
 			"workloads run. Data is crawled every few hours; check checkedAt and errors.",
@@ -191,23 +202,32 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 		}
 		out.Warnings = append(out.Warnings, inv.Warnings...)
 
-		affectedSources := 0
+		affectedSources, uncheckedSources := 0, 0
 		for _, src := range out.Sources {
 			if slices.ContainsFunc(src.Deployed, func(v versionFindings) bool {
 				return slices.ContainsFunc(v.Findings, func(f advisoryFinding) bool { return f.Confidence == crawler.Affected })
 			}) {
 				affectedSources++
 			}
+			if src.CheckedAt.IsZero() || len(src.Errors) > 0 {
+				uncheckedSources++
+			}
+		}
+		summary := fmt.Sprintf("%d sources; %d with a deployed version an advisory affects.", len(out.Sources), affectedSources)
+		if uncheckedSources > 0 {
+			summary += fmt.Sprintf(" %d not fully crawled yet or with errors; their findings may be incomplete.", uncheckedSources)
 		}
 
-		return text(fmt.Sprintf("%d sources; %d with a deployed version an advisory affects.", len(out.Sources), affectedSources)), out, nil
+		return text(summary), out, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:  "get_workload_findings",
 		Title: "Get version drift and security advisories by workload",
 		Description: "For root workloads the caller may list, the images they run resolved to source, deployed version, drift and " +
-			"applicable advisories, as in get_source_findings. Images whose source or version is unknown are listed as untracked. " +
+			"applicable advisories, as in get_source_findings, with each source's checkedAt and errors: an image without checkedAt, or " +
+			"with errors, was not fully checked, so no findings does not mean none apply. Images whose source or version is unknown " +
+			"are listed as untracked. " +
 			"Use it to judge what a workload is exposed to and which version to move to; find where the version is declared, such " +
 			"as a GitOps repository, before proposing a change.",
 		InputSchema: inputSchema[workloadFindingsInput](func(props map[string]*jsonschema.Schema) {
@@ -234,7 +254,7 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 
 		index := findings.NewIndex(reports)
 		out := &workloadFindingsOutput{Workloads: []workloadFindings{}, Warnings: inv.Warnings}
-		exposed := 0
+		exposed, incomplete := 0, 0
 		for _, wl := range rootWorkloads(inv) {
 			if in.Name != "" && wl.Name != in.Name {
 				continue
@@ -248,7 +268,10 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 				}
 				entry.Images = append(entry.Images, imageFindings{Image: image, Source: match.Source.URL, Version: match.Version.Version,
 					Behind: match.Version.Behind, LatestOnLine: match.Version.LatestOnLine, Latest: latestTag(match.Source),
-					Findings: expand(match.Source, match.Version)})
+					Findings: expand(match.Source, match.Version), CheckedAt: match.Source.CheckedAt, Errors: match.Source.Errors})
+				if unchecked(match.Source) {
+					incomplete++
+				}
 			}
 			if slices.ContainsFunc(entry.Images, func(i imageFindings) bool { return len(i.Findings) > 0 }) {
 				exposed++
@@ -257,6 +280,9 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 		}
 
 		summary := fmt.Sprintf("%d workloads; %d run an image with advisory findings.", len(out.Workloads), exposed)
+		if incomplete > 0 {
+			summary += fmt.Sprintf(" %d images were not fully checked: their source is not crawled yet or its crawl had errors.", incomplete)
+		}
 		if len(inv.Warnings) > 0 {
 			summary += " " + strings.Join(inv.Warnings, " ")
 		}

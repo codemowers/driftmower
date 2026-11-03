@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,6 +49,7 @@ func (denyImages) MayPerform(_ context.Context, _ authz.Identity, a authz.Attrib
 // advisory affects it; 0.9.0 is held by a node but run by no visible workload.
 var crawled = []crawler.SourceReport{{
 	URL:        "https://github.com/example/api",
+	CheckedAt:  time.Date(2026, 11, 3, 6, 0, 0, 0, time.UTC),
 	Latest:     &crawler.Release{Tag: "v1.2.0"},
 	Advisories: []crawler.Advisory{{ID: "GHSA-test", Summary: "Remote crash", URL: "https://github.com/advisories/GHSA-test"}},
 	Deployed: []crawler.DeployedVersion{{
@@ -177,5 +179,33 @@ func TestFindingsToolsNeedACrawler(t *testing.T) {
 		if strings.HasSuffix(tool.Name, "_findings") {
 			t.Errorf("%s registered without a crawler", tool.Name)
 		}
+	}
+}
+
+// Right after a crawler restart nothing is crawled: the crawler reports every
+// version as unknown with "not crawled yet", and the tools must not pass that
+// off as current and clean.
+func TestFindingsBeforeTheFirstCrawl(t *testing.T) {
+	notCrawled := []crawler.SourceReport{{
+		URL:    "https://github.com/example/api",
+		Errors: []string{"not crawled yet"},
+		Deployed: []crawler.DeployedVersion{{
+			Version: "1.0.0", Behind: -1, Images: []string{"registry.example.com/api:1"},
+		}},
+	}}
+	s := findingsSession(t, staticReports{reports: notCrawled}, allowAll{})
+
+	text, out := call(t, s, "get_workload_findings", map[string]any{"namespace": "team-a"})
+	if !strings.Contains(text, "1 images were not fully checked") {
+		t.Errorf("summary = %q", text)
+	}
+	image := out["workloads"].([]any)[0].(map[string]any)["images"].([]any)[0].(map[string]any)
+	if image["behind"] != float64(-1) || image["checkedAt"] != nil || image["errors"].([]any)[0] != "not crawled yet" {
+		t.Errorf("image = %v", image)
+	}
+
+	text, _ = call(t, s, "get_source_findings", nil)
+	if !strings.Contains(text, "1 not fully crawled yet or with errors") {
+		t.Errorf("summary = %q", text)
 	}
 }
