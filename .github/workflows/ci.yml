@@ -69,17 +69,14 @@ jobs:
       matrix:
         include:
           - name: operator
-            image: ghcr.io/codemowers/driftmower
             context: .
             file: operator/Dockerfile
             platforms: linux/amd64
           - name: mcp
-            image: ghcr.io/codemowers/driftmower-mcp
             context: .
             file: mcp/Dockerfile
             platforms: linux/amd64
           - name: ui
-            image: ghcr.io/codemowers/driftmower-ui
             context: ui
             file: ui/Dockerfile
             platforms: linux/amd64,linux/arm64
@@ -98,7 +95,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ${{ matrix.image }}
+          images: ghcr.io/codemowers/driftmower/${{ matrix.name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
