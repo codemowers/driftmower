@@ -356,7 +356,8 @@ type DeployedVersion struct {
 	// under, for matching Pod image fields.
 	References []string `json:"references,omitempty"`
 	// Behind counts newer stable releases; -1 when the version cannot be
-	// compared.
+	// compared: it does not parse, or no stable release on its own tag prefix
+	// is known, as before a source's first successful crawl.
 	Behind int `json:"behind"`
 	// LatestOnLine is the newest stable release on the version's own
 	// major.minor line.
@@ -391,12 +392,11 @@ func (c *Crawler) Reports() []SourceReport {
 			deployed := DeployedVersion{Version: version, Images: versions[version].images, References: versions[version].references, Behind: -1}
 			v, ok := ParseVersion(version)
 			if ok {
-				deployed.Behind = 0
+				deployed.Behind = behind(releases, v)
 				for _, r := range releases {
 					if r.version.Prefix != v.Prefix || r.version.Compare(v) <= 0 {
 						continue
 					}
-					deployed.Behind++
 					if r.version.Line(v) && (deployed.LatestOnLine == "" || r.version.Compare(mustParse(deployed.LatestOnLine)) > 0) {
 						deployed.LatestOnLine = r.Tag
 					}
@@ -421,6 +421,27 @@ func (c *Crawler) Reports() []SourceReport {
 		out = append(out, report)
 	}
 	return out
+}
+
+// behind counts stable releases newer than v on its own tag prefix. Without
+// any release on that prefix there is nothing to compare against, which is
+// unknown, not current.
+func behind(releases []parsedRelease, v Version) int {
+	known, newer := false, 0
+	for _, r := range releases {
+		if r.version.Prefix != v.Prefix {
+			continue
+		}
+		known = true
+		if r.version.Compare(v) > 0 {
+			newer++
+		}
+	}
+	if !known {
+		return -1
+	}
+
+	return newer
 }
 
 type parsedRelease struct {
