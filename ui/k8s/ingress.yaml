@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: driftmower-ui
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: driftmower-ui-tls
+  rules:
+    - host: driftmower.ee
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: driftmower-ui
+                port:
+                  number: 80

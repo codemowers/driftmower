@@ -1,0 +1,41 @@
+[
+  {
+    "clusterContext": "in-cluster",
+    "createdAt": "2026-07-13 20:14:51",
+    "id": "0b249694-625d-41c8-a788-5b207c9c4d6b",
+    "namespaceScope": {
+      "mode": "all"
+    },
+    "reportHash": "9709ec8bc4aac2b919846b6944d26a01e703cc45323431f9496cdef99c215409",
+    "sourceType": "cluster",
+    "status": "ready"
+  },
+  {
+    "clusterContext": "ee-lte-1.codemowers.io",
+    "createdAt": "2026-07-13 20:46:54",
+    "id": "bf36536f-789f-4f5f-957f-0a7a167c2ebd",
+    "namespaceScope": {
+      "mode": "selected",
+      "namespaces": [
+        "llm"
+      ]
+    },
+    "reportHash": "779a1ad4e1cbd40f7e28b33704e31524b777b627e58a65d089e7ebcda4963507",
+    "sourceType": "cluster",
+    "status": "pending"
+  },
+  {
+    "clusterContext": "ee-lte-1.codemowers.io",
+    "createdAt": "2026-07-13 20:48:30",
+    "id": "c0e8960e-847f-4a9e-bfad-d97508c9bb02",
+    "namespaceScope": {
+      "mode": "selected",
+      "namespaces": [
+        "llm"
+      ]
+    },
+    "reportHash": "d52775f270f3816ae3f28d84676d093c8c5a1ffb9df918204cf480b894fa6d76",
+    "sourceType": "cluster",
+    "status": "pending"
+  }
+]
