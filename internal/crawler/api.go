@@ -1,22 +1,22 @@
 package crawler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
-
-	"github.com/codemowers/driftmower/operator/internal/authz"
 )
 
 // API serves source reports to the callers it allows, authenticated by
 // projected ServiceAccount token. Reports hold only public data, but they
-// map the cluster's software, so the operator alone reads them.
+// map the cluster's software, so only the callers listed in Allowed read them.
 type API struct {
-	Crawler    *Crawler
-	Authorizer *authz.Authorizer
+	Crawler *Crawler
+	// Authenticate returns the username a bearer token belongs to.
+	Authenticate func(ctx context.Context, token string) (string, error)
 	// Allowed lists usernames such as
-	// system:serviceaccount:driftmower:driftmower-operator.
+	// system:serviceaccount:driftmower:driftmower-mcp.
 	Allowed []string
 }
 
@@ -31,12 +31,12 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	id, err := a.Authorizer.Authenticate(r.Context(), token)
+	user, err := a.Authenticate(r.Context(), token)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if !slices.Contains(a.Allowed, id.User) {
+	if !slices.Contains(a.Allowed, user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

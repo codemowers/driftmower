@@ -67,6 +67,9 @@ func TestDefaults(t *testing.T) {
 	if !c.Backend.Enabled || c.Backend.URL != "http://driftmower-be:3030" || c.Backend.Timeout != 15*time.Second {
 		t.Errorf("Backend = %+v", c.Backend)
 	}
+	if c.Crawler != (Crawler{TokenFile: "/var/run/secrets/driftmower/crawler/token"}) {
+		t.Errorf("Crawler = %+v", c.Crawler)
+	}
 	if c.Search != (Search{DefaultLimit: 20, MaximumLimit: 100}) {
 		t.Errorf("Search = %+v", c.Search)
 	}
@@ -260,5 +263,15 @@ func TestErrorsAreJoined(t *testing.T) {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error %q lacks %s", msg, want)
 		}
+	}
+}
+
+func TestCrawler(t *testing.T) {
+	c := load(t, with(noBackend, map[string]string{"CRAWLER_URL": "http://driftmower-crawler:8080", "CRAWLER_TOKEN_FILE": "/token"}))
+	if c.Crawler != (Crawler{URL: "http://driftmower-crawler:8080", TokenFile: "/token"}) {
+		t.Errorf("Crawler = %+v", c.Crawler)
+	}
+	if msg := loadError(t, with(noBackend, map[string]string{"CRAWLER_URL": "driftmower-crawler"})); !strings.Contains(msg, "CRAWLER_URL") {
+		t.Errorf("error = %q", msg)
 	}
 }

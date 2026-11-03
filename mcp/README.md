@@ -3,8 +3,8 @@
 Driftmower MCP exposes a Kubernetes cluster through the Model Context Protocol.
 It provides cluster identity, workload and resource discovery, provisioning
 capabilities, admission-policy guidance and namespace readiness. Optional
-integrations add Prometheus metrics, Loki logs and persisted Driftmower backend
-analysis. Supported workload restarts and standalone-pod termination can be
+integrations add Prometheus metrics, Loki logs, version drift and security
+advisories from driftmower-crawler, and persisted Driftmower backend analysis. Supported workload restarts and standalone-pod termination can be
 enabled explicitly.
 
 HTTP clients authenticate with OIDC. Kubernetes access checks use the verified
@@ -121,6 +121,17 @@ on caller RBAC. The MCP server needs permission to create TokenReviews.
 | `DRIFTMOWER_BE_URL` | `http://driftmower-be:3030` | Backend API base URL. |
 | `DRIFTMOWER_BE_SERVICE_TOKEN` | `unset` | Required backend credential when enabled. |
 | `DRIFTMOWER_BE_TIMEOUT_MS` | `15000` | Backend request timeout. |
+
+### Findings
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CRAWLER_URL` | `unset` | driftmower-crawler base URL; enables get_source_findings and get_workload_findings. |
+| `CRAWLER_TOKEN_FILE` | `/var/run/secrets/driftmower/crawler/token` | Projected ServiceAccount token for the crawler's audience, reread on every request. |
+
+The crawler must list this server's ServiceAccount among its allowed callers.
+Callers who may list `codemowers.io` ContainerImages see every source; others
+see only the versions their visible workloads run.
 
 ### Backend search
 

@@ -60,6 +60,9 @@ manifests:
         setValues:
           workloadRestart.enabled: true
           serviceAccountAuth.enabled: true
+          # The operator module's crawler; findings report it unreachable
+          # when that module is not deployed.
+          crawler.url: http://driftmower-crawler:8080
         setValueTemplates:
           image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
 
