@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -47,6 +48,11 @@ type Cache struct {
 	Judge     authz.Judge
 	Scope     *authz.ScopeResolver
 	Logger    *slog.Logger
+	// MayWatch reports whether this server's own ServiceAccount may list and
+	// watch a collection cluster-wide. A collection it may not watch is not
+	// started, rather than retried against a 403 for the life of the process,
+	// and every answer names the gap. Nil, or an error, means try the watch.
+	MayWatch func(ctx context.Context, gvr schema.GroupVersionResource) (bool, error)
 
 	ctx      context.Context
 	once     sync.Once
@@ -102,6 +108,12 @@ func (c *Cache) initialize() {
 
 		for _, s := range sources {
 			t := &target{source: s}
+			if !c.mayWatch(s) {
+				t.setWarning(notWatched(s))
+				c.targets = append(c.targets, t)
+
+				continue
+			}
 			switch {
 			case s.MetadataOnly:
 				t.informer = meta.ForResource(s.GVR).Informer()
@@ -133,6 +145,9 @@ func (c *Cache) initialize() {
 		// Wait for every first list, or its failure, within the bound.
 		deadline := time.Now().Add(syncTimeout)
 		for _, t := range c.targets {
+			if t.informer == nil {
+				continue
+			}
 			for !t.informer.HasSynced() && t.getWarning() == "" && time.Now().Before(deadline) && c.ctx.Err() == nil {
 				time.Sleep(20 * time.Millisecond)
 			}
@@ -172,6 +187,37 @@ func (c *Cache) wire(t *target) {
 		t.setWarning("list/watch unavailable: " + failureReason(err) + "; inventory and orphan classification may be incomplete.")
 		cache.DefaultWatchErrorHandler(ctx, r, err)
 	})
+}
+
+func (c *Cache) mayWatch(s Source) bool {
+	if c.MayWatch == nil {
+		return true
+	}
+	ok, err := c.MayWatch(c.ctx, s.GVR)
+	if err != nil {
+		c.Logger.Warn("could not check the server's own watch permission; watching anyway", "resource", s.GVR.Resource, "error", err)
+
+		return true
+	}
+	if !ok {
+		c.Logger.Info("not watching a workload source the service account may not list and watch cluster-wide", "resource", s.GVR.Resource)
+	}
+
+	return ok
+}
+
+// notWatched explains a collection left unwatched on purpose. Cluster-wide
+// list on Secrets returns their data whatever the client asks for, since RBAC
+// has no metadata-only verb, so a deployment may withhold it and accept the gap.
+func notWatched(s Source) string {
+	switch s.Category {
+	case Secrets, ConfigMaps, PVCs:
+		return "are not watched: this server's service account is not granted cluster-wide list and watch on them. " +
+			"Names that pods reference are still reported; unreferenced objects are missing from orphan classification."
+	default:
+		return "are not watched: this server's service account is not granted cluster-wide list and watch on them; " +
+			"inventory and orphan classification may be incomplete."
+	}
 }
 
 func failureReason(err error) string {
@@ -272,6 +318,11 @@ func (c *Cache) snapshot(ctx context.Context, ns string, id authz.Identity) ([]*
 		}
 		if w := t.getWarning(); w != "" {
 			warnings[ns+": "+t.source.GVR.Resource+" "+w] = true
+		}
+		if t.informer == nil {
+			lists = append(lists, SourceItems{Source: t.source})
+
+			continue
 		}
 		objs, err := t.informer.GetIndexer().ByIndex(cache.NamespaceIndex, ns)
 		if err != nil {

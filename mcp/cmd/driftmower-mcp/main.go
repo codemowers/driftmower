@@ -18,6 +18,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/sync/errgroup"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/codemowers/driftmower/mcp/internal/auth"
 	"github.com/codemowers/driftmower/mcp/internal/authz"
@@ -267,6 +271,7 @@ func newWorkloads(ctx context.Context, cfg *config.Config, svc *services, logger
 		Judge:      svc.judge,
 		Scope:      svc.scope,
 		Logger:     logger,
+		MayWatch:   selfMayWatch(svc.clients.Kubernetes),
 	}
 	c.Start(ctx)
 	w := &mcpserver.Workloads{Cache: c, Metadata: svc.clients.Metadata, Judge: svc.judge}
@@ -275,6 +280,28 @@ func newWorkloads(ctx context.Context, cfg *config.Config, svc *services, logger
 	}
 
 	return w
+}
+
+// selfMayWatch asks the API server whether this server's own ServiceAccount
+// may list and watch a collection in every namespace.
+func selfMayWatch(k kubernetes.Interface) func(context.Context, schema.GroupVersionResource) (bool, error) {
+	return func(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+		for _, verb := range []string{"list", "watch"} {
+			review, err := k.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
+				Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource, Verb: verb,
+				}},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				return false, err
+			}
+			if !review.Status.Allowed {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}
 }
 
 // newObservability guards the shared Prometheus and Loki: a server-wide

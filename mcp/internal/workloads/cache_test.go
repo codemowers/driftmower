@@ -2,6 +2,7 @@ package workloads
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
@@ -166,6 +168,53 @@ func TestCacheInventory(t *testing.T) {
 	}
 	if bucket.StandalonePods[0] != (StandalonePod{Name: "debug", UID: "p2"}) || inv.Revision == before {
 		t.Errorf("standalone = %+v, revision %s -> %s", bucket.StandalonePods, before, inv.Revision)
+	}
+}
+
+// A collection the server's own service account may not watch is never
+// started: nothing retries against a 403, references from pod specs are still
+// reported, and every answer names the gap.
+func TestCacheSkipsWatchesItMayNotPerform(t *testing.T) {
+	c, _ := newCache(t)
+	c.MayWatch = func(_ context.Context, gvr schema.GroupVersionResource) (bool, error) {
+		switch gvr.Resource {
+		case "configmaps":
+			return false, nil
+		case "services":
+			return false, errors.New("SelfSubjectAccessReview failed")
+		}
+
+		return true, nil
+	}
+
+	inv, err := c.List(context.Background(), "team-a", alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range c.targets {
+		switch target.source.GVR.Resource {
+		case "configmaps":
+			if target.informer != nil {
+				t.Error("configmaps are watched although the service account may not")
+			}
+		case "services":
+			if target.informer == nil {
+				t.Error("services are not watched although the permission check only failed")
+			}
+		}
+	}
+	api := inv.Workloads[slices.IndexFunc(inv.Workloads, func(w *Workload) bool { return w.Kind == "Deployment" })]
+	if !slices.Equal(api.ConfigMaps, []string{"api-config"}) || !slices.Equal(api.Services, []string{"api"}) {
+		t.Errorf("api = %+v", api)
+	}
+	// Empty orphan buckets are omitted.
+	if i := slices.IndexFunc(inv.Workloads, func(w *Workload) bool { return w.Kind == "Namespace" }); i >= 0 && len(inv.Workloads[i].ConfigMaps) != 0 {
+		t.Errorf("orphaned configmaps from an unwatched collection: %v", inv.Workloads[i].ConfigMaps)
+	}
+	want := "team-a: configmaps are not watched: this server's service account is not granted cluster-wide list and watch on them. " +
+		"Names that pods reference are still reported; unreferenced objects are missing from orphan classification."
+	if !slices.Contains(inv.Warnings, want) {
+		t.Errorf("warnings = %q", inv.Warnings)
 	}
 }
 
