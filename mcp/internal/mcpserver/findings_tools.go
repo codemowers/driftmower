@@ -143,8 +143,8 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 			"cannot be compared: it does not parse, or no release on its line is known yet. A source without checkedAt, or with errors, " +
 			"was not fully crawled, and the absence of findings for it means nothing. Advisories come from GitHub repository advisories, GitHub's reviewed advisory database and OSV; " +
 			"sources off GitHub get no repository advisories, and OSV by version covers Go modules only, so absence of findings is " +
-			"not proof of absence. Callers who may list ContainerImages see every source; others see the versions their visible " +
-			"workloads run. Data is crawled every few hours; check checkedAt and errors.",
+			"not proof of absence. Callers who may list ContainerImages see every source and image; others see only the versions, " +
+			"workloads and image references of workloads they may list. Data is crawled every few hours; check checkedAt and errors.",
 		InputSchema:  inputSchema[sourceFindingsInput](nil),
 		OutputSchema: schemaFor[*sourceFindingsOutput](),
 		Annotations:  readOnly("Get version drift and security advisories by source"),
@@ -168,10 +168,19 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 
 		index := findings.NewIndex(reports)
 		running := map[*crawler.DeployedVersion][]workloadRef{}
+		// The reference forms of the images the caller's own workloads run.
+		visible := map[string]bool{}
 		for _, wl := range rootWorkloads(inv) {
 			seen := map[*crawler.DeployedVersion]bool{}
 			for _, image := range wl.Images {
-				if match, ok := index.Lookup(image); ok && !seen[match.Version] {
+				match, ok := index.Lookup(image)
+				if !ok {
+					continue
+				}
+				for _, key := range findings.Keys(image) {
+					visible[key] = true
+				}
+				if !seen[match.Version] {
 					seen[match.Version] = true
 					running[match.Version] = append(running[match.Version], workloadRef{Namespace: wl.Namespace, Kind: wl.Kind, Name: wl.Name})
 				}
@@ -190,8 +199,17 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 				if (!allImages && len(running[deployed]) == 0) || (in.AffectedOnly && !affected(deployed)) {
 					continue
 				}
-				src.Deployed = append(src.Deployed, versionFindings{Version: deployed.Version, Behind: deployed.Behind,
-					LatestOnLine: deployed.LatestOnLine, Findings: expand(report, deployed), Workloads: running[deployed], Images: deployed.Images})
+				v := versionFindings{Version: deployed.Version, Behind: deployed.Behind,
+					LatestOnLine: deployed.LatestOnLine, Findings: expand(report, deployed), Workloads: running[deployed], Images: deployed.Images}
+				if !allImages {
+					// A version's images span the cluster. Another namespace's
+					// references, such as a private registry named after it,
+					// stay hidden from a caller who may not list them.
+					v.Images = slices.DeleteFunc(slices.Clone(v.Images), func(image string) bool {
+						return !slices.ContainsFunc(findings.Keys(image), func(key string) bool { return visible[key] })
+					})
+				}
+				src.Deployed = append(src.Deployed, v)
 			}
 			if len(src.Deployed) > 0 {
 				out.Sources = append(out.Sources, src)

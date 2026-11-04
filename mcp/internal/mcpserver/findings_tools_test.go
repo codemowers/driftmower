@@ -45,8 +45,9 @@ func (denyImages) MayPerform(_ context.Context, _ authz.Identity, a authz.Attrib
 	return authz.Judgement{Verdict: authz.Yes}
 }
 
-// One source with two deployed versions: 1.0.0 runs in team-a/api and an
-// advisory affects it; 0.9.0 is held by a node but run by no visible workload.
+// One source with two deployed versions: 1.0.0 runs in team-a/api, and in
+// another sandbox from that sandbox's own registry, and an advisory affects
+// it; 0.9.0 is held by a node but run by no visible workload.
 var crawled = []crawler.SourceReport{{
 	URL:        "https://github.com/example/api",
 	CheckedAt:  time.Date(2026, 11, 3, 6, 0, 0, 0, time.UTC),
@@ -54,7 +55,7 @@ var crawled = []crawler.SourceReport{{
 	Advisories: []crawler.Advisory{{ID: "GHSA-test", Summary: "Remote crash", URL: "https://github.com/advisories/GHSA-test"}},
 	Deployed: []crawler.DeployedVersion{{
 		Version: "1.0.0", Behind: 2, LatestOnLine: "1.0.3",
-		Images:   []string{"registry.example.com/api:1"},
+		Images:   []string{"registry.example.com/api:1", "registry.sb-other.example.com/api:1"},
 		Findings: []crawler.Finding{{Advisory: "GHSA-test", Severity: "high", Confidence: crawler.Affected, FixedIn: "1.0.3"}},
 	}, {
 		Version: "0.9.0", Behind: 3, Images: []string{"registry.example.com/api:0.9"},
@@ -107,6 +108,9 @@ func TestSourceFindings(t *testing.T) {
 		t.Fatalf("a caller who may list ContainerImages sees every version: %v", deployed)
 	}
 	current := deployed[0].(map[string]any)
+	if images := current["images"].([]any); len(images) != 2 {
+		t.Errorf("a caller who may list ContainerImages sees every image: %v", images)
+	}
 	finding := current["findings"].([]any)[0].(map[string]any)
 	workload := current["workloads"].([]any)[0].(map[string]any)
 	if finding["advisory"] != "GHSA-test" || finding["summary"] != "Remote crash" || finding["fixedIn"] != "1.0.3" ||
@@ -130,7 +134,10 @@ func TestSourceFindingsWithoutContainerImages(t *testing.T) {
 	_, out := call(t, s, "get_source_findings", nil)
 	deployed := out["sources"].([]any)[0].(map[string]any)["deployed"].([]any)
 	if len(deployed) != 1 || deployed[0].(map[string]any)["version"] != "1.0.0" {
-		t.Errorf("only versions the caller's workloads run are shown: %v", deployed)
+		t.Fatalf("only versions the caller's workloads run are shown: %v", deployed)
+	}
+	if images := deployed[0].(map[string]any)["images"].([]any); len(images) != 1 || images[0] != "registry.example.com/api:1" {
+		t.Errorf("another namespace's image references leak: %v", images)
 	}
 	if warnings := out["warnings"].([]any); !strings.Contains(warnings[0].(string), "ContainerImages") {
 		t.Errorf("warnings = %v", warnings)
