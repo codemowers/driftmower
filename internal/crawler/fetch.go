@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	UserAgent    = "driftmower-crawler (+https://github.com/codemowers/driftmower-operator)"
+	UserAgent    = "driftmower-crawler (+https://github.com/codemowers/driftmower)"
 	maxBody      = 8 << 20
 	githubAPI    = "https://api.github.com"
 	githubMargin = 2

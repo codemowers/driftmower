@@ -25,6 +25,7 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/catalog"
 	"github.com/codemowers/driftmower/mcp/internal/cluster"
 	"github.com/codemowers/driftmower/mcp/internal/config"
+	"github.com/codemowers/driftmower/mcp/internal/findings"
 	"github.com/codemowers/driftmower/mcp/internal/httpserver"
 	"github.com/codemowers/driftmower/mcp/internal/kube"
 	"github.com/codemowers/driftmower/mcp/internal/logging"
@@ -184,6 +185,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Workloads:     live,
 		Observability: obs,
 		Backend:       newBackend(cfg, svc, logger),
+		Findings:      newFindings(cfg),
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -303,6 +305,16 @@ func newObservability(cfg *config.Config, svc *services, m *metrics.Metrics) *ob
 	o.OnRefused = outcome
 
 	return o
+}
+
+// newFindings reads driftmower-crawler's reports, when a crawler is
+// configured.
+func newFindings(cfg *config.Config) mcpserver.FindingsSource {
+	if cfg.Crawler.URL == "" {
+		return nil
+	}
+
+	return &findings.Client{URL: cfg.Crawler.URL, TokenFile: cfg.Crawler.TokenFile, HTTP: &http.Client{Timeout: 30 * time.Second}}
 }
 
 // newBackend reads persisted analysis from driftmower-be, confined to each

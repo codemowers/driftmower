@@ -6,16 +6,16 @@ it. Every component lives in this repository:
 
 | Directory | Component | Image |
 | --- | --- | --- |
-| [operator/](operator/) | Drift, advisory and image-scan operator built on nodestatd's image facts; see [operator/spec.md](operator/spec.md) | `ghcr.io/codemowers/driftmower/operator` |
-| [mcp/](mcp/) | MCP server for cluster discovery, provisioning guidance, workloads and observability | `ghcr.io/codemowers/driftmower/mcp` |
+| [crawler/](crawler/) | Crawler of releases and security advisories for the sources nodestatd finds; [crawler/spec.md](crawler/spec.md) is the draft of the operator to be built on it | `ghcr.io/codemowers/driftmower/crawler` |
+| [mcp/](mcp/) | The MCP server: cluster discovery, provisioning guidance, workloads, observability, and the crawler's drift and advisory findings | `ghcr.io/codemowers/driftmower/mcp` |
 | [ui/](ui/) | Next.js dashboard | `ghcr.io/codemowers/driftmower/ui` |
 
-The operator is meant to take over the MCP server's tools one by one; see
-"MCP" in the operator spec.
+Code shared by the crawler and the MCP server, such as the crawler's report
+types, lives in [internal/](internal/).
 
 ## Development
 
-The operator and the MCP server share one Go module, `github.com/codemowers/driftmower`:
+The crawler and the MCP server share one Go module, `github.com/codemowers/driftmower`:
 
 ```bash
 go vet ./...
@@ -31,7 +31,7 @@ The dashboard has its own Node project in `ui/` (`npm ci`, `npm run lint`,
 ```bash
 cp skaffold.env.example skaffold.env   # cluster, namespace and registry
 skaffold dev                           # every component
-skaffold dev -m mcp                    # one: operator, mcp or ui
+skaffold dev -m mcp                    # one: crawler, mcp or ui
 ```
 
 Go images build from the repository root, where `go.mod` is; each Dockerfile

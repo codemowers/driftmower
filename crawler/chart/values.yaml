@@ -1,23 +1,8 @@
-# Defaults to ghcr.io/codemowers/driftmower/operator tagged with the chart's
+# Defaults to ghcr.io/codemowers/driftmower/crawler tagged with the chart's
 # appVersion. Skaffold overrides this with its built artifact.
 image: ""
 
 logLevel: info
-
-# Advertise the MCP endpoint to codemowers/agent workers as a
-# ClusterMCPServer of this name. Workers attach it when their ServiceAccount
-# holds the custom verb "use" on it; bind the driftmower-operator-mcp-use
-# ClusterRole to grant that.
-clusterMCPServer:
-  enabled: true
-  name: driftmower-operator
-
-resources:
-  requests:
-    cpu: 20m
-    memory: 64Mi
-  limits:
-    memory: 256Mi
 
 # Fetches releases and security advisories for every SourceRepository. The
 # only component with internet egress; it holds no Secret access. Its
@@ -32,6 +17,11 @@ crawler:
   # Optional Secret with a GitHub token under key token. Without one GitHub
   # allows 60 requests per hour and a full crawl takes hours.
   githubTokenSecret: driftmower-crawler-github
+  # ServiceAccounts allowed to read reports. driftmower-mcp serves them as
+  # get_source_findings and get_workload_findings.
+  allowedCallers:
+    - namespace: driftmower
+      name: driftmower-mcp
   resources:
     requests:
       cpu: 10m

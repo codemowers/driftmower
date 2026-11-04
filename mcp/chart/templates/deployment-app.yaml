@@ -72,6 +72,12 @@ spec:
                   name: {{ .Values.backend.serviceTokenSecret.name | quote }}
                   key: {{ .Values.backend.serviceTokenSecret.key | quote }}
             {{- end }}
+            {{- if .Values.crawler.url }}
+            # driftmower-crawler's reports back get_source_findings and
+            # get_workload_findings; the token below authenticates the reads.
+            - name: CRAWLER_URL
+              value: {{ .Values.crawler.url | quote }}
+            {{- end }}
             - name: PROMETHEUS_URL
               value: 'http://prometheus-operated.monitoring.svc.cluster.local:9090'
             - name: LOKI_URL
@@ -128,6 +134,23 @@ spec:
             limits:
               memory: '512Mi'
               cpu: '500m'
+          {{- if .Values.crawler.url }}
+          volumeMounts:
+            - name: crawler-token
+              mountPath: /var/run/secrets/driftmower/crawler
+              readOnly: true
+          {{- end }}
+      {{- if .Values.crawler.url }}
+      volumes:
+        # Bound to the crawler's audience, so it is good for nothing else.
+        - name: crawler-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.crawler.audience | default (printf "driftmower-crawler.%s" .Release.Namespace) | quote }}
+                  expirationSeconds: 3600
+                  path: token
+      {{- end }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault

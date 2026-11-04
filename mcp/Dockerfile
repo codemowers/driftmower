@@ -6,6 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY mcp/cmd ./mcp/cmd
 COPY mcp/internal ./mcp/internal
+COPY internal ./internal
 
 ARG BUILD_REVISION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${BUILD_REVISION}" -o /out/driftmower-mcp ./mcp/cmd/driftmower-mcp

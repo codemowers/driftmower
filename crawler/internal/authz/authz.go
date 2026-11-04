@@ -1,6 +1,4 @@
-// Package authz authenticates callers by projected ServiceAccount token and
-// checks their Kubernetes permissions, so cached cluster data is only ever
-// returned as the caller could read it.
+// Package authz authenticates callers by projected ServiceAccount token.
 package authz
 
 import (
@@ -8,7 +6,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,9 +16,8 @@ import (
 )
 
 const (
-	tokenTTL    = time.Minute
-	decisionTTL = 30 * time.Second
-	maxEntries  = 10_000
+	tokenTTL   = time.Minute
+	maxEntries = 10_000
 )
 
 // Identity is an authenticated caller.
@@ -32,22 +28,12 @@ type Identity struct {
 	Extra  map[string]authzv1.ExtraValue
 }
 
-func (id *Identity) key() string {
-	return id.User + "\x00" + strings.Join(id.Groups, "\x00")
-}
-
-// Attributes name a permission check.
-type Attributes struct {
-	Namespace, Group, Resource, Verb string
-}
-
 type Authorizer struct {
 	client   kubernetes.Interface
 	audience string
 
-	mu        sync.Mutex
-	tokens    map[[32]byte]entry[*Identity]
-	decisions map[string]entry[bool]
+	mu     sync.Mutex
+	tokens map[[32]byte]entry[*Identity]
 }
 
 type entry[T any] struct {
@@ -56,7 +42,7 @@ type entry[T any] struct {
 }
 
 func New(client kubernetes.Interface, audience string) *Authorizer {
-	return &Authorizer{client: client, audience: audience, tokens: map[[32]byte]entry[*Identity]{}, decisions: map[string]entry[bool]{}}
+	return &Authorizer{client: client, audience: audience, tokens: map[[32]byte]entry[*Identity]{}}
 }
 
 // Authenticate reviews a bearer token for this server's audience.
@@ -83,35 +69,6 @@ func (a *Authorizer) Authenticate(ctx context.Context, token string) (*Identity,
 	}
 	store(a, a.tokens, sum, id, tokenTTL)
 	return id, nil
-}
-
-// Allowed reports whether id may perform the check. A cluster-wide grant
-// answers namespaced checks too.
-func (a *Authorizer) Allowed(ctx context.Context, id *Identity, attrs Attributes) (bool, error) {
-	if attrs.Namespace != "" {
-		cluster := attrs
-		cluster.Namespace = ""
-		if allowed, err := a.allowed(ctx, id, cluster); err != nil || allowed {
-			return allowed, err
-		}
-	}
-	return a.allowed(ctx, id, attrs)
-}
-
-func (a *Authorizer) allowed(ctx context.Context, id *Identity, attrs Attributes) (bool, error) {
-	key := id.key() + "\x01" + attrs.Namespace + "\x00" + attrs.Group + "\x00" + attrs.Resource + "\x00" + attrs.Verb
-	if allowed, ok := lookup(a, a.decisions, key); ok {
-		return allowed, nil
-	}
-	review, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(ctx, &authzv1.SubjectAccessReview{Spec: authzv1.SubjectAccessReviewSpec{
-		User: id.User, UID: id.UID, Groups: id.Groups, Extra: id.Extra,
-		ResourceAttributes: &authzv1.ResourceAttributes{Namespace: attrs.Namespace, Group: attrs.Group, Resource: attrs.Resource, Verb: attrs.Verb},
-	}}, metav1.CreateOptions{})
-	if err != nil {
-		return false, err
-	}
-	store(a, a.decisions, key, review.Status.Allowed, decisionTTL)
-	return review.Status.Allowed, nil
 }
 
 func lookup[K comparable, V any](a *Authorizer, m map[K]entry[V], key K) (V, bool) {

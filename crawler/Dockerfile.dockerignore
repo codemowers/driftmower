@@ -1,0 +1,12 @@
+# Deny by default: only the crawler's build inputs enter the Docker context.
+**
+!go.mod
+!go.sum
+!crawler/cmd/
+!crawler/cmd/**/*.go
+!crawler/internal/
+!crawler/internal/**/*.go
+!crawler/internal/**/*.html
+!internal/
+!internal/**/*.go
+!internal/**/*.html
