@@ -7,16 +7,48 @@ metadata:
   name: crawler
 
 build:
-  local:
-    useBuildkit: true
-    push: true
+  cluster:
+    # Build namespace is independent of Skaffold's deploy namespace.
+    namespace: driftmower
+    dockerConfig:
+      secretName: driftmower-kaniko-registry
+    concurrency: 1
+    timeout: 30m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+        ephemeralStorage: 12Gi
+      limits:
+        memory: 8Gi
+        ephemeralStorage: 24Gi
+    volumes:
+      - name: kaniko-trust
+        configMap:
+          name: trusted-ca-certs
   artifacts:
     - image: driftmower
       platforms:
         - linux/amd64
       # The repository root, where go.mod is.
       context: .
-      docker:
+      kaniko:
+        image: ghcr.io/osscontainertools/kaniko:v1.29.0
+        pushRetry: "3"
+        env:
+          # Zot requires OCI manifests, including the DB image built FROM scratch.
+          - name: FF_KANIKO_OCI_SCRATCH_BASE
+            value: "true"
+          - name: GOMEMLIMIT
+            value: 6GiB
+          - name: SSL_CERT_FILE
+            value: /kaniko/trust/ca.pem
+        volumeMounts:
+          - name: kaniko-trust
+            mountPath: /kaniko/trust
+            readOnly: true
         dockerfile: crawler/Dockerfile
 
 manifests:
@@ -40,15 +72,47 @@ metadata:
   name: mcp
 
 build:
-  local:
-    useBuildkit: true
-    push: true
+  cluster:
+    # Build namespace is independent of Skaffold's deploy namespace.
+    namespace: driftmower
+    dockerConfig:
+      secretName: driftmower-kaniko-registry
+    concurrency: 1
+    timeout: 30m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+        ephemeralStorage: 12Gi
+      limits:
+        memory: 8Gi
+        ephemeralStorage: 24Gi
+    volumes:
+      - name: kaniko-trust
+        configMap:
+          name: trusted-ca-certs
   artifacts:
     - image: driftmower-mcp
       platforms:
         - linux/amd64
       context: .
-      docker:
+      kaniko:
+        image: ghcr.io/osscontainertools/kaniko:v1.29.0
+        pushRetry: "3"
+        env:
+          # Zot requires OCI manifests, including the DB image built FROM scratch.
+          - name: FF_KANIKO_OCI_SCRATCH_BASE
+            value: "true"
+          - name: GOMEMLIMIT
+            value: 6GiB
+          - name: SSL_CERT_FILE
+            value: /kaniko/trust/ca.pem
+        volumeMounts:
+          - name: kaniko-trust
+            mountPath: /kaniko/trust
+            readOnly: true
         dockerfile: mcp/Dockerfile
 
 manifests:
@@ -60,6 +124,9 @@ manifests:
         setValues:
           workloadRestart.enabled: true
           serviceAccountAuth.enabled: true
+          dashboard.origin: https://dashboard.driftmower.ee-lte-1.codemowers.io
+          dashboard.clientSecretName: oidc-client-driftmower-ui-owner-secrets
+          dashboard.localOrigins: ["http://localhost:8080", "http://127.0.0.1:8080"]
           # The crawler module; findings report it unreachable
           # when that module is not deployed.
           crawler.url: http://driftmower-crawler:8080
@@ -72,6 +139,13 @@ deploy:
       # Keep labeled chart resources when Skaffold cleans up.
       delete:
         - --selector=skaffold.dev/keep!=true
+
+profiles:
+  - name: ee-west-1
+    patches:
+      - op: replace
+        path: /manifests/helm/releases/0/setValues/dashboard.origin
+        value: https://dashboard.driftmower.ee-west-1.codemowers.io
 
 portForward:
   - resourceType: deployment
@@ -89,24 +163,155 @@ metadata:
   name: ui
 
 build:
+  cluster:
+    # Build namespace is independent of Skaffold's deploy namespace.
+    namespace: driftmower
+    dockerConfig:
+      secretName: driftmower-kaniko-registry
+    concurrency: 1
+    timeout: 30m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+        ephemeralStorage: 12Gi
+      limits:
+        memory: 8Gi
+        ephemeralStorage: 24Gi
+    volumes:
+      - name: kaniko-trust
+        configMap:
+          name: trusted-ca-certs
   artifacts:
     - image: driftmower-ui
       platforms:
         - linux/amd64
-      context: ui
-      docker:
-        dockerfile: Dockerfile
+      context: .
+      kaniko:
+        image: ghcr.io/osscontainertools/kaniko:v1.29.0
+        pushRetry: "3"
+        env:
+          # Zot requires OCI manifests, including the DB image built FROM scratch.
+          - name: FF_KANIKO_OCI_SCRATCH_BASE
+            value: "true"
+          - name: GOMEMLIMIT
+            value: 6GiB
+          - name: SSL_CERT_FILE
+            value: /kaniko/trust/ca.pem
+        volumeMounts:
+          - name: kaniko-trust
+            mountPath: /kaniko/trust
+            readOnly: true
+        dockerfile: ui/Dockerfile
 
-# These manifests target the driftmowers namespace and ee-lte-1 hosts; see
-# ui/README.md before deploying them elsewhere.
+# Default cluster is ee-lte-1; use -p ee-west-1 for the west overlay.
 manifests:
   rawYaml:
     - ui/k8s/oidcclient.yaml
-    - ui/k8s/rbac.yaml
     - ui/k8s/deployment.yaml
     - ui/k8s/service.yaml
     - ui/k8s/ingress.yaml
     - ui/k8s/certificate.yaml
 
+profiles:
+  - name: ee-west-1
+    patches:
+      - op: replace
+        path: /manifests
+        value:
+          kustomize:
+            paths: [ui/overlays/ee-west-1]
+
+deploy:
+  kubectl: {}
+
+---
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: history
+manifests:
+  rawYaml:
+    - monitoring/prometheus.yaml
+deploy:
+  kubectl: {}
+---
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: operator
+build:
+  cluster:
+    # Build namespace is independent of Skaffold's deploy namespace.
+    namespace: driftmower
+    dockerConfig:
+      secretName: driftmower-kaniko-registry
+    concurrency: 1
+    timeout: 30m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+        ephemeralStorage: 12Gi
+      limits:
+        memory: 8Gi
+        ephemeralStorage: 24Gi
+    volumes:
+      - name: kaniko-trust
+        configMap:
+          name: trusted-ca-certs
+  artifacts:
+    - image: driftmower-operator
+      platforms: [linux/amd64]
+      context: .
+      kaniko:
+        image: ghcr.io/osscontainertools/kaniko:v1.29.0
+        pushRetry: "3"
+        env:
+          # Zot requires OCI manifests, including the DB image built FROM scratch.
+          - name: FF_KANIKO_OCI_SCRATCH_BASE
+            value: "true"
+          - name: GOMEMLIMIT
+            value: 6GiB
+          - name: SSL_CERT_FILE
+            value: /kaniko/trust/ca.pem
+        volumeMounts:
+          - name: kaniko-trust
+            mountPath: /kaniko/trust
+            readOnly: true
+        dockerfile: operator/Dockerfile
+    - image: driftmower-trivy-db
+      platforms: [linux/amd64]
+      context: .
+      kaniko:
+        image: ghcr.io/osscontainertools/kaniko:v1.29.0
+        pushRetry: "3"
+        env:
+          # Zot requires OCI manifests, including the DB image built FROM scratch.
+          - name: FF_KANIKO_OCI_SCRATCH_BASE
+            value: "true"
+          - name: GOMEMLIMIT
+            value: 6GiB
+          - name: SSL_CERT_FILE
+            value: /kaniko/trust/ca.pem
+        volumeMounts:
+          - name: kaniko-trust
+            mountPath: /kaniko/trust
+            readOnly: true
+        dockerfile: operator/database.Dockerfile
+        # No Kaniko layer cache: rebuilding refreshes the upstream databases.
+manifests:
+  helm:
+    releases:
+      - name: driftmower-operator
+        chartPath: operator/chart
+        skipBuildDependencies: true
+        setValueTemplates:
+          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"
+          databaseImage: "{{.IMAGE_FULLY_QUALIFIED_driftmower_trivy_db}}"
 deploy:
   kubectl: {}

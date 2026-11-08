@@ -39,3 +39,16 @@ func TestIndexMatchesPodReferences(t *testing.T) {
 		t.Error("unrelated tag matched")
 	}
 }
+
+func TestUnknownDigestCannotBorrowTagFindings(t *testing.T) {
+	index := NewIndex([]crawler.SourceReport{{Deployed: []crawler.DeployedVersion{{Version: "1", References: []string{"nginx:latest", "nginx:v1@sha256:known"}}}}})
+	for _, ref := range []string{"nginx@sha256:unknown", "nginx:v1@sha256:unknown"} {
+		if _, ok := index.Lookup(ref); ok {
+			t.Fatalf("unknown digest borrowed a moving tag: %s", ref)
+		}
+	}
+	index = NewIndex([]crawler.SourceReport{{Deployed: []crawler.DeployedVersion{{References: []string{"nginx@sha256:known"}}}}})
+	if _, ok := index.Lookup("nginx:latest"); ok {
+		t.Fatal("digest-only reference invented a latest-tag association")
+	}
+}

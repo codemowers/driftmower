@@ -3,21 +3,17 @@
 import { useEffect, useMemo, useState } from "react"
 import PrefetchLink, { usePagePrefetch } from "@/app/components/prefetch-link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertTriangle, ExternalLink, Layers } from "lucide-react"
+import { ExternalLink, Layers } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
+import { isFinished, isDownscaled } from "../workload-lifecycle"
 import type { FocusDefinition, WorkloadEntry } from "../focus/types"
 
 export type { WorkloadEntry } from "../focus/types"
 
-function isFinished(e: WorkloadEntry): boolean {
-  if (e.kind !== "Job") return false
-  if (!e.pods || e.pods.total === 0) return true
-  return e.pods.worst.severity === "succeeded"
-}
 
 function matchesIdentity(e: WorkloadEntry, q: string): boolean {
   return (
@@ -46,7 +42,7 @@ function WorkloadRow({
 }) {
   const router = useRouter()
   const prefetchPage = usePagePrefetch()
-  const { uid, kind, name, namespace, manager, issueCount } = entry
+  const { uid, kind, name, namespace, manager } = entry
 
   const managerLinkable = (manager.kind === "helm" && !!manager.uid) || (manager.kind === "argo" && !!manager.url)
 
@@ -83,14 +79,10 @@ function WorkloadRow({
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-semibold text-foreground truncate">{name}</span>
-          {issueCount > 0 && (
-            <span className="flex items-center gap-1 shrink-0 rounded-md bg-status-minor-bg px-1.5 py-0.5 text-status-minor-label">
-              <AlertTriangle className="size-3" />
-              <span className="text-xs font-medium tabular-nums">{issueCount}</span>
-            </span>
-          )}
         </div>
         <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
+        {entry.sourceState === "unlinked" && <span className="block text-xs text-muted-foreground">No source repository associated</span>}
+        {entry.sourceState === "linked" && ["no_data", "no_version"].includes(entry.worstStatus) && <span className="block text-xs text-muted-foreground">Source linked · version data unavailable</span>}
         {repoHint.length > 0 && (
           <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             <Layers className="size-3 shrink-0" />
@@ -155,7 +147,7 @@ export default function WorkloadList({
   const [activeTokens, setActiveTokens] = useState<Set<string>>(
     () => new Set([...initialTokens].filter(t => focus.scale.some(l => l.token === t))),
   )
-  const [showIssuesOnly, setShowIssuesOnly] = useState(() => initialTokens.has("issues"))
+  const [showDownscaled, setShowDownscaled] = useState(() => initialTokens.has("showdownscaled"))
   const [showFinished, setShowFinished] = useState(() => initialTokens.has("showfinished"))
   const [hideHelmManaged, setHideHelmManaged] = useState(() => initialTokens.has("hidehelm"))
   const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
@@ -165,8 +157,8 @@ export default function WorkloadList({
     if (!syncUrl) return
     const filters = [
       ...focus.scale.filter(l => activeTokens.has(l.token)).map(l => l.token),
-      ...(showIssuesOnly ? ["issues"] : []),
       ...(showFinished ? ["showfinished"] : []),
+      ...(showDownscaled ? ["showdownscaled"] : []),
       ...(hideHelmManaged ? ["hidehelm"] : []),
       ...(hideArgoManaged ? ["hideargo"] : []),
     ].join(",")
@@ -179,7 +171,7 @@ export default function WorkloadList({
     if (next !== searchParams.toString()) {
       router.replace(next ? `?${next}` : window.location.pathname)
     }
-  }, [syncUrl, activeTokens, showIssuesOnly, showFinished, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
+  }, [syncUrl, activeTokens, showFinished, showDownscaled, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
 
   function handleTokenToggle(token: string) {
     setActiveTokens(prev => {
@@ -192,8 +184,8 @@ export default function WorkloadList({
 
   function handleReset() {
     setActiveTokens(new Set())
-    setShowIssuesOnly(false)
     setShowFinished(false)
+    setShowDownscaled(false)
     setHideHelmManaged(false)
     setHideArgoManaged(false)
     setSearchQuery("")
@@ -201,13 +193,13 @@ export default function WorkloadList({
 
   const counts = useMemo(() => ({
     finished: entries.filter(isFinished).length,
+    downscaled: entries.filter(isDownscaled).length,
     helm: entries.filter(e => e.manager.kind === "helm").length,
     argo: entries.filter(e => e.manager.kind === "argo").length,
-    issues: entries.filter(e => e.issueCount > 0).length,
   }), [entries])
 
   const isModified =
-    activeTokens.size > 0 || searchQuery !== "" || showIssuesOnly || showFinished || hideHelmManaged || hideArgoManaged
+    activeTokens.size > 0 || searchQuery !== "" || showFinished || showDownscaled || hideHelmManaged || hideArgoManaged
 
   const sortedEntries = useMemo(() => [...entries].sort(focus.compare), [entries, focus])
 
@@ -215,8 +207,8 @@ export default function WorkloadList({
   const q = searchQuery.toLowerCase()
   const filteredEntries = sortedEntries
     .filter(e => activeScale.length === 0 || activeScale.some(l => l.match(e)))
-    .filter(e => !showIssuesOnly || e.issueCount > 0)
     .filter(e => showFinished || !isFinished(e))
+    .filter(e => showDownscaled || !isDownscaled(e))
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
     .filter(e => q === "" || matchesIdentity(e, q) || matchingRepos(e, q).length > 0)
@@ -236,8 +228,8 @@ export default function WorkloadList({
         chips={focus.scale}
         activeTokens={activeTokens}
         onTokenToggle={handleTokenToggle}
-        showIssuesOnly={showIssuesOnly}
-        onIssuesToggle={() => setShowIssuesOnly(v => !v)}
+        showDownscaled={showDownscaled}
+        onToggleDownscaled={() => setShowDownscaled(v => !v)}
         showFinished={showFinished}
         onToggleFinished={() => setShowFinished(v => !v)}
         hideHelmManaged={hideHelmManaged}

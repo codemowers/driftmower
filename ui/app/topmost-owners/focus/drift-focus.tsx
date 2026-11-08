@@ -29,7 +29,7 @@ function DriftCells({ entry }: { entry: WorkloadEntry }) {
 
       <div className="flex items-center">
         <span className={cn("text-center rounded-md px-3 py-1.5 text-xs font-semibold", style.bg, style.text)}>
-          {style.label}
+          {["no_data", "no_version"].includes(worstStatus) ? entry.sourceState === "unlinked" ? "No source repository associated" : entry.sourceState === "linked" ? "Version data unavailable" : "No data" : style.label}
         </span>
       </div>
     </>

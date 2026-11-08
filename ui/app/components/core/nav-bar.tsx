@@ -17,6 +17,8 @@ import {
   Package,
   PackagePlus,
   ShipWheel,
+  ChevronsUpDown,
+  Pin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -28,6 +30,7 @@ import { setActivePageSection, usePageSectionsStore } from "@/lib/hooks/use-page
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
+import type { ClusterEndpoint } from "@/browser/connection"
 
 type NavItem = {
   name: string
@@ -56,21 +59,38 @@ function isNavActive(pathname: string, href: string): boolean {
 export default function NavBar({
   claims,
   seesClusterWideViews,
+  clusterEndpoints,
+  activeEndpoint,
+  pinnedEndpoints = [],
+  fixedEndpoint = false,
+  onSelectEndpoint,
+  onAddEndpoint,
+  streamUpdates,
+  onStreamUpdatesChange,
 }: {
   claims: SessionClaims
   seesClusterWideViews: boolean
+  clusterEndpoints?: ClusterEndpoint[]
+  activeEndpoint?: string
+  pinnedEndpoints?: string[]
+  fixedEndpoint?: boolean
+  onSelectEndpoint?: (url: string) => void
+  onAddEndpoint?: (endpoint: ClusterEndpoint) => void
+  streamUpdates?: boolean
+  onStreamUpdatesChange?: (enabled: boolean) => void
 }) {
   const [isExpanded, setIsExpanded] = useState(true)
-  const { isConnected, connectionError, clusterName, reportId } = useClusterState()
+  const { isConnected, connectionError, clusterName } = useClusterState()
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
   const pageSections = usePageSectionsStore()
+  const [newEndpoint, setNewEndpoint] = useState("")
+  const [endpointError, setEndpointError] = useState("")
 
   // Resolved on the server, so a hidden item never flashes in on first paint.
   const visibleItems = navItems.filter(item => seesClusterWideViews || !item.clusterWide)
 
   const carriedParams = new URLSearchParams()
-  if (reportId) carriedParams.set("report", reportId)
   if (selectedSandboxes.length > 0) carriedParams.set("sandbox", selectedSandboxes.join(","))
   const carriedQuery = carriedParams.toString()
 
@@ -233,17 +253,9 @@ export default function NavBar({
 
 
       {/* Footer */}
-      <footer
-        className={cn(
-          "flex w-full flex-col justify-center py-3 px-5",
-          isExpanded
-            ? "border-t border-gray-200 gap-0.5"
-            : "items-center py-4",
-        )}
-      >
-        <div
-          className={cn("flex items-center gap-2", !isExpanded && "justify-center")}
-        >
+      <footer className={cn("w-full border-t border-gray-200 p-3", !isExpanded && "px-1")}>
+        <details className="group relative">
+          <summary className={cn("flex cursor-pointer list-none items-center gap-2 rounded-md p-2 hover:bg-muted/60", !isExpanded && "justify-center")}>
           {isExpanded ? (
             <>
               <span
@@ -255,9 +267,11 @@ export default function NavBar({
                 )}
                 aria-hidden
               />
-              <span className="font-mono text-sm font-medium tracking-tighter text-gray-800">
-                {isConnected ? "Connected" : "Disconnected"}
+              <span className="min-w-0 flex-1">
+                <span className="block font-mono text-xs text-muted-foreground">{isConnected ? "Connected context" : "Disconnected"}</span>
+                <span className="block truncate text-sm font-medium text-gray-800">{clusterName ?? "Select a cluster"}</span>
               </span>
+              {onSelectEndpoint && !fixedEndpoint && <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
             </>
           ) : (
             <Tooltip>
@@ -301,17 +315,23 @@ export default function NavBar({
               </TooltipContent>
             </Tooltip>
           )}
-        </div>
-        {isExpanded && (
-          <p className="text-xs font-mono text-gray-400 pl-4">
-            Cluster: {clusterName ?? "none"}
-          </p>
-        )}
-        {isExpanded && !isConnected && connectionError && (
-          <p className="line-clamp-3 break-words pl-4 font-mono text-xs text-status-major-text" title={connectionError}>
-            {connectionError}
-          </p>
-        )}
+          </summary>
+          {isExpanded && onSelectEndpoint && !fixedEndpoint && <div className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full overflow-auto rounded-md border bg-background p-2 shadow-lg">
+            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Switch context</p>
+            {(clusterEndpoints ?? []).map(endpoint => <button key={endpoint.url} type="button" onClick={() => onSelectEndpoint(endpoint.url)} className={cn("flex w-full items-center gap-2 truncate rounded px-2 py-2 text-left text-sm hover:bg-muted", endpoint.url === activeEndpoint && "font-semibold text-brand")} title={endpoint.url}>{pinnedEndpoints.includes(endpoint.url) && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="Discovered context" />}<span className="truncate">{endpoint.name}</span></button>)}
+            {(clusterEndpoints ?? []).length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground">No contexts added yet.</p>}
+            {onAddEndpoint && <form className="mt-2 border-t pt-2" onSubmit={event => {event.preventDefault();try { const url = new URL(newEndpoint); onAddEndpoint({name:url.hostname,url:newEndpoint}); setNewEndpoint("");setEndpointError("")} catch(error) {setEndpointError(error instanceof Error ? error.message : "Invalid endpoint")}}}>
+              <label className="block px-2 text-xs text-muted-foreground" htmlFor="mcp-context-url">Add MCP address</label>
+              <div className="mt-1 flex gap-1"><input id="mcp-context-url" className="min-w-0 flex-1 rounded border px-2 py-1 text-xs" placeholder="https://cluster.example/mcp" value={newEndpoint} onChange={event=>setNewEndpoint(event.target.value)} /><button type="submit" className="rounded border px-2 text-xs">Add</button></div>
+              {endpointError && <p role="alert" className="px-2 pt-1 text-xs text-status-major-text">{endpointError}</p>}
+            </form>}
+          </div>}
+        </details>
+        {isExpanded && !isConnected && connectionError && <p className="mt-1 line-clamp-2 break-words px-2 text-xs text-status-major-text" title={connectionError}>{connectionError}</p>}
+        {isExpanded && onStreamUpdatesChange && <details className="mt-2 px-2 text-xs">
+          <summary className="cursor-pointer text-muted-foreground">Settings</summary>
+          <label className="mt-2 flex items-start gap-2"><input type="checkbox" checked={Boolean(streamUpdates)} onChange={event=>onStreamUpdatesChange(event.target.checked)} /><span><span className="font-medium text-foreground">Stream updates</span><span className="mt-1 block text-muted-foreground">Refresh from MCP notifications, with polling fallback.</span></span></label>
+        </details>}
       </footer>
 
       <NavUser claims={claims} isExpanded={isExpanded} />

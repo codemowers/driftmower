@@ -35,7 +35,7 @@ func loadError(t *testing.T, values map[string]string) string {
 	return err.Error()
 }
 
-var noBackend = map[string]string{"DRIFTMOWER_BE_ENABLED": "false"}
+var noBackend = map[string]string{}
 
 func with(base map[string]string, extra map[string]string) map[string]string {
 	out := maps.Clone(base)
@@ -50,7 +50,7 @@ var authenticatedHTTP = with(noBackend, map[string]string{
 })
 
 func TestDefaults(t *testing.T) {
-	c := load(t, map[string]string{"DRIFTMOWER_BE_SERVICE_TOKEN": "secret"})
+	c := load(t, map[string]string{})
 
 	if c.Transport != TransportStdio || c.Host != "::" || c.Port != 3000 || c.HealthPort != 3001 {
 		t.Errorf("server defaults = %v %q %d %d", c.Transport, c.Host, c.Port, c.HealthPort)
@@ -63,9 +63,6 @@ func TestDefaults(t *testing.T) {
 	}
 	if c.OIDC != nil || c.Observability != nil {
 		t.Errorf("stdio must not load OIDC or observability")
-	}
-	if !c.Backend.Enabled || c.Backend.URL != "http://driftmower-be:3030" || c.Backend.Timeout != 15*time.Second {
-		t.Errorf("Backend = %+v", c.Backend)
 	}
 	if c.Crawler != (Crawler{TokenFile: "/var/run/secrets/driftmower/crawler/token"}) {
 		t.Errorf("Crawler = %+v", c.Crawler)
@@ -98,12 +95,6 @@ func TestServiceLinkValuesAreIgnored(t *testing.T) {
 	}))
 	if c.Port != 3000 || c.HealthPort != 3001 {
 		t.Errorf("ports = %d %d", c.Port, c.HealthPort)
-	}
-}
-
-func TestBackendTokenRequiredWhenEnabled(t *testing.T) {
-	if msg := loadError(t, map[string]string{}); !strings.Contains(msg, "DRIFTMOWER_BE_SERVICE_TOKEN") {
-		t.Errorf("error = %q", msg)
 	}
 }
 
@@ -199,7 +190,6 @@ func TestStrictBooleans(t *testing.T) {
 func TestURLValidation(t *testing.T) {
 	cases := map[string]string{
 		"MCP_PUBLIC_URL":            "https://user:pw@mcp.example.com",
-		"DRIFTMOWER_BE_URL":         "http://be?x=1",
 		"KUBERNETES_API_URL":        "http://kubernetes.default.svc",
 		"KUBERNETES_PUBLIC_API_URL": "http://kube.example.com",
 	}
@@ -259,7 +249,7 @@ func TestMisc(t *testing.T) {
 
 func TestErrorsAreJoined(t *testing.T) {
 	msg := loadError(t, map[string]string{"DRIFTMOWER_MCP_PORT": "x", "DRIFTMOWER_MCP_LOG_LEVEL": "trace"})
-	for _, want := range []string{"DRIFTMOWER_MCP_PORT", "DRIFTMOWER_MCP_LOG_LEVEL", "DRIFTMOWER_BE_SERVICE_TOKEN"} {
+	for _, want := range []string{"DRIFTMOWER_MCP_PORT", "DRIFTMOWER_MCP_LOG_LEVEL"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error %q lacks %s", msg, want)
 		}

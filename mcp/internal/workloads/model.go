@@ -108,12 +108,17 @@ type OrphanOwner struct {
 // Workload is a root owner, or the namespace's orphan bucket (kind
 // Namespace, name orphaned-workloads).
 type Workload struct {
-	Name               string `json:"name"`
-	Kind               string `json:"kind"`
-	Namespace          string `json:"namespace"`
-	APIVersion         string `json:"apiVersion,omitempty"`
-	UID                string `json:"uid,omitempty"`
-	OwnerReferenceOnly bool   `json:"ownerReferenceOnly,omitempty"`
+	DesiredReplicas      *int32 `json:"desiredReplicas,omitempty"`
+	Completed            bool   `json:"completed,omitempty"`
+	HelmReleaseName      string `json:"helmReleaseName,omitempty"`
+	HelmReleaseNamespace string `json:"helmReleaseNamespace,omitempty"`
+	HelmChart            string `json:"helmChart,omitempty"`
+	Name                 string `json:"name"`
+	Kind                 string `json:"kind"`
+	Namespace            string `json:"namespace"`
+	APIVersion           string `json:"apiVersion,omitempty"`
+	UID                  string `json:"uid,omitempty"`
+	OwnerReferenceOnly   bool   `json:"ownerReferenceOnly,omitempty"`
 	Dependencies
 	StandalonePods []StandalonePod `json:"standalonePods,omitempty"`
 	// Qualified kind ("Kind.group") -> owner name -> what it generated.
@@ -202,6 +207,8 @@ type Spec struct {
 // Node is a cached object, reduced to identity, ownership, the two
 // annotations the inventory reads, and reference fields.
 type Node struct {
+	DesiredReplicas *int32
+	Completed       bool
 	metav1.ObjectMeta
 	APIVersion string
 	Kind       string
@@ -216,7 +223,7 @@ func (n *Node) DeepCopyObject() runtime.Object { return n }
 func (n *Node) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 // Annotations the inventory reads. Arbitrary annotations can hold secrets.
-var keptAnnotations = []string{"kubernetes.io/config.mirror", "reflector.v1.k8s.emberstack.com/reflects"}
+var keptAnnotations = []string{"meta.helm.sh/release-name", "meta.helm.sh/release-namespace", "kubernetes.io/config.mirror", "reflector.v1.k8s.emberstack.com/reflects"}
 
 func groupOf(apiVersion string) string {
 	if g, _, ok := strings.Cut(apiVersion, "/"); ok {

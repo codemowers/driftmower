@@ -81,3 +81,16 @@ func TestReportsCountReleasesOnTheVersionsPrefix(t *testing.T) {
 		t.Errorf("app-1.0.0 behind = %d, want -1", got["app-1.0.0"])
 	}
 }
+
+func TestReportsRetainStableReleaseNotes(t *testing.T) {
+	const url = "https://github.com/example/app"
+	c := reportsCrawler(t, url, "v1.0.0")
+	c.state[url] = &sourceState{checkedAt: time.Now(), releases: []Release{
+		{Tag: "v1.1.0", Notes: "Fixes and improvements", URL: url + "/releases/tag/v1.1.0"},
+		{Tag: "v1.2.0-rc1", Prerelease: true, Notes: "Preview"},
+	}}
+	report := c.Reports()[0]
+	if len(report.Releases) != 1 || report.Releases[0].Notes != "Fixes and improvements" || report.Latest.Notes != report.Releases[0].Notes {
+		t.Fatalf("release notes lost or prerelease included: %+v", report)
+	}
+}

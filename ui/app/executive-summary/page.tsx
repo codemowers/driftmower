@@ -56,7 +56,7 @@ const DRIFT_SEVERITY: Record<string, number> = { major_behind: 3, minor_behind: 
 
 // A score of 0.00 under "0 = healthy" reads as flawless, so it waits for something scorable.
 const UNSCORABLE: Partial<Record<ReportReadiness, { value: string; caption: string }>> = {
-  "no-reports": { value: "No analysis yet", caption: "The first report is still being collected" },
+  "no-reports": { value: "No analysis yet", caption: "Live inventory is loading" },
   unresolved: { value: "Cannot be scored", caption: "No container has a version to compare" },
 }
 

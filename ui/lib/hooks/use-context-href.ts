@@ -3,7 +3,7 @@ import { useSearchParams } from "next/navigation"
 // "tenant" is carried alongside "sandbox" so a link bookmarked before the
 // rename keeps its scope; SandboxContextInit reads either, and any write
 // emits only "sandbox".
-const CARRY = ["report", "sandbox", "tenant", "filters", "q", "focus", "wtab", "ptab", "htab"] as const
+const CARRY = ["sandbox", "tenant", "filters", "q", "focus", "wtab", "ptab", "htab"] as const
 
 export type LinkTo = (path: string, opts?: { drop?: string[]; set?: Record<string, string> }) => string
 

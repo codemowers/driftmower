@@ -9,6 +9,8 @@ nextEnv.loadEnvConfig(process.cwd(), dev)
 const port = parseInt(process.env.PORT || "3000", 10)
 const hostname = process.env.HOSTNAME || "::"
 const backendUrl = process.env.BACKEND_URL || "http://driftmower-be:3030"
+// Public origin of the dashboard, exported by passmower into the OIDC owner Secret.
+const publicUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "")
 
 const SOCKET_PATH = "/socket.io"
 
@@ -108,6 +110,7 @@ app.prepare().then(async () => {
 
   server.listen(port, hostname, () => {
     console.log(`> Ready on http://${hostname}:${port} (${dev ? "development" : "production"})`)
+    console.log(`> Public URL ${publicUrl || "(APP_BASE_URL is not set)"}`)
     console.log(`> Proxying ${SOCKET_PATH} -> ${backendUrl}`)
   })
 })

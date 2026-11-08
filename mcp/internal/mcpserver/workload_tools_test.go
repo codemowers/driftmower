@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	metadatafake "k8s.io/client-go/metadata/fake"
@@ -21,7 +23,11 @@ import (
 
 func TestWorkloadTools(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
-	k := fake.NewClientset(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "team-a", Name: "debug", UID: "p1"}})
+	k := fake.NewClientset(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "team-a", Name: "debug", UID: "p1"}},
+		&networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Namespace: "team-a", Name: "web"}, Spec: networkingv1.IngressSpec{
+			TLS:   []networkingv1.IngressTLS{{Hosts: []string{"web.example.com"}}},
+			Rules: []networkingv1.IngressRule{{Host: "web.example.com"}, {Host: "*.example.com"}},
+		}})
 	scheme := metadatafake.NewTestScheme()
 	_ = metav1.AddMetaToScheme(scheme)
 	meta := metadatafake.NewSimpleMetadataClient(scheme,
@@ -31,7 +37,7 @@ func TestWorkloadTools(t *testing.T) {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	c := &workloads.Cache{Kubernetes: k, Metadata: meta, Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme()),
+	c := &workloads.Cache{Kubernetes: k, Metadata: meta, Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{containerImagesGVR: "ContainerImageList", sourceRepositoriesGVR: "SourceRepositoryList"}),
 		Discovery: k.Discovery(), Judge: allowAll{}, Logger: logger,
 		Scope: &authz.ScopeResolver{ListNamespaces: func(context.Context) ([]string, error) { return []string{"team-a"}, nil }, Judge: allowAll{}}}
 	c.Start(ctx)
@@ -40,6 +46,7 @@ func TestWorkloadTools(t *testing.T) {
 		Cluster: cluster.NewIdentity(&id, nil, ""), Version: "test", Logger: logger,
 		Mapping:   auth.Mapping{UsernameClaim: "sub"},
 		Workloads: &Workloads{Cache: c, Metadata: meta, Judge: allowAll{}},
+		Findings:  staticReports{},
 	}))
 
 	text, out := call(t, s, "get_workloads", map[string]any{"namespace": "team-a"})
@@ -63,4 +70,39 @@ func TestWorkloadTools(t *testing.T) {
 			t.Errorf("%s registered without actions", tool.Name)
 		}
 	}
+	// The dashboard consumes current inventory, without persisted report identity.
+	_, snapshot := call(t, s, "get_dashboard_snapshot", map[string]any{"namespace": "team-a"})
+	score, ok := snapshot["drift"].(map[string]any)
+	if !ok || score["normalizedScore"] == nil || score["workloadScores"] == nil {
+		t.Fatalf("missing live drift fields: %v", snapshot)
+	}
+	if snapshot["report"] != nil || snapshot["id"] != nil || snapshot["imageUsages"] == nil {
+		t.Fatalf("expected live inventory without a report: %v", snapshot)
+	}
+	if len(snapshot["workloads"].([]any)) == 0 {
+		t.Fatal("live snapshot must retain inventory even when pods have no image usages")
+	}
+	_, apps := call(t, s, "list_applications", map[string]any{"namespace": "team-a"})
+	entries := apps["applications"].([]any)
+	if len(entries) != 1 || entries[0].(map[string]any)["url"] != "https://web.example.com/" {
+		t.Fatalf("expected concrete TLS ingress URL: %v", entries)
+	}
+	denied := connectTo(t, New(Deps{
+		Cluster: cluster.NewIdentity(&id, nil, ""), Version: "test", Logger: logger,
+		Mapping:   auth.Mapping{UsernameClaim: "sub"},
+		Workloads: &Workloads{Cache: c, Metadata: meta, Judge: denyIngresses{}},
+	}))
+	_, hidden := call(t, denied, "list_applications", map[string]any{"namespace": "team-a"})
+	if len(hidden["applications"].([]any)) != 0 || len(hidden["warnings"].([]any)) == 0 {
+		t.Fatalf("ingress denial must withhold endpoints and report the gap: %v", hidden)
+	}
+}
+
+type denyIngresses struct{}
+
+func (denyIngresses) MayPerform(_ context.Context, _ authz.Identity, a authz.Attributes) authz.Judgement {
+	if a.Resource == "ingresses" {
+		return authz.Judgement{Verdict: authz.No}
+	}
+	return authz.Judgement{Verdict: authz.Yes}
 }

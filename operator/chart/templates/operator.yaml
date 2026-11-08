@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: driftmower-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: driftmower-scan
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: driftmower-scanner-{{ .Release.Namespace }}
+rules:
+  - apiGroups: [codemowers.io]
+    resources: [containerimages]
+    verbs: [get, list, watch, patch]
+  - apiGroups: ['']
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: driftmower-scanner-{{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: driftmower-scanner-{{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: driftmower-operator
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: driftmower-scanner
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, delete, patch]
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list, watch]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, create, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: driftmower-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: driftmower-scanner
+subjects:
+  - kind: ServiceAccount
+    name: driftmower-operator
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driftmower-operator
+spec:
+  replicas: 1
+  # SBOM artifacts are local and reproducible. Never route uploads to a
+  # non-leader replica while the leader waits for a result on its own disk.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: driftmower-operator
+  template:
+    metadata:
+      labels:
+        app: driftmower-operator
+    spec:
+      serviceAccountName: driftmower-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: {{ .Values.image | quote }}
+          env:
+            - name: SCANNER_IMAGE
+              value: {{ .Values.image | quote }}
+            - name: TRIVY_IMAGE
+              value: {{ .Values.trivyImage | quote }}
+            - name: TRIVY_DB_IMAGE
+              value: {{ required "databaseImage must be a versioned filesystem image containing db/ and java-db/" .Values.databaseImage | quote }}
+            - name: SCAN_PRIORITY_CLASS
+              value: {{ .Values.priorityClassName | quote }}
+            - name: SBOM_CACHE_MIB
+              value: {{ .Values.sbomCacheMiB | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: {{ printf "%dMi" (add .Values.sbomCacheMiB 128) }}
+          volumeMounts:
+            - name: sboms
+              mountPath: /cache
+      volumes:
+        - name: sboms
+          emptyDir:
+            sizeLimit: {{ printf "%dMi" (add .Values.sbomCacheMiB 64) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: driftmower-operator
+spec:
+  selector:
+    app: driftmower-operator
+  ports:
+    - name: http
+      port: 8080

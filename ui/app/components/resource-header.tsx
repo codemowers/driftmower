@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { AlertTriangle } from "lucide-react"
-import RefreshButton from "@/app/components/core/refresh-button"
 import CopyButton from "@/app/components/copy-button"
 import Breadcrumbs, { type BreadcrumbItem } from "@/app/components/breadcrumbs"
 import { cn } from "@/lib/utils/cn"
@@ -97,7 +96,6 @@ export default function ResourceHeader({
       </div>
 
       <div className="shrink-0 p-1">
-        <RefreshButton />
       </div>
     </header>
   )

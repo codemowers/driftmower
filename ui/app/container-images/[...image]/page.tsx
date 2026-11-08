@@ -14,6 +14,8 @@ import ActionsCard from "@/app/components/actions-card"
 import CopyButton from "@/app/components/copy-button"
 import TagIdentity from "@/app/components/image/tag-identity"
 import SourceCard from "@/app/components/image/source-card"
+import SourceFindings from "@/app/components/image/source-findings"
+import ImageInspection from "@/app/components/image/image-inspection"
 import SupportLifecycle from "@/app/components/image/support-lifecycle"
 import ImageIssues from "@/app/components/image/image-issues"
 import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
@@ -51,7 +53,7 @@ function ArtifactView({
   const crumb = version.digest ? digestCrumb(version.digest) : "no digest"
   const { registry, repository, tag: pinned } = version.usage.imageInfo
   const fullRef = version.digest
-    ? `${registry}/${repository}:${pinned}@${version.digest}`
+    ? `${registry}/${repository}${pinned ? `:${pinned}` : ""}@${version.digest}`
     : `${registry}/${repository}:${pinned}`
 
   return (
@@ -95,6 +97,8 @@ function ArtifactView({
       </div>
 
       <ImageVulnerabilities usage={version.usage} />
+      <SourceFindings usage={version.usage} />
+      <ImageInspection usage={version.usage} />
     </>
   )
 }
@@ -123,7 +127,7 @@ function ContainerImageDetailContent() {
     return (
       <div className="min-h-full flex flex-col items-center">
         <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-          <p className="text-sm text-muted-foreground">Image not found in the latest report</p>
+          <p className="text-sm text-muted-foreground">Image not found in the current inventory</p>
         </main>
       </div>
     )

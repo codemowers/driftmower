@@ -4,7 +4,7 @@ metadata:
   name: driftmower-ui
 spec:
   dnsNames:
-    - driftmower.ee
+    - dashboard.driftmower.ee-lte-1.codemowers.io
   issuerRef:
     kind: ClusterIssuer
     name: letsencrypt

@@ -93,7 +93,7 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
                 <span className="block">scanned {compactRelativeTimeFromNow(vuln.report.updateTimestamp)}</span>
               </>
             : vulnError
-              ? "Trivy operator not installed"
+              ? "No scan results available"
               : "no Trivy scan"}
         >
           {!summary

@@ -5,6 +5,9 @@ import type { PodSummary } from "@/lib/utils/pods-by-root"
 import type { SeriesStats, Span } from "@/lib/features/drift-history/types"
 
 export type WorkloadEntry = {
+  sourceState?: "linked" | "unlinked" | "unknown"
+  desiredReplicas?: number
+  completed?: boolean
   groupKey: string
   uid: string
   kind: string
@@ -15,7 +18,6 @@ export type WorkloadEntry = {
     | { kind: "argo"; name: string; url?: string }
     | { kind: "standalone" }
   worstStatus: StatusType
-  issueCount: number
   repos: string[]
   drift: {
     containerCount: number

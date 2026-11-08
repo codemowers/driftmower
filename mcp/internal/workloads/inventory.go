@@ -164,7 +164,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 		w := roots[string(root.UID)]
 		if w == nil {
 			w = &Workload{Name: root.Name, Kind: root.Kind, Namespace: namespace, APIVersion: root.APIVersion, UID: string(root.UID),
-				OwnerReferenceOnly: root.OwnerReferenceOnly}
+				DesiredReplicas: root.DesiredReplicas, Completed: root.Completed, OwnerReferenceOnly: root.OwnerReferenceOnly, HelmReleaseName: root.Annotations["meta.helm.sh/release-name"], HelmReleaseNamespace: root.Annotations["meta.helm.sh/release-namespace"], HelmChart: root.Labels["helm.sh/chart"]}
 			roots[string(root.UID)] = w
 			all = append(all, w)
 		}

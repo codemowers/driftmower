@@ -11,9 +11,12 @@ import (
 
 // HealthHandler serves liveness, readiness, startup and metrics on the health
 // port. Readiness and startup report ready only once ready is set.
-func HealthHandler(ready *atomic.Bool, m *metrics.Metrics) http.Handler {
+func HealthHandler(ready *atomic.Bool, m *metrics.Metrics, drift ...http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", m.Handler())
+	if len(drift) > 0 && drift[0] != nil {
+		mux.Handle("GET /drift-metrics", drift[0])
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

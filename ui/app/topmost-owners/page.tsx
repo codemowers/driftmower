@@ -1,5 +1,6 @@
 "use client"
 
+import { LoaderCircle } from "lucide-react"
 import { Suspense, startTransition, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import PageHeader from "../components/page-header"
@@ -28,6 +29,8 @@ export default function TopmostOwnersPage() {
 }
 
 function TopmostOwnersContent() {
+  const fetching = useClusterState(s => s.isFetchingReport)
+  const error = useClusterState(s => s.error)
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const searchParams = useSearchParams()
@@ -112,11 +115,10 @@ function TopmostOwnersContent() {
         return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
       }, "no_data")
 
-      const issueCount = (data?.issues ?? []).filter(i =>
-        usages.some(u => u.image.includes(i.image))
-      ).length
-
       return {
+        sourceState: usages.some(u => u.imageInfo.sourceStatus === "linked") ? "linked" : usages.length > 0 && usages.every(u => u.imageInfo.sourceStatus === "unlinked") ? "unlinked" : "unknown",
+        desiredReplicas: root.desiredReplicas,
+        completed: root.completed,
         groupKey,
         uid,
         kind,
@@ -124,7 +126,6 @@ function TopmostOwnersContent() {
         namespace,
         manager,
         worstStatus,
-        issueCount,
         repos: [...repoStatus.keys()],
         drift: {
           containerCount: usages.length,
@@ -145,7 +146,9 @@ function TopmostOwnersContent() {
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
         <PageHeader title="Topmost Owners" subtitle="Controllers at the root of each workload subtree" />
-        <StatusSummaryBar
+        {(fetching || (!data && !error)) && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />{data ? "Updating workloads…" : "Loading workloads…"}</p>}
+        {!data && error && <p role="alert">Could not load workloads: {error}</p>}
+        {data && <><StatusSummaryBar
           totalLabel="workloads"
           totalCount={workloads.length}
           secondary={focus.secondary(workloads)}
@@ -157,6 +160,7 @@ function TopmostOwnersContent() {
         ) : (
           <WorkloadList key={focus.key} entries={workloads} focus={focus} syncUrl={focusResolved} />
         )}
+        </>}
       </main>
     </div>
   )

@@ -1,23 +1,20 @@
-FROM node:22-slim AS builder
-
+FROM node:22-slim AS assets
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY ui/package.json ui/package-lock.json ./
 RUN npm ci
-COPY . .
-RUN npm run build && npm prune --omit=dev
+COPY ui ./
+RUN npx next build static --webpack
 
-FROM node:22-slim
+FROM golang:1.26.10 AS server
+WORKDIR /src
+COPY ui/cmd/driftmower-dashboard/main.go ./main.go
+RUN CGO_ENABLED=0 go build -o /dashboard main.go
 
+FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/server.js /app/next.config.ts /app/package.json ./
-
-ENV NODE_ENV=production
-ENV PORT=8080
-ENV HOSTNAME=::
-
-USER node
+COPY --from=server /dashboard /dashboard
+COPY --from=assets /app/static/out /app/public
+ENV LISTEN_ADDR=[::]:8080
 EXPOSE 8080
-CMD ["node", "server.js"]
+USER 65532:65532
+ENTRYPOINT ["/dashboard"]

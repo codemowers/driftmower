@@ -38,7 +38,22 @@ export function sortedLabelEntries(labels: Record<string, string> | undefined): 
 }
 
 export function sourceRepoUrl(labels: Record<string, string> | undefined): string | null {
-  const source = labels?.[OCI_SOURCE]
+  const source = labels?.[OCI_SOURCE] ?? labels?.["org.label-schema.vcs-url"]
   if (!source?.startsWith("http")) return null
   return source.replace(/\.git$/, "")
+}
+
+// Only produce browse links for recognizable Git hosts; keep unknown hosts as text.
+export function sourceRefUrl(repository: string, ref: string, kind: "commit" | "tag"): string | null {
+  try {
+    const url = new URL(repository)
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || !ref.trim()) return null
+    const host = url.hostname.toLowerCase()
+    const base = url.origin + url.pathname.replace(/\/$/, "").replace(/\.git$/, "")
+    const value = encodeURIComponent(ref)
+    if (host === "github.com") return `${base}/${kind === "commit" ? "commit" : "tree"}/${value}`
+    if (host === "gitlab.com" || host.startsWith("gitlab.")) return `${base}/-/${kind === "commit" ? "commit" : "tree"}/${value}`
+    if (host === "codeberg.org" || host.startsWith("gitea.")) return `${base}/${kind === "commit" ? "commit" : "src/tag"}/${value}`
+    return null
+  } catch { return null }
 }

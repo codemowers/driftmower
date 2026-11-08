@@ -62,6 +62,7 @@ type versionFindings struct {
 }
 
 type sourceFindings struct {
+	Releases  []crawler.Release `json:"releases,omitempty"`
 	URL       string            `json:"url"`
 	CheckedAt time.Time         `json:"checkedAt,omitzero"`
 	Latest    string            `json:"latest,omitempty"`
@@ -136,7 +137,7 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 	mcp.AddTool(s, &mcp.Tool{
 		Name:  "get_source_findings",
 		Title: "Get version drift and security advisories by source",
-		Description: "Lists the source repositories of images in use with, per deployed version, how many stable releases it is behind, " +
+		Description: "With a specific source URL, also includes stable release notes and links. Lists the source repositories of images in use with, per deployed version, how many stable releases it is behind, " +
 			"the newest release on its own major.minor line, the security advisories that apply (severity, confidence, the version " +
 			"that fixes it, summary and link) and the root workloads running it. Confidence affected means a well-formed range or OSV " +
 			"matched the version; possible means a free-text range admits a reading that includes it. Behind -1 means the version " +
@@ -194,6 +195,9 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 				continue
 			}
 			src := sourceFindings{URL: report.URL, CheckedAt: report.CheckedAt, Latest: latestTag(report), Errors: report.Errors}
+			if in.URL != "" {
+				src.Releases = report.Releases
+			}
 			for j := range report.Deployed {
 				deployed := &report.Deployed[j]
 				if (!allImages && len(running[deployed]) == 0) || (in.AffectedOnly && !affected(deployed)) {

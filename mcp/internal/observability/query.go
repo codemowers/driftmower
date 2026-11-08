@@ -75,8 +75,12 @@ func (s *Service) QueryMetrics(ctx context.Context, id authz.Identity, in Metric
 		if end, err = time.Parse(time.RFC3339, in.End); err != nil {
 			return nil, fmt.Errorf("end: %w", err)
 		}
-		if err := validateRange(start, end); err != nil {
-			return nil, err
+		maxRange := s.MaxHistoryRange
+		if maxRange == 0 {
+			maxRange = 7 * 24 * time.Hour
+		}
+		if !end.After(start) || end.Sub(start) > maxRange {
+			return nil, errors.New("time range exceeds configured history limit")
 		}
 		if end.Sub(start).Seconds()/float64(in.StepSeconds) > 11000 {
 			return nil, errors.New("too many range samples; increase stepSeconds")

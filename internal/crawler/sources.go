@@ -19,6 +19,7 @@ const (
 
 // Release is a published release of a source.
 type Release struct {
+	Notes      string    `json:"notes,omitempty"`
 	Tag        string    `json:"tag"`
 	Prerelease bool      `json:"prerelease,omitempty"`
 	Published  time.Time `json:"published,omitzero"`
@@ -81,6 +82,7 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 			endpoint = "https://" + loc.host + "/api/v1/repos/" + loc.path + "/releases?limit=50"
 		}
 		var items []struct {
+			Body        string    `json:"body"`
 			TagName     string    `json:"tag_name"`
 			Draft       bool      `json:"draft"`
 			Prerelease  bool      `json:"prerelease"`
@@ -92,11 +94,12 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 		}
 		for _, item := range items {
 			if !item.Draft {
-				out = append(out, Release{Tag: item.TagName, Prerelease: item.Prerelease, Published: item.PublishedAt, URL: item.HTMLURL})
+				out = append(out, Release{Notes: item.Body, Tag: item.TagName, Prerelease: item.Prerelease, Published: item.PublishedAt, URL: item.HTMLURL})
 			}
 		}
 	case GitLab:
 		var items []struct {
+			Description     string    `json:"description"`
 			TagName         string    `json:"tag_name"`
 			ReleasedAt      time.Time `json:"released_at"`
 			UpcomingRelease bool      `json:"upcoming_release"`
@@ -109,7 +112,7 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 			return nil, err
 		}
 		for _, item := range items {
-			out = append(out, Release{Tag: item.TagName, Prerelease: item.UpcomingRelease, Published: item.ReleasedAt, URL: item.Links.Self})
+			out = append(out, Release{Notes: item.Description, Tag: item.TagName, Prerelease: item.UpcomingRelease, Published: item.ReleasedAt, URL: item.Links.Self})
 		}
 	}
 	for i := range out {

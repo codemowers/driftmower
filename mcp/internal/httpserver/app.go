@@ -3,6 +3,7 @@ package httpserver
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
@@ -16,10 +17,12 @@ import (
 
 // AppOptions configure the main port.
 type AppOptions struct {
-	PublicURL     string
-	Cluster       cluster.Identity
-	OAuthClientID string
-	MCP           *mcp.Server
+	PublicURL       string
+	Cluster         cluster.Identity
+	OAuthClientID   string
+	BrowserClientID string
+	AllowedOrigins  []string
+	MCP             *mcp.Server
 	// Nil serves /mcp unauthenticated, for servers not reachable from outside
 	// the cluster.
 	Auth *auth.Authenticator
@@ -65,6 +68,20 @@ func NewApp(opts AppOptions) http.Handler {
 		mux.Handle(auth.MetadataPath, metadata)
 	}
 	mux.Handle("/mcp", mcpHandler)
+	mux.HandleFunc("GET /api/client-config", func(w http.ResponseWriter, r *http.Request) {
+		clientID := opts.BrowserClientID
+		// Loopback dashboards use the native PKCE client, whose redirect URIs
+		// accept HTTP loopback. CORS still requires an explicitly allowed origin.
+		if origin, err := url.Parse(r.Header.Get("Origin")); err == nil && origin.Scheme == "http" && (origin.Hostname() == "localhost" || origin.Hostname() == "127.0.0.1" || origin.Hostname() == "::1") {
+			clientID = opts.OAuthClientID
+		}
+		if opts.Auth == nil || clientID == "" {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "browser_auth_not_configured"})
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, map[string]any{"clientId": clientID, "issuer": opts.Auth.Issuer, "resource": a.resource, "scopes": opts.Auth.Metadata().ScopesSupported})
+	})
 	mux.HandleFunc("GET /{$}", a.serveLanding)
 	if opts.UI != nil {
 		mux.Handle("/ui", opts.UI)
@@ -80,5 +97,5 @@ func NewApp(opts AppOptions) http.Handler {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 	})
 
-	return opts.Metrics.Instrument(mux)
+	return opts.Metrics.Instrument(browserOrigins(mux, opts.PublicURL, opts.AllowedOrigins))
 }

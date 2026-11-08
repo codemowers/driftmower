@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { HISTORY_WINDOW_DAYS } from "@/lib/features/drift-history/constants"
 import { windowBounds } from "@/lib/features/drift-history/reduce"
@@ -11,7 +11,7 @@ import {
   type SeriesSource,
   type Window,
 } from "@/lib/features/drift-history/build-series"
-import { loadDriftHistory, refreshDriftHistory, type DriftHistoryData } from "@/lib/features/drift-history/store"
+import { loadDriftHistory, type DriftHistoryData } from "@/lib/features/drift-history/store"
 import type { DriftSeries, RottennessPoint } from "@/lib/features/drift-history/types"
 
 export type DriftHistory = {
@@ -33,56 +33,28 @@ const DAY_MS = 86_400_000
 
 export function useDriftHistory(enabled = true): DriftHistoryState {
   const context = useClusterState(s => s.clusterName)
-  const reportId = useClusterState(s => s.reportId)
   const [result, setResult] = useState<Loaded | null>(null)
-  const refetched = useRef<string | null>(null)
 
   useEffect(() => {
     if (!context || !enabled) return
     let cancelled = false
 
-    loadDriftHistory(context)
-      .then(data => {
-        if (!cancelled) setResult({ context, data, error: false })
-      })
-      .catch(() => {
-        if (!cancelled) setResult({ context, data: null, error: true })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [context, enabled])
-
-  // A report the fetched list never held postdates the data, so reload once.
-  useEffect(() => {
-    if (!context || !reportId || !result?.data) return
-    if (result.data.reportTimes.has(reportId) || refetched.current === reportId) return
-
-    refetched.current = reportId
-    let cancelled = false
-
-    refreshDriftHistory(context)
-      .then(data => {
-        if (!cancelled) setResult({ context, data, error: false })
-      })
-      .catch(() => {
-        if (!cancelled) setResult({ context, data: null, error: true })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [context, reportId, result])
+    const update=()=>void loadDriftHistory(context)
+      .then(data=>{if(!cancelled)setResult({context,data,error:false})})
+      .catch(()=>{if(!cancelled)setResult({context,data:null,error:true})})
+    update()
+    const timer=setInterval(update,300_000)
+    return()=>{cancelled=true;clearInterval(timer)}
+  },[context,enabled])
 
   const settled = result !== null && result.context === context
   const raw = settled ? result.data : null
 
   const data = useMemo(() => {
     if (!raw) return null
-    const { timeline, reportTimes } = raw
-    // Pinned reports end the window where the rest of the page stops too.
-    const headTime = (reportId ? reportTimes.get(reportId) : undefined) ?? timeline[timeline.length - 1] ?? 0
+    const { timeline } = raw
+    // History is a rolling Prometheus window, independent of live inventory.
+    const headTime = timeline[timeline.length - 1] ?? 0
     const { windowStart, windowEnd } = windowBounds(headTime, HISTORY_WINDOW_DAYS, timeline)
 
     const scoreStart = windowEnd - HISTORY_WINDOW_DAYS * DAY_MS
@@ -93,7 +65,7 @@ export function useDriftHistory(enabled = true): DriftHistoryState {
       rottenness: raw.rottenness.filter(point => point.t >= scoreStart && point.t <= windowEnd),
       sources: raw.sources,
     }
-  }, [raw, reportId])
+  }, [raw])
 
   if (!context || !enabled) return { data: null, loading: false, error: false }
 

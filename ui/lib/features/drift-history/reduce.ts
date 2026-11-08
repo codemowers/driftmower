@@ -4,7 +4,7 @@ import type { Observation } from "./build-series"
 
 const HOUR_MS = 3_600_000
 const DAY_MS = 86_400_000
-const MIN_FILL_MS = 36 * HOUR_MS
+const MIN_FILL_MS = 5 * 60_000
 const FILL_GAP_PERCENTILE = 0.9
 const FILL_GAP_SLACK = 1.25
 
@@ -28,7 +28,7 @@ function percentile(values: number[], p: number): number {
 
 export function maxFillMs(timeline: number[]): number {
   const gaps = timeline.slice(1).map((t, i) => t - timeline[i])
-  return Math.max(MIN_FILL_MS, FILL_GAP_SLACK * percentile(gaps, FILL_GAP_PERCENTILE))
+  return Math.min(20 * 60_000, Math.max(MIN_FILL_MS, FILL_GAP_SLACK * percentile(gaps, FILL_GAP_PERCENTILE)))
 }
 
 function toBandStatus(status: Observation["status"]): BandStatus {

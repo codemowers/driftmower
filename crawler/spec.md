@@ -39,6 +39,57 @@ ContainerImages see every source, others only the versions their visible
 workloads run. Scan findings and rewrite rules become further tools the same
 way.
 
+## Dashboard and history architecture
+
+All server-side application logic belongs in Go. The dashboard is a static
+browser application, served as assets by the Go server, and is an MCP client
+alongside agents. Remove the Next.js runtime/BFF, Socket.IO, legacy
+`driftmower-be` database and `driftmower-ai` service dependencies. Move any
+remaining server-side integrations, including LLM calls and credentials,
+into the appropriate Go service; no service credentials enter the browser.
+
+The browser is a public OAuth client using authorization code with PKCE S256,
+state and OIDC nonce. It obtains access tokens for the MCP resource URI,
+matching the MCP server's protected-resource metadata and audience validation.
+ID tokens identify the login, not API authorization. Request only the scopes
+needed by enabled capabilities, and enforce permissions and Kubernetes
+SubjectAccessReview in Go for both reads and mutations. An MCP token is never
+forwarded to a different audience; downstream calls use their own explicitly
+authorized identity and audience. Prefer static assets and /mcp on the same
+origin; otherwise configure exact allowed origins and required CORS headers.
+
+The existing Go workload inventory is the single implementation of root owner
+resolution. Extend it through API discovery for custom owners, preserving UID
+checks, cycle/depth bounds and explicit unresolved ancestry. MCP tools,
+dashboard resources, findings and metric generation reuse this model; the
+browser does not reconstruct ownership independently.
+
+Use MCP Streamable HTTP with its negotiated protocol's subscription and SSE
+mechanism, not a second Socket.IO protocol or a legacy standalone SSE
+transport. Publish scoped resource-change notifications; clients reread the
+corresponding authorized snapshot. Coalesce updates, bound queues, and resync
+after reconnect instead of assuming notification delivery is durable.
+Subscriptions must not disclose out-of-scope names or data, and must stop on
+expired authorization and be reauthorized when permissions change. The browser
+uses an MCP transport capable of bearer-authenticated fetch streams, rather
+than placing access tokens in EventSource URLs. No explicit refresh button:
+changes refresh live views automatically, with polling only as a fallback.
+
+Current state comes from Kubernetes CRDs, live workload inventory and crawler
+findings. History comes from a dedicated Prometheus instance in the driftmower
+namespace, provisioned with the installed Prometheus Operator. Scrape every
+five minutes. Keep its endpoint independently configurable from the general
+cluster monitoring endpoint. Go exposes scoped historical queries through MCP;
+the browser never directly accesses cluster-wide Prometheus. Export raw drift,
+version and coverage measurements, not estimated hours or dollars. Compute
+debt estimates from history and configurable assumptions in application code.
+Missing samples and incomplete scans are unknown, not zero drift or no CVEs.
+
+The scan dispatcher watches ContainerImages and reconciles existing resources
+at startup. New platform digests enter a deduplicated bounded Trivy queue;
+missing artifacts and changed extraction configuration requeue work. This
+requires no image admission webhook.
+
 ## Inputs
 
 | Source | Provides |
@@ -75,6 +126,36 @@ Forge and OSV requests go through a client that reaches only public
 addresses and identifies as `driftmower-operator (+<repository URL>)`. An
 optional token raises GitHub's limit of 60 unauthenticated requests per hour;
 without one the operator spreads requests over its poll interval.
+
+## Scan Job lifecycle
+
+The operator creates eligible Jobs without waiting for scans to finish. A
+PriorityClass-scoped ResourceQuota admits at most `parallelism` non-terminal scan
+Pods in the namespace. Other Driftmower components are outside that quota.
+The scan class defaults to priority 100000 with preemption disabled, above
+end-user priority 0 and below the cluster's infrastructure classes (1000000+).
+Jobs watch their owning ContainerImage, and Job/Pod events trigger reconciliation.
+The 15-minute execution deadline belongs to each Pod, so waiting for quota does
+not expire a Job. There is no separate operator global or per-node admission cap;
+an architecture node selector and required hostname affinity constrain scans to
+known cached-image hosts. Each Job lists at most three eligible hosts, selected
+pseudorandomly by a stable hash of Job name and hostname to spread images across
+the cluster without reshuffling on reconciliation. The scheduler chooses among that subset
+according to resource availability. Target image volumes retain pullPolicy Never.
+
+The operator uses a stable Job name per ContainerImage/platform. The SBOM cache
+key separately includes the scanner and database versions. Unchanged Pod specs
+use native Job retries (backoff limit 6); an exhausted Job stays failed. A changed
+desired Pod spec replaces the Job under the same name, so that replacement also
+removes the previous Job record.
+
+Finished successful Jobs and their Pods are eligible for cleanup after two
+minutes; failed Jobs after 48 hours. Jobs start with the failure TTL and the
+operator shortens it on successful completion, including after operator restarts.
+Pending image-volume cache misses do not trigger native Job backoff. The operator
+ends those attempts and can replace them when it selects a different node or
+immutable image reference. Successful Jobs can disappear between five-minute
+Prometheus scrapes; Job state metrics are not durable success counters.
 
 ## Drift and advisories
 
@@ -119,45 +200,71 @@ version of a source appears on nodes.
 
 ## Image scanning
 
-The operator scans each platform manifest of every in-use ContainerImage
-once, since a digest's content never changes; matching the resulting package
-inventory against advisories is repeated centrally whenever advisories change.
+The operator watches ContainerImages and dispatches Trivy scan Jobs itself;
+Trivy Operator is not used. Work is deduplicated by platform manifest digest,
+so a multi-platform image is scanned once per platform actually present on
+nodes, not once per Pod or node. Extraction is repeated when the scanner
+version or extraction configuration changes. CVE evaluation is refreshed
+when the vulnerability database changes, even when the image does not.
 
-A scan is a Pod pinned with `nodeName` to a node whose ContainerImage entry
-holds that manifest. It mounts the image as an OCI image volume by digest with
-`pullPolicy: IfNotPresent`, so the node needs no pull and no registry
-credentials, and the platform is the node's own. The scanner container is the
-operator's own image; nothing from the scanned image executes.
+Each Job mounts the target as a read-only Kubernetes OCI image volume at
+`/target`, using a digest reference recorded as present on a candidate node
+and `pullPolicy: Never`. The dispatcher selects a node whose ContainerImage
+inventory holds that platform manifest and sets `nodeSelector` to its actual
+`kubernetes.io/hostname` label value (do not assume it equals the Node name).
+Verify that the label uniquely selects that node; otherwise leave the scan
+pending with an explicit reason. This retains scheduler resource, taint and cordon checks;
+do not bypass the scheduler with `nodeName`. ImageLocality scoring alone is
+not a placement guarantee. If no eligible node holds the image, leave the
+scan pending with an explicit reason. If image garbage collection races the
+scan, refresh inventory and retry with bounded backoff; do not silently pull
+the target from a registry. Verify runtime image-volume support and digest
+reference resolution on the deployed Kubernetes/runtime versions.
 
-The scanner reads, read-only:
+Run a pinned Trivy image with `trivy rootfs` against `/target` to extract a
+CycloneDX SBOM and evaluate OS and language-package vulnerabilities. Enable
+vulnerability scanning explicitly when producing CycloneDX; it is not implied
+by that output format. Nothing from the target image executes. Record the
+platform digest, scanner version, extraction configuration, database version,
+scan time and completeness alongside results. A failed or unsupported scan is
+unknown coverage, never a clean result.
 
-- OS package databases: dpkg status, apk installed, RPM database.
-- Go binaries' embedded build information (main module, version, dependencies).
-- Language manifests: `package.json` under `node_modules`, Python
-  `*.dist-info/METADATA`, JAR manifests and `pom.properties`.
-- `/etc/os-release` for the distribution and release.
+Dispatch limits are configurable: `scan.maxConcurrentJobs` bounds all active
+scan Jobs, and `scan.maxConcurrentJobsPerNode` bounds load on each node.
+Count pending Jobs against the global limit and reserve a node slot before
+dispatch; constrain that Job to its selected eligible node. Reconstruct active
+work from owned Jobs after restart and use leader election so replicas do not
+multiply the limits. Jobs have resource requests/limits, deadlines, bounded
+retries and cleanup after results are collected.
 
-It prints a bounded JSON inventory and exits; the operator reads it from the
-Pod log and deletes the Pod. Scan Pods run in the operator namespace with no
-ServiceAccount token, a deny-all NetworkPolicy, a read-only root filesystem,
-`hostUsers: false`, low priority, small resource limits and a timeout. A
-parser bug therefore exposes nothing but the image the Pod already sees.
+Trivy requires vulnerability databases and, for some analyzers, supplementary
+data. Package the vulnerability DB and Java index in a versioned OCI filesystem
+image and mount it as a second read-only image volume in each scan Job. The
+scanner container runs the Trivy image with DB updates and online resolution
+disabled; there is no Trivy server. A short Go upload container runs after the
+scan to collect its SBOM. Include the database-image digest in the scan cache
+key so replacing the DB image reevaluates unchanged target images. Refresh
+the DB image centrally; do not download databases independently for every scan. Network-isolated workers
+must have their required data staged before scanning. Keep the target mount
+read-only, disable ServiceAccount token mounting, drop capabilities and use
+writable scratch space only for Trivy cache/output. Validate filesystem
+permissions and analyzer coverage before enforcing a non-root scanner UID.
 
-Per platform manifest the operator keeps in memory the distribution, the
-package inventory and its vulnerable packages with advisory, severity and
-fixed version, and drops them when the ContainerImage goes away.
+Keep current scan summaries and artifact references in operator-owned CRDs,
+linked to the ContainerImage; do not place unbounded SBOMs in object status or
+Pod logs. Full SBOM/result artifact storage and bounded authenticated result
+collection still need an implementation decision. Expose current findings
+through MCP/UI, and export bounded numeric vulnerability/coverage metrics for
+Prometheus history. Do not use Prometheus as SBOM storage.
 
-The same mechanism verifies rewrite targets: scanning a target on each node
-architecture proves it is pullable there, pre-pulls it before rollout, and
-shows the fix does not introduce new findings.
+Rewrite-target verification is a distinct operation: it may deliberately pull
+a new target on the required architecture before scanning. Ordinary scans of
+existing ContainerImages remain cache-only.
 
-This replaces the Trivy operator, which pulls images again from registries,
-needs their credentials and scans outside the node's platform.
-
-Open: with kubelet's ensure-secret-pulled-images behavior, a node may refuse
-to reuse an image first pulled with credentials for a Pod without them. Verify
-on 1.36; if it applies, private images are scanned from a Pod in the
-workload's namespace with its pull secrets, or skipped.
+Validate private-image credential enforcement and admission policies on the
+actual cluster. A cached image is not a guarantee that a different Pod may
+mount it without credentials; report an explicit unavailable scan rather than
+copying workload secrets into the operator namespace.
 
 ## Hotfix image rewrite rules
 

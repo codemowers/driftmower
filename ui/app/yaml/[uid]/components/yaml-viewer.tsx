@@ -7,7 +7,7 @@ import { generatedAnnotator, stripGenerated } from "@/lib/features/yaml/managed-
 import { useSearchParam } from "@/lib/hooks/use-search-param"
 import { emitYamlLines } from "@/lib/features/yaml/yaml-lines"
 import LoadingLine from "@/app/components/loading-line"
-import { readApiError } from "@/lib/utils/read-api-error"
+import { callTool } from "@/browser/connection"
 
 type Props = {
   uid: string
@@ -30,19 +30,8 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    const query = new URLSearchParams({ kind, namespace, name })
-
-    fetch(`/api/cluster-resources/${encodeURIComponent(uid)}/yaml?${query}`, { cache: "no-store" })
-      .then(async res => {
-        if (cancelled) return
-        if (!res.ok) {
-          const message = await readApiError(res)
-          if (!cancelled) setState({ status: "error", message })
-          return
-        }
-        const json = await res.json()
-        setState({ status: "ready", resource: json })
-      })
+    callTool<Record<string,unknown>>("get_workload_object",{uid,kind,namespace,name})
+      .then(resource=>{if(!cancelled)setState({status:"ready",resource})})
       .catch(e => {
         if (!cancelled) setState({ status: "error", message: String(e) })
       })

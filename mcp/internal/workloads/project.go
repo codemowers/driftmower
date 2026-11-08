@@ -182,25 +182,35 @@ func Project(src Source, obj any) (*Node, error) {
 		}
 		n.ObjectMeta = reduceMeta(o.ObjectMeta)
 	case *corev1.Pod:
+		n.Completed = o.Status.Phase == corev1.PodSucceeded
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), Spec{Pod: podRefs(&o.Spec)}
 	case *corev1.ReplicationController:
+		n.DesiredReplicas = o.Spec.Replicas
 		n.ObjectMeta = reduceMeta(o.ObjectMeta)
 		if o.Spec.Template != nil {
 			n.Spec = template(o.Spec.Template)
 		}
 	case *appsv1.Deployment:
+		n.DesiredReplicas = o.Spec.Replicas
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.Template)
 	case *appsv1.ReplicaSet:
+		n.DesiredReplicas = o.Spec.Replicas
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.Template)
 	case *appsv1.DaemonSet:
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.Template)
 	case *appsv1.StatefulSet:
+		n.DesiredReplicas = o.Spec.Replicas
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.Template)
 		n.Spec.ServiceName = o.Spec.ServiceName
 		for _, c := range o.Spec.VolumeClaimTemplates {
 			n.Spec.ClaimTemplates = append(n.Spec.ClaimTemplates, c.Name)
 		}
 	case *batchv1.Job:
+		for _, condition := range o.Status.Conditions {
+			if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
+				n.Completed = true
+			}
+		}
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.Template)
 	case *batchv1.CronJob:
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), template(&o.Spec.JobTemplate.Spec.Template)

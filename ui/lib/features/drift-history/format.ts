@@ -34,5 +34,5 @@ export function windowSummary(window: {
   reportCount: number
 }): string {
   const days = Math.round((window.windowEnd - window.windowStart) / DAY_MS)
-  return `${window.reportCount} reports · ${days} days of data`
+  return `${window.reportCount} samples · ${days} days of data`
 }

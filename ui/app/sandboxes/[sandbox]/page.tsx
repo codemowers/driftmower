@@ -6,7 +6,6 @@ import { useParams } from "next/navigation"
 import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Breadcrumbs from "../../components/breadcrumbs"
-import RefreshButton from "../../components/core/refresh-button"
 import { ValuePill } from "../components/overflow-pills"
 import KubeconfigPanel from "../kubeconfig-panel"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -74,7 +73,6 @@ export default function SandboxDetailPage() {
               )}
             </div>
             <div className="shrink-0 p-1">
-              <RefreshButton />
             </div>
           </div>
 

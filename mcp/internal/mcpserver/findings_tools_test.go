@@ -52,6 +52,7 @@ var crawled = []crawler.SourceReport{{
 	URL:        "https://github.com/example/api",
 	CheckedAt:  time.Date(2026, 11, 3, 6, 0, 0, 0, time.UTC),
 	Latest:     &crawler.Release{Tag: "v1.2.0"},
+	Releases:   []crawler.Release{{Tag: "v1.2.0", Notes: "Fixes and improvements", URL: "https://github.com/example/api/releases/tag/v1.2.0"}},
 	Advisories: []crawler.Advisory{{ID: "GHSA-test", Summary: "Remote crash", URL: "https://github.com/advisories/GHSA-test"}},
 	Deployed: []crawler.DeployedVersion{{
 		Version: "1.0.0", Behind: 2, LatestOnLine: "1.0.3",
@@ -102,6 +103,14 @@ func TestSourceFindings(t *testing.T) {
 	text, out := call(t, s, "get_source_findings", nil)
 	if text != "1 sources; 1 with a deployed version an advisory affects." {
 		t.Errorf("summary = %q", text)
+	}
+	if _, exists := out["sources"].([]any)[0].(map[string]any)["releases"]; exists {
+		t.Fatal("unfiltered overview must not include every release body")
+	}
+	_, detail := call(t, s, "get_source_findings", map[string]any{"url": "https://github.com/example/api"})
+	releases := detail["sources"].([]any)[0].(map[string]any)["releases"].([]any)
+	if len(releases) != 1 || releases[0].(map[string]any)["notes"] != "Fixes and improvements" {
+		t.Fatalf("release notes missing: %v", releases)
 	}
 	deployed := out["sources"].([]any)[0].(map[string]any)["deployed"].([]any)
 	if len(deployed) != 2 {

@@ -7,7 +7,7 @@ spec:
   tls:
     - secretName: driftmower-ui-tls
   rules:
-    - host: driftmower.ee
+    - host: dashboard.driftmower.ee-lte-1.codemowers.io
       http:
         paths:
           - path: /

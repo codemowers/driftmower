@@ -47,6 +47,10 @@ metadata:
     kubernetes.io/description: 'Provides cluster-specific Kubernetes discovery, resource usage and provisioning guidance through MCP, using the authenticated caller’s permissions.'
 spec:
   applicationType: native
+  {{- with .Values.dashboard.localOrigins }}
+  allowedCORSOrigins:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   displayName: Driftmower MCP
   uri: https://mcp/
   # One entry per loopback hostname. The port shown is arbitrary and ignored at

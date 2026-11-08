@@ -1,0 +1,37 @@
+resources:
+  - ../../k8s
+patches:
+  - target:
+      kind: Deployment
+      name: driftmower-ui
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: https://mcp.driftmower.ee-west-1.codemowers.io/mcp
+  - target:
+      kind: Ingress
+      name: driftmower-ui
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dashboard.driftmower.ee-west-1.codemowers.io
+  - target:
+      kind: Certificate
+      name: driftmower-ui
+    patch: |-
+      - op: replace
+        path: /spec/dnsNames/0
+        value: dashboard.driftmower.ee-west-1.codemowers.io
+  - target:
+      kind: OIDCClient
+      name: driftmower-ui
+    patch: |-
+      - op: replace
+        path: /spec/uri
+        value: https://dashboard.driftmower.ee-west-1.codemowers.io/
+      - op: replace
+        path: /spec/redirectUris/0
+        value: https://dashboard.driftmower.ee-west-1.codemowers.io/callback
+      - op: replace
+        path: /spec/allowedCORSOrigins/0
+        value: https://dashboard.driftmower.ee-west-1.codemowers.io

@@ -1,0 +1,6 @@
+resources:
+  - oidcclient.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - certificate.yaml

@@ -20,13 +20,9 @@ rbac:
 serviceAccountAuth:
   enabled: false
 
-# Enable drift-analysis tools only when a backend and service token are provisioned.
-backend:
-  enabled: false
-  url: "http://driftmower-be:3030"
-  serviceTokenSecret:
-    name: driftmower-mcp-be-auth-token
-    key: token
+# Dedicated version-drift history, separate from resource-usage monitoring.
+driftHistory:
+  url: "http://driftmower-prometheus:9090"
 
 # driftmower-crawler (crawler/chart) for get_source_findings and
 # get_workload_findings. An empty url leaves both tools off. The crawler must
@@ -39,7 +35,7 @@ crawler:
 
 # Public browser client: authorization code + PKCE, credentials only in tab memory.
 webUi:
-  enabled: true
+  enabled: false
   # Set full URLs on clusters without hostname expansion policies.
   origin: "https://mcp"
   redirectUri: "https://mcp/ui/callback"
@@ -47,3 +43,10 @@ webUi:
 # Optional caller-authorized workload mutations. Disabled by default.
 workloadRestart:
   enabled: false
+
+# Public static-dashboard client; unset leaves browser client discovery disabled.
+dashboard:
+  origin: ""
+  clientSecretName: ""
+  # Exact loopback origins for a local static dashboard using the native client.
+  localOrigins: []

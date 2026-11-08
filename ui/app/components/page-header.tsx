@@ -1,11 +1,9 @@
 "use client"
 
 import type { ReactNode } from "react"
-import RefreshButton from "./core/refresh-button"
 import LoadError from "./load-error"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
-import { refreshState } from "@/lib/cluster/refresh-state"
 
 type Props = {
   title: string
@@ -15,10 +13,7 @@ type Props = {
 
 export default function PageHeader({ title, subtitle, accessory }: Props) {
   const error = useClusterState(s => s.error)
-  const errorSource = useClusterState(s => s.errorSource)
-  const retry = errorSource === "analysis"
-    ? () => void refreshState()
-    : () => void fetchDynamicData(useClusterState.getState().reportId)
+  const retry = () => void fetchDynamicData()
   return (
     <>
       <header className="flex items-start justify-between gap-8">
@@ -30,7 +25,6 @@ export default function PageHeader({ title, subtitle, accessory }: Props) {
           <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
         </div>
         <div className="shrink-0 p-1">
-          <RefreshButton />
         </div>
       </header>
       {error && <LoadError message={error} onRetry={retry} />}

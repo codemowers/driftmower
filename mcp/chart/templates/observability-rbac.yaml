@@ -107,6 +107,12 @@ rules:
   - apiGroups: [cert-manager.io]
     resources: [certificates]
     verbs: [list, watch]
+  - apiGroups: [codemowers.io]
+    resources: [containerimages, sourcerepositories]
+    verbs: [list]
+  - apiGroups: [helm.cattle.io]
+    resources: [helmcharts]
+    verbs: [list]
   # Every permission answer this server gives is a SubjectAccessReview asked as
   # the verified caller. This is a permission-probing capability: the server
   # only ever asks about the identity it just verified from the token.

@@ -1,4 +1,4 @@
-// Package tenancy decides which namespaces a caller may see driftmower-be
+// Package tenancy decides which namespaces a caller may see in scoped
 // results for, from the token's namespaces claim and the cluster authorizer.
 package tenancy
 

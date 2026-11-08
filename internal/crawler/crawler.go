@@ -344,6 +344,7 @@ type SourceReport struct {
 	NextCrawl time.Time `json:"nextCrawl,omitzero"`
 	Errors    []string  `json:"errors,omitempty"`
 	// Latest is the newest stable release.
+	Releases   []Release         `json:"releases,omitempty"`
 	Latest     *Release          `json:"latest,omitempty"`
 	Deployed   []DeployedVersion `json:"deployed"`
 	Advisories []Advisory        `json:"advisories,omitempty"`
@@ -388,6 +389,9 @@ func (c *Crawler) Reports() []SourceReport {
 			report.CheckedAt, report.NextCrawl, report.Errors = state.checkedAt, state.due, state.errors
 		}
 		releases, advisories := stableReleases(state), map[string]Advisory{}
+		for _, release := range releases {
+			report.Releases = append(report.Releases, release.Release)
+		}
 		for _, version := range sortedKeys(versions) {
 			deployed := DeployedVersion{Version: version, Images: versions[version].images, References: versions[version].references, Behind: -1}
 			v, ok := ParseVersion(version)

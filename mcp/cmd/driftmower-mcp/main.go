@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -25,10 +26,10 @@ import (
 
 	"github.com/codemowers/driftmower/mcp/internal/auth"
 	"github.com/codemowers/driftmower/mcp/internal/authz"
-	"github.com/codemowers/driftmower/mcp/internal/backend"
 	"github.com/codemowers/driftmower/mcp/internal/catalog"
 	"github.com/codemowers/driftmower/mcp/internal/cluster"
 	"github.com/codemowers/driftmower/mcp/internal/config"
+	"github.com/codemowers/driftmower/mcp/internal/drifthistory"
 	"github.com/codemowers/driftmower/mcp/internal/findings"
 	"github.com/codemowers/driftmower/mcp/internal/httpserver"
 	"github.com/codemowers/driftmower/mcp/internal/kube"
@@ -38,7 +39,6 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/observability"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower/mcp/internal/tenancy"
 	"github.com/codemowers/driftmower/mcp/internal/ui"
 	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
@@ -151,9 +151,10 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	// Probes answer not-ready while discovery runs, rather than refusing
 	// connections.
 	var health *http.Server
+	driftHandler := http.NewServeMux()
 	if cfg.Transport == config.TransportHTTP {
 		var err error
-		if health, err = serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.HealthPort)), httpserver.HealthHandler(&ready, m)); err != nil {
+		if health, err = serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.HealthPort)), httpserver.HealthHandler(&ready, m, driftHandler)); err != nil {
 			return err
 		}
 	}
@@ -177,6 +178,24 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 
 	live := newWorkloads(gctx, cfg, svc, logger)
 	obs := newObservability(cfg, svc, m)
+	source := newFindings(cfg)
+	if source != nil && live != nil {
+		namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		if err == nil {
+			name := os.Getenv("POD_SERVICE_ACCOUNT")
+			if name == "" {
+				name = "driftmower-mcp"
+			}
+			driftHandler.Handle("/drift-metrics", &drifthistory.Exporter{Source: source, Inventory: live.Cache, Kubernetes: live.Cache.Kubernetes, Dynamic: live.Cache.Dynamic,
+				Identity: authz.Identity{User: "system:serviceaccount:" + strings.TrimSpace(string(namespace)) + ":" + name, Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + strings.TrimSpace(string(namespace)), "system:authenticated"}}})
+		}
+	}
+	var history *observability.Service
+	if cfg.DriftPrometheusURL != "" {
+		history = &observability.Service{PrometheusURL: cfg.DriftPrometheusURL, MaxHistoryRange: 90 * 24 * time.Hour, Kubernetes: svc.clients.Kubernetes, Judge: svc.judge,
+			Backend: observability.NewGateway(observability.GatewayOptions{Next: observability.HTTPRequester(20 * time.Second), PrometheusURL: cfg.DriftPrometheusURL, MaxConcurrent: 4, MaxQueued: 16, QueueWait: 20 * time.Second, CacheTTL: 5 * time.Minute, PrometheusTimeout: 19 * time.Second}),
+			Budget:  &observability.Budget{QueriesPerMinute: 240, MaxConcurrentCalls: 4}}
+	}
 	server := mcpserver.New(mcpserver.Deps{
 		Cluster:       identity,
 		Version:       version,
@@ -188,8 +207,8 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Provisioning:  svc.service,
 		Workloads:     live,
 		Observability: obs,
-		Backend:       newBackend(cfg, svc, logger),
-		Findings:      newFindings(cfg),
+		Findings:      source,
+		DriftHistory:  history,
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -203,6 +222,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		logger.Warn("HTTP transport is serving unauthenticated; do not expose it through an Ingress in this state")
 	}
 	app, err := serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)), httpserver.NewApp(httpserver.AppOptions{
+		BrowserClientID: cfg.BrowserClientID, AllowedOrigins: cfg.AllowedOrigins,
 		PublicURL:     cfg.PublicURL,
 		Cluster:       identity,
 		OAuthClientID: cfg.OAuthClientID,
@@ -342,22 +362,6 @@ func newFindings(cfg *config.Config) mcpserver.FindingsSource {
 	}
 
 	return &findings.Client{URL: cfg.Crawler.URL, TokenFile: cfg.Crawler.TokenFile, HTTP: &http.Client{Timeout: 30 * time.Second}}
-}
-
-// newBackend reads persisted analysis from driftmower-be, confined to each
-// caller's tenancy.
-func newBackend(cfg *config.Config, svc *services, logger *slog.Logger) *mcpserver.Backend {
-	if !cfg.Backend.Enabled {
-		return nil
-	}
-	client := &backend.Client{BaseURL: cfg.Backend.URL, Token: cfg.Backend.ServiceToken, Timeout: cfg.Backend.Timeout}
-	rows := &backend.RowLoader{Client: client}
-
-	return &mcpserver.Backend{
-		Searcher: &backend.Searcher{Client: client, Rows: rows, DefaultLimit: cfg.Search.DefaultLimit, MaximumLimit: cfg.Search.MaximumLimit},
-		Planner:  &backend.Planner{Client: client, Rows: rows, DefaultLimit: cfg.Search.DefaultLimit, MaximumLimit: cfg.Search.MaximumLimit},
-		Tenancy:  &mcpserver.Tenancy{Policy: tenancy.Policy(cfg.Tenancy.ScopeSource), Resolver: svc.scope, Mapping: svc.mapping, Logger: logger},
-	}
 }
 
 // newExplorer serves the browser explorer when enabled. It signs in with the

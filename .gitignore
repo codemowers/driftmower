@@ -2,3 +2,5 @@ skaffold.env
 # Go binaries built in place
 /driftmower-crawler
 /driftmower-mcp
+
+/.build-tmp/

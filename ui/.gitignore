@@ -50,3 +50,6 @@ CLAUDE.md
 /docs/
 k8s/rasmus/
 skaffold.env
+
+/static/.next/
+/static/out/

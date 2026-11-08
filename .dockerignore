@@ -1,0 +1,14 @@
+# Shared context for Skaffold/Kaniko. Never upload local credentials or build output.
+.git
+.agents
+.codex
+.aws
+.build-tmp
+skaffold.env
+**/node_modules
+**/.next
+**/out
+**/coverage
+**/.env
+**/.env.*
+**/*.log

@@ -12,7 +12,7 @@ import { claudeCodeTokenCommand } from "@/lib/features/provisioning/mcp-quicksta
 // (passmower's resourceIndicators accessTokenTTL) and this route has no way to
 // give a client a refresh token, so a client configured with a static header
 // will start failing after that. The durable path is OAuth + PKCE against the
-// `driftmower-mcp` OIDCClient — see driftmower-mcp/manifests/oidcclient.yaml.
+// `mcp` OIDCClient — see mcp/chart/templates/oidcclient.yaml.
 //
 // Stays behind the session cookie like every other /api route (proxy.ts).
 

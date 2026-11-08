@@ -39,11 +39,10 @@ type Deps struct {
 	// Enables list_volumes, and the metrics and logs tools it is configured
 	// for.
 	Observability *observability.Service
-	// Enables search_workloads and plan_image_updates.
-	Backend *Backend
 	// Enables get_source_findings and get_workload_findings, which also need
 	// Workloads.
-	Findings FindingsSource
+	Findings     FindingsSource
+	DriftHistory *observability.Service
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -63,7 +62,9 @@ func New(d Deps) *mcp.Server {
 			}()
 		}
 	}
-	s := mcp.NewServer(&mcp.Implementation{Name: d.Cluster.MCPServerName, Version: d.Version}, opts)
+	var s *mcp.Server
+	dashboardSubscriptions(opts, d, &s)
+	s = mcp.NewServer(&mcp.Implementation{Name: d.Cluster.MCPServerName, Version: d.Version}, opts)
 
 	s.AddResource(&mcp.Resource{
 		Name:        "cluster-discovery-guide",
@@ -79,6 +80,9 @@ func New(d Deps) *mcp.Server {
 
 	if d.Workloads != nil {
 		addWorkloadTools(s, d.Workloads, d.Mapping)
+		addApplicationsTool(s, d.Workloads, d.Mapping)
+		addHelmTool(s, d.Workloads, d.Mapping)
+		addWorkloadObjectTool(s, d.Workloads, d.Mapping)
 	}
 	addClusterIdentityTool(s, d.Cluster, usage)
 	if d.Catalog != nil {
@@ -87,11 +91,16 @@ func New(d Deps) *mcp.Server {
 	if d.Scope != nil {
 		addAccessibleNamespacesTool(s, d.Scope, d.Mapping)
 	}
-	if d.Backend != nil {
-		addBackendTools(s, d.Backend)
-	}
 	if d.Findings != nil && d.Workloads != nil {
 		addFindingsTools(s, d.Findings, d.Workloads, d.Mapping)
+		clusterID := d.Cluster.MCPServerName
+		if d.Cluster.ID != nil {
+			clusterID = *d.Cluster.ID
+		}
+		addDashboardTool(s, d.Findings, d.Workloads, d.Mapping, clusterID)
+	}
+	if d.DriftHistory != nil {
+		addDriftHistoryTool(s, d.DriftHistory, d.Mapping)
 	}
 	if d.Observability != nil {
 		addObservabilityTools(s, d.Observability, d.Mapping)
@@ -133,7 +142,6 @@ func usageInstructions(d Deps) string {
 		"Use their history endpoints only for trends, past usage, peaks or statistics. Use query_metrics for specific metrics outside those fixed summaries. Missing metrics or low coverage are not evidence of zero usage.")
 	add(d.Findings != nil && d.Workloads != nil, "For version drift and security advisories, use get_workload_findings for a workload or namespace and get_source_findings across sources. "+
 		"Findings are crawled every few hours; absence of findings is not proof of absence.")
-	add(d.Backend != nil, "search_workloads reads backend report snapshots and may be stale or differently scoped; use live workload inventory when available for what is running now.")
 	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload and terminate_pod mutate resources. "+
 		"Use only for an explicit user request, using UID from current workload inventory; never treat them as diagnostic probes or automatically retry uncertain results.")
 	add(true, "Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories.")

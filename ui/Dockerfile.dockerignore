@@ -1,0 +1,9 @@
+**
+!ui
+!ui/**
+ui/node_modules
+ui/.next
+ui/static/.next
+ui/static/out
+ui/.env*
+ui/scripts

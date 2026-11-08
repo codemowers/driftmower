@@ -5,6 +5,10 @@ import { fetchJson } from "@/lib/utils/fetch-json"
 export type StatusType = "up_to_date" | "patch_behind" | "minor_behind" | "major_behind" | "ahead" | "behind" | "no_data" | "no_version"
 
 export type ReleaseInfo = {
+  desiredVersion?: string
+  helmChartRef?: string
+  evidence?: string[]
+  secretName?: string
   managementKind: string
   name: string
   namespace: string
@@ -85,6 +89,12 @@ export type ImageUsage = {
     repositoryUrl?: string
     tagUrl?: string
     labels?: Record<string, string>
+    crawlerSource?: { url: string; version: string }
+    sourceStatus?: "linked" | "unlinked" | "unknown"
+    sourceRepositories?: { name?: string; url: string }[]
+    containerImage?: string
+    sbomArtifacts?: string[]
+    scannerNamespace?: string
     endOfLifeDate?: string
     endOfActiveSupportDate?: string
   }
@@ -118,6 +128,7 @@ export type Issue = {
 }
 
 export type Report = {
+  workloads?: { desiredReplicas?: number; completed?: boolean; uid: string; kind: string; namespace: string; name: string; standalonePods?: { name: string; uid: string }[] }[]
   id: string
   sourceType: "cluster"
   clusterContext: string

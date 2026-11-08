@@ -19,6 +19,8 @@ import (
 type Service struct {
 	// Empty disables the metrics and resource-usage tools.
 	PrometheusURL string
+	// Optional bound for dedicated history stores; resource monitoring defaults to seven days.
+	MaxHistoryRange time.Duration
 	// Empty reads logs from the Kubernetes API instead.
 	LokiURL string
 	// Offers query_logs; set when observability is configured.

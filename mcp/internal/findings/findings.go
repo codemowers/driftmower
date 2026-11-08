@@ -92,7 +92,11 @@ func NewIndex(reports []crawler.SourceReport) Index {
 
 // Lookup resolves an image reference as a Pod spec carries it.
 func (index Index) Lookup(ref string) (Match, bool) {
-	for _, key := range Keys(ref) {
+	keys := Keys(ref)
+	if strings.Contains(ref, "@") && len(keys) > 0 {
+		keys = keys[:1]
+	}
+	for _, key := range keys {
 		if match, ok := index[key]; ok {
 			return match, true
 		}
@@ -107,8 +111,10 @@ func (index Index) Lookup(ref string) (Match, bool) {
 func Keys(ref string) []string {
 	name, digest, _ := strings.Cut(strings.TrimSpace(ref), "@")
 	tag := "latest"
+	explicitTag := false
 	if i := strings.LastIndex(name, ":"); i > strings.LastIndex(name, "/") {
 		name, tag = name[:i], name[i+1:]
+		explicitTag = true
 	}
 	repo := canonicalRepository(name)
 	if repo == "" {
@@ -117,6 +123,9 @@ func Keys(ref string) []string {
 	var keys []string
 	if digest != "" {
 		keys = append(keys, repo+"@"+digest)
+		if !explicitTag {
+			return keys
+		}
 	}
 	return append(keys, repo+":"+tag)
 }

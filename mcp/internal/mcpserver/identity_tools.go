@@ -25,7 +25,7 @@ func addClusterIdentityTool(s *mcp.Server, c cluster.Identity, usage string) {
 		Name:        "get_cluster_identity",
 		Title:       "Identify this cluster",
 		InputSchema: noArguments(),
-		Description: "Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting backend report scope. " +
+		Description: "Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting drift history. " +
 			"Match that URL against local kubeconfig before selecting an explicit kubectl context. Null values mean unconfigured identity; ask rather than guessing.",
 		Annotations: readOnly("Identify this cluster"),
 	}, func(context.Context, *mcp.CallToolRequest, noInput) (*mcp.CallToolResult, clusterIdentityOutput, error) {

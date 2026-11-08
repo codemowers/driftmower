@@ -16,6 +16,7 @@ import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
 import ReleaseTabs from "./components/release-tabs"
 import PageLoading from "@/app/components/page-loading"
+import HelmInspection from "@/app/components/helm-inspection"
 
 const NO_USAGES: ImageUsage[] = []
 
@@ -102,12 +103,14 @@ export default function HelmReleaseDetailPage() {
           revision={score.releaseInfo.revision}
         />
 
+        {score.releaseInfo.helmChartRef && <p className="text-sm text-muted-foreground">HelmChart: <span className="font-mono">{score.releaseInfo.helmChartRef}</span>{score.releaseInfo.desiredVersion && <> · Desired chart version: <span className="font-mono">{score.releaseInfo.desiredVersion}</span></>}</p>}
         <ChartCard
           releaseInfo={score.releaseInfo}
           href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab", "focus"] })}
         />
 
         <ActionsCard {...assessments} />
+        <HelmInspection release={score.releaseInfo} />
 
         <ReleaseTabs
           uid={uid}

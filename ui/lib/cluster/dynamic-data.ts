@@ -1,10 +1,10 @@
-import { fetchLatestReport, fetchReport } from "./reports"
-import { fetchVulnerabilityReports } from "@/lib/features/vulnerability"
+import { callTool } from "@/browser/connection"
+import { useClusterState } from "./cluster-state"
+import { presentationData, type DashboardSnapshot } from "@/browser/snapshot"
 
-// Fetches report + vulnerabilities on load and manual refresh. Not polled.
-export async function fetchDynamicData(reportId?: string | null): Promise<void> {
-  await Promise.allSettled([
-    reportId ? fetchReport(reportId) : fetchLatestReport(),
-    fetchVulnerabilityReports(),
-  ])
+export async function fetchDynamicData(_reportId?: string | null): Promise<void> {
+ try {
+  const snapshot=await callTool<DashboardSnapshot>("get_dashboard_snapshot")
+  useClusterState.setState({data:presentationData(snapshot),reportId:null,clusterName:snapshot.clusterContext,clusterResources:snapshot.resources,error:null,lastRefreshed:new Date()})
+ } catch(e) { useClusterState.setState({error:(e as Error).message,errorSource:"report"}) }
 }

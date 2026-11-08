@@ -1,5 +1,7 @@
 "use client"
 
+import { logout } from "@/browser/connection"
+
 import { LogOut, User } from "lucide-react"
 import type { SessionClaims } from "@/lib/auth/session"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -87,7 +89,7 @@ export default function NavUser({ claims, isExpanded }: NavUserProps) {
 
           <div className="border-t border-border" aria-hidden />
 
-          <form method="post" action="/api/auth/logout">
+          <form onSubmit={event=>{event.preventDefault();void logout()}}>
             <button
               type="submit"
               className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"

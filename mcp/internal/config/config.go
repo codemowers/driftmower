@@ -37,11 +37,14 @@ type Config struct {
 	// Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
 	// wherever the OS leaves bindv6only off. Narrow it to `::1` or
 	// `127.0.0.1` to bind loopback only.
-	Host       string
-	Port       int
-	HealthPort int
-	LogLevel   string
-	PublicURL  string
+	Host               string
+	Port               int
+	HealthPort         int
+	LogLevel           string
+	PublicURL          string
+	DriftPrometheusURL string
+	BrowserClientID    string
+	AllowedOrigins     []string
 	// MCP sessions with no open request are closed after this long.
 	SessionIdle time.Duration
 
@@ -56,7 +59,6 @@ type Config struct {
 	OIDC *OIDC
 
 	Cluster       cluster.Identity
-	Backend       Backend
 	Crawler       Crawler
 	Search        Search
 	Provisioning  Provisioning
@@ -78,15 +80,6 @@ type OIDC struct {
 	JWKSBearerTokenFile string
 	// Client IDs whose tokens this server accepts; empty accepts any client.
 	AllowedClientIDs []string
-}
-
-type Backend struct {
-	Enabled bool
-	URL     string
-	// The backend rejects unauthenticated reads, so the token is required
-	// whenever the backend is enabled.
-	ServiceToken string
-	Timeout      time.Duration
 }
 
 // Crawler is driftmower-crawler, which serves version drift and advisory
@@ -145,7 +138,7 @@ type Invalidate struct {
 }
 
 type Tenancy struct {
-	// Which sources confine driftmower-be results: the token claim, the
+	// Which sources describe caller namespace scope: the token claim, the
 	// cluster authorizer, or the union of both.
 	ScopeSource ScopeSource
 	// Upper bound on namespaces the RBAC scope sweep reviews for one caller.
@@ -356,17 +349,20 @@ func (r *reader) load() *Config {
 		r.fail("MCP_WEB_UI_ENABLED requires authenticated HTTP, OIDC_ISSUER and MCP_WEB_UI_CLIENT_ID")
 	}
 
-	c.Backend = Backend{
-		Enabled: r.bool("DRIFTMOWER_BE_ENABLED", true),
-		URL:     r.url("DRIFTMOWER_BE_URL", "http://driftmower-be:3030", false),
-		Timeout: r.millis("DRIFTMOWER_BE_TIMEOUT_MS", 15*time.Second, 1),
-	}
-	if c.Backend.Enabled {
-		c.Backend.ServiceToken = r.value("DRIFTMOWER_BE_SERVICE_TOKEN")
-		if c.Backend.ServiceToken == "" {
-			r.fail("DRIFTMOWER_BE_SERVICE_TOKEN is required when DRIFTMOWER_BE_ENABLED is true")
+	c.BrowserClientID = r.value("MCP_BROWSER_CLIENT_ID")
+	for _, origin := range strings.Split(r.value("MCP_ALLOWED_ORIGINS"), ",") {
+		origin = strings.TrimSpace(origin)
+		if origin == "" {
+			continue
 		}
+		u, err := url.Parse(origin)
+		if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"))) {
+			r.fail("MCP_ALLOWED_ORIGINS must contain exact HTTPS origins or loopback HTTP origins")
+			continue
+		}
+		c.AllowedOrigins = append(c.AllowedOrigins, origin)
 	}
+	c.DriftPrometheusURL = r.url("DRIFT_PROMETHEUS_URL", "", false)
 
 	c.Crawler = Crawler{
 		URL:       r.url("CRAWLER_URL", "", false),

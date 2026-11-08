@@ -58,12 +58,14 @@ func start(t *testing.T, authenticated bool) *fixture {
 	mapping := auth.Mapping{UsernameClaim: "sub", GroupsClaim: "groups", UsernamePrefix: "issuer#"}
 
 	opts := AppOptions{
-		PublicURL:     publicURL,
-		Cluster:       c,
-		OAuthClientID: "claude",
-		SessionIdle:   time.Minute,
-		Metrics:       m,
-		Logger:        logger,
+		PublicURL:       publicURL,
+		Cluster:         c,
+		OAuthClientID:   "claude",
+		BrowserClientID: "dashboard",
+		AllowedOrigins:  []string{"http://localhost:8080", "https://dashboard.example.com"},
+		SessionIdle:     time.Minute,
+		Metrics:         m,
+		Logger:          logger,
 		MCP: mcpserver.New(mcpserver.Deps{
 			Cluster: c, Version: "test", Logger: logger, Metrics: m, Mapping: mapping,
 			Scope: &authz.ScopeResolver{
@@ -320,5 +322,39 @@ func TestInvalidator(t *testing.T) {
 	disabled.ServeHTTP(rec, httptest.NewRequest("POST", invalidatePath, nil))
 	if rec.Code != 404 {
 		t.Errorf("disabled = %d", rec.Code)
+	}
+}
+
+func TestDashboardClientForOrigin(t *testing.T) {
+	f := start(t, true)
+	for _, tc := range []struct {
+		origin, client string
+		status         int
+	}{
+		{"https://dashboard.example.com", "dashboard", 200},
+		{"http://localhost:8080", "claude", 200},
+		{"http://localhost:9999", "", 403},
+		{"https://evil.example", "", 403},
+	} {
+		req, _ := http.NewRequest("GET", f.url+"/api/client-config", nil)
+		req.Header.Set("Origin", tc.origin)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		if res.StatusCode == 200 {
+			err = json.NewDecoder(res.Body).Decode(&body)
+		}
+		res.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.StatusCode != tc.status {
+			t.Fatalf("%s: status %d", tc.origin, res.StatusCode)
+		}
+		if tc.status == 200 && (body["clientId"] != tc.client || body["resource"] != f.url+"/mcp") {
+			t.Fatalf("wrong client/audience: %v", body)
+		}
 	}
 }

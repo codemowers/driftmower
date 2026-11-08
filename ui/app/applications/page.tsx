@@ -9,7 +9,6 @@ import { scopedHosts, useApplications, useDomainSuffix } from "@/lib/features/ap
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useSandboxContext, useSandboxScope, useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
 import { resolveManagerLink } from "@/lib/features/applications/manager-link"
-import { ownApps } from "@/lib/features/applications/ownership"
 import type { ApplicationEntry } from "@/lib/features/applications/types"
 import LoadingLine from "@/app/components/loading-line"
 
@@ -34,16 +33,7 @@ export default function ApplicationsPage() {
 
   const search = query.trim().toLowerCase()
 
-  // passmower filters /api/apps by group, not by tenancy, so a registration
-  // pointing at a platform host -- its Prometheus, its Alertmanager, a Thanos
-  // host whose workload is long gone -- reaches sandbox users too. They have
-  // their own `<id>-prom`; the platform's is not theirs to open.
-  const offered =
-    launcher.status === "ready"
-      ? seesEverything
-        ? launcher.entries
-        : ownApps(launcher.entries, sandboxes.map(s => s.sandbox), domainSuffix)
-      : []
+  const offered = launcher.status === "ready" ? scopedHosts(launcher.entries, namespaces) : []
 
   const available = offered.filter(e => matches(e, search))
 
@@ -69,7 +59,7 @@ export default function ApplicationsPage() {
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
         <PageHeader
           title="Applications"
-          subtitle="Applications you can reach, and the other hosts in your namespaces"
+          subtitle="Application endpoints discovered in namespaces you can access"
         />
 
         {(launcher.status === "loading" || (launcher.status === "ready" && !tenancyKnown)) && (
@@ -121,7 +111,7 @@ export default function ApplicationsPage() {
                 renderTiles(available)
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {search ? "No applications match that search." : "passmower has no applications registered for you."}
+                  {search ? "No applications match that search." : "No application endpoints were found in your accessible namespaces."}
                 </p>
               )}
             </section>

@@ -38,7 +38,7 @@ export default function DriftOverTime({ readiness }: { readiness: ReportReadines
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Drift over time</p>
-        <p className="mt-2 text-sm text-muted-foreground">Reading drift history across every report...</p>
+        <p className="mt-2 text-sm text-muted-foreground">Reading drift history from Prometheus…</p>
       </div>
     )
   }

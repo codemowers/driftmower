@@ -1,0 +1,4 @@
+apiVersion: v2
+name: driftmower-operator
+version: 0.1.0
+description: ContainerImage-driven Trivy scan dispatcher
