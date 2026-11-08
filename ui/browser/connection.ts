@@ -25,7 +25,7 @@ export function endpoints(): ClusterEndpoint[] {
   try { return JSON.parse(localStorage.getItem("driftmower.clusters") || "[]") } catch { return [] }
 }
 export function contextTitle(endpoint: string): string {
-  return new URL(endpoint).hostname.replace(/^mcp\.driftmower\./i, "")
+  return new URL(endpoint).hostname.replace(/^(?:mcp|dashboard)\.driftmower\./i, "")
 }
 export function saveEndpoint(endpoint: ClusterEndpoint) {
   const url = new URL(endpoint.url)
