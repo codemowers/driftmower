@@ -6,6 +6,7 @@ import { KeyRound } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import { readApiError } from "@/lib/utils/read-api-error"
 import { mcpQuickstarts, type Quickstart } from "@/lib/features/provisioning/mcp-quickstarts"
+import { fetchMcp } from "@/browser/connection"
 
 // Connect a coding agent to the MCP gateway.
 //
@@ -25,7 +26,7 @@ export default function McpPanel() {
   useEffect(() => {
     let cancelled = false
 
-    fetch("/api/mcp/config", { cache: "no-store" })
+    fetchMcp("/api/client-config", { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
         if (!res.ok) {
@@ -34,31 +35,22 @@ export default function McpPanel() {
           return
         }
         const body = await res.json()
-        if (!body.enabled) {
+        if (!body.resource) {
           setConfig({
             status: "unconfigured",
-            reason:
-              "MCP is not enabled on this deployment. Until MCP_ENABLED is set, login does not request the MCP resource, so no token for the gateway can be issued.",
-          })
-          return
-        }
-        if (!body.mcpUrl) {
-          setConfig({
-            status: "unconfigured",
-            reason: "No public URL is configured for the MCP gateway (MCP_PUBLIC_URL).",
+            reason: "No MCP resource URL is configured for this context.",
           })
           return
         }
         if (!body.clientId) {
           setConfig({
             status: "unconfigured",
-            reason:
-              "No OIDC client is configured for the MCP gateway (MCP_OIDC_CLIENT_ID), so a coding agent has nothing to sign in with.",
+            reason: "No OIDC client is configured for this MCP context.",
           })
           return
         }
 
-        setConfig({ status: "ready", mcpUrl: body.mcpUrl, clientId: body.clientId })
+        setConfig({ status: "ready", mcpUrl: body.resource, clientId: body.clientId })
       })
       .catch(e => {
         if (!cancelled) setConfig({ status: "unconfigured", reason: String(e) })

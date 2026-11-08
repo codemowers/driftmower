@@ -119,6 +119,18 @@ export async function callTool<T>(name: string, args: Record<string, unknown> = 
   throw new Error(`${name} returned no structured data`)
 }
 
+// Fetch a non-MCP browser resource from the selected MCP server using the same
+// audience-bound bearer as MCP calls (for example provisioning capabilities).
+export async function fetchMcp(path: string, init: RequestInit = {}): Promise<Response> {
+  const auth = await configure()
+  let current = await auth.getUser()
+  if (current?.expired) current = await auth.signinSilent()
+  if (!current) throw new Error("Sign in to connect to this cluster")
+  const headers = new Headers(init.headers)
+  headers.set("Authorization", `Bearer ${current.access_token}`)
+  return fetch(new URL(path, await selectedEndpoint()), { ...init, headers })
+}
+
 export async function subscribeDashboard(uri: string, changed: () => void): Promise<() => void> {
  const client = await connect()
  client.setNotificationHandler(ResourceUpdatedNotificationSchema, notification => { if(notification.params.uri === uri) changed() })

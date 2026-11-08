@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { CAPABILITIES_URL } from "./constants"
 import type { CapabilityResponse } from "./types"
 import { readApiError } from "@/lib/utils/read-api-error"
+import { fetchMcp } from "@/browser/connection"
 
 export type CapabilityState =
   | { status: "loading" }
@@ -26,7 +27,7 @@ export function useCapabilities(namespaces: string[]): CapabilityState {
     // per-resource matrix, so it need not travel.
     const query = key ? `?ns=${encodeURIComponent(key)}&access=summary` : "?access=summary"
 
-    fetch(`${CAPABILITIES_URL}${query}`, { cache: "no-store" })
+    fetchMcp(`${CAPABILITIES_URL}${query}`, { cache: "no-store" })
       .then(async res => {
         if (cancelled) return
         if (res.status === 401) {
