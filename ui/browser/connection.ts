@@ -24,12 +24,15 @@ const memory = new InMemoryWebStorage()
 export function endpoints(): ClusterEndpoint[] {
   try { return JSON.parse(localStorage.getItem("driftmower.clusters") || "[]") } catch { return [] }
 }
+export function contextTitle(endpoint: string): string {
+  return new URL(endpoint).hostname.replace(/^mcp\.driftmower\./i, "")
+}
 export function saveEndpoint(endpoint: ClusterEndpoint) {
   const url = new URL(endpoint.url)
   if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) throw new Error("Use HTTPS for remote MCP endpoints")
   if (url.username || url.password || url.search || url.hash) throw new Error("MCP URL must not contain credentials, a query or fragment")
   const items = endpoints().filter(item => item.url !== url.href)
-  items.push({ name: endpoint.name.trim() || url.hostname, url: url.href })
+  items.push({ name: contextTitle(url.href), url: url.href })
   localStorage.setItem("driftmower.clusters", JSON.stringify(items))
 }
 export async function selectedEndpoint(): Promise<string> {

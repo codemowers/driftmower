@@ -30,7 +30,7 @@ import { setActivePageSection, usePageSectionsStore } from "@/lib/hooks/use-page
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
-import type { ClusterEndpoint } from "@/browser/connection"
+import { contextTitle, type ClusterEndpoint } from "@/browser/connection"
 
 type NavItem = {
   name: string
@@ -318,7 +318,7 @@ export default function NavBar({
           </summary>
           {isExpanded && onSelectEndpoint && !fixedEndpoint && <div className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full overflow-auto rounded-md border bg-background p-2 shadow-lg">
             <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Switch context</p>
-            {(clusterEndpoints ?? []).map(endpoint => <button key={endpoint.url} type="button" onClick={() => onSelectEndpoint(endpoint.url)} className={cn("flex w-full items-center gap-2 truncate rounded px-2 py-2 text-left text-sm hover:bg-muted", endpoint.url === activeEndpoint && "font-semibold text-brand")} title={endpoint.url}>{pinnedEndpoints.includes(endpoint.url) && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="Discovered context" />}<span className="truncate">{endpoint.name}</span></button>)}
+            {(clusterEndpoints ?? []).map(endpoint => <button key={endpoint.url} type="button" onClick={() => onSelectEndpoint(endpoint.url)} className={cn("flex w-full items-center gap-2 truncate rounded px-2 py-2 text-left text-sm hover:bg-muted", endpoint.url === activeEndpoint && "font-semibold text-brand")} title={endpoint.url}>{pinnedEndpoints.includes(endpoint.url) && <Pin className="size-3 shrink-0 text-muted-foreground" aria-label="Discovered context" />}<span className="truncate">{contextTitle(endpoint.url)}</span></button>)}
             {(clusterEndpoints ?? []).length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground">No contexts added yet.</p>}
             {onAddEndpoint && <form className="mt-2 border-t pt-2" onSubmit={event => {event.preventDefault();try { const url = new URL(newEndpoint); onAddEndpoint({name:url.hostname,url:newEndpoint}); setNewEndpoint("");setEndpointError("")} catch(error) {setEndpointError(error instanceof Error ? error.message : "Invalid endpoint")}}}>
               <label className="block px-2 text-xs text-muted-foreground" htmlFor="mcp-context-url">Add MCP address</label>
