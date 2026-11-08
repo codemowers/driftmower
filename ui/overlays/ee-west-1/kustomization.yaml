@@ -16,13 +16,6 @@ patches:
         path: /spec/rules/0/host
         value: dashboard.driftmower.ee-west-1.codemowers.io
   - target:
-      kind: Certificate
-      name: driftmower-ui
-    patch: |-
-      - op: replace
-        path: /spec/dnsNames/0
-        value: dashboard.driftmower.ee-west-1.codemowers.io
-  - target:
       kind: OIDCClient
       name: driftmower-ui
     patch: |-

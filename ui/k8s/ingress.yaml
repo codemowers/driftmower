@@ -2,10 +2,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: driftmower-ui
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
 spec:
   ingressClassName: traefik
-  tls:
-    - secretName: driftmower-ui-tls
   rules:
     - host: dashboard.driftmower.ee-lte-1.codemowers.io
       http:

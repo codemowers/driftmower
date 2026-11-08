@@ -213,7 +213,6 @@ manifests:
     - ui/k8s/deployment.yaml
     - ui/k8s/service.yaml
     - ui/k8s/ingress.yaml
-    - ui/k8s/certificate.yaml
 
 profiles:
   - name: ee-west-1
