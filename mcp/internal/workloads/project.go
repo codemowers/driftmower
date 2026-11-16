@@ -148,7 +148,17 @@ func template(t *corev1.PodTemplateSpec) Spec {
 func reduceMeta(m metav1.ObjectMeta) metav1.ObjectMeta {
 	out := metav1.ObjectMeta{
 		Name: m.Name, Namespace: m.Namespace, UID: m.UID, ResourceVersion: m.ResourceVersion,
-		Labels: m.Labels, OwnerReferences: m.OwnerReferences,
+		Labels: m.Labels, OwnerReferences: m.OwnerReferences, CreationTimestamp: m.CreationTimestamp,
+	}
+	// Only the latest spec or metadata write is kept, without its fields:
+	// which manager made it and when.
+	for _, f := range m.ManagedFields {
+		if f.Subresource != "" || f.Time == nil {
+			continue
+		}
+		if len(out.ManagedFields) == 0 || f.Time.After(out.ManagedFields[0].Time.Time) {
+			out.ManagedFields = []metav1.ManagedFieldsEntry{{Manager: f.Manager, Operation: f.Operation, Time: f.Time}}
+		}
 	}
 	for _, k := range keptAnnotations {
 		if v, ok := m.Annotations[k]; ok {
@@ -184,6 +194,21 @@ func Project(src Source, obj any) (*Node, error) {
 	case *corev1.Pod:
 		n.Completed = o.Status.Phase == corev1.PodSucceeded
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), Spec{Pod: podRefs(&o.Spec)}
+		p := &PodSnapshot{Name: o.Name, Namespace: o.Namespace, UID: string(o.UID), CreatedAt: o.CreationTimestamp.Time, NodeName: o.Spec.NodeName, Phase: string(o.Status.Phase), HasImagePullSecrets: len(o.Spec.ImagePullSecrets) > 0, Containers: []PodContainer{}}
+		for _, ip := range o.Status.PodIPs {
+			p.IPs = append(p.IPs, ip.IP)
+		}
+		for _, c := range o.Spec.Containers {
+			item := PodContainer{Name: c.Name, Image: c.Image}
+			for _, s := range o.Status.ContainerStatuses {
+				if s.Name == c.Name {
+					item.ImageID = s.ImageID
+					break
+				}
+			}
+			p.Containers = append(p.Containers, item)
+		}
+		n.Pod = p
 	case *corev1.ReplicationController:
 		n.DesiredReplicas = o.Spec.Replicas
 		n.ObjectMeta = reduceMeta(o.ObjectMeta)

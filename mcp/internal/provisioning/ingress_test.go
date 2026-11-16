@@ -7,27 +7,27 @@ import (
 )
 
 // A real sandbox id: the hash prefix is assigned at creation.
-var sandboxRule = HostRuleFor("ee-lte-1.codemowers.io", "a1b2c3-demo", "sandbox-ingress-guard", "", false, nil)
+var sandboxRule = HostRuleFor("alpha.example.com", "a1b2c3-demo", "sandbox-ingress-guard", "", false, nil)
 
 func TestHostRuleFor(t *testing.T) {
-	if sandboxRule.ExactHost != "a1b2c3-demo.ee-lte-1.codemowers.io" || sandboxRule.LabelledPattern != "a1b2c3-demo-<label>.ee-lte-1.codemowers.io" {
+	if sandboxRule.ExactHost != "a1b2c3-demo.alpha.example.com" || sandboxRule.LabelledPattern != "a1b2c3-demo-<label>.alpha.example.com" {
 		t.Errorf("rule = %+v", sandboxRule)
 	}
 }
 
 func TestHostIsAllowedTenantPrefixed(t *testing.T) {
 	cases := map[string]bool{
-		"a1b2c3-demo.ee-lte-1.codemowers.io":      true,
-		"a1b2c3-demo-api.ee-lte-1.codemowers.io":  true,
-		"a1b2c3-demo-prom.ee-lte-1.codemowers.io": true,
-		"myapp.ee-lte-1.codemowers.io":            false,
-		"z9y8x7-other.ee-lte-1.codemowers.io":     false,
-		"driftmower-ui.ee-lte-1.codemowers.io":    false,
-		"*.ee-lte-1.codemowers.io":                false,
+		"a1b2c3-demo.alpha.example.com":      true,
+		"a1b2c3-demo-api.alpha.example.com":  true,
+		"a1b2c3-demo-prom.alpha.example.com": true,
+		"myapp.alpha.example.com":            false,
+		"z9y8x7-other.alpha.example.com":     false,
+		"driftmower-ui.alpha.example.com":    false,
+		"*.alpha.example.com":                false,
 		// The middle segment may contain no ".".
-		"a1b2c3-demo-foo.bar.ee-lte-1.codemowers.io": false,
-		"a1b2c3-demo-.ee-lte-1.codemowers.io":        false,
-		"a1b2c3-demo.ee-west-1.codemowers.io":        false,
+		"a1b2c3-demo-foo.bar.alpha.example.com": false,
+		"a1b2c3-demo-.alpha.example.com":        false,
+		"a1b2c3-demo.beta.example.com":          false,
 	}
 	for host, want := range cases {
 		if got := HostIsAllowed(host, sandboxRule); got != want {
@@ -57,16 +57,16 @@ func TestHostIsAllowedMatchesGuard(t *testing.T) {
 }
 
 func TestNamespaceAnchoredHosts(t *testing.T) {
-	rule := HostRuleFor("aws-us-west-2-bravo.codemowers.io", "a1b2c3-demo", "sandbox-ingress-guard", "sb-a1b2c3-demo", true, []string{"acme.com"})
-	if rule.ExactHost != "sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io" ||
-		rule.LabelledPattern != "<label>.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io" {
+	rule := HostRuleFor("bravo.example.com", "a1b2c3-demo", "sandbox-ingress-guard", "sb-a1b2c3-demo", true, []string{"acme.com"})
+	if rule.ExactHost != "sb-a1b2c3-demo.bravo.example.com" ||
+		rule.LabelledPattern != "<label>.sb-a1b2c3-demo.bravo.example.com" {
 		t.Errorf("rule = %+v", rule)
 	}
 	for _, host := range []string{
-		"sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io",
-		"gitea.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io",
-		"a.b.sb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io",
-		"a1b2c3-demo-api.aws-us-west-2-bravo.codemowers.io",
+		"sb-a1b2c3-demo.bravo.example.com",
+		"gitea.sb-a1b2c3-demo.bravo.example.com",
+		"a.b.sb-a1b2c3-demo.bravo.example.com",
+		"a1b2c3-demo-api.bravo.example.com",
 		"acme.com",
 		"www.acme.com",
 	} {
@@ -75,8 +75,8 @@ func TestNamespaceAnchoredHosts(t *testing.T) {
 		}
 	}
 	for _, host := range []string{
-		"evil.sb-z9y8x7-other.aws-us-west-2-bravo.codemowers.io",
-		"xsb-a1b2c3-demo.aws-us-west-2-bravo.codemowers.io",
+		"evil.sb-z9y8x7-other.bravo.example.com",
+		"xsb-a1b2c3-demo.bravo.example.com",
 		"notacme.com",
 		"victim.example.com",
 		"*.acme.com",
@@ -101,8 +101,8 @@ func TestSuffixFromParams(t *testing.T) {
 		data map[string]string
 		want string
 	}{
-		{map[string]string{"ingressDomainSuffix": "ee-lte-1.codemowers.io"}, "ee-lte-1.codemowers.io"},
-		{map[string]string{"ingressDomainSuffix": ".ee-lte-1.codemowers.io"}, "ee-lte-1.codemowers.io"},
+		{map[string]string{"ingressDomainSuffix": "alpha.example.com"}, "alpha.example.com"},
+		{map[string]string{"ingressDomainSuffix": ".alpha.example.com"}, "alpha.example.com"},
 		{map[string]string{}, ""},
 		{nil, ""},
 		{map[string]string{"ingressDomainSuffix": "  "}, ""},

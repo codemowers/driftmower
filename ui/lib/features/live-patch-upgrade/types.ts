@@ -13,8 +13,6 @@ export type LivePatchUpgradeRequest = {
   dryRun?: boolean
 }
 
-export type PolicyVersion = "v1" | "v1beta1"
-
 export type LivePatchUpgradeRecord = {
   actionKey: string
   namespace: string

@@ -1,0 +1,193 @@
+{{- if .Values.operator.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-scan
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-scanner
+rules:
+  - apiGroups: [codemowers.io]
+    resources: [containerimages]
+    verbs: [get, list, watch, patch]
+  - apiGroups: ['']
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-scanner
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-operator
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-scanner
+rules:
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, create, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-scanner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-scanner
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-operator
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-operator
+spec:
+  serviceName: {{ .Release.Name }}-operator
+  replicas: 1
+  # SBOM artifacts are local and reproducible. Never route uploads to a
+  # non-leader replica while the leader waits for a result on its own disk.
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app: {{ .Release.Name }}-operator
+    spec:
+      serviceAccountName: {{ .Release.Name }}-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      {{- with compact .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: operator
+          image: {{ .Values.operator.image | quote }}
+          env:
+            - name: SCANNER_READER_ACCOUNT
+              value: {{ .Release.Name }}-mcp
+            - name: SCANNER_INSTANCE
+              value: {{ .Release.Name | quote }}
+            - name: SCANNER_URL
+              value: {{ printf "http://%s-operator:8080" .Release.Name | quote }}
+            - name: SCANNER_SERVICE_ACCOUNT
+              value: {{ .Release.Name }}-scan
+            - name: SCANNER_IMAGE
+              value: {{ .Values.operator.image | quote }}
+            - name: TRIVY_IMAGE
+              value: {{ .Values.operator.trivyImage | quote }}
+            - name: TRIVY_DB_IMAGE
+              value: {{ .Values.operator.databaseImage | quote }}
+            - name: IMAGE_PULL_SECRETS
+              value: {{ join "," (compact .Values.imagePullSecrets) | quote }}
+            - name: SCAN_PRIORITY_CLASS
+              value: {{ .Values.operator.priorityClassName | default (printf "%s-%s-scan" .Release.Namespace .Release.Name) | quote }}
+            - name: SBOM_CACHE_MIB
+              value: {{ .Values.operator.sbomCacheMiB | quote }}
+            - name: SCAN_PARALLELISM
+              value: {{ .Values.operator.trivy.parallelism | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 128Mi
+          volumeMounts:
+            - name: sboms
+              mountPath: /cache
+  volumeClaimTemplates:
+    - metadata:
+        name: sboms
+        labels:
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+          skaffold.dev/keep: "true"
+      spec:
+        {{- with .Values.operator.sbomStorageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ printf "%dMi" (add .Values.operator.sbomCacheMiB 64) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-operator
+spec:
+  selector:
+    app: {{ .Release.Name }}-operator
+  ports:
+    - name: http
+      port: 8080
+{{- end }}

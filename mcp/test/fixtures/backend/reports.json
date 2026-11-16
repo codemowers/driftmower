@@ -11,7 +11,7 @@
     "status": "ready"
   },
   {
-    "clusterContext": "ee-lte-1.codemowers.io",
+    "clusterContext": "alpha.example.com",
     "createdAt": "2026-07-13 20:46:54",
     "id": "bf36536f-789f-4f5f-957f-0a7a167c2ebd",
     "namespaceScope": {
@@ -25,7 +25,7 @@
     "status": "pending"
   },
   {
-    "clusterContext": "ee-lte-1.codemowers.io",
+    "clusterContext": "alpha.example.com",
     "createdAt": "2026-07-13 20:48:30",
     "id": "c0e8960e-847f-4a9e-bfad-d97508c9bb02",
     "namespaceScope": {

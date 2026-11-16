@@ -11,9 +11,10 @@ COPY internal ./internal
 ARG BUILD_REVISION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${BUILD_REVISION}" -o /out/driftmower-mcp ./mcp/cmd/driftmower-mcp
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# CA certificates are mounted by the cluster.
+FROM scratch
 
 COPY --from=builder /out/driftmower-mcp /driftmower-mcp
 USER 1000:1000
-EXPOSE 3000 3001
+EXPOSE 3000 3001 3002
 ENTRYPOINT ["/driftmower-mcp"]

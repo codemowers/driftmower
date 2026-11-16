@@ -86,6 +86,10 @@ type Facts struct {
 	cluster   *ttlcache.Memo[*Cluster]
 }
 
+func (f *Facts) CacheStats() map[string]ttlcache.Stats {
+	return map[string]ttlcache.Stats{"api_surface": f.surface.Stats(), "topology": f.topology.Stats(), "operators": f.operators.Stats(), "cluster_facts": f.cluster.Stats()}
+}
+
 type topologyResult struct {
 	fact    provisioning.TopologyFact
 	unknown *unknown
@@ -271,7 +275,7 @@ func (f *Facts) gather(ctx context.Context) (*Cluster, error) {
 			return err
 		}
 		for _, c := range classes {
-			in := provisioning.StorageClassInput{Name: c.Name, AllowExpansion: c.AllowVolumeExpansion, IsDefault: c.IsDefault}
+			in := provisioning.StorageClassInput{Name: c.Name, AllowExpansion: c.AllowVolumeExpansion, IsDefault: c.IsDefault, Description: c.Description}
 			if c.Provisioner != nil {
 				in.Provisioner = *c.Provisioner
 			}

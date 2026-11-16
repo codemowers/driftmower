@@ -14,7 +14,6 @@ const TABS = ["Containers", "Resources", "Values", "Manifest"] as const
 const SCROLL_INTO_VIEW_TABS = new Set<string>(["Values", "Manifest"])
 
 type Props = {
-  uid: string
   releaseInfo: ReleaseInfo
   usages: ImageUsage[]
   issues: Issue[]
@@ -22,7 +21,7 @@ type Props = {
   reportId: string | null
 }
 
-export default function ReleaseTabs({ uid, releaseInfo, usages, issues, clusterResources, reportId }: Props) {
+export default function ReleaseTabs({ releaseInfo, usages, issues, clusterResources, reportId }: Props) {
   const [active, setActive] = useTabParam("htab", TABS)
   const { rootRef, requestScroll } = useScrollTabIntoView(active)
 
@@ -42,8 +41,8 @@ export default function ReleaseTabs({ uid, releaseInfo, usages, issues, clusterR
       {active === "Resources" && (
         <ResourcesTab usages={usages} clusterResources={clusterResources} reportId={reportId} />
       )}
-      {active === "Values" && <ValuesTab uid={uid} releaseInfo={releaseInfo} />}
-      {active === "Manifest" && <ManifestTab uid={uid} releaseInfo={releaseInfo} />}
+      {active === "Values" && <ValuesTab releaseInfo={releaseInfo} />}
+      {active === "Manifest" && <ManifestTab releaseInfo={releaseInfo} />}
     </TabBar>
   )
 }

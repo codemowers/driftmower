@@ -74,7 +74,7 @@ export default function HelmReleaseDetailPage() {
           copyValue={score.releaseInfo.name}
           breadcrumbs={[
             { label: "Helm Releases", href: backHref },
-            { label: `${score.releaseInfo.managementKind} ${score.releaseInfo.name}` },
+            { label: `Release ${score.releaseInfo.name}` },
           ]}
           chips={[
             { label: score.releaseInfo.managementKind, tone: "brand" },
@@ -103,7 +103,6 @@ export default function HelmReleaseDetailPage() {
           revision={score.releaseInfo.revision}
         />
 
-        {score.releaseInfo.helmChartRef && <p className="text-sm text-muted-foreground">HelmChart: <span className="font-mono">{score.releaseInfo.helmChartRef}</span>{score.releaseInfo.desiredVersion && <> · Desired chart version: <span className="font-mono">{score.releaseInfo.desiredVersion}</span></>}</p>}
         <ChartCard
           releaseInfo={score.releaseInfo}
           href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab", "focus"] })}
@@ -113,7 +112,6 @@ export default function HelmReleaseDetailPage() {
         <HelmInspection release={score.releaseInfo} />
 
         <ReleaseTabs
-          uid={uid}
           releaseInfo={score.releaseInfo}
           usages={usages}
           issues={data.issues}

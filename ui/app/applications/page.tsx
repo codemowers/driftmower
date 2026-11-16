@@ -5,9 +5,9 @@ import PageHeader from "../components/page-header"
 import { FilterSearchInput } from "../components/filter-bar"
 import { Switch } from "@/components/ui/switch"
 import ApplicationTile from "./components/application-tile"
-import { scopedHosts, useApplications, useDomainSuffix } from "@/lib/features/applications/use-applications"
+import { scopedHosts, useApplications } from "@/lib/features/applications/use-applications"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useSandboxContext, useSandboxScope, useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
+import { useSandboxContext, useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { resolveManagerLink } from "@/lib/features/applications/manager-link"
 import type { ApplicationEntry } from "@/lib/features/applications/types"
 import LoadingLine from "@/app/components/loading-line"
@@ -21,13 +21,10 @@ function matches(entry: ApplicationEntry, query: string): boolean {
 }
 
 export default function ApplicationsPage() {
-  const { launcher, inventory, domainSuffix: configuredSuffix } = useApplications()
+  const { launcher, inventory, warnings } = useApplications()
   const releaseScores = useClusterState(s => s.data?.rotenness.releaseScores)
   const { namespaces } = useSandboxScope()
-  const seesEverything = useSeesClusterWideViews()
   const tenancyKnown = useSandboxContext(s => s.hydrated)
-  const sandboxes = useSandboxContext(s => s.sandboxes)
-  const domainSuffix = useDomainSuffix(configuredSuffix)
   const [query, setQuery] = useState("")
   const [showAll, setShowAll] = useState(false)
 
@@ -59,23 +56,11 @@ export default function ApplicationsPage() {
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
         <PageHeader
           title="Applications"
-          subtitle="Application endpoints discovered in namespaces you can access"
+          subtitle="Registered applications from OIDCClients you can access"
         />
 
         {(launcher.status === "loading" || (launcher.status === "ready" && !tenancyKnown)) && (
           <LoadingLine loading="applications" />
-        )}
-
-        {launcher.status === "stale-session" && (
-          <p className="text-sm text-muted-foreground">
-            Your session is missing the applications scope. Log out and back in to refresh it.
-          </p>
-        )}
-
-        {launcher.status === "scope-not-configured" && (
-          <p className="text-sm text-muted-foreground">
-            This deployment does not request the applications scope. Add it to OIDC_SCOPE and redeploy.
-          </p>
         )}
 
         {launcher.status === "error" && (
@@ -103,7 +88,7 @@ export default function ApplicationsPage() {
             <section className="flex flex-col gap-3">
               <div className="flex items-baseline gap-2.5">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Available to you
+                  Registered applications
                 </h2>
                 <span className="text-xs tabular-nums text-muted-foreground">{available.length}</span>
               </div>
@@ -111,25 +96,15 @@ export default function ApplicationsPage() {
                 renderTiles(available)
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {search ? "No applications match that search." : "No application endpoints were found in your accessible namespaces."}
+                  {search ? "No applications match that search." : "No registered applications were found in your accessible namespaces."}
                 </p>
               )}
             </section>
 
+            {warnings.map(warning => <p key={warning} className="text-sm text-muted-foreground">{warning}</p>)}
+
             {inventory.status === "error" && (
               <p className="text-sm text-muted-foreground">Could not list cluster hosts: {inventory.message}</p>
-            )}
-
-            {inventory.status === "ready" && inventory.tenancy === "unreachable" && (
-              <p className="text-sm text-muted-foreground">
-                platform-manager is not answering, so this list may be missing hosts.
-              </p>
-            )}
-
-            {inventory.status === "ready" && inventory.tenancy === "rejected" && (
-              <p className="text-sm text-muted-foreground">
-                platform-manager did not accept your sign-in. Log out and back in to load the rest of the hosts.
-              </p>
             )}
 
             {showAll && (

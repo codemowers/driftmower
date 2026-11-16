@@ -68,24 +68,6 @@ export type HostWire = {
   hostNetNS: number
 }
 
-export type SnapshotFrame = {
-  hosts: HostWire[]
-  listening: ListeningPort[]
-}
-
-export type DeltaFrame = {
-  conns?: ConnDelta[]
-  listeningAdded?: ListeningPort[]
-  listeningRemoved?: string[]
-  hosts?: HostWire[]
-  dropped?: number
-}
-
-export type StatusFrame = {
-  upstream: UpstreamHealth
-  indexBuiltAt: number
-}
-
 export type NetstatdState = {
   status: NetstatdStatus
   error: string | null

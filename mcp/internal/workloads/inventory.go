@@ -165,6 +165,16 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 		if w == nil {
 			w = &Workload{Name: root.Name, Kind: root.Kind, Namespace: namespace, APIVersion: root.APIVersion, UID: string(root.UID),
 				DesiredReplicas: root.DesiredReplicas, Completed: root.Completed, OwnerReferenceOnly: root.OwnerReferenceOnly, HelmReleaseName: root.Annotations["meta.helm.sh/release-name"], HelmReleaseNamespace: root.Annotations["meta.helm.sh/release-namespace"], HelmChart: root.Labels["helm.sh/chart"]}
+			// An owner known only from a reference is not watched; the
+			// watched object just below it stands in for its provenance,
+			// which admission carries down. Its times are not the owner's,
+			// which are read when its page is opened.
+			if root.OwnerReferenceOnly && len(chain) > 0 {
+				w.Provenance = provenance(chain[len(chain)-1])
+			} else {
+				w.Provenance = provenance(root)
+				w.CreatedAt, w.UpdatedAt, w.UpdatedBy = times(root)
+			}
 			roots[string(root.UID)] = w
 			all = append(all, w)
 		}

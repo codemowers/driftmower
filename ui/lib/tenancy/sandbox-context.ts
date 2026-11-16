@@ -88,10 +88,6 @@ export const SANDBOX_PARAM = "sandbox"
 // scoped instead of silently widening to the whole cluster.
 export const LEGACY_SANDBOX_PARAM = "tenant"
 
-export function readSandboxParam(params: URLSearchParams): string | null {
-  return params.get(SANDBOX_PARAM) ?? params.get(LEGACY_SANDBOX_PARAM)
-}
-
 export function syncSandboxParam(sandboxes: string[]): void {
   if (typeof window === "undefined") return
   const value = sandboxes.join(",")
@@ -159,10 +155,6 @@ export function sandboxScope(state: SandboxContextState): SandboxScope {
   }
 }
 
-export function sandboxScopeNamespaces(state: SandboxContextState): string[] | null {
-  return sandboxScope(state).namespaces
-}
-
 export function useSandboxScope(): SandboxScope {
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const sandboxes = useSandboxContext(s => s.sandboxes)
@@ -175,7 +167,7 @@ export function useSandboxScope(): SandboxScope {
   )
 }
 
-// Client mirror of the server's view rule (lib/server/scope-rules.ts): a caller
+// A caller whose namespace selection does not narrow their view
 // nothing narrows is cluster-wide. Lets client components drop links into
 // cluster-scoped pages that would 404 for a sandbox user.
 //

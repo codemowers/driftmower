@@ -192,6 +192,8 @@ type StorageClassFact struct {
 	Implies string `json:"implies"`
 	// Can two instances live here and still be moved by their operator?
 	ReplicaSafe bool `json:"replicaSafe"`
+	// The class's kubernetes.io/description, Markdown.
+	Description *string `json:"description,omitempty"`
 }
 
 type QuotaAmounts map[string]string

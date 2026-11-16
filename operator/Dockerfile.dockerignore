@@ -1,7 +1,12 @@
+# Build context: repository root. Only Go build inputs are required.
+# Re-include each directory as well as its files: Skaffold does not descend
+# into an excluded directory to find re-included files.
 **
 !go.mod
 !go.sum
-!internal
-!internal/**
-!operator
-!operator/**
+!internal/
+!internal/**/*.go
+!internal/**/*.html
+!operator/
+!operator/**/*.go
+**/*_test.go

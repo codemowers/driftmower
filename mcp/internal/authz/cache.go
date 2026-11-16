@@ -96,3 +96,5 @@ func (c *CachedReviewer) Clear() int {
 func (c *CachedReviewer) Len() int {
 	return c.cache.Len()
 }
+
+func (c *CachedReviewer) Stats() ttlcache.Stats { return c.cache.Stats() }

@@ -56,8 +56,7 @@ func TestObservabilityTools(t *testing.T) {
 	o := &observability.Service{
 		PrometheusURL: "http://prometheus:9090", LokiURL: "http://loki:3100", LogsEnabled: true,
 		Backend: backend, Kubernetes: k, Judge: allowAll{},
-		Budget: &observability.Budget{QueriesPerMinute: 1000, MaxConcurrentCalls: 2},
-		Now:    func() time.Time { return time.Date(2025, 10, 28, 12, 0, 7, 0, time.UTC) }, Alignment: 15 * time.Second,
+		Now: func() time.Time { return time.Date(2025, 10, 28, 12, 0, 7, 0, time.UTC) }, Alignment: 15 * time.Second,
 	}
 	id := "bravo.example.com"
 	s := connectTo(t, New(Deps{

@@ -1,0 +1,21 @@
+{{- if .Values.operator.enabled }}
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Release.Name }}-operator
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    monitoring.codemowers.io/instance: {{ .Release.Name | quote }}
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-operator
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+{{- end }}
+{{- end }}

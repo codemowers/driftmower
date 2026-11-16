@@ -5,27 +5,26 @@ import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import DocumentViewer from "@/app/components/document-viewer"
 import TabMessage from "./tab-message"
-import { HELM_RELEASES_URL } from "@/lib/cluster/constants"
+import { callTool } from "@/browser/connection"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 import { cn } from "@/lib/utils/cn"
 import { textLines } from "@/lib/features/yaml/yaml-lines"
-import { readApiError } from "@/lib/utils/read-api-error"
 
-type ManifestDocumentSummary = {
+type ManifestDocument = {
   index: number
   kind: string
   name: string
   source: string
   lineCount: number
+  text: string
 }
 
 type ManifestIndex = {
-  documents: ManifestDocumentSummary[]
+  documents: ManifestDocument[]
   totalLines: number
 }
 
 type Props = {
-  uid: string
   releaseInfo: ReleaseInfo
 }
 
@@ -34,60 +33,19 @@ type FetchState =
   | { status: "error"; message: string }
   | { status: "ready"; index: ManifestIndex }
 
-export default function ManifestTab({ uid, releaseInfo }: Props) {
+export default function ManifestTab({ releaseInfo }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" })
   const [selected, setSelected] = useState(0)
-  const [loaded, setLoaded] = useState<{ index: number; text: string } | null>(null)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-
   const { namespace, name } = releaseInfo
   const documents = state.status === "ready" ? state.index.documents : []
-  const base = `${HELM_RELEASES_URL}/${encodeURIComponent(uid)}/manifest`
-  const query = new URLSearchParams({ namespace, name }).toString()
 
   useEffect(() => {
     let cancelled = false
-
-    fetch(`${base}?${query}`, { cache: "no-store" })
-      .then(async res => {
-        if (cancelled) return
-        if (!res.ok) {
-          const message = await readApiError(res)
-          if (!cancelled) setState({ status: "error", message })
-          return
-        }
-        const json = await res.json()
-        setState({ status: "ready", index: json })
-      })
-      .catch(e => {
-        if (!cancelled) setState({ status: "error", message: String(e) })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [base, query])
-
-  useEffect(() => {
-    if (!documents.length) return
-    let cancelled = false
-
-    fetch(`${base}?${query}&doc=${selected}`, { cache: "no-store" })
-      .then(async res => {
-        if (!res.ok) throw new Error(await readApiError(res))
-        return res.json()
-      })
-      .then(json => {
-        if (!cancelled) setLoaded({ index: selected, text: json.text ?? "" })
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setLoaded({ index: selected, text: `# Could not load this document: ${e.message}` })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [base, query, selected, documents.length])
+    callTool<ManifestIndex>("get_helm_release", { namespace, name })
+      .then(index => { if (!cancelled) setState({ status: "ready", index }) })
+      .catch((e: unknown) => { if (!cancelled) setState({ status: "error", message: e instanceof Error ? e.message : String(e) }) })
+    return () => { cancelled = true }
+  }, [namespace, name])
 
   if (state.status === "loading") {
     return <TabMessage>Loading manifest…</TabMessage>
@@ -105,15 +63,9 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
 
   const active = documents[Math.min(selected, documents.length - 1)]
 
-  async function downloadManifest() {
-    const res = await fetch(`${base}?${query}&doc=all`, { cache: "no-store" })
-    if (!res.ok) {
-      setDownloadError(await readApiError(res))
-      return
-    }
-    setDownloadError(null)
-    const json = await res.json()
-    const url = URL.createObjectURL(new Blob([json.text ?? ""], { type: "application/yaml" }))
+  function downloadManifest() {
+    const text = documents.map(d => (d.source ? `# Source: ${d.source}\n${d.text}` : d.text)).join("\n---\n")
+    const url = URL.createObjectURL(new Blob([text], { type: "application/yaml" }))
     const a = document.createElement("a")
     a.href = url
     a.download = `${name}-manifest.yaml`
@@ -132,9 +84,6 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
           Download manifest
         </Button>
       </div>
-      {downloadError && (
-        <p className="border-b border-gray-200 px-4 py-2 text-xs text-status-major-text">Download failed: {downloadError}</p>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="border-b border-gray-200 md:border-b-0 md:border-r">
@@ -172,7 +121,7 @@ export default function ManifestTab({ uid, releaseInfo }: Props) {
 
         <DocumentViewer
           key={active.index}
-          lines={textLines(loaded?.index === active.index ? loaded.text : "")}
+          lines={textLines(active.text)}
           filename={`${name}-${active.kind}-${active.name}.yaml`}
           className="rounded-none border-0"
           toolbar={

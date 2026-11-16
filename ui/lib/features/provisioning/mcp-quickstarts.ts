@@ -85,3 +85,49 @@ export function mcpQuickstarts({ mcpUrl, clientId }: QuickstartInput): Quickstar
 export function claudeCodeTokenCommand({ mcpUrl, token }: { mcpUrl: string; token: string }): string {
   return `claude mcp add --transport http ${SERVER_NAME} ${mcpUrl} --header "Authorization: Bearer ${token}"`
 }
+
+export type McpScope = "user" | "project"
+
+export type McpServerTarget = {
+  // The name the agent lists it under.
+  name: string
+  // Full endpoint.
+  url: string
+  // A public OIDC client to sign in with; absent for servers that need none.
+  clientId?: string
+}
+
+// One server's recipe for one client, in the user's own configuration or
+// the project's, which is shared through the repository.
+export function mcpQuickstart(client: McpClientId, server: McpServerTarget, scope: McpScope): Quickstart {
+  const { name, url, clientId } = server
+  switch (client) {
+    case "claude-code":
+      return {
+        id: client,
+        heading: "Claude Code",
+        caption: scope === "project" ? "Writes .mcp.json in the project, to commit for everyone working on it." : undefined,
+        blocks: [`claude mcp add --transport http --scope ${scope} ${name} ${url}${clientId ? ` --client-id ${clientId}` : ""}`],
+      }
+    case "codex":
+      return {
+        id: client,
+        heading: "Codex",
+        caption: scope === "project" ? "Codex adds MCP servers to your user configuration, ~/.codex/config.toml; this command has no project scope." : undefined,
+        blocks: [`codex mcp add ${name} --url ${url}${clientId ? ` --oauth-client-id ${clientId}` : ""}`],
+      }
+    case "opencode":
+      return {
+        id: client,
+        heading: "opencode",
+        caption: `Add this to ${scope === "project" ? "opencode.json in the project" : "~/.config/opencode/opencode.json"}${clientId ? ", then sign in. Its CLI cannot take a client id" : ""}.`,
+        blocks: [
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            mcp: { [name]: { type: "remote", url, ...(clientId ? { oauth: { clientId, redirectUri: OPENCODE_REDIRECT_URI } } : {}) } },
+          }, null, 2),
+          ...(clientId ? [`opencode mcp auth ${name}`] : []),
+        ],
+      }
+  }
+}

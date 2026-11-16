@@ -33,7 +33,13 @@ const (
 )
 
 type Config struct {
-	Transport Transport
+	ScannerURL        string
+	ScannerTokenFile  string
+	ScannerNamespace  string
+	ScannerInstance   string
+	CVEHistoryEnabled bool
+	SAHistoryEnabled  bool
+	Transport         Transport
 	// Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
 	// wherever the OS leaves bindv6only off. Narrow it to `::1` or
 	// `127.0.0.1` to bind loopback only.
@@ -43,30 +49,45 @@ type Config struct {
 	LogLevel           string
 	PublicURL          string
 	DriftPrometheusURL string
-	BrowserClientID    string
-	AllowedOrigins     []string
+	// Argo CD's public address, for links to the applications that track
+	// workloads; Argo CD may run in another cluster.
+	ArgoCDURL       string
+	BrowserClientID string
+	AllowedOrigins  []string
 	// MCP sessions with no open request are closed after this long.
 	SessionIdle time.Duration
 
 	// Bearer verification on the HTTP transport. Ignored by stdio, which is a
 	// local process with no network surface.
 	AuthEnabled               bool
+	AuthMode                  string
 	OAuthClientID             string
 	ServiceAccountAuthEnabled bool
 	WorkloadRestartEnabled    bool
+	// OIDCUser listing and effective-rights inspection for callers who may
+	// impersonate users; needs impersonate on users and groups.
+	UserAccess UserAccess
 	// Present only when the HTTP transport runs with authentication; the
 	// loader refuses to start an authenticated server without it.
 	OIDC *OIDC
 
 	Cluster       cluster.Identity
 	Crawler       Crawler
+	Registry      Crawler
 	Search        Search
 	Provisioning  Provisioning
 	Kubernetes    Kubernetes
 	Invalidate    Invalidate
 	Tenancy       Tenancy
 	Observability *Observability
-	WebUI         WebUI
+}
+
+type UserAccess struct {
+	Enabled bool
+	// Namespace holding Passmower OIDCUsers.
+	Namespace string
+	// Effective-rights evaluations are reused for this long.
+	CacheTTL time.Duration
 }
 
 type OIDC struct {
@@ -146,22 +167,15 @@ type Tenancy struct {
 }
 
 type Observability struct {
-	PrometheusURL  string
-	LokiURL        string
-	RequestTimeout time.Duration
-	// Denial-of-service guards for the shared Prometheus and Loki.
-	MaxConcurrentRequests int
-	MaxQueuedRequests     int
-	// Backend requests per caller per minute (also the burst); 0 is unlimited.
-	QueriesPerMinute            int
-	MaxConcurrentCallsPerCaller int
-	// Identical Prometheus queries are answered once in this window; 0 is off.
-	CacheTTL time.Duration
-}
-
-type WebUI struct {
-	Enabled  bool
-	ClientID string
+	PrometheusURL string
+	// Prometheus's public address for links; empty uses its web.external-url.
+	PrometheusExternalURL string
+	LokiURL               string
+	// Empty disables the alert tools.
+	AlertmanagerURL string
+	RequestTimeout  time.Duration
+	// Evaluation and private browser cache windows; 0 disables alignment.
+	Alignment time.Duration
 }
 
 // Load reads the configuration from the process environment.
@@ -323,8 +337,14 @@ func (r *reader) load() *Config {
 		SessionIdle: r.millis("MCP_SESSION_IDLE_MS", 30*time.Minute, 1),
 		AuthEnabled: r.bool("MCP_AUTH_ENABLED", true),
 	}
-	c.PublicURL = r.url("MCP_PUBLIC_URL", fmt.Sprintf("http://127.0.0.1:%d", c.Port), false)
-	c.OAuthClientID = r.value("MCP_OAUTH_CLIENT_ID")
+	c.PublicURL = r.url("OIDC_CLIENT_ORIGIN", fmt.Sprintf("http://127.0.0.1:%d", c.Port), false)
+	defaultAuthMode := "rbac"
+	if !c.AuthEnabled {
+		defaultAuthMode = "anonymous"
+	}
+	c.AuthMode = r.enum("MCP_AUTH_MODE", defaultAuthMode, "rbac", "oidc", "anonymous")
+	c.AuthEnabled = c.AuthMode != "anonymous"
+	c.OAuthClientID = r.value("OIDC_CLIENT_ID")
 
 	c.Cluster = r.cluster(c.PublicURL)
 
@@ -338,35 +358,53 @@ func (r *reader) load() *Config {
 		r.fail("MCP_SERVICE_ACCOUNT_AUTH_ENABLED requires authenticated HTTP")
 	}
 	c.WorkloadRestartEnabled = r.bool("MCP_WORKLOAD_RESTART_ENABLED", false)
+	if c.AuthMode != "rbac" {
+		c.WorkloadRestartEnabled = false
+	}
 	if c.WorkloadRestartEnabled && !authenticated {
-		r.fail("MCP_WORKLOAD_RESTART_ENABLED requires authenticated HTTP and OIDC_ISSUER")
+		r.fail("MCP_WORKLOAD_RESTART_ENABLED requires authenticated HTTP and OIDC_IDP_URI")
 	}
-	c.WebUI = WebUI{
-		Enabled:  r.bool("MCP_WEB_UI_ENABLED", false),
-		ClientID: r.value("MCP_WEB_UI_CLIENT_ID"),
+	c.UserAccess = UserAccess{
+		Enabled:   r.bool("MCP_USER_ACCESS_ENABLED", false),
+		Namespace: r.string("MCP_OIDC_USERS_NAMESPACE", "passmower"),
+		CacheTTL:  r.millis("MCP_USER_ACCESS_CACHE_TTL_MS", 5*time.Minute, 0),
 	}
-	if c.WebUI.Enabled && (!authenticated || c.WebUI.ClientID == "") {
-		r.fail("MCP_WEB_UI_ENABLED requires authenticated HTTP, OIDC_ISSUER and MCP_WEB_UI_CLIENT_ID")
+	if c.UserAccess.Enabled && !authenticated && c.AuthMode != "anonymous" {
+		r.fail("MCP_USER_ACCESS_ENABLED requires authenticated HTTP and OIDC_IDP_URI")
 	}
-
-	c.BrowserClientID = r.value("MCP_BROWSER_CLIENT_ID")
-	for _, origin := range strings.Split(r.value("MCP_ALLOWED_ORIGINS"), ",") {
+	c.BrowserClientID = r.value("DASHBOARD_OIDC_CLIENT_ID")
+	for _, origin := range append(strings.Split(r.value("MCP_ALLOWED_ORIGINS"), ","), r.value("DASHBOARD_OIDC_CLIENT_ORIGIN")) {
 		origin = strings.TrimSpace(origin)
 		if origin == "" {
 			continue
 		}
 		u, err := url.Parse(origin)
 		if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"))) {
-			r.fail("MCP_ALLOWED_ORIGINS must contain exact HTTPS origins or loopback HTTP origins")
+			r.fail("MCP_ALLOWED_ORIGINS and DASHBOARD_OIDC_CLIENT_ORIGIN must contain exact HTTPS origins or loopback HTTP origins")
 			continue
 		}
 		c.AllowedOrigins = append(c.AllowedOrigins, origin)
 	}
+	c.ScannerURL = r.url("SCANNER_URL", "", false)
+	c.ScannerTokenFile = r.string("SCANNER_TOKEN_FILE", "/var/run/secrets/driftmower/scanner/token")
+	c.ScannerNamespace = r.value("POD_NAMESPACE")
+	c.ScannerInstance = r.value("SCANNER_INSTANCE")
+	c.CVEHistoryEnabled = r.bool("HISTORY_CVE_ENABLED", c.ScannerURL != "")
+	c.SAHistoryEnabled = r.bool("HISTORY_SERVICE_ACCOUNTS_ENABLED", c.UserAccess.Enabled)
 	c.DriftPrometheusURL = r.url("DRIFT_PROMETHEUS_URL", "", false)
+	c.ArgoCDURL = r.url("ARGO_URL", "", false)
 
 	c.Crawler = Crawler{
 		URL:       r.url("CRAWLER_URL", "", false),
 		TokenFile: r.string("CRAWLER_TOKEN_FILE", "/var/run/secrets/driftmower/crawler/token"),
+	}
+	c.Registry = Crawler{URL: r.url("REGISTRY_SCRAPER_URL", "", false), TokenFile: r.string("REGISTRY_SCRAPER_TOKEN_FILE", "/var/run/secrets/driftmower/registry/token")}
+
+	if c.Crawler.URL != "" && c.Crawler.TokenFile == "" {
+		r.fail("CRAWLER_TOKEN_FILE is required for the internal crawler API")
+	}
+	if c.Registry.URL != "" && c.Registry.TokenFile == "" {
+		r.fail("REGISTRY_SCRAPER_TOKEN_FILE is required for the internal registry API")
 	}
 
 	c.Search.MaximumLimit = r.int("DRIFTMOWER_MCP_MAX_LIMIT", 100, 1, 0)
@@ -392,7 +430,10 @@ func (r *reader) load() *Config {
 		MaxNamespaces: r.int("MCP_SCOPE_MAX_NAMESPACES", 2000, 1, 0),
 	}
 
-	c.Observability = r.observability(authenticated)
+	c.Observability = r.observability(authenticated || c.Transport == TransportHTTP && c.AuthMode == "anonymous")
+	if c.DriftPrometheusURL == "" && c.Observability != nil {
+		c.DriftPrometheusURL = c.Observability.PrometheusURL
+	}
 
 	return c
 }
@@ -417,9 +458,9 @@ func (r *reader) cluster(publicURL string) cluster.Identity {
 // ingress with authentication on and no issuer would otherwise have to choose
 // between serving unauthenticated and rejecting every call.
 func (r *reader) oidc() *OIDC {
-	issuer := r.value("OIDC_ISSUER")
+	issuer := r.value("OIDC_IDP_URI")
 	if issuer == "" {
-		r.fail("OIDC_ISSUER is required when the HTTP transport runs with authentication " +
+		r.fail("OIDC_IDP_URI is required when the HTTP transport runs with authentication " +
 			"(set MCP_AUTH_ENABLED=false only for a server that is not reachable from outside the cluster)")
 
 		return nil
@@ -464,21 +505,20 @@ func (r *reader) kubernetes(oidc *OIDC) Kubernetes {
 func (r *reader) observability(authenticated bool) *Observability {
 	prometheus := r.url("PROMETHEUS_URL", "", false)
 	loki := r.url("LOKI_URL", "", false)
-	if prometheus == "" && loki == "" && !r.bool("OBSERVABILITY_ENABLED", false) {
+	alertmanager := r.url("ALERTMANAGER_URL", "", false)
+	if prometheus == "" && loki == "" && alertmanager == "" && !r.bool("OBSERVABILITY_ENABLED", false) {
 		return nil
 	}
 	if !authenticated {
-		r.fail("observability tools require authenticated HTTP transport and OIDC_ISSUER")
+		r.fail("observability tools require authenticated HTTP transport and OIDC_IDP_URI")
 	}
 
 	return &Observability{
-		PrometheusURL:               prometheus,
-		LokiURL:                     loki,
-		RequestTimeout:              r.millis("OBSERVABILITY_TIMEOUT_MS", 10*time.Second, 1),
-		MaxConcurrentRequests:       r.int("OBSERVABILITY_MAX_CONCURRENT_REQUESTS", 8, 1, 0),
-		MaxQueuedRequests:           r.int("OBSERVABILITY_MAX_QUEUED_REQUESTS", 32, 0, 0),
-		QueriesPerMinute:            r.int("OBSERVABILITY_QUERIES_PER_MINUTE", 120, 0, 0),
-		MaxConcurrentCallsPerCaller: r.int("OBSERVABILITY_MAX_CONCURRENT_CALLS_PER_CALLER", 2, 1, 0),
-		CacheTTL:                    r.millis("OBSERVABILITY_CACHE_TTL_MS", 15*time.Second, 0),
+		PrometheusURL:         prometheus,
+		PrometheusExternalURL: r.url("PROMETHEUS_EXTERNAL_URL", "", false),
+		LokiURL:               loki,
+		AlertmanagerURL:       alertmanager,
+		RequestTimeout:        r.millis("OBSERVABILITY_TIMEOUT_MS", 10*time.Second, 1),
+		Alignment:             r.millis("OBSERVABILITY_ALIGNMENT_MS", 15*time.Second, 0),
 	}
 }

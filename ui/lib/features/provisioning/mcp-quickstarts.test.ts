@@ -3,12 +3,13 @@ import { test } from "node:test"
 
 import {
   claudeCodeTokenCommand,
+  mcpQuickstart,
   mcpQuickstarts,
   OPENCODE_REDIRECT_URI,
   type QuickstartInput,
 } from "./mcp-quickstarts.ts"
 
-const URL_ = "https://driftmower-mcp.ee-lte-1.codemowers.io/mcp"
+const URL_ = "https://driftmower-mcp.alpha.example.com/mcp"
 
 const DEFAULT_INPUT: QuickstartInput = { mcpUrl: URL_, clientId: "cid-123" }
 
@@ -70,4 +71,14 @@ test("the token route's command passes the token as a literal header", () => {
   const text = claudeCodeTokenCommand({ mcpUrl: URL_, token: "tok-abc" })
   assert.match(text, /^claude mcp add --transport http driftmower /)
   assert.match(text, /--header "Authorization: Bearer tok-abc"/)
+})
+
+test("scoped recipes carry the scope and leave out absent client ids", () => {
+  const server = { name: "feeds", url: "https://feeds.example.com/mcp" }
+  assert.equal(mcpQuickstart("claude-code", server, "project").blocks[0], "claude mcp add --transport http --scope project feeds https://feeds.example.com/mcp")
+  assert.equal(mcpQuickstart("codex", { ...server, clientId: "c" }, "user").blocks[0], "codex mcp add feeds --url https://feeds.example.com/mcp --oauth-client-id c")
+  const opencode = mcpQuickstart("opencode", server, "user")
+  assert.equal(opencode.blocks.length, 1)
+  assert.match(opencode.caption!, /~\/.config\/opencode\/opencode.json/)
+  assert.ok(!opencode.blocks[0].includes("oauth"))
 })

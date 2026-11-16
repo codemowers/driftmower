@@ -1,6 +1,3 @@
-import { useClusterState } from "./cluster-state"
-import { REPORTS_URL } from "./constants"
-import { fetchJson } from "@/lib/utils/fetch-json"
 
 export type StatusType = "up_to_date" | "patch_behind" | "minor_behind" | "major_behind" | "ahead" | "behind" | "no_data" | "no_version"
 
@@ -66,6 +63,7 @@ export type ScrapeStatus = {
 }
 
 export type ImageUsage = {
+  finished?: boolean
   context: string
   namespace: string
   podName: string
@@ -95,6 +93,7 @@ export type ImageUsage = {
     containerImage?: string
     sbomArtifacts?: string[]
     scannerNamespace?: string
+    platforms?: import("@/lib/features/base-images/types").Target[]
     endOfLifeDate?: string
     endOfActiveSupportDate?: string
   }
@@ -127,8 +126,46 @@ export type Issue = {
   reason: string
 }
 
+// Names of the objects a workload uses, as MCP's get_workloads reports them.
+export type WorkloadDependencies = {
+  pods?: string[]
+  images?: string[]
+  configmaps?: string[]
+  secrets?: string[]
+  pvcs?: string[]
+  services?: string[]
+  ingresses?: string[]
+  certificates?: string[]
+}
+
+// A generating owner left without its root, and what it still generated.
+export type OrphanOwner = WorkloadDependencies & { apiVersion: string; uid: string; ownerReferenceOnly: boolean }
+
+export type ReportWorkload = WorkloadDependencies & {
+  sourceRepositories?: import("../features/crawler/sources").SourceRepository[]
+  apiVersion?: string
+  createdAt?: string
+  updatedAt?: string
+  updatedBy?: string
+  provenance?: Record<string,string>
+  ownerReferenceOnly?: boolean
+  helmReleaseName?: string
+  helmReleaseNamespace?: string
+  helmChart?: string
+  desiredReplicas?: number
+  completed?: boolean
+  uid: string
+  kind: string
+  namespace: string
+  name: string
+  // On a namespace's orphan bucket (kind Namespace): ownerless Pods, and
+  // generating owners by "Kind.group" and name.
+  standalonePods?: { name: string; uid: string }[]
+  orphaned?: Record<string, Record<string, OrphanOwner>>
+}
+
 export type Report = {
-  workloads?: { desiredReplicas?: number; completed?: boolean; uid: string; kind: string; namespace: string; name: string; standalonePods?: { name: string; uid: string }[] }[]
+  workloads?: ReportWorkload[]
   id: string
   sourceType: "cluster"
   clusterContext: string
@@ -159,75 +196,4 @@ export type Report = {
     repoScores: Record<string, unknown>
   }
   issues: Issue[]
-}
-
-type ReportsListResponse = {
-  total: number
-  limit: number
-  skip: number
-  data: Report[]
-}
-
-function parseReportDate(createdAt: string): Date {
-  return new Date(createdAt.replace(" ", "T") + "Z")
-}
-
-const ZERO_DATE_PREFIX = "0001-01-01"
-
-function normalizeBuiltAt(value?: string): string | undefined {
-  return value && !value.startsWith(ZERO_DATE_PREFIX) ? value : undefined
-}
-
-function normalizeReport(report: Report): void {
-  report.issues ??= []
-  const r = report.report
-  const usageLists: ImageUsage[][] = [
-    r.imageUsages,
-    ...Object.values(r.releaseGroupMap),
-    ...Object.values(r.workloadGroupMap),
-  ]
-  for (const usages of usageLists) {
-    for (const usage of usages) {
-      usage.imageInfo.digest ||= ""
-      const vs = usage.versionStatus
-      vs.deployedBuiltAt = normalizeBuiltAt(vs.deployedBuiltAt)
-      vs.latestBuiltAt = normalizeBuiltAt(vs.latestBuiltAt)
-    }
-  }
-}
-
-async function loadReport(getReport: () => Promise<Report>): Promise<void> {
-  useClusterState.setState({ isFetchingReport: true, error: null, errorSource: null })
-  try {
-    const report = await getReport()
-    normalizeReport(report)
-    useClusterState.setState({
-      data: report,
-      reportId: report.id,
-      lastRefreshed: parseReportDate(report.createdAt),
-      isFetchingReport: false,
-    })
-  } catch (e) {
-    useClusterState.setState({
-      error: `Could not load the report: ${(e as Error).message}`,
-      errorSource: "report",
-      isFetchingReport: false,
-    })
-  }
-}
-
-export function fetchLatestReport(): Promise<void> {
-  return loadReport(async () => {
-    const clusterName = useClusterState.getState().clusterName
-    let url = `${REPORTS_URL}?$limit=1&$sort[createdAt]=-1`
-    if (clusterName) url += `&clusterContext=${encodeURIComponent(clusterName)}`
-    const json = await fetchJson<ReportsListResponse>(url)
-    const report = json.data[0]
-    if (!report) throw new Error("No reports found")
-    return report
-  })
-}
-
-export function fetchReport(id: string): Promise<void> {
-  return loadReport(() => fetchJson<Report>(`${REPORTS_URL}/${id}`))
 }

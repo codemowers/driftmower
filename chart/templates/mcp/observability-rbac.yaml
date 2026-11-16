@@ -1,0 +1,208 @@
+{{- if .Values.mcp.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-mcp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Values.mcp.rbac.clusterRoleName | default (printf "%s-%s-observability" .Release.Namespace .Release.Name) | quote }}
+rules:
+  - apiGroups: ['']
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  # Caches are invalidated on change by watching RBAC objects and CRDs. Without
+  # `watch` the server falls back to the review-cache TTL and logs a warning.
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [list, watch]
+  # Reviews audience-bound ServiceAccount tokens for optional MCP machine auth,
+  # and tokens for cache invalidation gated by MCP_INVALIDATE_ALLOWED_SUBJECTS.
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  # Provisioning facts (all read-only): per-namespace budget and network
+  # posture, node topology, operator Deployments, and the parameter ConfigMap an
+  # admission guard names. The guard chooses its ConfigMap's name, so a chart
+  # cannot know it in advance; set rbac.paramConfigMapNames to narrow the grant.
+  - apiGroups: ['']
+    resources: [nodes, resourcequotas, limitranges, pods, persistentvolumeclaims]
+    verbs: [list]
+  - apiGroups: ['']
+    resources: [persistentvolumes]
+    verbs: [get, list]
+  - apiGroups: ['']
+    resources: [persistentvolumeclaims]
+    verbs: [get]
+  - apiGroups: ['']
+    resources: [configmaps]
+    verbs: [get]
+{{- with .Values.mcp.rbac.paramConfigMapNames }}
+    resourceNames:
+{{ toYaml . | indent 6 }}
+{{- end }}
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [list]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [list]
+  # A namespace's container registry: the Service selecting a Zot Deployment
+  # and the Ingress publishing it. Read only where such a Deployment runs.
+  - apiGroups: ['']
+    resources: [services]
+    verbs: [list]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [list]
+  - apiGroups: [cilium.io]
+    resources: [ciliumnetworkpolicies]
+    verbs: [list]
+  - apiGroups: [kyverno.io]
+    resources: [clusterpolicies]
+    verbs: [list]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [list, watch]
+  # Discover the infra-owned API ingress without creating objects in its namespace.
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    resourceNames: [kubelogin]
+    verbs: [get]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingressclasses]
+    verbs: [list]
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    verbs: [list]
+  - apiGroups: [cert-manager.io]
+    resources: [clusterissuers]
+    verbs: [list]
+  # Cluster-wide capability catalogs: storage settings and admission policies.
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [get, list]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingadmissionpolicies, mutatingadmissionpolicies, validatingadmissionpolicybindings, mutatingadmissionpolicybindings]
+    verbs: [list]
+  # list_trust_bundles: trust-manager Bundles, served to every caller.
+  - apiGroups: [trust.cert-manager.io]
+    resources: [bundles]
+    verbs: [list]
+  # Workload inventory watches only metadata for Secrets, ConfigMaps, PVCs and
+  # names only. Kubernetes RBAC still grants collection reads; metadata
+  # negotiation does not constrain what this service account could request.
+  - apiGroups: ['']
+    resources: [pods, replicationcontrollers, persistentvolumeclaims, configmaps, secrets, services]
+    verbs: [list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [codemowers.cloud]
+    resources: [oidcclients]
+    verbs: [list]
+  # Optional CNPG dependency adapter: the instance manager reads TLS/query
+  # resources through the API rather than mounting them in the Pod.
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters]
+    verbs: [list, watch]
+  # Explicit Certificate adapter retains only its target Secret name.
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [list, watch]
+  - apiGroups: [codemowers.io]
+    resources: [containerimages, sourcerepositories]
+    verbs: [list]
+  - apiGroups: [helm.cattle.io]
+    resources: [helmcharts]
+    verbs: [list]
+  # MCP servers registered for agents, listed for callers who may list them.
+  - apiGroups: [codemowers.ai]
+    resources: [clustermcpservers, mcpservers]
+    verbs: [list]
+  # Every permission answer this server gives is a SubjectAccessReview asked as
+  # the verified caller. This is a permission-probing capability: the server
+  # only ever asks about the identity it just verified from the token.
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]
+    verbs: [create]
+  # The application checks the caller's get pods/log access before every read.
+  # Workload writes, when enabled, use verified caller impersonation below.
+  - apiGroups: ['']
+    resources: [pods/log]
+    verbs: [get]
+{{- if or .Values.mcp.workloadRestart.enabled .Values.mcp.userAccess.enabled }}
+  # Mutations are authorized and admitted as the verified OIDC caller, not this
+  # service account. No patch/delete privileges are granted to the account.
+  # User access inspection sends only SelfSubjectRulesReviews as the inspected
+  # user, and only for callers who may impersonate users and groups themselves.
+  - apiGroups: ['']
+    resources: [users, groups]
+    verbs: [impersonate]
+{{- end }}
+{{- if .Values.mcp.userAccess.enabled }}
+  # OIDCUsers are read only after the caller's own RBAC allows the same read.
+  # Granted cluster-wide so the release stays in one namespace; the server
+  # reads only mcp.userAccess.oidcUserNamespace.
+  - apiGroups: [codemowers.cloud]
+    resources: [oidcusers]
+    verbs: [get, list]
+  # ServiceAccounts are listed and inspected, as SelfSubjectRulesReviews
+  # impersonating them, only for callers who may do the same themselves.
+  - apiGroups: ['']
+    resources: [serviceaccounts]
+    verbs: [get, list, impersonate]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Values.mcp.rbac.clusterRoleName | default (printf "%s-%s-observability" .Release.Namespace .Release.Name) | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.mcp.rbac.clusterRoleName | default (printf "%s-%s-observability" .Release.Namespace .Release.Name) | quote }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-mcp
+    namespace: {{ .Release.Namespace | quote }}
+---
+# list_trust_bundles reads the bundles trust-manager distributes to this namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-mcp-trust-bundles
+rules:
+  - apiGroups: ['']
+    resources: [configmaps]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-mcp-trust-bundles
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-mcp-trust-bundles
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-mcp
+{{- end }}

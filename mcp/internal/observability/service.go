@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -18,11 +19,21 @@ import (
 // permission is asked of the cluster authorizer before a backend is queried.
 type Service struct {
 	// Empty disables the metrics and resource-usage tools.
-	PrometheusURL string
+	PrometheusURL     string
+	ScannerNamespace  string
+	ScannerInstance   string
+	CVEHistoryEnabled bool
+	SAHistoryEnabled  bool
+	// Prometheus's public address for links; empty reads its
+	// web.external-url flag.
+	PrometheusExternalURL string
 	// Optional bound for dedicated history stores; resource monitoring defaults to seven days.
 	MaxHistoryRange time.Duration
 	// Empty reads logs from the Kubernetes API instead.
 	LokiURL string
+	// Empty disables the alert tools.
+	AlertmanagerURL     string
+	AlertmanagerTimeout time.Duration
 	// Offers query_logs; set when observability is configured.
 	LogsEnabled bool
 	// The shared gateway to Prometheus and Loki.
@@ -31,14 +42,17 @@ type Service struct {
 	// the caller's permission is checked.
 	Kubernetes kubernetes.Interface
 	Judge      authz.Judge
-	// Nil admits every call.
-	Budget *Budget
+	// Marks claims the caller may expand; set when expand_volume is offered.
+	ExpandEnabled bool
 	// Resource-usage evaluation times are aligned down to this, so refreshes
 	// ask Prometheus the identical question and share an answer.
 	Alignment time.Duration
 	Now       func() time.Time
-	// rate_limited and caller_busy refusals.
-	OnRefused func(reason string)
+
+	external struct {
+		sync.Mutex
+		url *string
+	}
 }
 
 func (s *Service) MetricsEnabled() bool { return s.PrometheusURL != "" }
@@ -49,27 +63,6 @@ func (s *Service) now() time.Time {
 	}
 
 	return time.Now()
-}
-
-// admit runs one tool call within the caller's budget, charging each backend
-// request it makes.
-func (s *Service) admit(id authz.Identity, run func(backend Requester) error) error {
-	if s.Budget == nil {
-		return run(s.Backend)
-	}
-	err := s.Budget.Admit(id.User, func(charge func()) error {
-		return run(RequesterFunc(func(ctx context.Context, u *url.URL) (Response, error) {
-			charge()
-
-			return s.Backend.Get(ctx, u)
-		}))
-	})
-	var refused *Refused
-	if errors.As(err, &refused) && refused.Reason != "busy" && s.OnRefused != nil {
-		s.OnRefused(refused.Reason)
-	}
-
-	return err
 }
 
 func (s *Service) require(ctx context.Context, id authz.Identity, attrs authz.Attributes, denied string) error {
@@ -84,6 +77,48 @@ func endpoint(base, path string) *url.URL {
 	u, _ := url.Parse(strings.TrimRight(base, "/") + path)
 
 	return u
+}
+
+// PublicURL is Prometheus's public address for links to its graphs, or nil.
+func (s *Service) PublicURL(ctx context.Context) *string {
+	if s.PrometheusURL == "" {
+		return nil
+	}
+
+	return s.externalURL(ctx, s.Backend)
+}
+
+// externalURL is Prometheus's public address: PrometheusExternalURL, else its
+// web.external-url flag, which prometheus-operator sets from
+// spec.externalUrl. A successful answer is kept; nil when Prometheus
+// advertises no http(s) address.
+func (s *Service) externalURL(ctx context.Context, backend Requester) *string {
+	if s.PrometheusExternalURL != "" {
+		public := strings.TrimRight(s.PrometheusExternalURL, "/")
+
+		return &public
+	}
+	s.external.Lock()
+	defer s.external.Unlock()
+	if s.external.url == nil {
+		var resp struct {
+			Status string            `json:"status"`
+			Data   map[string]string `json:"data"`
+		}
+		if err := get(ctx, backend, endpoint(s.PrometheusURL, "/api/v1/status/flags"), "Prometheus", &resp); err != nil || resp.Status != "success" {
+			return nil
+		}
+		public := ""
+		if u, err := url.Parse(resp.Data["web.external-url"]); err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" {
+			public = strings.TrimRight(u.String(), "/")
+		}
+		s.external.url = &public
+	}
+	if *s.external.url == "" {
+		return nil
+	}
+
+	return s.external.url
 }
 
 // get queries a backend and decodes a 200 answer.

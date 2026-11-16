@@ -23,9 +23,9 @@ type AppOptions struct {
 	BrowserClientID string
 	AllowedOrigins  []string
 	MCP             *mcp.Server
-	// Nil serves /mcp unauthenticated, for servers not reachable from outside
-	// the cluster.
-	Auth *auth.Authenticator
+	// Nil skips bearer verification. AnonymousRead explicitly enables all reads.
+	Auth          *auth.Authenticator
+	AnonymousRead bool
 	// MCP sessions with no request in flight are closed after this long.
 	SessionIdle time.Duration
 	// Nil answers /api/cache/invalidate with 404.
@@ -33,10 +33,9 @@ type AppOptions struct {
 	// Nil answers /api/provisioning/capabilities with 404. Authenticated
 	// like /mcp.
 	Capabilities http.Handler
-	// Serves /ui and links the landing page to it; nil disables it.
-	UI      http.Handler
-	Metrics *metrics.Metrics
-	Logger  *slog.Logger
+	BrowserReads http.Handler
+	Metrics      *metrics.Metrics
+	Logger       *slog.Logger
 }
 
 type app struct {
@@ -56,7 +55,12 @@ func NewApp(opts AppOptions) http.Handler {
 
 	mux := http.NewServeMux()
 	capabilities := opts.Capabilities
+	protect := func(h http.Handler) http.Handler { return h }
+	if opts.AnonymousRead {
+		protect = auth.AnonymousMiddleware
+	}
 	if opts.Auth != nil {
+		protect = opts.Auth.Middleware(opts.PublicURL)
 		if capabilities != nil {
 			capabilities = opts.Auth.Middleware(opts.PublicURL)(capabilities)
 		}
@@ -67,8 +71,32 @@ func NewApp(opts AppOptions) http.Handler {
 		mux.Handle("/.well-known/oauth-protected-resource", metadata)
 		mux.Handle(auth.MetadataPath, metadata)
 	}
-	mux.Handle("/mcp", mcpHandler)
+	if opts.Auth == nil && opts.AnonymousRead {
+		mcpHandler = protect(mcpHandler)
+		if capabilities != nil {
+			capabilities = protect(capabilities)
+		}
+	}
+	mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		mcpHandler.ServeHTTP(w, r)
+	}))
+	if opts.BrowserReads != nil && (opts.Auth != nil || opts.AnonymousRead) {
+		protected := protect(opts.BrowserReads)
+		reads := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Vary", "Authorization, Origin")
+			protected.ServeHTTP(w, r)
+		})
+		mux.Handle("/api/observability/", reads)
+		mux.Handle("/api/crawler/authorize", reads)
+	}
 	mux.HandleFunc("GET /api/client-config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if opts.AnonymousRead {
+			writeJSON(w, http.StatusOK, map[string]any{"authMode": "anonymous"})
+			return
+		}
 		clientID := opts.BrowserClientID
 		// Loopback dashboards use the native PKCE client, whose redirect URIs
 		// accept HTTP loopback. CORS still requires an explicitly allowed origin.
@@ -80,13 +108,9 @@ func NewApp(opts AppOptions) http.Handler {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, http.StatusOK, map[string]any{"clientId": clientID, "issuer": opts.Auth.Issuer, "resource": a.resource, "scopes": opts.Auth.Metadata().ScopesSupported})
+		writeJSON(w, http.StatusOK, map[string]any{"authMode": "oidc", "clientId": clientID, "issuer": opts.Auth.Issuer, "resource": a.resource, "scopes": opts.Auth.Metadata().ScopesSupported})
 	})
 	mux.HandleFunc("GET /{$}", a.serveLanding)
-	if opts.UI != nil {
-		mux.Handle("/ui", opts.UI)
-		mux.Handle("/ui/", opts.UI)
-	}
 	if capabilities != nil {
 		mux.Handle(capabilitiesPath, capabilities)
 	}

@@ -3,7 +3,6 @@
 import type { ReactNode } from "react"
 import LoadError from "./load-error"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { fetchDynamicData } from "@/lib/cluster/dynamic-data"
 
 type Props = {
   title: string
@@ -13,7 +12,7 @@ type Props = {
 
 export default function PageHeader({ title, subtitle, accessory }: Props) {
   const error = useClusterState(s => s.error)
-  const retry = () => void fetchDynamicData()
+  const retry = () => window.dispatchEvent(new Event("driftmower:refresh-inventory"))
   return (
     <>
       <header className="flex items-start justify-between gap-8">

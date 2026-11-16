@@ -1,19 +1,17 @@
-# One module per component. `skaffold dev` runs them all; `-m crawler`,
-# `-m mcp` or `-m ui` runs one. Cluster, namespace and registry come from
-# skaffold.env (see skaffold.env.example) or exported variables.
+# All components build and deploy together. Select a cluster through local env settings.
 apiVersion: skaffold/v4beta13
 kind: Config
 metadata:
-  name: crawler
+  name: driftmower
 
 build:
   cluster:
     # Build namespace is independent of Skaffold's deploy namespace.
     namespace: driftmower
     dockerConfig:
-      secretName: driftmower-kaniko-registry
-    concurrency: 1
-    timeout: 30m
+      secretName: zot-registry-cluster-push-kaniko
+    # 0 is unlimited: every artifact builds in parallel.
+    concurrency: 0
     nodeSelector:
       kubernetes.io/arch: amd64
     resources:
@@ -29,14 +27,12 @@ build:
         configMap:
           name: trusted-ca-certs
   artifacts:
-    - image: driftmower
+    - image: driftmower-crawler
       platforms:
         - linux/amd64
       # The repository root, where go.mod is.
       context: .
       kaniko:
-        image: ghcr.io/osscontainertools/kaniko:v1.29.0
-        pushRetry: "3"
         env:
           # Zot requires OCI manifests, including the DB image built FROM scratch.
           - name: FF_KANIKO_OCI_SCRATCH_BASE
@@ -50,57 +46,11 @@ build:
             mountPath: /kaniko/trust
             readOnly: true
         dockerfile: crawler/Dockerfile
-
-manifests:
-  helm:
-    releases:
-      - name: driftmower-crawler
-        chartPath: crawler/chart
-        skipBuildDependencies: true
-        setValues:
-          # The development image is built for amd64 only.
-          nodeSelector.kubernetes\.io/arch: amd64
-        setValueTemplates:
-          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower}}"
-
-deploy:
-  kubectl: {}
----
-apiVersion: skaffold/v4beta13
-kind: Config
-metadata:
-  name: mcp
-
-build:
-  cluster:
-    # Build namespace is independent of Skaffold's deploy namespace.
-    namespace: driftmower
-    dockerConfig:
-      secretName: driftmower-kaniko-registry
-    concurrency: 1
-    timeout: 30m
-    nodeSelector:
-      kubernetes.io/arch: amd64
-    resources:
-      requests:
-        cpu: 500m
-        memory: 2Gi
-        ephemeralStorage: 12Gi
-      limits:
-        memory: 8Gi
-        ephemeralStorage: 24Gi
-    volumes:
-      - name: kaniko-trust
-        configMap:
-          name: trusted-ca-certs
-  artifacts:
     - image: driftmower-mcp
       platforms:
         - linux/amd64
       context: .
       kaniko:
-        image: ghcr.io/osscontainertools/kaniko:v1.29.0
-        pushRetry: "3"
         env:
           # Zot requires OCI manifests, including the DB image built FROM scratch.
           - name: FF_KANIKO_OCI_SCRATCH_BASE
@@ -114,84 +64,11 @@ build:
             mountPath: /kaniko/trust
             readOnly: true
         dockerfile: mcp/Dockerfile
-
-manifests:
-  helm:
-    releases:
-      - name: driftmower-mcp
-        chartPath: mcp/chart
-        skipBuildDependencies: true
-        setValues:
-          workloadRestart.enabled: true
-          serviceAccountAuth.enabled: true
-          dashboard.origin: https://dashboard.driftmower.ee-lte-1.codemowers.io
-          dashboard.clientSecretName: oidc-client-driftmower-ui-owner-secrets
-          dashboard.localOrigins: ["http://localhost:8080", "http://127.0.0.1:8080"]
-          # The crawler module; findings report it unreachable
-          # when that module is not deployed.
-          crawler.url: http://driftmower-crawler:8080
-        setValueTemplates:
-          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
-
-deploy:
-  kubectl:
-    flags:
-      # Keep labeled chart resources when Skaffold cleans up.
-      delete:
-        - --selector=skaffold.dev/keep!=true
-
-profiles:
-  - name: ee-west-1
-    patches:
-      - op: replace
-        path: /manifests/helm/releases/0/setValues/dashboard.origin
-        value: https://dashboard.driftmower.ee-west-1.codemowers.io
-
-portForward:
-  - resourceType: deployment
-    resourceName: driftmower-mcp
-    port: 3000
-    localPort: 3000
-  - resourceType: deployment
-    resourceName: driftmower-mcp
-    port: 3001
-    localPort: 3001
----
-apiVersion: skaffold/v4beta13
-kind: Config
-metadata:
-  name: ui
-
-build:
-  cluster:
-    # Build namespace is independent of Skaffold's deploy namespace.
-    namespace: driftmower
-    dockerConfig:
-      secretName: driftmower-kaniko-registry
-    concurrency: 1
-    timeout: 30m
-    nodeSelector:
-      kubernetes.io/arch: amd64
-    resources:
-      requests:
-        cpu: 500m
-        memory: 2Gi
-        ephemeralStorage: 12Gi
-      limits:
-        memory: 8Gi
-        ephemeralStorage: 24Gi
-    volumes:
-      - name: kaniko-trust
-        configMap:
-          name: trusted-ca-certs
-  artifacts:
     - image: driftmower-ui
       platforms:
         - linux/amd64
       context: .
       kaniko:
-        image: ghcr.io/osscontainertools/kaniko:v1.29.0
-        pushRetry: "3"
         env:
           # Zot requires OCI manifests, including the DB image built FROM scratch.
           - name: FF_KANIKO_OCI_SCRATCH_BASE
@@ -205,71 +82,10 @@ build:
             mountPath: /kaniko/trust
             readOnly: true
         dockerfile: ui/Dockerfile
-
-# Default cluster is ee-lte-1; use -p ee-west-1 for the west overlay.
-manifests:
-  rawYaml:
-    - ui/k8s/oidcclient.yaml
-    - ui/k8s/deployment.yaml
-    - ui/k8s/service.yaml
-    - ui/k8s/ingress.yaml
-
-profiles:
-  - name: ee-west-1
-    patches:
-      - op: replace
-        path: /manifests
-        value:
-          kustomize:
-            paths: [ui/overlays/ee-west-1]
-
-deploy:
-  kubectl: {}
-
----
-apiVersion: skaffold/v4beta13
-kind: Config
-metadata:
-  name: history
-manifests:
-  rawYaml:
-    - monitoring/prometheus.yaml
-deploy:
-  kubectl: {}
----
-apiVersion: skaffold/v4beta13
-kind: Config
-metadata:
-  name: operator
-build:
-  cluster:
-    # Build namespace is independent of Skaffold's deploy namespace.
-    namespace: driftmower
-    dockerConfig:
-      secretName: driftmower-kaniko-registry
-    concurrency: 1
-    timeout: 30m
-    nodeSelector:
-      kubernetes.io/arch: amd64
-    resources:
-      requests:
-        cpu: 500m
-        memory: 2Gi
-        ephemeralStorage: 12Gi
-      limits:
-        memory: 8Gi
-        ephemeralStorage: 24Gi
-    volumes:
-      - name: kaniko-trust
-        configMap:
-          name: trusted-ca-certs
-  artifacts:
     - image: driftmower-operator
       platforms: [linux/amd64]
       context: .
       kaniko:
-        image: ghcr.io/osscontainertools/kaniko:v1.29.0
-        pushRetry: "3"
         env:
           # Zot requires OCI manifests, including the DB image built FROM scratch.
           - name: FF_KANIKO_OCI_SCRATCH_BASE
@@ -287,8 +103,6 @@ build:
       platforms: [linux/amd64]
       context: .
       kaniko:
-        image: ghcr.io/osscontainertools/kaniko:v1.29.0
-        pushRetry: "3"
         env:
           # Zot requires OCI manifests, including the DB image built FROM scratch.
           - name: FF_KANIKO_OCI_SCRATCH_BASE
@@ -303,14 +117,110 @@ build:
             readOnly: true
         dockerfile: operator/database.Dockerfile
         # No Kaniko layer cache: rebuilding refreshes the upstream databases.
+
 manifests:
   helm:
+    # Helm template is offline: advertise APIs installed on our deployment
+    # clusters so capability-guarded resources are not silently omitted.
+    flags:
+      template:
+        - --api-versions=monitoring.coreos.com/v1/PodMonitor
+        - --api-versions=monitoring.coreos.com/v1/ServiceMonitor
+        - --api-versions=monitoring.coreos.com/v1/PrometheusRule
+        - --api-versions=monitoring.coreos.com/v1/Prometheus
+        - --api-versions=codemowers.ai/v1alpha1/ClusterMCPServer
     releases:
-      - name: driftmower-operator
-        chartPath: operator/chart
+      - name: driftmower
+        chartPath: chart
         skipBuildDependencies: true
+        setValues:
+          crawler.nodeSelector.kubernetes\.io/arch: amd64
+          mcp.workloadRestart.enabled: true
+          mcp.userAccess.enabled: true
+          mcp.serviceAccountAuth.enabled: true
+          mcp.dashboard.localOrigins: ['http://localhost:17843', 'http://127.0.0.1:17843', 'http://localhost:8080', 'http://127.0.0.1:8080']
+          ui.nodeSelector.kubernetes\.io/arch: amd64
+          history.storageClassName: prometheus
+          operator.sbomStorageClassName: scratch
+          registryScraper.storageClassName: scratch
         setValueTemplates:
-          image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"
-          databaseImage: "{{.IMAGE_FULLY_QUALIFIED_driftmower_trivy_db}}"
+          crawler.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_crawler}}"
+          mcp.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
+          mcp.auth.mode: '{{ default "rbac" .MCP_AUTH_MODE }}'
+          mcp.ingress.enabled: '{{ default "true" .MCP_INGRESS_ENABLED }}'
+          mcp.publicUrl: '{{ default "" .MCP_PUBLIC_URL }}'
+          ui.enabled: '{{ default "true" .UI_ENABLED }}'
+          operator.enabled: '{{ default "true" .OPERATOR_ENABLED }}'
+          mcp.metrics.prometheusNamespace: '{{ default "monitoring" .PROMETHEUS_NAMESPACE }}'
+          ui.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_ui}}"
+          operator.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_operator}}"
+          operator.databaseImage: "{{.IMAGE_FULLY_QUALIFIED_driftmower_trivy_db}}"
+          # Comma-separated Secret names from the environment, for images from
+          # another cluster's registry.
+          imagePullSecrets: '{{ printf "{%s}" (default "" .IMAGE_PULL_SECRETS) }}'
+          # Per-cluster components and command context.
+          crawler.enabled: '{{ default "true" .CRAWLER_ENABLED }}'
+          registryScraper.enabled: '{{ default "true" .REGISTRY_SCRAPER_ENABLED }}'
+          ui.kubeContext: '{{ default (default "" .SKAFFOLD_KUBE_CONTEXT) .KUBECTL_CONTEXT }}'
+          # Argo CD's public address, when it manages this cluster's workloads.
+          mcp.argocd.url: '{{ default "" .ARGO_URL }}'
+
 deploy:
-  kubectl: {}
+  kubectl:
+    flags:
+      # Keep labeled resources when Skaffold cleans up.
+      delete:
+        - --selector=skaffold.dev/keep!=true
+
+portForward:
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3000
+    localPort: 3000
+  - resourceType: deployment
+    resourceName: driftmower-mcp
+    port: 3001
+    localPort: 3001
+
+profiles:
+  # Build on this machine's Docker instead of Kaniko in the cluster, all
+  # artifacts at once: `skaffold run -p local`. Needs `docker login` to the
+  # registry; the containerd image store keeps the OCI manifests Zot requires.
+  # Host networking gives builds the VPN routes and DNS.
+  - name: local
+    build:
+      local:
+        push: true
+        useBuildkit: true
+        concurrency: 0
+      artifacts:
+        - image: driftmower-crawler
+          platforms: [linux/amd64]
+          context: .
+          docker:
+            dockerfile: crawler/Dockerfile
+            network: host
+        - image: driftmower-mcp
+          platforms: [linux/amd64]
+          context: .
+          docker:
+            dockerfile: mcp/Dockerfile
+            network: host
+        - image: driftmower-ui
+          platforms: [linux/amd64]
+          context: .
+          docker:
+            dockerfile: ui/Dockerfile
+            network: host
+        - image: driftmower-operator
+          platforms: [linux/amd64]
+          context: .
+          docker:
+            dockerfile: operator/Dockerfile
+            network: host
+        - image: driftmower-trivy-db
+          platforms: [linux/amd64]
+          context: .
+          docker:
+            dockerfile: operator/database.Dockerfile
+            network: host

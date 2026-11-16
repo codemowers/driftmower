@@ -17,7 +17,7 @@ const (
 	Gitea  = "gitea"
 )
 
-// Release is a published release of a source.
+// Release is a published release of a source, or a Git tag when it has no releases.
 type Release struct {
 	Notes      string    `json:"notes,omitempty"`
 	Tag        string    `json:"tag"`
@@ -77,11 +77,11 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 	var out []Release
 	switch loc.forge {
 	case GitHub, Gitea:
-		endpoint := githubAPI + "/repos/" + loc.path + "/releases?per_page=100"
+		endpoint := c.githubAPIFor(loc) + "/repos/" + loc.path + "/releases?per_page=100"
 		if loc.forge == Gitea {
 			endpoint = "https://" + loc.host + "/api/v1/repos/" + loc.path + "/releases?limit=50"
 		}
-		var items []struct {
+		type releaseItem struct {
 			Body        string    `json:"body"`
 			TagName     string    `json:"tag_name"`
 			Draft       bool      `json:"draft"`
@@ -89,8 +89,36 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 			PublishedAt time.Time `json:"published_at"`
 			HTMLURL     string    `json:"html_url"`
 		}
-		if err := c.fetch.getJSON(ctx, endpoint, &items); err != nil {
-			return nil, err
+		var items []releaseItem
+		// Asset metadata can make GitHub's 100-release response exceed the
+		// bounded HTTP cache. Reduce page size and restart pagination so the
+		// same 100 releases, including their notes, remain available.
+		pageSize := 100
+		for page := 1; len(items) < 100; page++ {
+			pageURL := endpoint
+			if loc.forge == GitHub && pageSize < 100 {
+				pageURL = c.githubAPIFor(loc) + "/repos/" + loc.path + "/releases?per_page=" + strconv.Itoa(pageSize) + "&page=" + strconv.Itoa(page)
+			}
+			var batch []releaseItem
+			if err := c.fetchFor(loc).getJSON(ctx, pageURL, &batch); err != nil {
+				if loc.forge == GitHub && errors.Is(err, errResponseTooLarge) && pageSize > 1 {
+					pageSize /= 2
+					items = nil
+					page = 0
+					continue
+				}
+				if errors.Is(err, errNotFound) && page == 1 {
+					break // No published releases; verify the repository through its tags.
+				}
+				return nil, err
+			}
+			items = append(items, batch...)
+			if loc.forge != GitHub || len(batch) < pageSize {
+				break
+			}
+		}
+		if len(items) > 100 {
+			items = items[:100]
 		}
 		for _, item := range items {
 			if !item.Draft {
@@ -108,11 +136,38 @@ func (c *Crawler) releases(ctx context.Context, loc location) ([]Release, error)
 			} `json:"_links"`
 		}
 		endpoint := "https://gitlab.com/api/v4/projects/" + url.PathEscape(loc.path) + "/releases?per_page=100"
-		if err := c.fetch.getJSON(ctx, endpoint, &items); err != nil {
+		if err := c.fetchFor(loc).getJSON(ctx, endpoint, &items); err != nil && !errors.Is(err, errNotFound) {
 			return nil, err
 		}
 		for _, item := range items {
 			out = append(out, Release{Notes: item.Description, Tag: item.TagName, Prerelease: item.UpcomingRelease, Published: item.ReleasedAt, URL: item.Links.Self})
+		}
+	}
+	// Empty or unavailable release collections fall back to repository tags.
+	// Authentication, throttling and transport failures remain errors.
+	if len(out) == 0 {
+		var endpoint, tagURL string
+		switch loc.forge {
+		case GitHub:
+			endpoint = c.githubAPIFor(loc) + "/repos/" + loc.path + "/tags?per_page=100"
+			tagURL = loc.url + "/tree/"
+		case Gitea:
+			endpoint = "https://" + loc.host + "/api/v1/repos/" + loc.path + "/tags?limit=50"
+			tagURL = loc.url + "/src/tag/"
+		case GitLab:
+			endpoint = "https://gitlab.com/api/v4/projects/" + url.PathEscape(loc.path) + "/repository/tags?per_page=100"
+			tagURL = loc.url + "/-/tags/"
+		}
+		if endpoint != "" {
+			var tags []struct {
+				Name string `json:"name"`
+			}
+			if err := c.fetchFor(loc).getJSON(ctx, endpoint, &tags); err != nil {
+				return nil, err
+			}
+			for _, tag := range tags {
+				out = append(out, Release{Tag: tag.Name, URL: tagURL + url.PathEscape(tag.Name)})
+			}
 		}
 	}
 	for i := range out {
@@ -150,7 +205,7 @@ type githubAdvisory struct {
 // ranges from GitHub's reviewed advisory database where it has them.
 func (c *Crawler) githubAdvisories(ctx context.Context, loc location) ([]Advisory, error) {
 	var items []githubAdvisory
-	err := c.fetch.getJSON(ctx, githubAPI+"/repos/"+loc.path+"/security-advisories?per_page=100&state=published", &items)
+	err := c.fetchFor(loc).getJSON(ctx, c.githubAPIFor(loc)+"/repos/"+loc.path+"/security-advisories?per_page=100&state=published", &items)
 	if errors.Is(err, errNotFound) {
 		return nil, nil
 	} else if err != nil {
@@ -165,7 +220,7 @@ func (c *Crawler) githubAdvisories(ctx context.Context, loc location) ([]Advisor
 		}
 		vulnerabilities := item.Vulnerabilities
 		var reviewed githubAdvisory
-		if err := c.fetch.getJSON(ctx, githubAPI+"/advisories/"+item.GHSAID, &reviewed); err == nil && len(reviewed.Vulnerabilities) > 0 {
+		if err := c.fetchFor(loc).getJSON(ctx, c.githubAPIFor(loc)+"/advisories/"+item.GHSAID, &reviewed); err == nil && len(reviewed.Vulnerabilities) > 0 {
 			advisory.Origin, vulnerabilities = "reviewed", reviewed.Vulnerabilities
 		} else if err != nil && !errors.Is(err, errNotFound) {
 			return nil, err

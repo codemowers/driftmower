@@ -14,16 +14,17 @@ import ActionsCard from "@/app/components/actions-card"
 import CopyButton from "@/app/components/copy-button"
 import TagIdentity from "@/app/components/image/tag-identity"
 import SourceCard from "@/app/components/image/source-card"
-import SourceFindings from "@/app/components/image/source-findings"
+import { SourceAdvisories, SourceReleases } from "@/app/components/image/source-findings"
 import ImageInspection from "@/app/components/image/image-inspection"
+import BaseImageHierarchy from "@/app/components/image/base-image-hierarchy"
 import SupportLifecycle from "@/app/components/image/support-lifecycle"
 import ImageIssues from "@/app/components/image/image-issues"
+import ImageLicenses from "@/app/components/image/image-licenses"
 import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
 import ImageTagStats from "@/app/components/image/image-tag-stats"
 import { artifactTitle, digestCrumb, imagePath, integrityStyle } from "@/lib/utils/image-artifacts"
 import ImageStats from "./components/image-stats"
 import DeployedByCard from "./components/deployed-by-card"
-import ManagedByCard from "./components/managed-by-card"
 import TagHistoryCard from "./components/tag-history-card"
 import VersionsTable from "./components/versions-table"
 import HistoryCard from "./components/history-card"
@@ -87,6 +88,9 @@ function ArtifactView({
       />
 
       <ImageTagStats usage={version.usage} />
+      <ImageLicenses digests={version.digest ? [version.digest] : []}/>
+
+      <BaseImageHierarchy images={version.usage.imageInfo.platforms ?? []} targetLabel={fullRef} />
 
       <div className="grid gap-6 items-start md:grid-cols-[1fr_320px]">
         <TagIdentity usage={version.usage} />
@@ -96,8 +100,9 @@ function ArtifactView({
         </div>
       </div>
 
-      <ImageVulnerabilities usage={version.usage} />
-      <SourceFindings usage={version.usage} />
+      <SourceAdvisories key={`advisories-${version.artifactKey}`} usage={version.usage} />
+      <ImageVulnerabilities key={`cves-${version.artifactKey}`} usage={version.usage} />
+      <SourceReleases key={`releases-${version.artifactKey}`} usage={version.usage} />
       <ImageInspection usage={version.usage} />
     </>
   )
@@ -197,6 +202,9 @@ function ContainerImageDetailContent() {
         />
 
         <ImageStats detail={detail} />
+        <ImageLicenses digests={detail.digests}/>
+
+        <BaseImageHierarchy images={detail.versions.flatMap(version => version.usage.imageInfo.platforms ?? [])} targetLabel={detail.key} />
 
         <ActionsCard {...assessments} />
 
@@ -215,7 +223,6 @@ function ContainerImageDetailContent() {
             <HistoryCard imageKey={detail.key} />
           </div>
           <div className="flex flex-col gap-6">
-            <ManagedByCard releases={detail.releases} linkTo={linkTo} />
             {detail.versions[0] && (
               <>
                 <SourceCard usage={detail.versions[0].usage} showRevision={false} />

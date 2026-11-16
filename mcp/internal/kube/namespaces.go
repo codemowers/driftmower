@@ -47,3 +47,5 @@ func (l *NamespaceLister) List(ctx context.Context) ([]string, error) {
 func (l *NamespaceLister) Invalidate() {
 	l.memo.Invalidate()
 }
+
+func (l *NamespaceLister) Stats() ttlcache.Stats { return l.memo.Stats() }

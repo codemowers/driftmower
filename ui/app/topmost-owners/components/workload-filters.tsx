@@ -29,7 +29,9 @@ type Props = {
   onToggleHelmManaged: () => void
   hideArgoManaged: boolean
   onToggleArgoManaged: () => void
-  counts: { downscaled: number; finished: number; helm: number; argo: number }
+  hideOrphaned: boolean
+  onToggleOrphaned: () => void
+  counts: { downscaled: number; finished: number; helm: number; argo: number; orphaned: number }
   onReset: () => void
 }
 
@@ -41,9 +43,10 @@ export default function WorkloadFilters({
   showDownscaled, onToggleDownscaled,
   hideHelmManaged, onToggleHelmManaged,
   hideArgoManaged, onToggleArgoManaged,
+  hideOrphaned, onToggleOrphaned,
   counts, onReset,
 }: Props) {
-  const menuFilterCount = (showFinished ? 1 : 0) + (showDownscaled ? 1 : 0) + (hideHelmManaged ? 1 : 0) + (hideArgoManaged ? 1 : 0)
+  const menuFilterCount = (showFinished ? 1 : 0) + (showDownscaled ? 1 : 0) + (hideHelmManaged ? 1 : 0) + (hideArgoManaged ? 1 : 0) + (hideOrphaned ? 1 : 0)
 
   return (
     <div className="flex items-center gap-7 border-b border-gray-200 px-5 py-3.5">
@@ -78,6 +81,7 @@ export default function WorkloadFilters({
             <FilterToggle checked={showDownscaled} onToggle={onToggleDownscaled} label="Show downscaled" count={counts.downscaled} />
             <FilterToggle checked={hideHelmManaged} onToggle={onToggleHelmManaged} label="Hide Helm-managed" count={counts.helm} />
             <FilterToggle checked={hideArgoManaged} onToggle={onToggleArgoManaged} label="Hide ArgoCD-managed" count={counts.argo} />
+            <FilterToggle checked={hideOrphaned} onToggle={onToggleOrphaned} label="Hide orphaned" count={counts.orphaned} />
           </PopoverContent>
         </Popover>
       </div>

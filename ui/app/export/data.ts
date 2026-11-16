@@ -48,7 +48,7 @@ export function formatSize(bytes: number): string {
   return `${Math.round(bytes / MB)} MB`
 }
 
-export const CLUSTER_NAME = "ee-lte-1"
+export const CLUSTER_NAME = "alpha"
 export const BUNDLE_DATE = "2026-05-31"
 export const BUNDLE_BASENAME = `driftmower-${CLUSTER_NAME}-${BUNDLE_DATE}`
 export const MANIFEST_COUNT = 156
@@ -238,7 +238,7 @@ export const ARTIFACT_CLASSES: { id: ArtifactClass; label: string }[] = [
 ]
 
 export const SANDBOXES: Sandbox[] = [
-  { id: "sb-1", name: "ee-lte-1-preflight", status: "ready", k8sVersion: "v1.31.1", ttl: "3h 41m" },
+  { id: "sb-1", name: "alpha-preflight", status: "ready", k8sVersion: "v1.31.1", ttl: "3h 41m" },
   { id: "sb-2", name: "client-acme-handoff", status: "provisioning", k8sVersion: "v1.30.4", ttl: "4h 00m" },
   { id: "sb-3", name: "airgap-restore-check", status: "ready", k8sVersion: "v1.31.1", ttl: "1h 12m" },
   { id: "sb-4", name: "cilium-1.19-preview", status: "provisioning", k8sVersion: "v1.31.1", ttl: "4h 00m" },

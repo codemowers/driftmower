@@ -3,14 +3,18 @@ WORKDIR /app
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci
 COPY ui ./
-RUN npx next build static --webpack
+RUN npm run build
 
 FROM golang:1.26.10 AS server
 WORKDIR /src
-COPY ui/cmd/driftmower-dashboard/main.go ./main.go
-RUN CGO_ENABLED=0 go build -o /dashboard main.go
+COPY go.mod go.sum ./
+RUN go mod download
+COPY ui/cmd ./ui/cmd
+COPY desktop/dashboard ./desktop/dashboard
+RUN CGO_ENABLED=0 go build -o /dashboard ./ui/cmd/driftmower-dashboard
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# CA certificates are mounted by the cluster.
+FROM scratch
 WORKDIR /app
 COPY --from=server /dashboard /dashboard
 COPY --from=assets /app/static/out /app/public

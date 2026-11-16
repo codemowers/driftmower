@@ -27,13 +27,6 @@ export type Purpose =
 
 export type PresetId = "dev" | "small" | "ha"
 
-// A fact we could not read degrades to `known: false` rather than silently
-// passing: "absent" means the API does not serve it, "rbac" means we were
-// refused. Both must reach the user as prose.
-export type Unknown = { known: false; reason: "rbac" | "absent"; detail: string }
-export type Known<T> = { known: true; value: T }
-export type Fact<T> = Known<T> | Unknown
-
 export type DegradedRead = {
   // The fact family, e.g. "storageclasses". Used as a stable key in the UI.
   source: string
@@ -105,6 +98,8 @@ export type StorageClassFact = {
   implies: string
   // Can two instances live here and still be moved by their operator?
   replicaSafe: boolean
+  // The class's kubernetes.io/description, Markdown.
+  description?: string
 }
 
 export type QuotaAmounts = Partial<Record<string, string>>
@@ -269,26 +264,6 @@ export type FindingSeverity = "blocker" | "warning" | "note"
 
 export type WizardStep = "offering" | "where" | "size" | "options" | "review" | "apply"
 
-export type Finding = {
-  // Stable machine string, e.g. "quota.requests-memory". The UI anchors on it,
-  // an agent branches on it, and tests assert on it without matching prose.
-  code: string
-  severity: FindingSeverity
-  // Which step owns the fix, so the wizard can put it where the choice is made.
-  step: Exclude<WizardStep, "review" | "apply">
-  // The consequence, not the rule. <= 70 chars.
-  title: string
-  // The mechanism, naming real objects so the sentence is greppable.
-  detail: string
-  // One transferable sentence: why this bites, in general.
-  why: string
-  // Pure URL-param patches, so a fix is never a dead end.
-  fixes: { label: string; patch: Record<string, string | null> }[]
-  learnMore?: { label: string; href: string }
-  // Set when an unreadable fact forced a blocker down to a warning.
-  degradedFrom?: "blocker"
-}
-
 export type ChoiceOption<T> = {
   value: T
   label: string
@@ -298,95 +273,3 @@ export type ChoiceOption<T> = {
   // in the sizing step.
   disabledReason?: string
 }
-
-export type Choice<T> = {
-  value: T
-  source: "preset" | "user" | "cluster-default"
-  options: ChoiceOption<T>[]
-}
-
-export type PlanObject = {
-  index: number
-  kind: string
-  apiVersion: string
-  name: string
-  namespace: string
-  role: "primary" | "secret" | "policy" | "monitor" | "backup" | "config" | "rbac"
-  does: string
-  why: string
-  optional: boolean
-  // The wizard param that toggles this object, when optional.
-  includedBy?: string
-  object: Record<string, unknown>
-  // jsonPath -> inline note, rendered by DocumentViewer beside the line.
-  notes: Record<string, string>
-}
-
-export type ConnectionInfo = {
-  serviceName: string
-  port: number
-  secretName: string
-  // A command, never a value: the app must not read Secret contents.
-  passwordCommand: string
-  dsnHint: string
-}
-
-export type PlanCommand = { label: string; value: string; why: string; hint?: string }
-
-export type PlanResponse = {
-  // False when any blocker is present.
-  ok: boolean
-  // Operator missing: manifests are shown read-only, nothing is validated.
-  preview: boolean
-  resolved: {
-    instances: number
-    storageGi: number
-    storageClass: string | null
-    version: string | null
-  }
-  choices: {
-    instances: Choice<number>
-    storageClass: Choice<string>
-    storageGi: Choice<number>
-    version: Choice<string>
-  }
-  findings: Finding[]
-  objects: PlanObject[]
-  commands: PlanCommand[]
-  readySignal: { humanText: string; watchCommand: string }
-  connect: ConnectionInfo | null
-  trackHref: string
-  filename: string
-  // Facts we could not read, named honestly.
-  unknowns: string[]
-}
-
-export type InstanceSummary = {
-  offering: OfferingId | null
-  kind: string
-  // "clusters.postgresql.cnpg.io", so the detail URL is kubectl-derivable.
-  resource: string
-  name: string
-  namespace: string
-  ready: boolean | null
-  instances: number | null
-  storageClass: string | null
-  storageGi: number | null
-  backupConfigured: boolean
-  href: string
-}
-
-export type InstancesResponse = {
-  instances: InstanceSummary[]
-  degraded: DegradedRead[]
-}
-
-export type InstanceDetailResponse =
-  | { status: "absent"; namespace: string; resource: string; name: string; hint: string }
-  | {
-      status: "found"
-      instance: InstanceSummary
-      connect: ConnectionInfo | null
-      readySignal: { humanText: string; watchCommand: string }
-      object: Record<string, unknown>
-    }

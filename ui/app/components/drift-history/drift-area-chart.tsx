@@ -1,12 +1,12 @@
 "use client"
 
 import type { ComponentProps } from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartTooltipContent } from "@/components/ui/chart"
 import { DRIFT_CHART_CONFIG } from "@/lib/features/drift-history/chart-config"
 import type { StackPoint, StackStatus } from "@/lib/features/drift-history/types"
 import { axisDate, tooltipDate } from "@/lib/features/drift-history/format"
 import { BAND_STYLE } from "@/lib/features/drift-history/band-style"
+import TimeSeriesChart from "../time-series-chart"
 import HistoryLegend from "./history-legend"
 
 const LAYERS: StackStatus[] = ["no_data", "behind", "major_behind", "minor_behind", "patch_behind", "up_to_date", "ahead"]
@@ -66,37 +66,8 @@ export default function DriftAreaChart({ stack }: { stack: StackPoint[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <ChartContainer config={DRIFT_CHART_CONFIG} className="h-[260px] w-full">
-        <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="t"
-            type="number"
-            domain={["dataMin", "dataMax"]}
-            scale="time"
-            tickFormatter={axisDate}
-            tickLine={false}
-            axisLine={false}
-            minTickGap={72}
-          />
-          <YAxis tickLine={false} axisLine={false} width={48} allowDecimals={false} />
-          <ChartTooltip isAnimationActive={false} position={{ y: 8 }} content={<StackTooltip />} />
-          {LAYERS.map(status => (
-            <Area
-              key={status}
-              dataKey={plotKey(status)}
-              name={status}
-              type="stepAfter"
-              stackId="containers"
-              fill={BAND_STYLE[status].fill}
-              fillOpacity={1}
-              stroke={BAND_STYLE[status].baseline}
-              strokeWidth={1}
-              isAnimationActive={false}
-            />
-          ))}
-        </AreaChart>
-      </ChartContainer>
+      <TimeSeriesChart data={rows} config={DRIFT_CHART_CONFIG} axes axisFormatter={axisDate} tooltip={<StackTooltip/>}
+        series={LAYERS.map(status=>({key:plotKey(status),name:status,fill:BAND_STYLE[status].fill,stroke:BAND_STYLE[status].baseline,stack:"containers",curve:"stepAfter"}))} />
       <HistoryLegend showMarks={false} />
     </div>
   )

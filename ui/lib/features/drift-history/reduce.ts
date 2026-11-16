@@ -1,8 +1,6 @@
-import type { BandStatus, Span, VersionMark } from "./types"
 import { HISTORY_SEVERITY } from "@/lib/cluster/styles/status-style"
 import type { Observation } from "./build-series"
-
-const HOUR_MS = 3_600_000
+import type { BandStatus,Span,VersionMark } from "./types"
 const DAY_MS = 86_400_000
 const MIN_FILL_MS = 5 * 60_000
 const FILL_GAP_PERCENTILE = 0.9

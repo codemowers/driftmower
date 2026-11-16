@@ -76,6 +76,7 @@ type StorageClassInput struct {
 	VolumeBindingMode string
 	AllowExpansion    bool
 	IsDefault         bool
+	Description       *string
 }
 
 // ToStorageClassFact applies the API defaults (reclaim Delete, binding
@@ -104,5 +105,6 @@ func ToStorageClassFact(in StorageClassInput) (StorageClassFact, bool) {
 		Topology:       topology,
 		Implies:        impliesClause(topology, reclaim, in.AllowExpansion, binding),
 		ReplicaSafe:    topology == ClusterWide || topology == Zonal,
+		Description:    in.Description,
 	}, true
 }

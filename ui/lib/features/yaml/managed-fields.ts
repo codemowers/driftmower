@@ -18,6 +18,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function isGeneratedPath(keys: (string | number)[]): boolean {
   const [leaf, parent, grandparent] = [keys.at(-1), keys.at(-2), keys.at(-3)]
   if (typeof leaf !== "string") return false
+  // Observed state, written by controllers rather than declared.
+  if (keys.length === 1) return leaf === "status"
   if (parent === "metadata") return GENERATED_METADATA_KEYS.has(leaf)
   if (parent === "annotations" && grandparent === "metadata") return GENERATED_ANNOTATIONS.has(leaf)
   return false

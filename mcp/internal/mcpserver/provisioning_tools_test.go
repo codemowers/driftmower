@@ -100,6 +100,8 @@ var strictTools = map[string]bool{
 	"get_pod_resource_usage_history": true, "get_cluster_resource_usage_history": true,
 	"query_metrics": true, "query_logs": true, "list_volumes": true,
 	"restart_workload": true, "terminate_pod": true,
+	"get_namespace_resources": true, "get_workload_resource_usage": true, "query_workload_logs": true,
+	"get_namespace_summaries": true, "get_log_rate": true,
 }
 
 type bearer struct{}
@@ -135,7 +137,7 @@ func TestProvisioningAndCatalogTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 12 {
+	if len(tools.Tools) != 13 {
 		var names []string
 		for _, tool := range tools.Tools {
 			names = append(names, tool.Name)

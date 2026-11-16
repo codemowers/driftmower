@@ -150,17 +150,24 @@ func labelKey(labels map[string]string) string {
 	return b.String()
 }
 
+// alignedNow is the evaluation time, aligned so a refresh within the window
+// asks the identical query. Relative to the Unix epoch, as Prometheus
+// timestamps are.
+func (s *Service) alignedNow() time.Time {
+	current := s.now()
+	if s.Alignment > 0 {
+		ms, align := current.UnixMilli(), s.Alignment.Milliseconds()
+		current = time.UnixMilli(ms - ms%align)
+	}
+
+	return current
+}
+
 func (s *Service) snapshot(ctx context.Context, backend Requester, queries map[string]definition, breakdown bool, history *HistoryInput, sc *scope) (*Usage, error) {
 	if s.PrometheusURL == "" {
 		return nil, errors.New("PROMETHEUS_URL is not configured")
 	}
-	current := s.now()
-	if s.Alignment > 0 {
-		// Aligned so a refresh within the window asks the identical query.
-		// Relative to the Unix epoch, as Prometheus timestamps are.
-		ms, align := current.UnixMilli(), s.Alignment.Milliseconds()
-		current = time.UnixMilli(ms - ms%align)
-	}
+	current := s.alignedNow()
 	observedAt := current.UTC().Format("2006-01-02T15:04:05.000Z")
 	end := float64(current.UnixMilli()) / 1000
 	start := end
@@ -417,7 +424,7 @@ type PodUsageInput struct {
 // usage from fixed PromQL.
 func (s *Service) PodUsage(ctx context.Context, id authz.Identity, in PodUsageInput, history *HistoryInput) (*Usage, error) {
 	var usage *Usage
-	err := s.admit(id, func(backend Requester) error {
+	err := func(backend Requester) error {
 		if err := s.require(ctx, id, authz.Attributes{Namespace: in.Namespace, Resource: "pods", Verb: "list"},
 			"Kubernetes RBAC denied list pods in namespace "+in.Namespace); err != nil {
 			return err
@@ -473,7 +480,7 @@ func (s *Service) PodUsage(ctx context.Context, id authz.Identity, in PodUsageIn
 		}
 
 		return nil
-	})
+	}(s.Backend)
 
 	return usage, err
 }
@@ -488,7 +495,7 @@ type ClusterUsageInput struct {
 // inventory.
 func (s *Service) ClusterUsage(ctx context.Context, id authz.Identity, in ClusterUsageInput, history *HistoryInput) (*Usage, error) {
 	var usage *Usage
-	err := s.admit(id, func(backend Requester) error {
+	err := func(backend Requester) error {
 		for _, resource := range []string{"pods", "nodes"} {
 			if err := s.require(ctx, id, authz.Attributes{Resource: resource, Verb: "list"},
 				"Kubernetes RBAC denied list "+resource+" cluster-wide"); err != nil {
@@ -516,6 +523,12 @@ func (s *Service) ClusterUsage(ctx context.Context, id authz.Identity, in Cluste
 		vgSize := "max by (node,device_class) (topolvm_volumegroup_size_bytes) and on (node) " + inventory
 		vgAvailable := "max by (node,device_class) (topolvm_volumegroup_available_bytes) and on (node) " + inventory
 		const network = `device!~"lo|veth.*|lxc.*|cali.*|cilium.*|flannel.*|docker.*|br-.*|virbr.*|tun.*|tap.*"`
+		// Whole disks only: avoid counting both physical devices and their
+		// partitions or device-mapper/LVM layers.
+		const disks = `device=~"sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+|hd[a-z]+"`
+		ioRate := func(metric, selector string) string {
+			return "sum by (node) (" + host(fmt.Sprintf("max by (instance,device) (rate(%s{%s}[%ss]))", metric, selector, window), "device") + ")"
+		}
 		queries := map[string]definition{
 			"cpuUsed":         {"cores", host(fmt.Sprintf(`sum by (instance) (1 - max by (instance,cpu) (rate(node_cpu_seconds_total{mode="idle"}[%ss])))`, window), "")},
 			"cpuCapacity":     {"cores", `max by (node) (kube_node_status_capacity{resource="cpu",unit="core"})`},
@@ -535,8 +548,10 @@ func (s *Service) ClusterUsage(ctx context.Context, id authz.Identity, in Cluste
 			"lvmVolumeGroupSize":      {"bytes", vgSize},
 			"lvmVolumeGroupAvailable": {"bytes", vgAvailable},
 			"lvmVolumeGroupAllocated": {"bytes", "(" + vgSize + ") - (" + vgAvailable + ")"},
-			"networkRx":               {"bytes/second", host(fmt.Sprintf("max by (instance,device) (rate(node_network_receive_bytes_total{%s}[%ss]))", network, window), "device")},
-			"networkTx":               {"bytes/second", host(fmt.Sprintf("max by (instance,device) (rate(node_network_transmit_bytes_total{%s}[%ss]))", network, window), "device")},
+			"networkRx":               {"bytes/second", ioRate("node_network_receive_bytes_total", network)},
+			"networkTx":               {"bytes/second", ioRate("node_network_transmit_bytes_total", network)},
+			"diskRead":                {"bytes/second", ioRate("node_disk_read_bytes_total", disks)},
+			"diskWrite":               {"bytes/second", ioRate("node_disk_written_bytes_total", disks)},
 		}
 		var err error
 		usage, err = s.snapshot(ctx, backend, queries, true, history, nil)
@@ -581,12 +596,12 @@ func (s *Service) ClusterUsage(ctx context.Context, id authz.Identity, in Cluste
 				"kube_node_info filters those names to the Kubernetes inventory. sourceMetrics and query identify the metrics behind each figure.",
 			"Requests and limits sum regular container declarations, not scheduler effective pod requirements.",
 			`Root filesystem metrics select mountpoint="/" only. TopoLVM volume-group allocation is size minus available space; it describes allocated LVM capacity, not filesystem data written inside PVCs. ` +
-				"Breakdown retains node, device, mountpoint and device_class labels. Network totals exclude common virtual interfaces; bonded or bridged interfaces may still overlap.",
+				"Filesystem breakdown retains device and mountpoint; LVM retains device_class. Network and whole-disk rates are summed per node in Prometheus. Network totals exclude common virtual interfaces; bonded or bridged interfaces may still overlap. Disk totals exclude partitions and device-mapper layers.",
 			"Missing samples mean unavailable, not zero. This Prometheus endpoint must contain metrics for this cluster only.",
 		}
 
 		return nil
-	})
+	}(s.Backend)
 
 	return usage, err
 }

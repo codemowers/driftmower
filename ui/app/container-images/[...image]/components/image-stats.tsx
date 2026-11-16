@@ -93,8 +93,11 @@ function IntegrityCell({ detail }: { detail: ImageDetail }) {
 
 export default function ImageStats({ detail }: { detail: ImageDetail }) {
   const reports = useClusterState(s => s.vulnerabilityReports)
+  const scanStatuses = useClusterState(s => s.imageScanStatuses)
   const reportsError = useClusterState(s => s.vulnerabilityReportsError)
 
+  const states=detail.digests.map(d=>scanStatuses[d]??"loading")
+  const scanCaption=states.includes("partial")?"Partial scan coverage":states.includes("expired")?"Stored scan expired from the operator cache":states.includes("unavailable")?"Scan results unavailable":states.includes("loading")?"Loading scan results":"Waiting for a scan"
   const { containerCount, versions } = detail
   const scanned = reports === null ? [] : detail.digests.map(d => reports[d]).filter(Boolean)
   const { summary, total, fixable } = aggregateVulnerabilities(scanned)
@@ -141,15 +144,15 @@ export default function ImageStats({ detail }: { detail: ImageDetail }) {
             <p className="mt-0.5 text-xl font-medium text-foreground">
               {reports === null
                 ? (reportsError ? "unavailable" : "loading")
-                : scanned.length > 0 ? "none" : "not scanned"}
+                : scanned.length > 0 ? (states.includes("partial")?"partial":"none") : states.includes("loading")?"loading":"not scanned"}
             </p>
           )}
         <StatCaption>
           {scanned.length > 0
             ? vulnerabilityCaption
             : reportsError
-              ? "Trivy operator not installed"
-              : coverage ?? "no Trivy scan for this image"}
+              ? reportsError
+              : scanCaption}
         </StatCaption>
       </StatCell>
     </StatGrid>

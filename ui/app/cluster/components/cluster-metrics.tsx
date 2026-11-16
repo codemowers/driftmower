@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, type ReactNode } from "react"
-import { cn } from "@/lib/utils/cn"
+import MetricBar from "@/app/components/metric-bar"
 import { formatBytes } from "@/lib/utils/format-bytes"
 import { useClusterState, type ClusterResource } from "@/lib/cluster/cluster-state"
 import type { Report } from "@/lib/cluster/reports"
@@ -9,65 +9,48 @@ import { findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { summarizePodsByRoot } from "@/lib/utils/pods-by-root"
 import { reportWorkloadRoots } from "@/lib/utils/report-roots"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
+import GraphLink from "@/app/components/graph-link"
 
 type Memory = NonNullable<ClusterMetrics["memory"]>
 
 const MEMORY_SEGMENTS = [
-  { key: "used",    label: "Allocated", fill: "bg-status-ok-bg" },
-  { key: "buffers", label: "Buffers",   fill: "bg-brand-bg" },
-  { key: "cached",  label: "Cached",    fill: "bg-status-patch-bg" },
+  { key: "used",    label: "Allocated", fill: "bg-status-ok" },
+  { key: "buffers", label: "Buffers",   fill: "bg-brand" },
+  { key: "cached",  label: "Cached",    fill: "bg-status-patch" },
 ] as const
 
-function barColor(pct: number): string {
-  if (pct < 0.7) return "bg-status-ok-bg"
-  if (pct < 0.85) return "bg-status-minor-bg"
-  return "bg-status-major-bg"
-}
-
 type UsageBarProps = {
+  graph?: string[]
   label: string
   value: number
   total: number
-  valueLabel: string
-  totalLabel: string
+  valueLabel: ReactNode
+  totalLabel: ReactNode
 }
 
-function UsageBar({ label, value, total, valueLabel, totalLabel }: UsageBarProps) {
-  const pct = total > 0 ? value / total : 0
+function UsageBar({ graph, label, value, total, valueLabel, totalLabel }: UsageBarProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <GraphLink exprs={graph}><span className="text-xs font-medium text-muted-foreground">{label}</span></GraphLink>
         <span className="font-mono text-xs text-muted-foreground">{totalLabel}</span>
       </div>
-      <div className="flex h-3 w-full items-stretch gap-1">
-        <div
-          className={cn("rounded-full transition-all", barColor(pct))}
-          style={{ width: `${Math.min(pct * 100, 100)}%` }}
-        />
-        <div className="flex-1 rounded-full bg-gray-100" />
-      </div>
+      <MetricBar value={value} total={total} className="h-3" />
       <span className="font-mono text-xs text-muted-foreground">{valueLabel}</span>
     </div>
   )
 }
 
-function MemoryBar({ memory }: { memory: Memory }) {
-  const pct = (value: number) => (memory.total > 0 ? (value / memory.total) * 100 : 0)
+function MemoryBar({ memory, graph }: { memory: Memory; graph?: string[] }) {
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Memory</span>
+        <GraphLink exprs={graph}><span className="text-xs font-medium text-muted-foreground">Memory</span></GraphLink>
         <span className="font-mono text-xs text-muted-foreground">{formatBytes(memory.total)}</span>
       </div>
-      <div className="flex h-3 w-full items-stretch gap-1">
-        {MEMORY_SEGMENTS.filter(seg => memory[seg.key] > 0).map(seg => (
-          <div key={seg.key} className={cn("rounded-full", seg.fill)} style={{ width: `${pct(memory[seg.key])}%` }} />
-        ))}
-        <div className="flex-1 rounded-full bg-gray-100" />
-      </div>
+      <MetricBar total={memory.total} segments={MEMORY_SEGMENTS.map(seg=>({key:seg.key,value:memory[seg.key],color:seg.fill}))} className="h-3" />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {MEMORY_SEGMENTS.map(seg => (
           <span key={seg.key} className="font-mono text-xs text-muted-foreground">
@@ -117,10 +100,10 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
     () => (data && clusterResources ? countReportedPods(data, clusterResources) : null),
     [data, clusterResources],
   )
-  const metricsEmpty = !metrics || (metrics.storage === null && metrics.memory === null && metrics.cpuLoad === null)
+  const metricsEmpty = !metrics || (metrics.storage === null && metrics.memory === null && metrics.cpu === null)
   if (metricsEmpty && !podStats) return null
 
-  const hasStats = podStats !== null || (metrics?.cpuLoad ?? null) !== null
+  const hasStats = podStats !== null || (metrics?.cpu ?? null) !== null
 
   return (
     <div
@@ -136,6 +119,7 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
       <div className="flex flex-col gap-4 px-5 py-4">
         {metrics?.storage && (
           <UsageBar
+            graph={metrics.graphs?.storage}
             label="LVM Storage"
             value={metrics.storage.used}
             total={metrics.storage.total}
@@ -143,7 +127,17 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
             totalLabel={formatBytes(metrics.storage.total)}
           />
         )}
-        {metrics?.memory && <MemoryBar memory={metrics.memory} />}
+        {metrics?.memory && <MemoryBar memory={metrics.memory} graph={metrics.graphs?.memory} />}
+        {metrics?.buckets?.usage != null && (
+          <UsageBar
+            graph={metrics.graphs?.buckets}
+            label={`Buckets · ${metrics.buckets.count}`}
+            value={metrics.buckets.usage}
+            total={metrics.buckets.requests ?? 0}
+            valueLabel={`${formatBytes(metrics.buckets.usage)} used`}
+            totalLabel={metrics.buckets.requests != null ? `${formatBytes(metrics.buckets.requests)} quota` : "no quota"}
+          />
+        )}
         {hasStats && (
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
             {podStats && (
@@ -152,8 +146,8 @@ export default function ClusterMetrics({ matchHeight }: { matchHeight?: number |
                 <StatRow label="Attention" value={attentionLabel(podStats)} />
               </>
             )}
-            {metrics && metrics.cpuLoad !== null && (
-              <StatRow label="CPU load avg" value={`${metrics.cpuLoad.toFixed(2)} / core`} />
+            {metrics?.cpu && (
+              <StatRow label="CPU used" value={<GraphLink exprs={metrics.graphs?.cpu}>{`${metrics.cpu.used.toFixed(1)} / ${Math.round(metrics.cpu.capacity)} cores`}</GraphLink>} />
             )}
           </div>
         )}

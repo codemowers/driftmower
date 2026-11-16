@@ -46,7 +46,7 @@ func with(base map[string]string, extra map[string]string) map[string]string {
 
 var authenticatedHTTP = with(noBackend, map[string]string{
 	"DRIFTMOWER_MCP_TRANSPORT": "http",
-	"OIDC_ISSUER":              "https://auth.example.com/",
+	"OIDC_IDP_URI":             "https://auth.example.com/",
 })
 
 func TestDefaults(t *testing.T) {
@@ -81,6 +81,22 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestAccessModes(t *testing.T) {
+	for _, mode := range []string{"rbac", "oidc", "anonymous"} {
+		values := with(authenticatedHTTP, map[string]string{"MCP_AUTH_MODE": mode, "PROMETHEUS_URL": "http://prometheus:9090", "MCP_WORKLOAD_RESTART_ENABLED": "true"})
+		if mode == "anonymous" {
+			delete(values, "OIDC_IDP_URI")
+		}
+		c := load(t, values)
+		if c.AuthMode != mode || (c.OIDC == nil) != (mode == "anonymous") || c.WorkloadRestartEnabled != (mode == "rbac") || c.Observability == nil {
+			t.Fatalf("mode %s: %+v", mode, c)
+		}
+	}
+	if !strings.Contains(loadError(t, with(authenticatedHTTP, map[string]string{"MCP_AUTH_MODE": "typo"})), "MCP_AUTH_MODE") {
+		t.Fatal("invalid access mode accepted")
+	}
+}
+
 func TestEmptyValuesMeanUnset(t *testing.T) {
 	c := load(t, with(noBackend, map[string]string{"MCP_AUDIENCE": "", "DRIFTMOWER_MCP_PORT": "  "}))
 	if c.Port != 3000 {
@@ -100,7 +116,7 @@ func TestServiceLinkValuesAreIgnored(t *testing.T) {
 
 func TestAuthenticatedHTTPRequiresIssuer(t *testing.T) {
 	msg := loadError(t, with(noBackend, map[string]string{"DRIFTMOWER_MCP_TRANSPORT": "http"}))
-	if !strings.Contains(msg, "OIDC_ISSUER is required") {
+	if !strings.Contains(msg, "OIDC_IDP_URI is required") {
 		t.Errorf("error = %q", msg)
 	}
 
@@ -149,7 +165,6 @@ func TestFeaturesRequireAuthentication(t *testing.T) {
 	for _, name := range []string{
 		"MCP_SERVICE_ACCOUNT_AUTH_ENABLED",
 		"MCP_WORKLOAD_RESTART_ENABLED",
-		"MCP_WEB_UI_ENABLED",
 		"OBSERVABILITY_ENABLED",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -160,19 +175,12 @@ func TestFeaturesRequireAuthentication(t *testing.T) {
 	loadError(t, with(noBackend, map[string]string{"PROMETHEUS_URL": "http://prometheus:9090"}))
 }
 
-func TestWebUIRequiresClientID(t *testing.T) {
-	msg := loadError(t, with(authenticatedHTTP, map[string]string{"MCP_WEB_UI_ENABLED": "true"}))
-	if !strings.Contains(msg, "MCP_WEB_UI_CLIENT_ID") {
-		t.Errorf("error = %q", msg)
-	}
-}
-
 func TestObservability(t *testing.T) {
 	c := load(t, with(authenticatedHTTP, map[string]string{"PROMETHEUS_URL": "http://prometheus:9090/"}))
 	if c.Observability == nil || c.Observability.PrometheusURL != "http://prometheus:9090" {
 		t.Fatalf("Observability = %+v", c.Observability)
 	}
-	if c.Observability.MaxConcurrentRequests != 8 || c.Observability.CacheTTL != 15*time.Second {
+	if c.Observability.Alignment != 15*time.Second {
 		t.Errorf("guards = %+v", c.Observability)
 	}
 }
@@ -189,7 +197,7 @@ func TestStrictBooleans(t *testing.T) {
 
 func TestURLValidation(t *testing.T) {
 	cases := map[string]string{
-		"MCP_PUBLIC_URL":            "https://user:pw@mcp.example.com",
+		"OIDC_CLIENT_ORIGIN":        "https://user:pw@mcp.example.com",
 		"KUBERNETES_API_URL":        "http://kubernetes.default.svc",
 		"KUBERNETES_PUBLIC_API_URL": "http://kube.example.com",
 	}

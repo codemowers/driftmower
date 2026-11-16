@@ -69,7 +69,7 @@ export default function PrometheusAlerts({ onCollapsedHeight }: { onCollapsedHei
 
       <div className="divide-y divide-gray-100">
         {visible.map(group => (
-          <AlertRow key={group.alertname} group={group} prometheusUrl={prometheusUrl} />
+          <AlertRow key={`${group.severity}/${group.alertname}`} group={group} prometheusUrl={prometheusUrl} />
         ))}
       </div>
 

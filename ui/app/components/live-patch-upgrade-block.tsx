@@ -1,4 +1,6 @@
 "use client"
+import { useKubectlConnection } from "@/lib/hooks/use-kubectl"
+import { scopeActionCommand } from "@/lib/kubernetes/contexts"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -34,6 +36,8 @@ function restartLabel(target: LivePatchUpgradeTarget): string {
 }
 
 export default function LivePatchUpgradeBlock({ row, target, state }: Props) {
+  const connection = useKubectlConnection()
+  const restart = scopeActionCommand(restartCommand(target), connection)
   const [write, setWrite] = useState<WriteState>({ status: "idle" })
   const [preview, setPreview] = useState<PreviewState>({ status: "closed" })
   const [copied, setCopied] = useState(false)
@@ -144,8 +148,8 @@ export default function LivePatchUpgradeBlock({ row, target, state }: Props) {
         {!active && !state.canWrite && (
           <div className="flex items-center gap-3 border-t border-gray-200 px-4 py-2">
             <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">kubectl</span>
-            <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-[12.5px] text-foreground">{restartCommand(target)}</code>
-            <CopyButton value={restartCommand(target)} className="shrink-0" />
+            <code className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-[12.5px] text-foreground">{restart}</code>
+            <CopyButton value={restart} className="shrink-0" />
           </div>
         )}
       </div>

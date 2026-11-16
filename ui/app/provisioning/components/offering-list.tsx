@@ -1,4 +1,5 @@
 "use client"
+import { useKubectl } from "@/lib/hooks/use-kubectl"
 
 import { ExternalLink } from "lucide-react"
 
@@ -78,7 +79,8 @@ function OfferingRow({
   const badge = BADGE[card.availability.state]
   // A sample is only honest when the cluster serves the kind: apiVersion is the
   // version discovery negotiated, and it is null exactly when it does not.
-  const sample = card.apiVersion ? sampleFor(card.id, { apiVersion: card.apiVersion, namespace, sandboxId, storageClass }) : null
+  const kubectl = useKubectl()
+  const sample = card.apiVersion ? sampleFor(card.id, { apiVersion: card.apiVersion, namespace, sandboxId, storageClass, kubectlPrefix: kubectl("", namespace) }) : null
 
   return (
     <div className="rounded-lg border border-border bg-card px-5 py-4">

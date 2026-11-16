@@ -50,7 +50,7 @@ func TestHealthHandler(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "driftmower_mcp_sessions_total 1") {
 		t.Errorf("/metrics = %d %s", rec.Code, rec.Body)
 	}
-	if strings.Contains(rec.Body.String(), "go_goroutines") {
-		t.Error("/metrics exports Go runtime collectors")
+	if !strings.Contains(rec.Body.String(), "go_goroutines") || !strings.Contains(rec.Body.String(), "go_memstats_heap_alloc_bytes") || !strings.Contains(rec.Body.String(), "process_resident_memory_bytes") {
+		t.Error("/metrics is missing runtime and process memory collectors")
 	}
 }

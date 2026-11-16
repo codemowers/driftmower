@@ -22,7 +22,6 @@ func TestInstrument(t *testing.T) {
 
 	for _, req := range []*http.Request{
 		httptest.NewRequest("POST", "/mcp", strings.NewReader("{}")),
-		httptest.NewRequest("GET", "/ui/workloads/default", nil),
 		httptest.NewRequest("PATCH", "/missing", nil),
 		httptest.NewRequest("HEAD", "/", nil),
 	} {
@@ -32,7 +31,6 @@ func TestInstrument(t *testing.T) {
 	expected := `
 # HELP driftmower_http_requests_total Completed or aborted HTTP requests.
 # TYPE driftmower_http_requests_total counter
-driftmower_http_requests_total{method="GET",outcome="complete",route="/ui",status="200"} 1
 driftmower_http_requests_total{method="HEAD",outcome="complete",route="/",status="200"} 1
 driftmower_http_requests_total{method="POST",outcome="complete",route="/mcp",status="200"} 1
 driftmower_http_requests_total{method="other",outcome="complete",route="other",status="404"} 1

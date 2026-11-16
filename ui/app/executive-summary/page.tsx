@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useClusterState } from "@/lib/cluster/cluster-state";
 import { useSandboxScope } from "@/lib/tenancy/sandbox-context";
-import { currentChartScopes, deriveClusterActions } from "@/lib/features/actions/derive";
-import TopActions from "./components/top-actions";
+import ActionItems from "./components/action-items";
+import SecurityHistory from "./components/security-history";
+import WorkloadAdvisories from "../components/workload-advisories";
 import { type StatValueTone } from "./components/stat-card";
 import SectionLinkCard from "./components/section-link-card";
 import DriftBreakdown from "./components/drift-breakdown";
@@ -61,14 +62,10 @@ const UNSCORABLE: Partial<Record<ReportReadiness, { value: string; caption: stri
 }
 
 export default function ExecutiveSummaryPage() {
-  const { data, reportId, clusterResources, vulnerabilityReports, isFetchingReport } = useClusterState();
+  const { data, reportId, isFetchingReport } = useClusterState();
   const { launcher, inventory } = useApplications();
   const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope();
   const [issuesHeight, setIssuesHeight] = useState<number | null>(null);
-  const topActions = useMemo(
-    () => (data ? deriveClusterActions(data, clusterResources, vulnerabilityReports, namespaces ? new Set(namespaces) : null) : []),
-    [data, clusterResources, vulnerabilityReports, namespaces],
-  )
   const ready = data !== null
   const rottennessScore = data?.rotenness.normalizedScore ?? 0;
   const rottennessTone = ready ? rottennessValueTone(rottennessScore) : "muted"
@@ -77,7 +74,6 @@ export default function ExecutiveSummaryPage() {
   const usages = (data?.report.imageUsages ?? [])
     .filter(u => !scopeSet || scopeSet.has(u.namespace))
 
-  const currentCharts = currentChartScopes(usages)
   const workloadMap = groupByWorkload(usages)
   const ownerCount = reportWorkloadRoots(data).filter(r => !scopeSet || scopeSet.has(r.namespace)).length
   const helmReleaseCount = new Set(
@@ -101,7 +97,7 @@ export default function ExecutiveSummaryPage() {
 
   const availableApps = launcher.status === "ready" ? launcher.entries.length : null
   const otherHosts =
-    inventory.status === "ready" && inventory.tenancy === "ok"
+    inventory.status === "ready"
       ? scopedHosts(inventory.entries, namespaces).length
       : 0
 
@@ -140,6 +136,8 @@ export default function ExecutiveSummaryPage() {
           <SandboxEmptyState sandboxes={scopedSandboxes} entity="tracked containers" />
         ) : (
           <>
+            <ActionItems />
+
             <div className="grid grid-cols-[2fr_1px_3fr] gap-6 items-stretch">
               {/* Rottenness score: pre-computed in the report, cannot be re-scoped client-side */}
               <div
@@ -202,7 +200,7 @@ export default function ExecutiveSummaryPage() {
               />
               <SectionLinkCard
                 href={reportId ? `/topmost-owners?report=${reportId}` : "/topmost-owners"}
-                title="Topmost Owners"
+                title="Workloads"
                 count={ready ? ownerCount : null}
                 countEntity="owners"
                 hint="Root controller of each workload"
@@ -220,12 +218,11 @@ export default function ExecutiveSummaryPage() {
 
             <DriftOverTime readiness={readiness} />
 
-            <TechnicalDebtEstimate
-              outdatedWorkloadCount={ready ? patchCount + minorCount + majorCount : null}
-              readiness={readiness}
-            />
+            <SecurityHistory />
 
-            <TopActions rows={topActions} currentCharts={currentCharts} reportId={reportId} />
+            <TechnicalDebtEstimate />
+
+            <WorkloadAdvisories />
 
             <div className="grid grid-cols-[3fr_2fr] gap-5 items-start">
               <MostOutdatedWorkloads

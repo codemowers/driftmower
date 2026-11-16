@@ -3,7 +3,9 @@ package httpserver
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/http/pprof"
 	"sync/atomic"
 
 	"github.com/codemowers/driftmower/mcp/internal/metrics"
@@ -11,11 +13,19 @@ import (
 
 // HealthHandler serves liveness, readiness, startup and metrics on the health
 // port. Readiness and startup report ready only once ready is set.
-func HealthHandler(ready *atomic.Bool, m *metrics.Metrics, drift ...http.Handler) http.Handler {
+func HealthHandler(ready *atomic.Bool, m *metrics.Metrics) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", m.Handler())
-	if len(drift) > 0 && drift[0] != nil {
-		mux.Handle("GET /drift-metrics", drift[0])
+	for _, name := range []string{"heap", "allocs", "goroutine"} {
+		mux.Handle("GET /debug/pprof/"+name, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil || !net.ParseIP(host).IsLoopback() {
+				http.Error(w, "profiles require a local port-forward", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			pprof.Handler(name).ServeHTTP(w, r)
+		}))
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

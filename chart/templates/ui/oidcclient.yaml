@@ -1,0 +1,31 @@
+{{- if and .Values.ui.enabled (ne .Values.mcp.auth.mode "anonymous") }}
+# Public browser client. The static dashboard holds no client secret.
+apiVersion: codemowers.cloud/v1
+kind: OIDCClient
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-ui
+spec:
+  applicationType: web
+  displayName: Driftmower
+  uri: https://dashboard/
+  redirectUris:
+    - https://dashboard/callback
+  allowedCORSOrigins:
+    - https://dashboard
+  grantTypes:
+    - authorization_code
+    - refresh_token
+  responseTypes:
+    - code
+  availableScopes:
+    - openid
+    - profile
+    - email
+    - groups
+    - namespaces
+    - offline_access
+  tokenEndpointAuthMethod: none
+  pkce: true
+{{- end }}

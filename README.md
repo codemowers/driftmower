@@ -1,53 +1,90 @@
 # Driftmower
 
-Driftmower tells Kubernetes users what runs in their cluster, how far it has
-drifted from upstream releases and which advisories apply, and helps them fix
-it. Every component lives in this repository:
+**A Kubernetes dashboard that connects the dots.**
 
-| Directory | Component | Image |
-| --- | --- | --- |
-| [crawler/](crawler/) | Crawler of releases and security advisories for the sources nodestatd finds; [crawler/spec.md](crawler/spec.md) is the draft of the operator to be built on it | `ghcr.io/codemowers/driftmower/crawler` |
-| [mcp/](mcp/) | The MCP server: cluster discovery, provisioning guidance, workloads, observability, and the crawler's drift and advisory findings | `ghcr.io/codemowers/driftmower/mcp` |
-| [ui/](ui/) | Next.js dashboard | `ghcr.io/codemowers/driftmower/ui` |
+Think Lens on steroids: cluster exploration with image ancestry, vulnerability
+findings, source advisories, storage and access rights brought into the same
+picture. Driftmower helps you understand what is running, what needs attention,
+and where to act.
 
-Code shared by the crawler and the MCP server, such as the crawler's report
-types, lives in [internal/](internal/).
+Follow a workload through its Pods, container images, source repositories,
+security findings, logs and volumes. See the affected resources together,
+instead of piecing the answer together across dashboards and terminal output.
+Less context switching. Less cognitive load. More time to fix the actual problem.
 
-## Development
+## See the whole workload
 
-The crawler and the MCP server share one Go module, `github.com/codemowers/driftmower`:
+- **Workloads, connected.** Consolidated cluster, namespace, workload and Pod
+  views show ownership, dependencies, resource usage and related resources.
+- **Images beyond the tag.** Inspect immutable digests, platform variants, build
+  timestamps, source repositories, licenses and base image ancestry. Track how
+  far deployed images have drifted from upstream releases.
+- **Security findings with impact.** CVEs and GitHub Security Advisories (GHSAs)
+  link to affected images and workloads. Prioritize by score and severity, see
+  scan coverage, and follow security trends over time.
+- **Storage you can make sense of.** Explore PersistentVolumes and
+  PersistentVolumeClaims (PVs/PVCs) together: bindings, capacity, usage, placement
+  and reclaim policy. Identify unused storage and get copyable cleanup or
+  resize commands.
+- **RBAC you can interpret.** Inspect users, groups, ServiceAccounts and their
+  effective permissions. Understand who can access what, in which namespace,
+  and identify broad permissions worth reviewing.
+- **Operations in context.** CPU, memory, network and disk I/O, logs and firing
+  alerts sit alongside the resources they describe. Executive Summary brings
+  firing alerts together as prioritized action items.
 
-```bash
-go vet ./...
-go test -race ./...
-golangci-lint run ./mcp/...
+## From understanding to action
+
+Driftmower provides copyable commands for inspection, upgrades and cleanup,
+with explicit Kubernetes contexts and namespaces. You can see the command
+before running it, without reconstructing it from resource details.
+
+Use the browser dashboard or native desktop application. Agents can query the
+same cluster through MCP to inspect workloads, resource usage, security findings
+and operational signals. Kubernetes RBAC governs access by default.
+
+## Install in a cluster
+
+Configure authentication, monitoring and storage for your cluster using the
+[deployment guide](docs/deployment.md), then install the Helm chart into an
+existing namespace:
+
+```sh
+helm upgrade --install driftmower oci://ghcr.io/codemowers/charts/driftmower \
+  --namespace driftmower -f values.yaml
 ```
 
-The dashboard has its own Node project in `ui/` (`npm ci`, `npm run lint`,
-`npm test`, `npm run build`).
+Open the deployed dashboard, or connect through the desktop application.
+See [access configuration](docs/deployment.md#access-modes) for authentication options.
 
-[Skaffold](https://skaffold.dev) builds and deploys any or all of them:
+## Run the desktop application
 
-```bash
-cp skaffold.env.example skaffold.env   # cluster, namespace and registry
-skaffold dev                           # every component
-skaffold dev -m mcp                    # one: crawler, mcp or ui
+Download the executable for Linux, Intel Mac or Apple Silicon from
+[GitHub Releases](https://github.com/codemowers/driftmower/releases), make it
+executable and run it. The UI is included; Chrome or Chromium and your kubeconfig
+are all you need, plus any authentication tools your kubeconfig uses. See the
+[desktop installation guide](desktop/README.md) for platform details.
+
+To build from a source checkout with Go and Node.js installed:
+
+```sh
+git submodule update --init --recursive
+npm --prefix ui ci
+desktop/build.sh
+desktop/build/driftmower-desktop
 ```
 
-Go images build from the repository root, where `go.mod` is; each Dockerfile
-has its own `<Dockerfile>.dockerignore` beside it.
+The application opens a Chrome or Chromium window. In **Settings**, select a
+kubeconfig connection and click **Connect**; use **Sign in** when prompted.
+If MCP has no Ingress, the desktop connects using an automatic port-forward.
+Use `--status` to see its PID, `--stop` to stop it, or `--restart` to restart.
+See the [desktop guide](docs/desktop.md) for Chrome profiles and connection details.
 
-## Releases
+## Documentation
 
-CI builds every image from the same commit. Pushes to `main` publish `latest`
-and `sha-<commit>` tags. A Git tag such as `0.9.0` publishes that version of
-every image.
-
-## History
-
-`mcp/` and `ui/` were merged in from
-[codemowers/driftmower-mcp](https://github.com/codemowers/driftmower-mcp) and
-[codemowers/driftmower-ui](https://github.com/codemowers/driftmower-ui) with
-their history, which `git log -- mcp/` and `git log -- ui/` show. The MCP
-server's TypeScript implementation and its releases up to 0.8.0 remain in
-driftmower-mcp.
+- [Deployment and access](docs/deployment.md): Helm configuration, storage and authentication.
+- [Desktop dashboard](docs/desktop.md): connections, profiles and command snippets.
+- [Registry scraper](docs/registry.md): credentials, repositories and base image matching.
+- [Metrics and alerts](docs/observability.md): scan coverage, history and metric definitions.
+- [Components](docs/architecture.md): services and component references.
+- [Development and releases](docs/development.md): local builds, Skaffold, tests and publishing.

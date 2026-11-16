@@ -4,12 +4,10 @@ import { cn } from "@/lib/utils/cn"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { useSeesClusterWideViews } from "@/lib/tenancy/sandbox-context"
-import { useTabParam } from "@/lib/hooks/use-tab-param"
 import CopyButton from "@/app/components/copy-button"
 import { StatCell, StatValue } from "@/app/components/stats-card"
 import type { DiagnosisCategory, DiagnosisFacts, Evidence } from "@/lib/features/pod-diagnosis/types"
 import { usePodDiagnosis } from "../hooks/use-pod-diagnosis"
-import { POD_TABS, POD_TABS_ID } from "./pod-tabs"
 import PrefetchLink from "@/app/components/prefetch-link"
 
 const CATEGORY_LABEL: Record<DiagnosisCategory, string> = {
@@ -186,11 +184,9 @@ function EvidenceLine({ kind, line }: { kind: Evidence["kind"]; line: string }) 
 function EvidenceGroup({
   group,
   hrefFor,
-  onLogsClick,
 }: {
   group: { label: string; link: Evidence["link"]; kind: Evidence["kind"]; lines: string[] }
   hrefFor: (link: Evidence["link"]) => string | null
-  onLogsClick: (event: React.MouseEvent<HTMLAnchorElement>) => void
 }) {
   const href = hrefFor(group.link)
   return (
@@ -216,7 +212,7 @@ function EvidenceGroup({
         </a>
       )}
       {href && group.link && group.link !== "yaml" && (
-        <PrefetchLink href={href} onClick={group.link === "logs" ? onLogsClick : undefined} className={EVIDENCE_LINK}>
+        <PrefetchLink href={href} className={EVIDENCE_LINK}>
           {LINK_LABEL[group.link]} ↗
         </PrefetchLink>
       )}
@@ -228,7 +224,6 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
   const { facts, state, unavailable, error, rechecking, recheck } = usePodDiagnosis(pod)
   const { linkTo } = useContextHref()
   const seesClusterWideViews = useSeesClusterWideViews()
-  const [, setPodTab] = useTabParam("ptab", POD_TABS)
 
   if (!facts) return null
 
@@ -238,19 +233,12 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
   const category = result?.category ?? null
 
   function hrefFor(link: Evidence["link"]): string | null {
-    if (link === "logs") return linkTo(`/topmost-owners/${workloadUid}/${pod.uid}`, { set: { ptab: "logs" } })
+    if (link === "logs") return linkTo(`/topmost-owners/${workloadUid}/${pod.uid}/logs`, { drop: ["ptab"] })
     if (link === "pods") return linkTo(`/topmost-owners/${workloadUid}`)
     // The Cluster page is hidden from sandbox users, so do not offer the link.
     if (link === "node") return seesClusterWideViews ? linkTo("/cluster") : null
     if (link === "yaml") return linkTo(`/yaml/${pod.uid}`, { drop: ["ptab", "wtab", "htab"] })
     return null
-  }
-
-  function openLogsTab(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
-    event.preventDefault()
-    setPodTab("Logs")
-    document.getElementById(POD_TABS_ID)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   return (
@@ -307,7 +295,7 @@ export default function DiagnosisCard({ pod, workloadUid }: { pod: ClusterResour
           <Section title="Evidence">
             <div className="divide-y divide-gray-200 rounded-lg border border-gray-200">
               {groupEvidence(result.evidence).map(group => (
-                <EvidenceGroup key={`${group.kind}-${group.lines[0]}`} group={group} hrefFor={hrefFor} onLogsClick={openLogsTab} />
+                <EvidenceGroup key={`${group.kind}-${group.lines[0]}`} group={group} hrefFor={hrefFor} />
               ))}
             </div>
           </Section>

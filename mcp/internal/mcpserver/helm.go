@@ -67,8 +67,18 @@ func collectHelm(ctx context.Context, w *Workloads, id authz.Identity, namespace
 		}
 		return r
 	}
+	// HelmCharts usually live in kube-system and name the namespace they
+	// install into, so a namespace filter still looks at every namespace.
+	chartNamespaces := namespaces
 	_, chartErr := w.Cache.Discovery.ServerResourcesForGroupVersion("helm.cattle.io/v1")
-	for _, ns := range namespaces {
+	if chartErr == nil && namespace != "" {
+		scope, err := w.Cache.Scope.Resolve(ctx, id, nil)
+		if err != nil {
+			return out, err
+		}
+		chartNamespaces = scope.Namespaces
+	}
+	for _, ns := range chartNamespaces {
 		if chartErr == nil && w.Judge.MayPerform(ctx, id, authz.Attributes{Namespace: ns, Group: "helm.cattle.io", Resource: "helmcharts", Verb: "list"}).Verdict == authz.Yes {
 			charts, err := w.Cache.Dynamic.Resource(helmChartsGVR).Namespace(ns).List(ctx, metav1.ListOptions{})
 			if err != nil {
@@ -78,6 +88,9 @@ func collectHelm(ctx context.Context, w *Workloads, id authz.Identity, namespace
 					target, _, _ := unstructured.NestedString(chart.Object, "spec", "targetNamespace")
 					if target == "" {
 						target = ns
+					}
+					if namespace != "" && target != namespace {
+						continue
 					}
 					r := ensure(target, chart.GetName())
 					r.HelmChartRef = ns + "/" + chart.GetName()
@@ -90,6 +103,8 @@ func collectHelm(ctx context.Context, w *Workloads, id authz.Identity, namespace
 				}
 			}
 		}
+	}
+	for _, ns := range namespaces {
 		if w.Judge.MayPerform(ctx, id, authz.Attributes{Namespace: ns, Resource: "secrets", Verb: "list"}).Verdict != authz.Yes {
 			out.Warnings = append(out.Warnings, ns+": Helm release Secret metadata is not authorized.")
 			continue
@@ -171,7 +186,7 @@ func chartVersionSeparator(s string) int {
 	return -1
 }
 func addHelmTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
-	mcp.AddTool(s, &mcp.Tool{Name: "list_helm_releases", Title: "List Helm releases", Description: "Discover Rancher HelmChart declarations and Helm release Secret metadata. Match by release name and target namespace; attach roots with explicit Helm ownership annotations. Desired HelmChart versions are separate from installed workload chart-label evidence. Secret payloads are not requested; chart values are never returned. Revision/status are taken from the highest-numbered release Secret. Coverage gaps appear in warnings.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List Helm releases")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, helmOutput, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "list_helm_releases", Title: "List Helm releases", Description: "Discover Rancher HelmChart declarations and Helm release Secret metadata. Match by release name and target namespace; attach roots with explicit Helm ownership annotations. Desired HelmChart versions are separate from installed workload chart-label evidence. Secret payloads are not requested; get_helm_release reads one release's values and manifest. Revision/status are taken from the highest-numbered release Secret. Coverage gaps appear in warnings.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List Helm releases")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, helmOutput, error) {
 		id, err := callerIdentity(req, mapping)
 		if err != nil {
 			return nil, helmOutput{}, err

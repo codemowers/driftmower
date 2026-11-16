@@ -5,115 +5,70 @@ import PrefetchLink from "@/app/components/prefetch-link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StatusType } from "@/lib/cluster/reports"
 import type { Span } from "@/lib/features/drift-history/types"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
+import { isNoData } from "@/lib/cluster/styles/status-style"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
 import { imagePath } from "@/lib/utils/image-artifacts"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
-import {
-  CVE_SEVERITY_STYLE,
-  compareVulnerabilities,
-  worstVulnerability,
-  type Vulnerability,
-  type VulnerabilityReport,
-} from "@/lib/features/vulnerability"
 import DriftSparkline from "@/app/components/drift-history/drift-sparkline"
 import { useImageHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
 import ImageFilters from "./image-filters"
 import type { ImageEntry } from "../utils/image-entries"
+import ScanStatusBadge,{useImageScanStatuses} from "./scan-status"
+import { sourceRepositoryPath } from "@/lib/features/crawler/sources"
+import type {ScanStatus} from "@/lib/features/images/scan-status"
 
-const GRID = "grid-cols-[3.5fr_2fr_2fr_1.9fr_0.9fr_1.2fr]"
-const HEADERS = ["Image", "Running", "Used by", "Historic drift", "Drift", "Worst CVE"]
+const GRID = "grid-cols-[3fr_2.5fr_1.8fr_1.8fr_1.4fr_1.9fr]"
+const HEADERS = ["Image", "Source", "Running", "Used by", "Trivy scan", "Historic drift"]
 
-function WorstCveCell({
-  digests,
-  reports,
-}: {
-  digests: string[]
-  reports: Record<string, VulnerabilityReport> | null
-}) {
-  if (reports === null) {
-    return <span className="text-xs text-muted-foreground">—</span>
-  }
-
-  const scanned = digests.map(d => reports[d]).filter(Boolean)
-  if (scanned.length === 0) {
-    return (
-      <span className="rounded-md bg-gray-100 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-        No scan
-      </span>
-    )
-  }
-
-  const worst = scanned
-    .map(worstVulnerability)
-    .filter((v): v is Vulnerability => v !== null)
-    .sort(compareVulnerabilities)[0]
-
-  const style = worst ? CVE_SEVERITY_STYLE[worst.severity] : undefined
-  if (!worst || !style) {
-    return (
-      <span className="rounded-md bg-status-ok-bg px-2 py-1.5 text-xs font-semibold text-status-ok-label">
-        Clean
-      </span>
-    )
-  }
-
-  return (
-    <span className={cn("rounded-md px-2 py-1.5 text-xs font-semibold whitespace-nowrap", style.bg, style.text)}>
-      {style.label}{worst.score > 0 && ` ${worst.score}`}
-    </span>
-  )
+function safeSourceUrl(raw: string | null) {
+  try {
+    const url = new URL(raw ?? "")
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href.replace(/\/$/, "") : null
+  } catch { return null }
 }
 
 function runningLabel({ versionCount, runningTags }: ImageEntry): string {
   return versionCount > 1 ? `${versionCount} versions` : runningTags[0] ?? "—"
 }
 
-function UsedByCell({ entry }: { entry: ImageEntry }) {
-  const { workloads, containerCount } = entry
+function UsedByCell({ entry, linkTo }: { entry: ImageEntry; linkTo: LinkTo }) {
+  const { workloads } = entry
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate text-sm text-foreground">
-        {workloads.length === 0
-          ? "—"
-          : workloads.length === 1
-            ? workloads[0].name
-            : `${workloads.length} workloads`}
-      </span>
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {containerCount} {containerCount === 1 ? "container" : "containers"}
-      </span>
+      {workloads.slice(0, 3).map(workload => <PrefetchLink key={workload.uid} href={linkTo(`/topmost-owners/${workload.uid}`)} className="relative z-10 truncate text-xs text-brand-text hover:underline">{workload.namespace}/{workload.name}</PrefetchLink>)}
+      {!workloads.length && <span className="text-xs text-muted-foreground">—</span>}
+      {workloads.length > 3 && <span className="text-xs text-muted-foreground">+{workloads.length - 3} more</span>}
+
     </div>
   )
 }
 
 function ImageRow({
   entry,
-  reports,
   spans,
   linkTo,
+  scanStatuses,scanError,scanLoading,
 }: {
   entry: ImageEntry
-  reports: Record<string, VulnerabilityReport> | null
   spans: Span[] | undefined
   linkTo: LinkTo
+  scanStatuses?:Record<string,ScanStatus>
+  scanError?:string
+  scanLoading:boolean
 }) {
-  const { registry, repository, latestTag, worstStatus, issueCount, digests } = entry
-  const style = SEVERITY_STYLE[worstStatus]
+  const { registry, repository, latestTag, issueCount, sourceUrl } = entry
   const path = imagePath(entry.key)
+  const source = safeSourceUrl(sourceUrl)
 
+  // The row links to the image; the source link sits above that link.
   return (
-    <PrefetchLink
-      href={linkTo(`/container-images/${path}`, { drop: ["focus"] })}
-      className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}
-    >
+    <div className={cn("relative grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", GRID)}>
       {/* Image */}
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-semibold text-foreground">{repository}</span>
+          <PrefetchLink href={linkTo(`/container-images/${path}`, { drop: ["focus"] })} className="truncate font-semibold text-foreground after:absolute after:inset-0">{repository}</PrefetchLink>
           {issueCount > 0 && (
             <span className="flex items-center gap-1 shrink-0 rounded-md bg-status-minor-bg px-1.5 py-0.5 text-status-minor-label">
               <AlertTriangle className="size-3" />
@@ -124,6 +79,14 @@ function ImageRow({
         <span className="truncate font-mono text-xs text-muted-foreground">{registry}</span>
       </div>
 
+      <div className="min-w-0">
+        {source
+          ? <PrefetchLink href={linkTo(sourceRepositoryPath(source))} title={source} className="relative z-10 inline-flex max-w-full items-center gap-1 font-mono text-xs text-brand-text hover:underline">
+              <span className="truncate">{source.replace(/^https?:\/\//, "")}</span>
+            </PrefetchLink>
+          : <span className="text-xs text-muted-foreground">—</span>}
+      </div>
+
       {/* Running */}
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-mono text-sm text-foreground">{runningLabel(entry)}</span>
@@ -132,35 +95,18 @@ function ImageRow({
         )}
       </div>
 
-      <UsedByCell entry={entry} />
+      <UsedByCell entry={entry} linkTo={linkTo} />
+      <ScanStatusBadge digests={entry.digests} statuses={scanStatuses} error={scanError} loading={scanLoading}/>
 
       <div className="flex items-center pr-10">
         {spans ? <DriftSparkline spans={spans} className="w-full" /> : <span className="text-xs text-muted-foreground">—</span>}
       </div>
 
-      {/* Drift */}
-      <div className="flex items-center">
-        {style ? (
-          <span className={cn("text-center rounded-md px-3 py-1.5 text-xs font-semibold", style.bg, style.text)}>
-            {style.label}
-          </span>
-        ) : (
-          <span className="text-center rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-            No data
-          </span>
-        )}
-      </div>
-
-      {/* Worst CVE */}
-      <div>
-        <WorstCveCell digests={digests} reports={reports} />
-      </div>
-    </PrefetchLink>
+    </div>
   )
 }
 
 export default function ImageList({ entries }: { entries: ImageEntry[] }) {
-  const reports = useClusterState(s => s.vulnerabilityReports)
   const history = useImageHistory()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -219,6 +165,8 @@ export default function ImageList({ entries }: { entries: ImageEntry[] }) {
       (e.latestTag?.toLowerCase().includes(q) ?? false)
     )
 
+  const scans=useImageScanStatuses(filteredEntries.flatMap(entry=>entry.digests))
+
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white">
       <ImageFilters
@@ -243,7 +191,7 @@ export default function ImageList({ entries }: { entries: ImageEntry[] }) {
       <div className="divide-y divide-gray-100">
         {filteredEntries.length > 0 ? (
           filteredEntries.map(entry => (
-            <ImageRow key={entry.key} entry={entry} reports={reports} spans={history[entry.key]?.spans} linkTo={linkTo} />
+            <ImageRow key={entry.key} entry={entry} spans={history[entry.key]?.spans} linkTo={linkTo} scanStatuses={scans.data} scanError={scans.error} scanLoading={scans.loading}/>
           ))
         ) : (
           <p className="py-12 text-center text-sm text-muted-foreground">No images match your filters</p>

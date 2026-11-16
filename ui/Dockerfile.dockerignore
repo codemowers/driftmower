@@ -1,9 +1,37 @@
 **
+!go.mod
+!go.sum
 !ui
 !ui/**
+!desktop
+!desktop/dashboard
+!desktop/dashboard/**
 ui/node_modules
 ui/.next
 ui/static/.next
 ui/static/out
+# Local browser build output.
+ui/build
 ui/.env*
-ui/scripts
+ui/scripts/*
+!ui/scripts/license-data.mjs
+
+# Exclude nested outputs, local cluster settings and credentials from COPY ui.
+ui/**/node_modules
+ui/**/.next
+ui/**/out
+ui/**/coverage
+ui/**/.env*
+ui/**/.git
+ui/**/.agents
+ui/**/.codex
+ui/**/.aws
+ui/**/.build-tmp
+ui/skaffold.env*
+ui/**/*.log
+ui/**/*.tsbuildinfo
+
+# Only the SPDX metadata is needed to build the UI.
+ui/vendor/spdx-license-list-data/**
+!ui/vendor/spdx-license-list-data/json
+!ui/vendor/spdx-license-list-data/json/licenses.json

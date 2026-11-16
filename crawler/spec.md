@@ -366,7 +366,7 @@ goes the same way on the Agent's own schedule, through the MCP tools.
 
 - For every SourceRepository with releases, MCP lists deployed versions with
   their root workloads, how far each is behind and applicable advisories;
-  cert-manager v1.20.0 on ee-lte-1 shows GHSA-8rvj-mm4h-c258 fixed in 1.20.3.
+  cert-manager v1.20.0 shows GHSA-8rvj-mm4h-c258 fixed in 1.20.3.
 - An unparsable version or range is shown as unknown or possibly applicable,
   never as drift or as an applicable advisory.
 - Until a source is crawled without errors, as after a crawler restart, its

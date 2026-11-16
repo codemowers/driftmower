@@ -5,11 +5,10 @@ import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import type { WorkloadRef } from "@/lib/server/restart-workload"
 import { cn } from "@/lib/utils/cn"
-import { readApiError } from "@/lib/utils/read-api-error"
+import { callTool } from "@/browser/connection"
 
-export type RestartTarget = WorkloadRef & { managerKind: "argo" | "standalone" }
+export type RestartTarget = { namespace: string; kind: string; apiVersion: string; name: string; uid: string; managerKind: "argo" | "standalone" }
 
 type Props = { target: RestartTarget; restartedAt: string | null; pods: ClusterResource[] }
 
@@ -84,16 +83,10 @@ export default function RestartTile({ target, restartedAt, pods }: Props) {
   async function restart() {
     setConfirming(false)
     setError(null)
-    const { uid, ...body } = target
+    const { namespace, name, uid, apiVersion, kind } = target
     const startedAt = new Date().toISOString()
     try {
-      const res = await fetch(`/api/workloads/${encodeURIComponent(uid)}/restart`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error(await readApiError(res))
+      await callTool("restart_workload", { namespace, name, uid, apiVersion, kind })
       setRequestedAt(startedAt)
     } catch (e) {
       console.error(`[workload-restart] ${target.kind} ${target.namespace}/${target.name}: ${(e as Error).message}`)

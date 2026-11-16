@@ -1,0 +1,16 @@
+{{- if .Values.mcp.enabled }}
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-mcp
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mcp
+  podMetricsEndpoints:
+    - port: health
+{{- end }}
+{{- end }}

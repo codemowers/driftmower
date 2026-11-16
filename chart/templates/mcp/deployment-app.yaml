@@ -1,0 +1,199 @@
+{{- if .Values.mcp.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-mcp
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app: {{ .Release.Name }}-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app: {{ .Release.Name }}-mcp
+    spec:
+      serviceAccountName: {{ .Release.Name }}-mcp
+      {{- with compact .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-mcp
+          image: {{ .Values.mcp.image | quote }}
+          securityContext:
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 3000
+              name: mcp
+            - containerPort: 3001
+              name: health
+            - containerPort: 3002
+              name: drift
+          # Passmower owner Secrets: OIDC_CLIENT_ID, OIDC_CLIENT_ORIGIN (public
+          # URL; audience is that plus /mcp) and OIDC_IDP_URI (issuer).
+          {{- if ne .Values.mcp.auth.mode "anonymous" }}
+          envFrom:
+            - secretRef:
+                name: oidc-client-mcp-owner-secrets
+            {{- if .Values.ui.enabled }}
+            # Browser client ID and allowed CORS origin for the dashboard.
+            - secretRef:
+                name: oidc-client-{{ .Release.Name }}-ui-owner-secrets
+              prefix: DASHBOARD_
+            {{- end }}
+          {{- end }}
+          env:
+            - name: MCP_AUTH_MODE
+              value: {{ required "mcp.auth.mode must be rbac, oidc or anonymous" .Values.mcp.auth.mode | quote }}
+            {{- if not (has .Values.mcp.auth.mode (list "rbac" "oidc" "anonymous")) }}
+            {{- fail "mcp.auth.mode must be rbac, oidc or anonymous" }}
+            {{- end }}
+            {{- if or .Values.mcp.publicUrl (eq .Values.mcp.auth.mode "anonymous") }}
+            - name: OIDC_CLIENT_ORIGIN
+              value: {{ .Values.mcp.publicUrl | default "http://127.0.0.1:3000" | quote }}
+            {{- end }}
+            {{- with .Values.mcp.goMemoryLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
+            - name: DRIFTMOWER_MCP_TRANSPORT
+              value: http
+            - name: MCP_WORKLOAD_RESTART_ENABLED
+              value: {{ and .Values.mcp.workloadRestart.enabled (eq .Values.mcp.auth.mode "rbac") | quote }}
+            - name: MCP_USER_ACCESS_ENABLED
+              value: {{ .Values.mcp.userAccess.enabled | quote }}
+            - name: MCP_OIDC_USERS_NAMESPACE
+              value: {{ .Values.mcp.userAccess.oidcUserNamespace | quote }}
+            - name: MCP_SERVICE_ACCOUNT_AUTH_ENABLED
+              value: {{ and .Values.mcp.serviceAccountAuth.enabled (ne .Values.mcp.auth.mode "anonymous") | quote }}
+            {{- with .Values.mcp.dashboard.localOrigins }}
+            - name: MCP_ALLOWED_ORIGINS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            - name: POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SCANNER_INSTANCE
+              value: {{ .Release.Name | quote }}
+            - name: HISTORY_CVE_ENABLED
+              value: {{ .Values.operator.enabled | quote }}
+            - name: HISTORY_SERVICE_ACCOUNTS_ENABLED
+              value: {{ .Values.mcp.userAccess.enabled | quote }}
+            {{- with .Values.mcp.cluster.id }}
+            - name: DRIFTMOWER_CLUSTER_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.mcp.cluster.apiUrl }}
+            - name: KUBERNETES_PUBLIC_API_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.history.enabled }}
+            - name: DRIFT_PROMETHEUS_URL
+              value: http://{{ .Release.Name }}-prometheus:9090
+            {{- end }}
+            {{- if .Values.operator.enabled }}
+            - name: SCANNER_URL
+              value: http://{{ .Release.Name }}-operator:8080
+            {{- end }}
+            {{- if .Values.crawler.enabled }}
+            - name: CRAWLER_URL
+              value: http://{{ .Release.Name }}-crawler:8080
+            {{- end }}
+            {{- if .Values.registryScraper.enabled }}
+            - name: REGISTRY_SCRAPER_URL
+              value: http://{{ .Release.Name }}-registry-scraper:8080
+            {{- end }}
+            - name: PROMETHEUS_URL
+              # Absolute DNS names avoid public search-domain wildcards when
+              # kubelet's ndots:5 would expand these four-dot Service names.
+              value: http://prometheus-operated.monitoring.svc.cluster.local.:9090
+            {{- with .Values.mcp.argocd.url }}
+            - name: ARGO_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.mcp.prometheus.externalUrl }}
+            - name: PROMETHEUS_EXTERNAL_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LOKI_URL
+              value: http://loki.monitoring.svc.cluster.local.:3100
+            - name: ALERTMANAGER_URL
+              value: http://alertmanager-operated.monitoring.svc.cluster.local.:9093
+          # Probes report local MCP readiness without contacting dependencies.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: health
+            failureThreshold: 30
+            periodSeconds: 2
+          resources:
+            {{- toYaml .Values.mcp.resources | nindent 12 }}
+          {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled }}
+          volumeMounts:
+            {{- if .Values.registryScraper.enabled }}
+            - name: registry-token
+              mountPath: /var/run/secrets/driftmower/registry
+              readOnly: true
+            {{- end }}
+            {{- if .Values.crawler.enabled }}
+            - name: crawler-token
+              mountPath: /var/run/secrets/driftmower/crawler
+              readOnly: true
+            {{- end }}
+            {{- if .Values.operator.enabled }}
+            - name: scanner-token
+              mountPath: /var/run/secrets/driftmower/scanner
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled }}
+      volumes:
+        {{- if .Values.registryScraper.enabled }}
+        - name: registry-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Release.Name }}-registry-scraper.{{ .Release.Namespace }}
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
+        {{- if .Values.crawler.enabled }}
+        - name: crawler-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Release.Name }}-crawler.{{ .Release.Namespace }}
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
+        {{- if .Values.operator.enabled }}
+        - name: scanner-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: driftmower-scans.{{ .Release.Namespace }}
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+{{- end }}

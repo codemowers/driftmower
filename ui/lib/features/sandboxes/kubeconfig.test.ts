@@ -25,18 +25,18 @@ users:
 }
 
 test("current context names, <cluster>/<namespace>: the cluster comes from the context entry", () => {
-  const yaml = kubeconfig("aws-us-west-2-bravo.codemowers.io/sb-78ac58-tyybid", "aws-us-west-2-bravo.codemowers.io")
+  const yaml = kubeconfig("bravo.example.com/sb-78ac58-tyybid", "bravo.example.com")
 
   assert.deepEqual(readContext(yaml, "78ac58-tyybid"), {
-    context: "aws-us-west-2-bravo.codemowers.io/sb-78ac58-tyybid",
-    clusterName: "aws-us-west-2-bravo.codemowers.io"
+    context: "bravo.example.com/sb-78ac58-tyybid",
+    clusterName: "bravo.example.com"
   })
 })
 
 test("older <sandbox>.<cluster> context names still yield the cluster", () => {
-  const yaml = kubeconfig("78ac58-tyybid.aws-us-west-2-bravo.codemowers.io", "aws-us-west-2-bravo.codemowers.io")
+  const yaml = kubeconfig("78ac58-tyybid.bravo.example.com", "bravo.example.com")
 
-  assert.equal(readContext(yaml, "78ac58-tyybid").clusterName, "aws-us-west-2-bravo.codemowers.io")
+  assert.equal(readContext(yaml, "78ac58-tyybid").clusterName, "bravo.example.com")
 })
 
 test("the scratch file name never contains a path separator", () => {

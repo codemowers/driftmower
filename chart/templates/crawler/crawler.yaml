@@ -1,0 +1,208 @@
+{{- if .Values.crawler.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-crawler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-crawler
+rules:
+  - apiGroups: [codemowers.io]
+    resources: [sourcerepositories, containerimages]
+    verbs: [list, watch]
+  # Authenticates the callers reading reports.
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-crawler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-crawler
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-crawler
+    namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-crawler
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app: {{ .Release.Name }}-crawler
+spec:
+  # Crawl state lives in memory; a second replica would crawl twice.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-crawler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app: {{ .Release.Name }}-crawler
+    spec:
+      serviceAccountName: {{ .Release.Name }}-crawler
+      {{- with .Values.crawler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      {{- with compact .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-crawler
+          image: {{ .Values.crawler.image | quote }}
+          command: ["/driftmower-crawler"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            {{- if and .Values.mcp.enabled (ne .Values.mcp.auth.mode "anonymous") }}
+            - name: BROWSER_AUTHORIZE_URL
+              value: http://mcp:3000/api/crawler/authorize
+            - name: BROWSER_ALLOWED_ORIGINS
+              value: {{ join "," .Values.mcp.dashboard.localOrigins | quote }}
+            - name: BROWSER_MCP_ORIGIN
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-mcp-owner-secrets
+                  key: OIDC_CLIENT_ORIGIN
+            {{- if .Values.ui.enabled }}
+            - name: BROWSER_UI_ORIGIN
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-client-{{ .Release.Name }}-ui-owner-secrets
+                  key: OIDC_CLIENT_ORIGIN
+            {{- end }}
+            {{- end }}
+            - name: CRAWLER_AUDIENCE
+              value: {{ printf "%s-crawler.%s" .Release.Name .Release.Namespace | quote }}
+            - name: ALLOWED_CALLERS
+              value: system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-mcp
+            - name: CRAWL_INTERVAL
+              value: {{ .Values.crawler.interval | quote }}
+            - name: GITEA_HOSTS
+              value: {{ join "," .Values.crawler.giteaHosts | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.crawler.logLevel | quote }}
+            {{- with .Values.crawler.githubTokenSecret }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . | quote }}
+                  key: token
+                  optional: true
+            {{- end }}
+            {{- if .Values.crawler.githubEnterprise }}
+            {{- $tokens := dict }}
+            {{- range $i, $host := .Values.crawler.githubEnterprise }}
+            {{- $_ := set $tokens $host.host (printf "/var/run/secrets/driftmower/github-enterprise/%d/token" $i) }}
+            {{- end }}
+            - name: GITHUB_ENTERPRISE_TOKEN_FILES
+              value: {{ $tokens | toJson | quote }}
+            {{- end }}
+          {{- if .Values.crawler.githubEnterprise }}
+          volumeMounts:
+            {{- range $i, $host := .Values.crawler.githubEnterprise }}
+            - name: github-enterprise-{{ $i }}
+              mountPath: /var/run/secrets/driftmower/github-enterprise/{{ $i }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
+          ports:
+            - containerPort: 8080
+              name: api
+            - containerPort: 8081
+              name: health
+            # Bound to the Pod's loopback address: reachable through
+            # kubectl port-forward only, never through the Service.
+            - containerPort: 8082
+              name: ui
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            periodSeconds: 10
+          {{- with .Values.crawler.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.crawler.githubEnterprise }}
+      volumes:
+        {{- range $i, $host := .Values.crawler.githubEnterprise }}
+        - name: github-enterprise-{{ $i }}
+          secret:
+            secretName: {{ required "crawler.githubEnterprise[].tokenSecret is required" $host.tokenSecret | quote }}
+            optional: true
+            items:
+              - key: {{ $host.tokenKey | default "token" | quote }}
+                path: token
+        {{- end }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-crawler
+spec:
+  selector:
+    app: {{ .Release.Name }}-crawler
+  ports:
+    - name: api
+      port: 8080
+      targetPort: api
+---
+# Only this cluster's MCP may read the internal crawler API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-crawler
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-crawler
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-mcp
+      ports:
+        - port: api
+    - ports:
+        - port: health
+{{- end }}

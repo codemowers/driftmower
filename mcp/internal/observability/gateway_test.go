@@ -2,7 +2,6 @@ package observability
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -72,8 +71,8 @@ func newGateway(t *testing.T, backend Requester, mutate func(*GatewayOptions)) (
 	t.Helper()
 	o := &outcomes{}
 	opts := GatewayOptions{
-		Next: backend, PrometheusURL: "http://prometheus:9090", MaxConcurrent: 2, MaxQueued: 1,
-		QueueWait: time.Second, CacheTTL: 15 * time.Second, PrometheusTimeout: 9 * time.Second, OnOutcome: o.add,
+		Next: backend, PrometheusURL: "http://prometheus:9090",
+		PrometheusTimeout: 9 * time.Second, OnOutcome: o.add,
 	}
 	if mutate != nil {
 		mutate(&opts)
@@ -97,30 +96,51 @@ func TestGatewayAddsPrometheusTimeoutOnlyToQueries(t *testing.T) {
 	}
 }
 
-func TestGatewayCachesPrometheusUntilExpiryNeverFailures(t *testing.T) {
+func TestGatewayDoesNotRetainCompletedPrometheusResponses(t *testing.T) {
 	b := &fakeBackend{}
-	g, o := newGateway(t, b, func(o *GatewayOptions) { o.CacheTTL = 50 * time.Millisecond })
-	ctx := context.Background()
+	g, _ := newGateway(t, b, nil)
+	for range 3 {
+		_, _ = g.Get(context.Background(), promQuery("up"))
+	}
+	if b.calls() != 3 {
+		t.Fatalf("calls = %d, want a fresh request every time", b.calls())
+	}
+}
 
-	_, _ = g.Get(ctx, promQuery("up"))
-	_, _ = g.Get(ctx, promQuery("up"))
-	if b.calls() != 1 {
-		t.Fatalf("calls = %d, want cached", b.calls())
+func TestGatewayRunsDistinctQueriesConcurrently(t *testing.T) {
+	const requests = 16
+	started := make(chan struct{}, requests)
+	release := make(chan struct{})
+	backend := RequesterFunc(func(context.Context, *url.URL) (Response, error) {
+		started <- struct{}{}
+		<-release
+		return okResponse, nil
+	})
+	gateway, _ := newGateway(t, backend, nil)
+	results := make(chan error, requests)
+	var workers sync.WaitGroup
+	defer workers.Wait()
+	defer close(release)
+	for i := range requests {
+		workers.Go(func() {
+			u := promQuery("up")
+			q := u.Query()
+			q.Set("time", time.Unix(int64(i), 0).Format(time.RFC3339))
+			u.RawQuery = q.Encode()
+			_, err := gateway.Get(context.Background(), u)
+			results <- err
+		})
 	}
-	time.Sleep(60 * time.Millisecond)
-	_, _ = g.Get(ctx, promQuery("up"))
-	if b.calls() != 2 {
-		t.Fatalf("calls = %d after expiry", b.calls())
-	}
-
-	b.respond = func(*url.URL) (Response, error) { return Response{Status: 503, Body: []byte("overloaded")}, nil }
-	_, _ = g.Get(ctx, promQuery("down"))
-	_, _ = g.Get(ctx, promQuery("down"))
-	if b.calls() != 4 {
-		t.Errorf("calls = %d; a failure was cached", b.calls())
-	}
-	if got := o.get(); !slices.Equal(got, []string{"ok", "cached", "ok", "ok", "ok"}) {
-		t.Errorf("outcomes = %v", got)
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	for range requests {
+		select {
+		case <-started:
+		case err := <-results:
+			t.Fatalf("request returned before backend release: %v", err)
+		case <-timer.C:
+			t.Fatal("concurrent queries did not all reach the backend")
+		}
 	}
 }
 
@@ -156,154 +176,6 @@ func TestGatewaySharesInFlightButDoesNotCacheLoki(t *testing.T) {
 	slices.Sort(got)
 	if !slices.Equal(got, []string{"ok", "ok", "shared"}) {
 		t.Errorf("outcomes = %v", got)
-	}
-}
-
-func TestGatewayQueuesThenRefuses(t *testing.T) {
-	release := map[string]chan struct{}{"a": make(chan struct{}), "b": make(chan struct{}), "c": make(chan struct{})}
-	b := &fakeBackend{respond: func(u *url.URL) (Response, error) {
-		<-release[u.Query().Get("query")]
-
-		return okResponse, nil
-	}}
-	g, _ := newGateway(t, b, func(o *GatewayOptions) { o.CacheTTL = 0 })
-	ctx := context.Background()
-
-	var wg sync.WaitGroup
-	for _, q := range []string{"a", "b"} {
-		wg.Go(func() { _, _ = g.Get(ctx, promQuery(q)) })
-	}
-	for b.calls() < 2 {
-		time.Sleep(time.Millisecond)
-	}
-	wg.Go(func() { _, _ = g.Get(ctx, promQuery("c")) })
-	// Wait until c holds the only queue slot.
-	for len(g.queue) == 0 {
-		time.Sleep(time.Millisecond)
-	}
-
-	_, err := g.Get(ctx, promQuery("d"))
-	var refused *Refused
-	if !errors.As(err, &refused) || refused.Reason != "busy" || refused.RetryAfterSeconds != 1 {
-		t.Fatalf("err = %v", err)
-	}
-	if b.calls() != 2 {
-		t.Errorf("calls = %d", b.calls())
-	}
-
-	close(release["a"])
-	// The freed slot goes to the queued request.
-	deadline := time.Now().Add(2 * time.Second)
-	for b.calls() < 3 {
-		if time.Now().After(deadline) {
-			t.Fatal("queued request never ran")
-		}
-		time.Sleep(time.Millisecond)
-	}
-	close(release["b"])
-	close(release["c"])
-	wg.Wait()
-}
-
-func TestGatewayRefusesQueuedRequestPastDeadline(t *testing.T) {
-	release := make(chan struct{})
-	b := &fakeBackend{respond: func(*url.URL) (Response, error) { <-release; return okResponse, nil }}
-	g, o := newGateway(t, b, func(o *GatewayOptions) {
-		o.CacheTTL, o.MaxConcurrent, o.QueueWait = 0, 1, 30*time.Millisecond
-	})
-	ctx := context.Background()
-
-	done := make(chan struct{})
-	go func() { _, _ = g.Get(ctx, promQuery("a")); close(done) }()
-	for b.calls() == 0 {
-		time.Sleep(time.Millisecond)
-	}
-	_, err := g.Get(ctx, promQuery("b"))
-	var refused *Refused
-	if !errors.As(err, &refused) || refused.Reason != "busy" || !strings.Contains(refused.Message, "30 ms") {
-		t.Fatalf("err = %v", err)
-	}
-	close(release)
-	<-done
-	if got := o.get(); !slices.Equal(got, []string{"busy", "ok"}) {
-		t.Errorf("outcomes = %v", got)
-	}
-}
-
-func TestBudgetChargesEveryBackendRequest(t *testing.T) {
-	now := time.Unix(0, 0)
-	b := &Budget{QueriesPerMinute: 10, MaxConcurrentCalls: 5, Now: func() time.Time { return now }}
-
-	_ = b.Admit("alice", func(charge func()) error {
-		for range 12 {
-			charge()
-		}
-
-		return nil
-	})
-	// 10 - 12 = -2: the next query needs 3 more tokens, 18 s at 10 per minute.
-	err := b.Admit("alice", func(func()) error { return nil })
-	var refused *Refused
-	if !errors.As(err, &refused) || refused.Reason != "rate_limited" || refused.RetryAfterSeconds != 18 {
-		t.Fatalf("err = %v", err)
-	}
-	if err := b.Admit("bob", func(func()) error { return nil }); err != nil {
-		t.Errorf("bob has his own budget: %v", err)
-	}
-	now = now.Add(18 * time.Second)
-	if err := b.Admit("alice", func(func()) error { return nil }); err != nil {
-		t.Errorf("refilled: %v", err)
-	}
-}
-
-func TestBudgetCapsCallsInFlight(t *testing.T) {
-	b := &Budget{MaxConcurrentCalls: 1}
-	release := make(chan struct{})
-	started := make(chan struct{})
-	done := make(chan error)
-	go func() {
-		done <- b.Admit("alice", func(func()) error { close(started); <-release; return nil })
-	}()
-	<-started
-
-	err := b.Admit("alice", func(func()) error { return nil })
-	var refused *Refused
-	if !errors.As(err, &refused) || refused.Reason != "caller_busy" {
-		t.Fatalf("err = %v", err)
-	}
-	close(release)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-
-	boom := errors.New("backend down")
-	if err := b.Admit("alice", func(func()) error { return boom }); !errors.Is(err, boom) {
-		t.Errorf("err = %v", err)
-	}
-	if err := b.Admit("alice", func(func()) error { return nil }); err != nil {
-		t.Errorf("slot not released after failure: %v", err)
-	}
-}
-
-func TestBudgetNeverForgetsBusyCaller(t *testing.T) {
-	b := &Budget{MaxConcurrentCalls: 1, MaxCallers: 1}
-	release := make(chan struct{})
-	started := make(chan struct{})
-	done := make(chan error)
-	go func() {
-		done <- b.Admit("alice", func(func()) error { close(started); <-release; return nil })
-	}()
-	<-started
-
-	_ = b.Admit("bob", func(func()) error { return nil })
-	err := b.Admit("alice", func(func()) error { return nil })
-	var refused *Refused
-	if !errors.As(err, &refused) || refused.Reason != "caller_busy" {
-		t.Errorf("err = %v; a caller with a call in flight was forgotten", err)
-	}
-	close(release)
-	if err := <-done; err != nil {
-		t.Fatal(err)
 	}
 }
 

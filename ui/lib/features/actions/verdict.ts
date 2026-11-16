@@ -1,13 +1,12 @@
 import type {
-  ActionFacts,
-  ActionRow,
-  AssessResult,
-  ChangeEntry,
-  Classification,
-  Coverage,
-  Relation,
-  Risk,
-  Value,
+ActionFacts,
+ActionRow,
+AssessResult,
+Classification,
+Coverage,
+Relation,
+Risk,
+Value
 } from "./types"
 
 export const VERDICT_LEAD: Record<Risk, string> = {
@@ -69,25 +68,6 @@ export function deriveValue(facts: ActionFacts, c: Classification): Value {
   if (hasFixableSevereCve(facts) || c.security.length > 0) return "high"
   if (facts.cves.length === 0 && c.security.length === 0 && c.affects.length === 0) return "low"
   return "medium"
-}
-
-export function interimVersion(entries: ChangeEntry[], c: Classification, facts: ActionFacts): string | null {
-  if (c.breaking.length === 0) return null
-  const from = parseSemver(facts.from)
-  const to = parseSemver(facts.to)
-  if (!from || !to) return null
-  const versions = [...new Set(entries.map(e => e.version))]
-    .map(v => ({ v, s: parseSemver(v) }))
-    .filter((x): x is { v: string; s: Semver } => x.s !== null && compareSemver(x.s, from) > 0 && compareSemver(x.s, to) < 0)
-    .sort((a, b) => compareSemver(a.s, b.s))
-  const breakingVersions = c.breaking.map(i => parseSemver(entries[i]?.version ?? "")).filter((s): s is Semver => s !== null)
-  if (breakingVersions.length === 0) return null
-  const firstBreaking = breakingVersions.sort(compareSemver)[0]
-  const fixes = facts.cves
-    .map(cv => (cv.fixedVersion ? parseSemver(cv.fixedVersion) : null))
-    .filter((s): s is Semver => s !== null && compareSemver(s, from) > 0 && compareSemver(s, to) <= 0)
-  const candidates = versions.filter(x => compareSemver(x.s, firstBreaking) < 0 && fixes.every(f => compareSemver(x.s, f) >= 0))
-  return candidates.length > 0 ? candidates[candidates.length - 1].v : null
 }
 
 function plural(n: number, word: string, words = `${word}s`): string {

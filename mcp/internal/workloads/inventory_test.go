@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -218,6 +219,17 @@ func TestStandalonePodsAndScaledToZero(t *testing.T) {
 		t.Errorf("deployment = %+v", d)
 	}
 	eq(t, "deployment images", d.Images, []string{"two:1"})
+}
+
+func TestRootsCarryProvenance(t *testing.T) {
+	w, _ := graph(t, deployment(t, "app", corev1.PodSpec{Containers: []corev1.Container{{Image: "app:1"}}}, opts{
+		labels:      map[string]string{"skaffold.dev/run-id": "run", "argocd.argoproj.io/tracking-id": "apps:apps/Deployment:team/app", "app": "app"},
+		annotations: map[string]string{"codemowers.io/created-by": "system:admin", "arbitrary": "sensitive"},
+	}))
+	want := map[string]string{"skaffold.dev/run-id": "run", "argocd.argoproj.io/tracking-id": "apps:apps/Deployment:team/app", "codemowers.io/created-by": "system:admin"}
+	if got := find(w, "Deployment").Provenance; !maps.Equal(got, want) {
+		t.Errorf("provenance = %v", got)
+	}
 }
 
 func TestMirrorPodsAreNotStandalone(t *testing.T) {
@@ -488,5 +500,31 @@ func TestProjectIsIdempotent(t *testing.T) {
 	}
 	if _, err := Project(sourceFor(t, "Secret"), project(t, "Pod", &corev1.Pod{ObjectMeta: objMeta("Pod", "p", opts{})})); err == nil {
 		t.Error("a Pod node accepted for the Secret source")
+	}
+}
+
+// A custom resource root is not watched; the StatefulSet it owns supplies the
+// provenance and times.
+func TestReferenceOnlyRootTakesProvenanceFromChild(t *testing.T) {
+	w, _ := graph(t, statefulSet(t, "cache", opts{
+		owners:      []metav1.OwnerReference{ownerRef("Dragonfly", "cache", "dragonflydb.io/v1alpha1")},
+		annotations: map[string]string{"codemowers.io/created-by": "system:serviceaccount:dragonfly:operator"},
+	}))
+	root := find(w, "Dragonfly")
+	if root == nil || root.Provenance["codemowers.io/created-by"] != "system:serviceaccount:dragonfly:operator" || root.CreatedAt != nil {
+		t.Fatalf("root = %+v", root)
+	}
+}
+
+func TestReduceMetaKeepsLatestWrite(t *testing.T) {
+	early, late := metav1.NewTime(time.Unix(100, 0)), metav1.NewTime(time.Unix(200, 0))
+	m := reduceMeta(metav1.ObjectMeta{CreationTimestamp: early, ManagedFields: []metav1.ManagedFieldsEntry{
+		{Manager: "kubectl", Time: &early},
+		{Manager: "argocd-controller", Time: &late},
+		{Manager: "operator", Time: &late, Subresource: "status"},
+	}})
+	created, updated, by := times(&Node{ObjectMeta: m})
+	if !created.Equal(early.Time) || !updated.Equal(late.Time) || by != "argocd-controller" || m.ManagedFields[0].FieldsV1 != nil {
+		t.Fatalf("created %v updated %v by %q", created, updated, by)
 	}
 }

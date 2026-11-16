@@ -51,7 +51,9 @@ type Actions struct {
 	Catalog *catalog.Catalog
 	// Overridable in tests.
 	clientFor func(authz.Identity) (dynamic.Interface, error)
-	now       func() time.Time
+	// This server's own credentials; built from Config when nil.
+	serverClient dynamic.Interface
+	now          func() time.Time
 }
 
 func (a *Actions) client(id authz.Identity) (dynamic.Interface, error) {
@@ -238,4 +240,35 @@ func (a *Actions) Terminate(ctx context.Context, t Target, id authz.Identity) (*
 
 	return &ActionResult{Target: t, Action: "terminate", Status: "requested",
 		Message: "Pod termination requested with its normal grace period. A standalone pod has no controller to recreate it."}, nil
+}
+
+// OwnerRecord is what the dashboard shows of a custom-resource owner that
+// is not watched.
+type OwnerRecord struct {
+	CreatedAt  *time.Time        `json:"createdAt,omitempty"`
+	UpdatedAt  *time.Time        `json:"updatedAt,omitempty"`
+	UpdatedBy  string            `json:"updatedBy,omitempty"`
+	Provenance map[string]string `json:"provenance,omitempty"`
+}
+
+// Owner reads one object's metadata as the caller, so the caller's own get
+// permission decides; uid rejects a replaced object.
+func (a *Actions) Owner(ctx context.Context, id authz.Identity, gvr schema.GroupVersionResource, namespace, name, uid string) (*OwnerRecord, error) {
+	client, err := a.client(id)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := client.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if uid != "" && string(obj.GetUID()) != uid {
+		return nil, errors.New("the object was replaced")
+	}
+	n := &Node{ObjectMeta: reduceMeta(metav1.ObjectMeta{CreationTimestamp: obj.GetCreationTimestamp(), ManagedFields: obj.GetManagedFields(),
+		Labels: obj.GetLabels(), Annotations: obj.GetAnnotations()})}
+	out := &OwnerRecord{Provenance: provenance(n)}
+	out.CreatedAt, out.UpdatedAt, out.UpdatedBy = times(n)
+
+	return out, nil
 }

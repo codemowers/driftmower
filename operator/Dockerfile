@@ -5,7 +5,8 @@ RUN go mod download
 COPY internal ./internal
 COPY operator ./operator
 RUN CGO_ENABLED=0 go build -trimpath -o /operator ./operator/cmd/driftmower-operator
-FROM gcr.io/distroless/static-debian12:nonroot
+# CA certificates are mounted by the cluster.
+FROM scratch
 COPY --from=builder /operator /driftmower-operator
 USER 65532:65532
 ENTRYPOINT ["/driftmower-operator"]

@@ -1,35 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback } from "react"
+import { useQuery } from "@/lib/hooks/use-query"
+import { useClusterState } from "@/lib/cluster/cluster-state"
 import { fetchPodMetrics, type PodMetrics } from "@/lib/features/prometheus/pod-metrics"
 
-const POLL_INTERVAL = 30000
-
-export function usePodMetrics(namespace: string, name: string): PodMetrics | null {
-  const [metrics, setMetrics] = useState<PodMetrics | null>(null)
-
-  const podKey = `${namespace}/${name}`
-  const [prevKey, setPrevKey] = useState(podKey)
-  if (prevKey !== podKey) {
-    setPrevKey(podKey)
-    setMetrics(null)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function tick() {
-      const data = await fetchPodMetrics(namespace, name).catch(() => null)
-      if (!cancelled) setMetrics(data)
-    }
-
-    void tick()
-    const id = setInterval(tick, POLL_INTERVAL)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [namespace, name])
-
-  return metrics
+export function usePodMetrics(namespace: string, workloadUid: string, name: string): PodMetrics | null {
+  const cluster = useClusterState(s => s.clusterName)
+  const key = JSON.stringify([cluster, namespace, workloadUid, name])
+  const load = useCallback((signal: AbortSignal) => fetchPodMetrics(namespace, workloadUid, name, signal), [namespace, workloadUid, name])
+  return useQuery({ key: namespace && workloadUid && name ? key : null, load, interval: 30_000, keepDataOnError: false }).data ?? null
 }

@@ -4,26 +4,22 @@ import { useEffect, useRef, useState } from "react"
 import { fetchLogs } from "@/lib/features/logs/fetch"
 import { BUFFER_CAP, POLL_INTERVAL_MS, TAIL_LINES } from "@/lib/features/logs/constants"
 import { compareNs } from "@/lib/features/logs/line"
-import type { LogLine, LogSource, LogsResponse } from "@/lib/features/logs/types"
+import type { LogLine, LogSource } from "@/lib/features/logs/types"
 
 export type LogsState = {
   lines: LogLine[]
   source: LogSource | null
+  selector: "labels" | "pods" | "namespace" | null
+  containers: string[]
   error: string | null
   notice: string | null
   loaded: boolean
 }
 
-const INITIAL: LogsState = { lines: [], source: null, error: null, notice: null, loaded: false }
+const INITIAL: LogsState = { lines: [], source: null, selector: null, containers: [], error: null, notice: null, loaded: false }
 
-export function useLogs(
-  ns: string,
-  pod: string,
-  uid: string,
-  container: string | undefined,
-  follow: boolean,
-  includePrevious: boolean,
-): LogsState {
+// Polls a workload's logs, or one Pod's, from the newest line seen onward.
+export function useLogs(namespace: string, workloadUid: string | undefined, pod: string | undefined, container: string | undefined, follow: boolean): LogsState {
   const [state, setState] = useState<LogsState>(INITIAL)
 
   const followRef = useRef(follow)
@@ -31,7 +27,7 @@ export function useLogs(
     followRef.current = follow
   }, [follow])
 
-  const key = `${ns}/${pod}/${container ?? "*"}/${includePrevious}`
+  const key = `${namespace}/${workloadUid}/${pod ?? "*"}/${container ?? "*"}`
   const [prevKey, setPrevKey] = useState(key)
   if (prevKey !== key) {
     setPrevKey(key)
@@ -42,59 +38,26 @@ export function useLogs(
     let cancelled = false
     let cursor: string | null = null
     let buffer: LogLine[] = []
-    let source: LogSource | null = null
-    let notice: string | null = null
     const seen = new Set<string>()
 
-    function absorb(lines: LogLine[]): boolean {
+    async function tick() {
+      const resp = await fetchLogs({ namespace, workloadUid, pod, container, sinceNs: cursor, limit: TAIL_LINES }).catch((e: Error) => e)
+      if (cancelled) return
+      if (resp instanceof Error) {
+        const message = `Could not load logs: ${resp.message}`
+        setState(s => (s.error === message ? s : { ...s, error: message }))
+        return
+      }
+
       let changed = false
-      for (const line of lines) {
+      for (const line of resp.lines) {
         if (seen.has(line.key)) continue
         seen.add(line.key)
         buffer.push(line)
         changed = true
         if (cursor === null || compareNs(line.tsNs, cursor) > 0) cursor = line.tsNs
       }
-      return changed
-    }
-
-    async function previousRun(): Promise<LogsResponse | null> {
-      return fetchLogs({ ns, pod, uid, container, sinceNs: null, limit: TAIL_LINES, sourceHint: "kube API", previous: true }).catch(() => null)
-    }
-
-    async function tick() {
-      const initial = cursor === null
-      const resp = await fetchLogs({
-        ns,
-        pod,
-        uid,
-        container,
-        sinceNs: cursor,
-        limit: TAIL_LINES,
-        sourceHint: source,
-      }).catch((e: Error) => e)
-      if (cancelled) return
-
-      if (resp instanceof Error) {
-        const message = `Could not load logs: ${resp.message}`
-        setState(s => (s.error === message ? s : { ...s, error: message }))
-        return
-      }
-      source = resp.source
-
-      let changed = false
-      if (initial && includePrevious && resp.source === "kube API") {
-        const prev = await previousRun()
-        if (cancelled) return
-        if (prev) {
-          changed = absorb(prev.lines)
-          notice = prev.notice ?? null
-        }
-      }
-      if (resp.notice) notice = resp.notice
-      if (absorb(resp.lines)) changed = true
       if (changed) buffer.sort((a, b) => compareNs(a.tsNs, b.tsNs))
-
       if (followRef.current && buffer.length > BUFFER_CAP) {
         const drop = buffer.length - BUFFER_CAP
         for (let i = 0; i < drop; i++) seen.delete(buffer[i].key)
@@ -102,9 +65,13 @@ export function useLogs(
         changed = true
       }
 
+      const notice = resp.warnings.join(" ") || null
       setState(s => {
-        if (!changed && s.loaded && s.source === source && s.error === null) return s
-        return { lines: buffer.slice(), source, error: null, notice, loaded: true }
+        if (!changed && s.loaded && s.source === resp.source && s.error === null && s.notice === notice) return s
+        return {
+          lines: buffer.slice(), source: resp.source, selector: resp.selector,
+          containers: resp.containers.length ? resp.containers : s.containers, error: null, notice, loaded: true,
+        }
       })
     }
 
@@ -114,7 +81,7 @@ export function useLogs(
       cancelled = true
       clearInterval(id)
     }
-  }, [ns, pod, uid, container, includePrevious])
+  }, [namespace, workloadUid, pod, container])
 
   return state
 }

@@ -47,7 +47,7 @@ type fixture struct {
 	metrics *metrics.Metrics
 }
 
-func start(t *testing.T, authenticated bool) *fixture {
+func start(t *testing.T, authenticated bool, mode ...string) *fixture {
 	t.Helper()
 	m := metrics.New()
 	id := "bravo.example.com"
@@ -56,6 +56,12 @@ func start(t *testing.T, authenticated bool) *fixture {
 	publicURL := "http://" + srv.Listener.Addr().String()
 	c := cluster.NewIdentity(&id, nil, publicURL)
 	mapping := auth.Mapping{UsernameClaim: "sub", GroupsClaim: "groups", UsernamePrefix: "issuer#"}
+	var accessJudge authz.Judge = judge
+	readAll := len(mode) > 0 && (mode[0] == "oidc" || mode[0] == "anonymous")
+	if readAll {
+		mapping.ReadAll = true
+		accessJudge = authz.ReadAll{}
+	}
 
 	opts := AppOptions{
 		PublicURL:       publicURL,
@@ -64,13 +70,15 @@ func start(t *testing.T, authenticated bool) *fixture {
 		BrowserClientID: "dashboard",
 		AllowedOrigins:  []string{"http://localhost:8080", "https://dashboard.example.com"},
 		SessionIdle:     time.Minute,
+		BrowserReads:    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("read")) }),
 		Metrics:         m,
+		AnonymousRead:   readAll && !authenticated,
 		Logger:          logger,
 		MCP: mcpserver.New(mcpserver.Deps{
 			Cluster: c, Version: "test", Logger: logger, Metrics: m, Mapping: mapping,
 			Scope: &authz.ScopeResolver{
 				ListNamespaces: func(context.Context) ([]string, error) { return []string{"team-a", "team-b"}, nil },
-				Judge:          judge,
+				Judge:          accessJudge,
 			},
 		}),
 	}
@@ -355,6 +363,36 @@ func TestDashboardClientForOrigin(t *testing.T) {
 		}
 		if tc.status == 200 && (body["clientId"] != tc.client || body["resource"] != f.url+"/mcp") {
 			t.Fatalf("wrong client/audience: %v", body)
+		}
+	}
+}
+
+func TestBrowserReadsAreProtectedBeforeServingOrCaching(t *testing.T) {
+	f := start(t, true)
+	for _, path := range []string{"/api/observability/cluster-health", "/api/crawler/authorize"} {
+		for _, tc := range []struct {
+			token string
+			want  int
+		}{{"", 401}, {f.issuer.Token(t, "alice", f.url+"/mcp", nil), 200}, {f.issuer.Token(t, "alice", "wrong-audience", nil), 401}} {
+			token := tc.token
+			req, err := http.NewRequest("GET", f.url+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if token != "" {
+				req.Header.Set("Authorization", "Bearer "+token)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.Header.Get("Cache-Control") != "no-store" {
+				t.Fatal(resp.Header)
+			}
+			if resp.StatusCode != tc.want {
+				t.Fatalf("status %d, want %d", resp.StatusCode, tc.want)
+			}
 		}
 	}
 }

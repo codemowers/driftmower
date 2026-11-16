@@ -10,6 +10,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -75,7 +76,7 @@ func TestVolumesJoinClaimsPVsAndUsage(t *testing.T) {
 		t.Errorf("claim = %+v", c)
 	}
 	pv := res.PersistentVolumes[0]
-	if pv.Name != "pv-data" || *pv.CapacityStorage != "8Gi" || *pv.CSIDriver != "topolvm.io" || *pv.Claim != (ClaimRef{"team", "data"}) {
+	if pv.Name != "pv-data" || *pv.CapacityStorage != "8Gi" || *pv.CSIDriver != "topolvm.io" || *pv.Claim != (ClaimRef{Namespace: "team", Name: "data"}) {
 		t.Errorf("pv = %+v", pv)
 	}
 	if !slices.Contains(j.asked, authz.Attributes{Namespace: "team", Resource: "persistentvolumeclaims", Verb: "list"}) ||
@@ -197,5 +198,86 @@ func TestVolumesKeepInventoryWithoutMetrics(t *testing.T) {
 	res, _ = svc.ListVolumes(context.Background(), alice, "team", false)
 	if len(res.Degraded) != 1 || res.Degraded[0].Source != "prometheus" {
 		t.Errorf("degraded = %+v", res.Degraded)
+	}
+}
+
+func TestVolumesMarkExpandableClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		enabled, allow, ok bool
+		want               bool
+	}{
+		{"expandable", true, true, true, true},
+		{"disabled on server", false, true, true, false},
+		{"class forbids", true, false, true, false},
+		{"caller may not patch", true, true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, k, j, _ := volumeFixture()
+			svc.ExpandEnabled = tc.enabled
+			allow := tc.allow
+			_, _ = k.StorageV1().StorageClasses().Create(context.Background(), &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "local"}, AllowVolumeExpansion: &allow}, metav1.CreateOptions{})
+			j.answer = func(_ authz.Identity, a authz.Attributes) authz.Verdict {
+				if a.Verb == "patch" && !tc.ok {
+					return authz.No
+				}
+
+				return authz.Yes
+			}
+			res, err := svc.ListVolumes(context.Background(), alice, "team", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Claims[0].CanExpand != tc.want {
+				t.Errorf("canExpand = %v, want %v", res.Claims[0].CanExpand, tc.want)
+			}
+		})
+	}
+}
+
+func TestVolumesPrometheusURLFromExternalURLFlag(t *testing.T) {
+	for flag, want := range map[string]string{"http://prom.example/": "http://prom.example", "javascript:alert(1)": "", "": ""} {
+		svc, _, _, b := volumeFixture()
+		flags := 0
+		b.respond = func(u *url.URL) (Response, error) {
+			if u.Path == "/api/v1/status/flags" {
+				flags++
+
+				return jsonBody(map[string]any{"status": "success", "data": map[string]string{"web.external-url": flag}}), nil
+			}
+
+			return vectorOf(), nil
+		}
+		for range 2 {
+			res, err := svc.ListVolumes(context.Background(), alice, "team", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := res.PrometheusURL; (got == nil) != (want == "") || (got != nil && *got != want) {
+				t.Errorf("flag %q: prometheusUrl = %v, want %q", flag, got, want)
+			}
+		}
+		if flags != 1 {
+			t.Errorf("flag %q: read flags %d times, want once", flag, flags)
+		}
+	}
+}
+
+func TestVolumesReportUnknownPodUsageWhenListingIsDenied(t *testing.T) {
+	svc, _, judge, _ := volumeFixture()
+	judge.answer = func(_ authz.Identity, attrs authz.Attributes) authz.Verdict {
+		if attrs.Resource == "pods" {
+			return authz.No
+		}
+		return authz.Yes
+	}
+	volumes, err := svc.ListVolumes(context.Background(), alice, "team", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(volumes.Degraded, func(item VolumeDegraded) bool {
+		return item.Source == "pods" && strings.Contains(item.Message, "lacks list pods permission")
+	}) {
+		t.Fatalf("missing unknown Pod usage warning: %+v", volumes.Degraded)
 	}
 }

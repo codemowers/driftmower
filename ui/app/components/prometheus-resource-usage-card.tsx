@@ -1,16 +1,15 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
+import { prometheusGraphLink } from "@/lib/features/prometheus/links"
 import { softWrapText } from "@/lib/utils/soft-wrap-text"
-import { ChevronRight, ExternalLink } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import { formatBytes, formatCores } from "@/lib/utils/format-bytes"
-import { usageBarColor } from "@/lib/utils/usage-color"
+import MetricBar from "./metric-bar"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { PodVolume, ResourceTriplet } from "@/lib/features/prometheus/query"
-import type { PerPodMetrics } from "@/lib/features/prometheus/workload-metrics"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import PrefetchLink from "@/app/components/prefetch-link"
 
 const MAX_VISIBLE = 5
 
@@ -26,29 +25,18 @@ type Props = {
   graphQueries: { memUsage: string; cpuUsage: string; volUsed?: string }
   emptyHint?: string
   podCount?: number
-  perPod?: PerPodMetrics[]
   qosBreakdown?: { qosClass: string; count: number }[]
-  podHref?: (podName: string) => string | null
 }
 
 function metricHasBar(metric: ResourceTriplet): boolean {
   return metric.usage !== null && metric.limit !== null && metric.limit > 0
 }
 
-function buildPrometheusGraphLink(baseUrl: string, exprs: string[]): string {
-  const params = new URLSearchParams()
-  exprs.forEach((expr, i) => {
-    params.set(`g${i}.expr`, expr)
-    params.set(`g${i}.tab`, "0")
-  })
-  return `${baseUrl}/graph?${params.toString()}`
-}
-
 function nameSeries(expr: string, name: string): string {
   return `label_replace(${expr}, "__name__", "${name}", "", "")`
 }
 
-export default function PrometheusResourceUsageCard({ metrics, graphQueries, emptyHint, podCount, perPod, qosBreakdown, podHref }: Props) {
+export default function PrometheusResourceUsageCard({ metrics, graphQueries, emptyHint, podCount, qosBreakdown }: Props) {
   const prometheusUrl = useClusterState(s => s.prometheusUrl)
 
   if (!metrics) return null
@@ -58,13 +46,12 @@ export default function PrometheusResourceUsageCard({ metrics, graphQueries, emp
     nameSeries(graphQueries.cpuUsage, "cpu"),
     ...(metrics.volumes.length > 0 && graphQueries.volUsed ? [nameSeries(graphQueries.volUsed, "volume")] : []),
   ]
-  const link = prometheusUrl ? buildPrometheusGraphLink(prometheusUrl, exprs) : null
+  const link = prometheusUrl ? prometheusGraphLink(prometheusUrl, exprs, "1h") : null
 
   const hasComputeUsage = metrics.memory.usage !== null || metrics.cpu.usage !== null
   const noBars = !metricHasBar(metrics.memory) && !metricHasBar(metrics.cpu)
   const qosInStrip = noBars && hasComputeUsage
   const showHeaderQos = metrics.qosClass !== null && !qosInStrip
-  const showBreakdown = !!perPod && perPod.length > 1
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white">
@@ -118,7 +105,6 @@ export default function PrometheusResourceUsageCard({ metrics, graphQueries, emp
               </div>
             )}
 
-            {showBreakdown && <PerPodBreakdown pods={perPod} podHref={podHref} />}
           </>
         )}
       </div>
@@ -186,48 +172,52 @@ function EmptyState({ hint }: { hint?: string }) {
 }
 
 function ComputeBar({ kind, data, className }: { kind: "memory" | "cpu"; data: ResourceTriplet; className?: string }) {
-  const { usage, limit, request } = data
-  const hasUsage = usage !== null
-  const hasLimit = limit !== null && limit > 0
-  const hasRequest = request !== null && request > 0
-
-  const title = kind === "memory" ? "Memory" : "CPU"
   const fmt = (n: number) => (kind === "memory" ? formatBytes(n) : formatCores(n))
+  return (
+    <ResourceGauge className={className} label={kind === "memory" ? "Memory" : "CPU"} fmt={fmt}
+      used={data.usage} requested={data.request} ceiling={data.limit !== null && data.limit > 0 ? { value: data.limit, label: "limit" } : null} />
+  )
+}
 
-  if (hasUsage && hasLimit) {
-    return (
-      <div className={cn("flex flex-col gap-2", className)}>
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
-          <span className="font-mono text-xs tabular-nums text-muted-foreground">{fmt(usage)} / {fmt(limit)}</span>
-        </div>
-        <UsageBar usage={usage} limit={limit} request={request} fmt={fmt} height="h-2.5" />
-      </div>
-    )
-  }
+type Ceiling = { value: number; label: string }
 
-  const value = hasUsage
-    ? `used ${fmt(usage)}${hasRequest ? ` · req ${fmt(request)}` : ""}`
-    : "—"
-
+// One resource as every usage view draws it: its figures top right, as
+// "0.2 used · 0.8 requested · 2.0 limit", and below them usage filled against
+// the ceiling with a tick at the request and at any other ceilings.
+export function ResourceGauge({ label, fmt, used, requested, ceiling, others = [], className }: {
+  label: ReactNode; fmt: (n: number) => string; used: number | null; requested: number | null
+  ceiling: Ceiling | null; others?: Ceiling[]; className?: string
+}) {
+  const figures = [
+    used !== null ? `${fmt(used)} used` : "no usage data",
+    ...(requested !== null && requested > 0 ? [`${fmt(requested)} requested`] : []),
+    ...(ceiling ? [`${fmt(ceiling.value)} ${ceiling.label}`] : []),
+    ...others.map(o => `${fmt(o.value)} ${o.label}`),
+  ]
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
-      <span className="font-mono text-xs tabular-nums text-foreground">{value}</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className="font-mono text-xs tabular-nums text-muted-foreground">{figures.join(" · ")}</span>
+      </div>
+      {used !== null && ceiling && (
+        <UsageBar usage={used} limit={ceiling.value} request={requested} fmt={fmt} height="h-2.5"
+          markers={others.map(o => ({ value: o.value, label: o.label }))} />
+      )}
     </div>
   )
 }
 
-function UsageBar({ usage, limit, request, fmt, height }: { usage: number; limit: number; request: number | null; fmt: (n: number) => string; height: string }) {
+// Usage filled against the limit, coloured by how full it is, with a tick at
+// the request; markers add further ticks, such as a namespace's quota.
+export function UsageBar({ usage, limit, request, fmt, height, markers = [] }: {
+  usage: number; limit: number; request: number | null; fmt: (n: number) => string; height: string
+  markers?: { value: number; label: string }[]
+}) {
   const hasRequest = request !== null && request > 0
   return (
     <div className="relative">
-      <div className={cn("w-full overflow-hidden rounded-full bg-gray-100", height)}>
-        <div
-          className={cn("h-full rounded-full", usageBarColor(usage / limit))}
-          style={{ width: `${Math.min((usage / limit) * 100, 100)}%` }}
-        />
-      </div>
+      <MetricBar value={usage} total={limit} className={height} />
       {hasRequest && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -241,106 +231,19 @@ function UsageBar({ usage, limit, request, fmt, height }: { usage: number; limit
           <TooltipContent>Request {fmt(request)} · guaranteed reservation</TooltipContent>
         </Tooltip>
       )}
-    </div>
-  )
-}
-
-const PER_POD_GRID = "grid grid-cols-[auto_auto_auto_auto] justify-start"
-const MAX_VISIBLE_PODS = 10
-
-function PerPodBreakdown({ pods, podHref }: { pods: PerPodMetrics[]; podHref?: (podName: string) => string | null }) {
-  const [expanded, setExpanded] = useState(false)
-  const [showAll, setShowAll] = useState(false)
-
-  const visible = showAll ? pods : pods.slice(0, MAX_VISIBLE_PODS)
-  const hidden = pods.length - MAX_VISIBLE_PODS
-
-  return (
-    <div className="mt-4">
-      <button
-        type="button"
-        onClick={() => setExpanded(v => !v)}
-        aria-expanded={expanded}
-        className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-      >
-        <ChevronRight className={cn("size-3.5 transition-transform", expanded && "rotate-90")} />
-        Per-pod breakdown
-      </button>
-
-      {expanded && (
-        <div className="mt-3">
-          <div className={PER_POD_GRID}>
-            <HeaderCell>Pod</HeaderCell>
-            <HeaderCell>Memory</HeaderCell>
-            <HeaderCell>CPU</HeaderCell>
-            <HeaderCell>QoS</HeaderCell>
-            {visible.map((pod, i) => (
-              <PodRow key={pod.podName} pod={pod} href={podHref?.(pod.podName) ?? null} divider={i > 0} />
-            ))}
-          </div>
-          {hidden > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAll(v => !v)}
-              className="mt-2.5 text-xs text-muted-foreground hover:text-brand hover:underline"
+      {markers.filter(m => m.value > 0).map(m => (
+        <Tooltip key={m.label}>
+          <TooltipTrigger asChild>
+            <div
+              className="absolute top-1/2 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-default justify-center"
+              style={{ left: `clamp(1px, ${(m.value / limit) * 100}%, calc(100% - 1px))` }}
             >
-              {showAll ? "show less" : `+ ${hidden} more`}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function HeaderCell({ children }: { children: string }) {
-  return (
-    <div className="border-b border-gray-100 pb-2 pr-8">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</span>
-    </div>
-  )
-}
-
-function PodRow({ pod, href, divider }: { pod: PerPodMetrics; href: string | null; divider: boolean }) {
-  const cell = cn("flex items-center py-2 pr-8 transition-colors", divider && "border-t border-gray-100", href && "group-hover:bg-brand-bg/30")
-  const inner = (
-    <>
-      <div className={cn(cell, "min-w-0")}>
-        <span className="truncate font-mono text-xs text-foreground" title={pod.podName}>{pod.podName}</span>
-      </div>
-      <PodMetricCell kind="memory" data={pod.memory} cellClass={cell} />
-      <PodMetricCell kind="cpu" data={pod.cpu} cellClass={cell} />
-      <div className={cell}>
-        <span className="font-mono text-xs text-muted-foreground">{pod.qosClass ?? "—"}</span>
-      </div>
-    </>
-  )
-
-  if (href) {
-    return <PrefetchLink href={href} className="group contents">{inner}</PrefetchLink>
-  }
-  return inner
-}
-
-function PodMetricCell({ kind, data, cellClass }: { kind: "memory" | "cpu"; data: ResourceTriplet; cellClass: string }) {
-  const { usage, limit } = data
-  const fmt = (n: number) => (kind === "memory" ? formatBytes(n) : formatCores(n))
-  const minWidth = kind === "memory" ? "min-w-[7.5rem]" : "min-w-[6rem]"
-
-  if (usage !== null && limit !== null && limit > 0) {
-    return (
-      <div className={cn(cellClass, minWidth, "gap-2.5")}>
-        <div className="w-40">
-          <UsageBar usage={usage} limit={limit} request={data.request} fmt={fmt} height="h-2" />
-        </div>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">{fmt(usage)} / {fmt(limit)}</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className={cn(cellClass, minWidth)}>
-      <span className="font-mono text-xs tabular-nums text-foreground">{statCellValue(data, fmt)}</span>
+              <div className="h-full w-0.5 rounded-full bg-foreground/70" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{m.label} {fmt(m.value)}</TooltipContent>
+        </Tooltip>
+      ))}
     </div>
   )
 }
@@ -366,16 +269,13 @@ function VolumeList({ volumes }: { volumes: PodVolume[] }) {
 }
 
 function VolumeRow({ volume }: { volume: PodVolume }) {
-  const pct = volume.capacity > 0 ? volume.used / volume.capacity : 0
 
   return (
     <div className="flex items-center gap-3">
       <span className="w-56 shrink-0 break-words font-mono text-xs text-foreground" title={volume.name}>
         {softWrapText(volume.name)}
       </span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-        <div className={cn("h-full rounded-full", usageBarColor(pct))} style={{ width: `${Math.min(pct * 100, 100)}%` }} />
-      </div>
+      <MetricBar value={volume.used} total={volume.capacity} className="flex-1" />
       <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
         {formatBytes(volume.used)} / {formatBytes(volume.capacity)}
       </span>

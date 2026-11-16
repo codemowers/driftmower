@@ -1,4 +1,6 @@
 "use client"
+import { useKubectlConnection } from "@/lib/hooks/use-kubectl"
+import { scopeActionCommand } from "@/lib/kubernetes/contexts"
 
 import { useState } from "react"
 import { ChevronRight, SquareTerminal } from "lucide-react"
@@ -29,13 +31,17 @@ function buildCommands(kind: string, namespace: string, name: string, apiGroup?:
     { label: "get", value: `kubectl get ${token} -n ${namespace} ${name}` },
     { label: "events", value: `kubectl events -n ${namespace} ${token} ${name}` },
   ]
-  const restart: Command[] = RESTARTABLE_KINDS.has(kind)
-    ? [{ label: "restart", value: `kubectl rollout restart -n ${namespace} ${token} ${name}` }]
-    : []
+  // Mutating commands, apart from the read-only ones.
+  const restart: Command[] = [
+    ...(RESTARTABLE_KINDS.has(kind) ? [{ label: "restart", value: `kubectl rollout restart -n ${namespace} ${token} ${name}` }] : []),
+    { label: "delete", value: `kubectl delete -n ${namespace} ${token} ${name}` },
+  ]
   return { inspect, restart }
 }
 
 function CommandRow({ label, value }: Command) {
+  const connection = useKubectlConnection()
+  value = scopeActionCommand(value, connection)
   return (
     <div className="flex items-center gap-3 rounded-lg bg-gray-100 px-3 py-2">
       <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -54,7 +60,7 @@ export default function CommandsCard({ kind, namespace, name, apiGroup }: Props)
   const { inspect, restart } = buildCommands(kind, namespace, name, apiGroup)
 
   const summaryParts = ["inspect", "events"]
-  if (restart.length) summaryParts.push("restart")
+  summaryParts.push(...restart.map(c => c.label))
 
   return (
     <div>

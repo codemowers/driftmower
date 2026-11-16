@@ -6,8 +6,9 @@ import {
   StatValue,
   StatCaption,
   DriftScoreCell,
-  NamespaceCell,
 } from "@/app/components/stats-card"
+import RuntimeCell from "@/app/components/runtime-cell"
+import type { ClusterResource } from "@/lib/cluster/cluster-state"
 
 type Props = {
   normalizedScore: number
@@ -15,8 +16,10 @@ type Props = {
   distinctRepoCount: number
   totalContainers: number
   totalPods: number
-  namespace: string
   worstStatus: StatusType
+  pods: ClusterResource[]
+  // Kinds meant to run as interchangeable replicas.
+  replicated: boolean
 }
 
 export default function WorkloadStats({
@@ -25,8 +28,9 @@ export default function WorkloadStats({
   distinctRepoCount,
   totalContainers,
   totalPods,
-  namespace,
   worstStatus,
+  pods,
+  replicated,
 }: Props) {
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
 
@@ -46,7 +50,7 @@ export default function WorkloadStats({
         <StatCaption>in {podLabel}</StatCaption>
       </StatCell>
 
-      <NamespaceCell namespace={namespace} worstStatus={worstStatus} />
+      <RuntimeCell pods={pods} replicated={replicated} />
     </StatGrid>
   )
 }

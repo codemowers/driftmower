@@ -8,15 +8,14 @@ import {
   StatValue,
   StatCaption,
   DriftScoreCell,
-  NamespaceCell,
 } from "@/app/components/stats-card"
+import RuntimeCell from "@/app/components/runtime-cell"
 
 type Props = {
   pod: ClusterResource
   nodeName: string
   totalContainers: number
   staleContainerCount: number
-  namespace: string
   worstStatus: StatusType
   normalizedScore: number
 }
@@ -26,7 +25,6 @@ export default function PodStats({
   nodeName,
   totalContainers,
   staleContainerCount,
-  namespace,
   worstStatus,
   normalizedScore,
 }: Props) {
@@ -63,7 +61,7 @@ export default function PodStats({
         <StatCaption>{staleLabel}</StatCaption>
       </StatCell>
 
-      <NamespaceCell namespace={namespace} worstStatus={worstStatus} />
+      <RuntimeCell pods={[pod]} />
     </StatGrid>
   )
 }

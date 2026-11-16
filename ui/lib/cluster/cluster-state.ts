@@ -1,6 +1,8 @@
+import type { PodSpread } from "./availability"
 import { create } from "zustand"
-import type { AnalysisProgress } from "./refresh-state"
 import type { Report } from "./reports"
+import type { PodSecurity } from "./pod-security"
+import type { Subject } from "@/lib/features/users/types"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
 import type { AlertGroup } from "@/lib/features/prometheus/types"
@@ -31,6 +33,7 @@ export type LivenessProbe = { container: string; check: string }
 export type ClusterResource = {
   uid: string
   kind: string
+  apiVersion?: string
   name: string
   namespace: string
   createdAt?: string
@@ -46,9 +49,24 @@ export type ClusterResource = {
   nodeName?: string
   phase?: string
   podStatus?: PodStatus
+  priorityClassName?: string
+  priority?: number
+  security?: PodSecurity
+  spread?: PodSpread[]
+  // Top-level owners: provenance labels and annotations by key, and the
+  // account named by codemowers.io/created-by.
+  provenance?: Record<string, string>
+  createdBy?: Subject
+  // The latest write other than to status, and its field manager.
+  updatedAt?: string
+  updatedBy?: string
+  // A custom-resource owner known only from a reference; its times are read
+  // with get_owner_record.
+  ownerReferenceOnly?: boolean
 }
 
 export type ClusterState = {
+  imageScanStatuses: Record<string,string>
   clusterName: string | null
   data: Report | null
   reportId: string | null
@@ -59,7 +77,6 @@ export type ClusterState = {
   error: string | null
   errorSource: "analysis" | "report" | null
   lastRefreshed: Date | null
-  analysis: AnalysisProgress | null
   clusterResources: ClusterResource[] | null
   clusterResourcesError: string | null
   livePatchUpgrades: LivePatchUpgradeListResponse | null
@@ -84,12 +101,12 @@ export const useClusterState = create<ClusterState>(() => ({
   error: null,
   errorSource: null,
   lastRefreshed: null,
-  analysis: null,
   clusterResources: null,
   clusterResourcesError: null,
   livePatchUpgrades: null,
   nodeDrift: null,
   nodeDriftError: null,
+  imageScanStatuses: {},
   vulnerabilityReports: null,
   vulnerabilityReportsError: null,
   prometheusAlerts: null,

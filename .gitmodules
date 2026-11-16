@@ -1,0 +1,4 @@
+[submodule "ui/vendor/spdx-license-list-data"]
+	path = ui/vendor/spdx-license-list-data
+	url = https://github.com/spdx/license-list-data.git
+	shallow = true

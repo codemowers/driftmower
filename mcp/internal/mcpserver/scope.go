@@ -25,6 +25,9 @@ type Tenancy struct {
 // is unrestricted. Otherwise the configured sources decide: the claim alone,
 // the authorizer alone, or their union.
 func (t *Tenancy) resolveScope(ctx context.Context, req *mcp.CallToolRequest) tenancy.Scope {
+	if t.Mapping.ReadAll {
+		return tenancy.UnrestrictedScope
+	}
 	caller := auth.CallerFrom(req.Extra.TokenInfo)
 	if caller == nil {
 		return tenancy.UnrestrictedScope

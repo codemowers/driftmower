@@ -26,7 +26,7 @@ func tolerate(source string, err error) (*unknown, error) {
 		return nil, nil
 	case apierrors.IsForbidden(err):
 		return &unknown{Reason: "rbac", Detail: "Not authorized to read " + source + " (403). The driftmower-mcp ServiceAccount needs get/list on " + source +
-			"; add the rule to chart/templates/observability-rbac.yaml and redeploy."}, nil
+			"; add the rule to chart/templates/mcp/observability-rbac.yaml and redeploy."}, nil
 	case apierrors.IsNotFound(err):
 		return &unknown{Reason: "absent", Detail: "This cluster does not serve " + source + ", so it could not be checked."}, nil
 	default:

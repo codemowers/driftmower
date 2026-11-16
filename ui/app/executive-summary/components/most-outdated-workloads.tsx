@@ -1,6 +1,6 @@
 import PrefetchLink from "@/app/components/prefetch-link"
 import { cn } from "@/lib/utils/cn"
-import type { ImageUsage } from "@/lib/cluster/refresh-state"
+import type { ImageUsage } from "@/lib/cluster/reports"
 import type { StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 import type { ReportReadiness } from "@/lib/cluster/report-readiness"

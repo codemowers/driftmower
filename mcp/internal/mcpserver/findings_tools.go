@@ -53,6 +53,8 @@ type advisoryFinding struct {
 }
 
 type versionFindings struct {
+	Status       map[string]any    `json:"versionStatus,omitempty"`
+	References   []string          `json:"references,omitempty"`
 	Version      string            `json:"version"`
 	Behind       int               `json:"behind"`
 	LatestOnLine string            `json:"latestOnLine,omitempty"`
@@ -62,12 +64,15 @@ type versionFindings struct {
 }
 
 type sourceFindings struct {
-	Releases  []crawler.Release `json:"releases,omitempty"`
-	URL       string            `json:"url"`
-	CheckedAt time.Time         `json:"checkedAt,omitzero"`
-	Latest    string            `json:"latest,omitempty"`
-	Errors    []string          `json:"errors,omitempty"`
-	Deployed  []versionFindings `json:"deployed"`
+	License   *crawler.RepositoryLicense `json:"license,omitempty"`
+	NextCrawl time.Time                  `json:"nextCrawl,omitzero"`
+	Scraping  bool                       `json:"scraping,omitempty"`
+	Releases  []crawler.Release          `json:"releases,omitempty"`
+	URL       string                     `json:"url"`
+	CheckedAt time.Time                  `json:"checkedAt,omitzero"`
+	Latest    string                     `json:"latest,omitempty"`
+	Errors    []string                   `json:"errors,omitempty"`
+	Deployed  []versionFindings          `json:"deployed"`
 }
 
 type sourceFindingsOutput struct {
@@ -154,7 +159,14 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 		if err != nil {
 			return nil, nil, fmt.Errorf("findings require an authenticated caller: %w", err)
 		}
-		reports, err := source.Reports(ctx)
+		var reports []crawler.SourceReport
+		if details, ok := source.(interface {
+			SourceDetails(context.Context, string) ([]crawler.SourceReport, error)
+		}); in.URL != "" && ok {
+			reports, err = details.SourceDetails(ctx, in.URL)
+		} else {
+			reports, err = source.Reports(ctx)
+		}
 		if err != nil {
 			return nil, nil, errors.New("findings are unavailable: the crawler could not be reached")
 		}
@@ -194,7 +206,7 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 			if in.URL != "" && report.URL != in.URL {
 				continue
 			}
-			src := sourceFindings{URL: report.URL, CheckedAt: report.CheckedAt, Latest: latestTag(report), Errors: report.Errors}
+			src := sourceFindings{License: report.License, NextCrawl: report.NextCrawl, Scraping: report.Scraping, URL: report.URL, CheckedAt: report.CheckedAt, Latest: latestTag(report), Errors: report.Errors}
 			if in.URL != "" {
 				src.Releases = report.Releases
 			}
@@ -203,12 +215,15 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 				if (!allImages && len(running[deployed]) == 0) || (in.AffectedOnly && !affected(deployed)) {
 					continue
 				}
-				v := versionFindings{Version: deployed.Version, Behind: deployed.Behind,
+				v := versionFindings{Status: crawler.VersionStatus(report, deployed), References: slices.Clone(deployed.References), Version: deployed.Version, Behind: deployed.Behind,
 					LatestOnLine: deployed.LatestOnLine, Findings: expand(report, deployed), Workloads: running[deployed], Images: deployed.Images}
 				if !allImages {
 					// A version's images span the cluster. Another namespace's
 					// references, such as a private registry named after it,
 					// stay hidden from a caller who may not list them.
+					v.References = slices.DeleteFunc(v.References, func(image string) bool {
+						return !slices.ContainsFunc(findings.Keys(image), func(key string) bool { return visible[key] })
+					})
 					v.Images = slices.DeleteFunc(slices.Clone(v.Images), func(image string) bool {
 						return !slices.ContainsFunc(findings.Keys(image), func(key string) bool { return visible[key] })
 					})

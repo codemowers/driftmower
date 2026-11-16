@@ -1,0 +1,202 @@
+{
+  "interval": "12h",
+  "concurrency": 2,
+  "repositories": [
+    {
+      "repository": "docker.io/library/python",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/php",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/perl",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/node",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/ruby",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/golang",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/rust",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/nginx",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/httpd",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/postgres",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/redis",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/rabbitmq",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/maven",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(eclipse-temurin|amazoncorretto|ibm-semeru|sapmachine|microsoft|openjdk)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/gradle",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(jdk|jre)[0-9][a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/alpine",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    {
+      "repository": "docker.io/library/debian",
+      "tagPattern": "^(bullseye|bookworm|trixie|forky)(-[0-9]{8})?(-slim)?$"
+    },
+    {
+      "repository": "docker.io/library/ubuntu",
+      "tagPattern": "^[0-9]{2}\\.[0-9]{2}(\\.[0-9]+)?$"
+    },
+    {
+      "repository": "docker.io/library/busybox",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(glibc|musl|uclibc))?$"
+    },
+    {
+      "repository": "docker.io/library/fedora",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/library/rockylinux",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/library/almalinux",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/library/oraclelinux",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/library/amazonlinux",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/library/photon",
+      "tagPattern": "^[0-9]+(\\.[0-9]+)*(-(minimal|micro|base))?$"
+    },
+    {
+      "repository": "docker.io/opensuse/leap",
+      "tagPattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+    },
+    {
+      "repository": "docker.io/library/eclipse-temurin",
+      "tagPattern": "^[0-9]+(\\.[0-9]+){0,3}(_[0-9]+)?(-(jdk|jre|alpine|al2023|al2|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "docker.io/library/amazoncorretto",
+      "tagPattern": "^[0-9]+(\\.[0-9]+){0,3}(_[0-9]+)?(-(jdk|jre|alpine|al2023|al2|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "mcr.microsoft.com/dotnet/runtime",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|bookworm|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "mcr.microsoft.com/dotnet/runtime-deps",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|bookworm|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "mcr.microsoft.com/dotnet/aspnet",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|bookworm|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "mcr.microsoft.com/dotnet/sdk",
+      "tagPattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|bookworm|noble|jammy)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "gcr.io/distroless/static-debian12",
+      "tagPattern": "^(latest|nonroot|debug|debug-nonroot)$"
+    },
+    {
+      "repository": "gcr.io/distroless/base-debian12",
+      "tagPattern": "^(latest|nonroot|debug|debug-nonroot)$"
+    },
+    {
+      "repository": "gcr.io/distroless/cc-debian12",
+      "tagPattern": "^(latest|nonroot|debug|debug-nonroot)$"
+    },
+    {
+      "repository": "gcr.io/distroless/python3-debian12",
+      "tagPattern": "^(latest|nonroot|debug|debug-nonroot)$"
+    },
+    {
+      "repository": "gcr.io/distroless/nodejs22-debian12",
+      "tagPattern": "^(latest|nonroot|debug|debug-nonroot)$"
+    },
+    {
+      "repository": "cgr.dev/chainguard/wolfi-base",
+      "tagPattern": "^(latest|latest-dev)$"
+    },
+    {
+      "repository": "cgr.dev/chainguard/static",
+      "tagPattern": "^(latest|latest-dev)$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi9/ubi",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi9/ubi-minimal",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi9/ubi-micro",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi10/ubi",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi10/ubi-minimal",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "registry.access.redhat.com/ubi10/ubi-micro",
+      "tagPattern": "^[0-9]+\\.[0-9]+(-[0-9]+(\\.[0-9]+)*)?$"
+    },
+    {
+      "repository": "quay.io/jetstack/base-static",
+      "tagPattern": "^(latest|[0-9]{8}|v?[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    },
+    {
+      "repository": "quay.io/jetstack/base-static-csi",
+      "tagPattern": "^(latest|[0-9]{8}|v?[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    },
+    {
+      "repository": "docker.elastic.co/wolfi/static",
+      "tagPattern": "^(latest|[0-9]+(\\.[0-9]+)*)$"
+    },
+    {
+      "repository": "docker.dragonflydb.io/dragonflydb/dragonfly",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
+    },
+    {
+      "repository": "ghcr.io/astral-sh/uv",
+      "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine([0-9]+\\.[0-9]+)?|bookworm|trixie|bullseye|distroless|python[0-9]+\\.[0-9]+(-(alpine|bookworm|trixie|bullseye)(-slim)?)?))?$"
+    }
+  ]
+}

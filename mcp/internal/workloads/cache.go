@@ -54,11 +54,12 @@ type Cache struct {
 	// and every answer names the gap. Nil, or an error, means try the watch.
 	MayWatch func(ctx context.Context, gvr schema.GroupVersionResource) (bool, error)
 
-	ctx      context.Context
-	once     sync.Once
-	targets  []*target
-	epoch    string
-	revision atomic.Uint64
+	ctx         context.Context
+	once        sync.Once
+	targets     []*target
+	epoch       string
+	revision    atomic.Uint64
+	initialized atomic.Bool
 }
 
 type target struct {
@@ -66,17 +67,28 @@ type target struct {
 	informer cache.SharedIndexInformer
 	mu       sync.Mutex
 	warning  string
+	// The informer's resource version when the warning was set.
+	warnedAt string
 }
 
 func (t *target) setWarning(w string) {
 	t.mu.Lock()
 	t.warning = w
+	if t.informer != nil {
+		t.warnedAt = t.informer.LastSyncResourceVersion()
+	}
 	t.mu.Unlock()
 }
 
+// getWarning clears a warning once a later list or watch has succeeded: a
+// collection with no objects, such as ReplicationControllers on most
+// clusters, never delivers an event that would clear it otherwise.
 func (t *target) getWarning() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.warning != "" && t.informer != nil && t.informer.LastSyncResourceVersion() != t.warnedAt {
+		t.warning = ""
+	}
 
 	return t.warning
 }
@@ -152,10 +164,31 @@ func (c *Cache) initialize() {
 				time.Sleep(20 * time.Millisecond)
 			}
 			if !t.informer.HasSynced() && t.getWarning() == "" {
-				t.setWarning("list/watch unavailable: initial list still in progress; inventory and orphan classification may be incomplete.")
+				t.setWarning("initial list still in progress")
+				c.Logger.Warn("workload inventory incomplete: initial list still in progress", "resource", t.source.GVR.Resource)
 			}
 		}
+		c.initialized.Store(true)
 	})
+}
+
+// ObjectCounts observes only already-started watches; scraping metrics cannot
+// initialize discovery or load any Kubernetes objects.
+func (c *Cache) ObjectCounts() map[string]int {
+	out := map[string]int{}
+	if !c.initialized.Load() {
+		return out
+	}
+	for _, t := range c.targets {
+		if t.informer != nil {
+			name := t.source.GVR.Resource
+			if t.source.GVR.Group != "" {
+				name += "." + t.source.GVR.Group
+			}
+			out[name] = len(t.informer.GetStore().ListKeys())
+		}
+	}
+	return out
 }
 
 func (c *Cache) wire(t *target) {
@@ -183,8 +216,13 @@ func (c *Cache) wire(t *target) {
 		DeleteFunc: func(any) { changed() },
 	})
 	_ = t.informer.SetWatchErrorHandlerWithContext(func(ctx context.Context, r *cache.Reflector, err error) {
-		// Upstream bodies are not exposed; a stale inventory is labelled.
-		t.setWarning("list/watch unavailable: " + failureReason(err) + "; inventory and orphan classification may be incomplete.")
+		// The server's own watch failures are logged, not shown to callers;
+		// a repeated failure is logged once.
+		reason := failureReason(err)
+		if t.getWarning() != reason {
+			c.Logger.Warn("workload list/watch unavailable; inventory and orphan classification may be incomplete", "resource", src.GVR.Resource, "reason", reason)
+		}
+		t.setWarning(reason)
 		cache.DefaultWatchErrorHandler(ctx, r, err)
 	})
 }
@@ -237,6 +275,9 @@ func failureReason(err error) string {
 
 	return "connection or response validation failed"
 }
+
+// Version changes whenever a cached object does.
+func (c *Cache) Version() string { return c.version() }
 
 func (c *Cache) version() string {
 	return c.epoch + ":" + strconv.FormatUint(c.revision.Load(), 10)
@@ -316,10 +357,9 @@ func (c *Cache) snapshot(ctx context.Context, ns string, id authz.Identity) ([]*
 
 			continue
 		}
-		if w := t.getWarning(); w != "" {
-			warnings[ns+": "+t.source.GVR.Resource+" "+w] = true
-		}
 		if t.informer == nil {
+			// Unwatched by deployment choice; watch failures are only logged.
+			warnings[ns+": "+t.source.GVR.Resource+" "+t.getWarning()] = true
 			lists = append(lists, SourceItems{Source: t.source})
 
 			continue

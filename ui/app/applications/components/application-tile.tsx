@@ -1,5 +1,7 @@
 "use client"
 
+import MarkdownText from "@/app/components/markdown-text"
+
 import { useRouter } from "next/navigation"
 import { usePagePrefetch } from "@/app/components/prefetch-link"
 import { Anchor, ExternalLink, ShipWheel, Users } from "lucide-react"
@@ -163,7 +165,7 @@ export default function ApplicationTile({
         </div>
 
         {entry.description && (
-          <p className="line-clamp-2 text-sm text-muted-foreground">{entry.description}</p>
+          <MarkdownText text={entry.description} className="line-clamp-2 text-sm text-muted-foreground" />
         )}
       </div>
 

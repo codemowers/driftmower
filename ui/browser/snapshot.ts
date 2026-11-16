@@ -13,7 +13,11 @@ export type DashboardSnapshot = {
   issues: Report["issues"]
   resources: ClusterResource[]
   warnings?: string[]
+  // Components the cluster lacks, such as nodestatd.
+  missingComponents?: string[]
   subscriptionUri?: string
+  // Prometheus's public address for links from metric charts.
+  prometheusUrl?: string | null
 }
 
 // Adapt live inventory for existing presentation components. No report is

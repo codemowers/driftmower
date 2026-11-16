@@ -1,0 +1,152 @@
+# Components are enabled by default; Helm installs can disable individual components.
+
+# Pull Secrets added to every driftmower Pod, scan Pods included, for images
+# in a registry the cluster does not supply credentials for.
+imagePullSecrets: []
+
+# Independent registry metadata catalog, using the crawler image's registry mode.
+registryScraper:
+  enabled: true
+  image: ""
+  storageClassName: ""
+  storageSize: 10Gi
+  # Existing ConfigMap with repositories.json; otherwise the chart owns it.
+  configMapName: ""
+  # Optional full replacement for files/base-images.json. Mounted updates reload.
+  config: {}
+  # Optional Docker auth JSON Secret. Missing Secret means anonymous access.
+  # Never copy tokens into this file or the ConfigMap.
+  credentialsSecretName: driftmower-dockerhub
+  credentialsSecretKey: .dockerconfigjson
+  # Empty reuses crawler.githubTokenSecret (optional); mounted only in scraper.
+  githubTokenSecret: ""
+  # Empty resolves the token owner through GitHub once per token rotation.
+  githubUsername: ""
+
+# Fetches releases and security advisories for every SourceRepository. The
+# source crawler and registry scraper have internet egress, without Secret access. Its
+# inspection page listens on the Pod's loopback address only:
+#   kubectl -n <namespace> port-forward deploy/driftmower-crawler 8082:ui
+#   open http://localhost:8082/
+crawler:
+  enabled: true
+  image: driftmower-crawler
+  logLevel: info
+  # Interval between crawls of one source.
+  interval: 6h
+  # Gitea or Forgejo hosts besides codeberg.org and gitea.com.
+  giteaHosts: []
+  # Optional Secret with a GitHub token under key token. Without one GitHub
+  # allows 60 requests per hour and a full crawl takes hours.
+  githubTokenSecret: driftmower-crawler-github
+  # GitHub.com and any Enterprise hosts stay active simultaneously.
+  # Each entry: {host: github.company.example, tokenSecret: crawler-ghe, tokenKey: token}
+  githubEnterprise: []
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  nodeSelector: {}
+
+mcp:
+  enabled: true
+  auth:
+    # rbac: OIDC + caller Kubernetes RBAC (default).
+    # oidc: verified OIDC login grants cluster-wide read access, no caller RBAC.
+    # anonymous: anyone reaching the endpoint can read; no OIDC dependency.
+    # Both relaxed modes disable mutation tools.
+    mode: rbac
+  ingress:
+    enabled: true
+  # Explicit advertised origin for deployments without Passmower.
+  publicUrl: ""
+  metrics:
+    # Optional platform Prometheus namespace permitted to read cluster-wide
+    # security/version metadata on the dedicated metrics port.
+    prometheusNamespace: ""
+  image: driftmower-mcp
+  # Keep the Go soft limit below the container limit for non-heap overhead.
+  goMemoryLimit: 1536MiB
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+
+  # Optional explicit cluster identity. Leave empty to use runtime discovery.
+  cluster:
+    id: ""
+    apiUrl: ""
+
+  rbac:
+    # Name of the cluster-scoped ClusterRole and ClusterRoleBinding. A second
+    # release in another namespace needs its own, or it rebinds this one.
+    clusterRoleName: ""
+    # Names of the ConfigMaps admission guards read their parameters from. Empty
+    # grants `get` on every ConfigMap (needed because a guard names its own);
+    # set it to narrow the grant to those names.
+    paramConfigMapNames: []
+
+  # Optional machine authentication; audience-bound TokenReview, then caller RBAC.
+  serviceAccountAuth:
+    enabled: false
+
+  # Optional caller-authorized mutations: workload restart, standalone Pod
+  # termination and PVC expansion. Disabled by default.
+  workloadRestart:
+    enabled: false
+
+  # OIDCUser listing and per-user effective rights (tools).
+  # Grants this server impersonate on users and groups; only callers who may
+  # impersonate themselves can view rights. Disabled by default.
+  userAccess:
+    enabled: false
+    oidcUserNamespace: passmower
+
+  prometheus:
+    # Public Prometheus address the dashboard links its metric charts to.
+    # Empty uses the address Prometheus advertises (web.external-url, set from
+    # the Prometheus resource's spec.externalUrl).
+    externalUrl: ""
+
+  argocd:
+    # Public Argo CD address the dashboard links tracked workloads to. Argo CD
+    # may run in another cluster. Empty shows application names without links.
+    url: ""
+
+  dashboard:
+    # Exact loopback origins for a local static dashboard using the native client.
+    localOrigins: []
+
+operator:
+  enabled: true
+  image: driftmower-operator
+  trivyImage: aquasec/trivy:0.75.0
+  databaseImage: driftmower-trivy-db
+  trivy:
+    # Scan Pods the operator runs at once. It picks a random unscanned image
+    # for each free slot, fewest failed attempts first.
+    parallelism: 2
+  priorityClassName: ""
+  priorityValue: 100000
+  sbomCacheMiB: 2048
+  # Independent PVC for CycloneDX results; survives operator Pod replacement.
+  # Omit the class to use the cluster default. Capacity includes 64 MiB headroom.
+  sbomStorageClassName: ""
+
+ui:
+  # Kubeconfig context used by copyable commands in the web UI.
+  kubeContext: ""
+  enabled: true
+  image: driftmower-ui
+  nodeSelector: {}
+
+history:
+  # Optional dedicated history store; global Prometheus is the default.
+  enabled: false
+  storageClassName: ""

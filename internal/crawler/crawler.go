@@ -13,8 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,23 +36,29 @@ const sourceIndex = "source"
 type Config struct {
 	// Interval between crawls of a source; each is jittered by up to a
 	// tenth.
-	Interval    time.Duration
-	GitHubToken string
-	GiteaHosts  []string
-	OSVURL      string
+	Interval         time.Duration
+	GitHubToken      string
+	GitHubEnterprise map[string]string
+	GiteaHosts       []string
+	OSVURL           string
 }
 
 type Crawler struct {
-	cfg     Config
-	fetch   *fetcher
-	osvURL  string
-	log     *slog.Logger
-	sources cache.SharedIndexInformer
-	images  cache.SharedIndexInformer
-	wake    chan struct{}
+	cfg        Config
+	fetch      *fetcher
+	enterprise map[string]*fetcher
+	osvURL     string
+	log        *slog.Logger
+	sources    cache.SharedIndexInformer
+	images     cache.SharedIndexInformer
+	wake       chan struct{}
+	// Resources the API server does not serve: their CRDs, which nodestatd
+	// installs, are missing, so there is nothing to wait for.
+	sourcesMissing, imagesMissing atomic.Bool
 
-	mu    sync.RWMutex
-	state map[string]*sourceState
+	mu           sync.RWMutex
+	state        map[string]*sourceState
+	activeSource string
 }
 
 // sourceState is what the crawler last learned about a source.
@@ -60,6 +68,9 @@ type sourceState struct {
 	errors     []string
 	releases   []Release
 	advisories []Advisory
+	// The repository's changelog file as fetched; nil when it has none.
+	changelog *Changelog
+	license   *RepositoryLicense
 	// versions and revisions crawled, so new ones trigger a crawl.
 	versions  map[string]bool
 	revisions map[string]bool
@@ -74,6 +85,12 @@ func New(cfg Config, client dynamic.Interface, log *slog.Logger) *Crawler {
 	}
 	c := &Crawler{cfg: cfg, fetch: newFetcher(PublicHTTPClient(), cfg.GitHubToken), osvURL: cfg.OSVURL, log: log,
 		wake: make(chan struct{}, 1), state: map[string]*sourceState{}}
+	c.enterprise = map[string]*fetcher{}
+	for host, token := range cfg.GitHubEnterprise {
+		f := newEnterpriseFetcher(host, token)
+		f.metrics = c.fetch.metrics
+		c.enterprise[host] = f
+	}
 	c.sources = dynamicinformer.NewFilteredDynamicInformer(client, sourceRepositories, metav1.NamespaceAll, 0, cache.Indexers{}, nil).Informer()
 	c.images = dynamicinformer.NewFilteredDynamicInformer(client, containerImages, metav1.NamespaceAll, 0, cache.Indexers{
 		sourceIndex: func(obj any) ([]string, error) {
@@ -89,7 +106,33 @@ func New(cfg Config, client dynamic.Interface, log *slog.Logger) *Crawler {
 	nudge := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { c.nudge() }, UpdateFunc: func(any, any) { c.nudge() }}
 	c.sources.AddEventHandler(nudge)
 	c.images.AddEventHandler(nudge)
+	missing := func(flag *atomic.Bool, resource string) cache.WatchErrorHandlerWithContext {
+		return func(ctx context.Context, r *cache.Reflector, err error) {
+			if apierrors.IsNotFound(err) {
+				if !flag.Swap(true) {
+					log.Warn("resource not served; install nodestatd's CRDs", "resource", resource)
+				}
+				return
+			}
+			flag.Store(false)
+			cache.DefaultWatchErrorHandler(ctx, r, err)
+		}
+	}
+	_ = c.sources.SetWatchErrorHandlerWithContext(missing(&c.sourcesMissing, sourceRepositories.Resource))
+	_ = c.images.SetWatchErrorHandlerWithContext(missing(&c.imagesMissing, containerImages.Resource))
 	return c
+}
+
+// Missing names the resources the API server does not serve.
+func (c *Crawler) Missing() []string {
+	var out []string
+	if c.imagesMissing.Load() && !c.images.HasSynced() {
+		out = append(out, containerImages.Resource+"."+containerImages.Group)
+	}
+	if c.sourcesMissing.Load() && !c.sources.HasSynced() {
+		out = append(out, sourceRepositories.Resource+"."+sourceRepositories.Group)
+	}
+	return out
 }
 
 // keep reduces informer objects to their identity and the named top-level
@@ -136,8 +179,11 @@ func (c *Crawler) nudge() {
 	}
 }
 
-// Synced reports whether both informers completed their initial list.
-func (c *Crawler) Synced() bool { return c.sources.HasSynced() && c.images.HasSynced() }
+// Synced reports whether both informers completed their initial list, or
+// found their resource not served, which no waiting will change.
+func (c *Crawler) Synced() bool {
+	return (c.sources.HasSynced() || c.sourcesMissing.Load()) && (c.images.HasSynced() || c.imagesMissing.Load())
+}
 
 // Run watches sources and images and crawls each source when it is due:
 // first seen, its interval elapsed, or a newly deployed version or revision.
@@ -270,6 +316,10 @@ func (c *Crawler) deployed(url string) (map[string]*deployment, []string) {
 }
 
 func (c *Crawler) crawl(ctx context.Context, url string) {
+	c.mu.Lock()
+	c.activeSource = url
+	c.mu.Unlock()
+	defer func() { c.mu.Lock(); c.activeSource = ""; c.mu.Unlock() }()
 	state := &sourceState{checkedAt: time.Now(), versions: map[string]bool{}, revisions: map[string]bool{}, osv: map[string][]Advisory{}}
 	jitter := time.Duration(rand.Int64N(int64(c.cfg.Interval)/10 + 1))
 	state.due = state.checkedAt.Add(c.cfg.Interval + jitter)
@@ -279,13 +329,23 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 		}
 	}
 	versions, revisions := c.deployed(url)
-	loc, supported := locate(url, c.cfg.GiteaHosts)
+	loc, supported := c.locate(url)
 	if supported {
+		license, err := c.repositoryLicense(ctx, loc)
+		if err != nil {
+			fail("license", err)
+		}
+		state.license = license
 		releases, err := c.releases(ctx, loc)
 		if err != nil {
 			fail("releases", err)
 		}
 		state.releases = releases
+		changelog, err := c.changelog(ctx, loc)
+		if err != nil {
+			fail("changelog", err)
+		}
+		state.changelog = changelog
 		if loc.forge == GitHub {
 			advisories, err := c.githubAdvisories(ctx, loc)
 			if err != nil {
@@ -295,7 +355,7 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 		}
 		for version := range versions {
 			state.versions[version] = true
-			if v, ok := ParseVersion(version); ok && v.Prefix == "" {
+			if v, ok := ParseVersion(version); ok && v.Prefix == "" && c.enterprise[loc.host] == nil {
 				query := map[string]any{"package": map[string]any{"name": goModule(loc, v), "ecosystem": "Go"}, "version": strings.Join(intStrings(v.Core), ".")}
 				advisories, err := c.osvQuery(ctx, query)
 				if err != nil {
@@ -312,6 +372,9 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 	}
 	for _, revision := range revisions {
 		state.revisions[revision] = true
+		if c.enterprise[loc.host] != nil {
+			continue
+		}
 		advisories, err := c.osvQuery(ctx, map[string]any{"commit": revision})
 		if err != nil {
 			fail("osv "+revision, err)
@@ -339,20 +402,26 @@ func intStrings(values []int) []string {
 // SourceReport is what the crawler knows about one source, matched against
 // the versions currently deployed.
 type SourceReport struct {
-	URL       string    `json:"url"`
-	CheckedAt time.Time `json:"checkedAt,omitzero"`
-	NextCrawl time.Time `json:"nextCrawl,omitzero"`
-	Errors    []string  `json:"errors,omitempty"`
+	License   *RepositoryLicense `json:"license,omitempty"`
+	Scraping  bool               `json:"scraping,omitempty"`
+	URL       string             `json:"url"`
+	CheckedAt time.Time          `json:"checkedAt,omitzero"`
+	NextCrawl time.Time          `json:"nextCrawl,omitzero"`
+	Errors    []string           `json:"errors,omitempty"`
 	// Latest is the newest stable release.
 	Releases   []Release         `json:"releases,omitempty"`
 	Latest     *Release          `json:"latest,omitempty"`
 	Deployed   []DeployedVersion `json:"deployed"`
 	Advisories []Advisory        `json:"advisories,omitempty"`
+	// The changelog file found in the repository; its text is served by
+	// /v1/changes, parsed.
+	Changelog *Changelog `json:"changelog,omitempty"`
 }
 
 type DeployedVersion struct {
-	Version string   `json:"version"`
-	Images  []string `json:"images"`
+	Status  map[string]any `json:"versionStatus,omitempty"`
+	Version string         `json:"version"`
+	Images  []string       `json:"images"`
 	// References are every tag and digest reference nodes hold the images
 	// under, for matching Pod image fields.
 	References []string `json:"references,omitempty"`
@@ -380,13 +449,14 @@ func (c *Crawler) Reports() []SourceReport {
 	defer c.mu.RUnlock()
 	var out []SourceReport
 	for _, url := range c.urls() {
-		report := SourceReport{URL: url, Deployed: []DeployedVersion{}}
+		report := SourceReport{URL: url, Scraping: c.activeSource == url, Deployed: []DeployedVersion{}}
 		state := c.state[url]
 		versions, _ := c.deployed(url)
 		if state == nil {
 			report.Errors = []string{"not crawled yet"}
 		} else {
-			report.CheckedAt, report.NextCrawl, report.Errors = state.checkedAt, state.due, state.errors
+			report.CheckedAt, report.NextCrawl, report.Errors, report.Changelog = state.checkedAt, state.due, state.errors, state.changelog
+			report.License = state.license
 		}
 		releases, advisories := stableReleases(state), map[string]Advisory{}
 		for _, release := range releases {

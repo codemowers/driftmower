@@ -1,9 +1,6 @@
-import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { POD_DIAGNOSIS_URL } from "@/lib/cluster/constants"
 import { readApiError } from "@/lib/utils/read-api-error"
-import type { DiagnoseRequest, DiagnoseResponse, DiagnosisState } from "./types"
-
-const PREWARM_MIN_INTERVAL_MS = 60 * 1000
+import type { DiagnoseRequest,DiagnoseResponse,DiagnosisState } from "./types"
 
 export type DiagnoseOutcome = DiagnoseResponse | { unavailable: string }
 
@@ -31,22 +28,4 @@ export function rememberDiagnoses(results: Record<string, DiagnosisState>): void
 
 export function recallDiagnosis(key: string): DiagnosisState | undefined {
   return known.get(key)
-}
-
-let lastPrewarmAt = 0
-let lastPrewarmResources: ClusterResource[] | null = null
-
-export function prewarmDiagnoses(resources: ClusterResource[] | null): void {
-  if (!resources || resources === lastPrewarmResources) return
-  const now = Date.now()
-  if (now - lastPrewarmAt < PREWARM_MIN_INTERVAL_MS) return
-  lastPrewarmResources = resources
-  lastPrewarmAt = now
-
-  void postDiagnose({ prewarm: true })
-    .then(outcome => "results" in outcome && rememberDiagnoses(outcome.results))
-    .catch(() => {
-      lastPrewarmAt = 0
-      lastPrewarmResources = null
-    })
 }

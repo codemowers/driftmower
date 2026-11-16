@@ -13,6 +13,7 @@ import ChartCommandsCard, { canBuildChartCommands } from "./components/chart-com
 import ContainersCard from "./components/containers-card"
 import UsedByCard, { chartIdentity } from "./components/used-by-card"
 import VersionHistoryCard from "./components/version-history-card"
+import ChartValuesCard from "./components/chart-values-card"
 
 function repoHost(url?: string): string | null {
   if (!url) return null
@@ -75,10 +76,10 @@ export default function ChartDetailPage() {
           breadcrumbs={[
             { label: "Helm Releases", href: linkTo("/helm-releases", { drop: ["focus"] }) },
             {
-              label: `${info.managementKind} ${info.name}`,
+              label: `Release ${info.name}`,
               href: linkTo(`/helm-releases/${uid}`, { drop: ["htab", "focus"] }),
             },
-            { label: `chart ${chartName}` },
+            { label: `Chart ${chartName}` },
           ]}
           chips={info.chartSourceKind ? [{ label: info.chartSourceKind, tone: "muted" }] : []}
           scoreChip={!isNoData(drift) && driftStyle ? { status: drift, score: 0, label: driftStyle.label } : null}
@@ -126,6 +127,8 @@ export default function ChartDetailPage() {
           chartSource={info.chartSource}
           repoUrl={info.chartRepoUrl}
         />
+
+        <ChartValuesCard namespace={info.namespace} name={info.name} chartName={chartName} />
       </main>
     </div>
   )

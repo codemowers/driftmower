@@ -3,7 +3,7 @@
 import { logout } from "@/browser/connection"
 
 import { LogOut, User } from "lucide-react"
-import type { SessionClaims } from "@/lib/auth/session"
+import type { SessionClaims } from "@/lib/auth/types"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"

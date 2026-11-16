@@ -1,8 +1,8 @@
 import type { StatusType } from "@/lib/cluster/reports"
 import { HISTORY_SEVERITY } from "@/lib/cluster/styles/status-style"
-import { clipBands, maxFillMs, snapMarks, toBands, toMarks, toSpans } from "./reduce"
+import { clipBands,maxFillMs,snapMarks,toBands,toMarks,toSpans } from "./reduce"
 import { seriesStats } from "./stats"
-import type { DigestSeries, DriftSeries, SeriesStats } from "./types"
+import type { DigestSeries,DriftSeries,SeriesStats } from "./types"
 
 export type Observation = {
   t: number
@@ -35,12 +35,6 @@ export function seriesKey(workloadGroupKey: string, registry: string, repository
 
 export function imageKey(registry: string, repository: string): string {
   return `${registry}/${repository}`
-}
-
-// Registry is the first segment; the repository may contain slashes.
-export function splitImageKey(key: string): { registry: string; repository: string } {
-  const [registry, ...rest] = key.split("/")
-  return { registry, repository: rest.join("/") }
 }
 
 export function rank(status: SeriesStats["currentStatus"]): number {

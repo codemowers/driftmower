@@ -75,7 +75,7 @@ A beginner who wants a PostgreSQL on one of the codemowers clusters today has to
 things that are written down nowhere machine-readable:
 
 - **Which operator is even installed on *this* cluster.** Availability is feature-gated per
-  cluster in `codemowers-kube/values.<cluster>.yaml` — `ee-lte-1` has
+  cluster in `codemowers-kube/values.<cluster>.yaml` — the reference cluster has
   emqx/opensearch/redpanda/rabbitmq, the AWS cluster has none of them. Installed across the
   fleet: CloudNativePG (+ barman-cloud plugin), dragonfly-operator, mongodb community
   operator, s3-operator, rabbitmq-cluster-operator, redpanda-operator, opensearch-operator,
@@ -260,7 +260,7 @@ The honest answer is three-part, in this order:
    RBAC is also not the only gate: a ValidatingAdmissionPolicy overrides it, so admission
    denials are checked *first* and outrank any role-derived verdict.
    Narrow the RBAC to match: `clusterroles` with `resourceNames: ["admin","edit","view"]`, `get` only.
-   **Verify per-operator on ee-lte-1 in phase 2**; upstream CloudNativePG does ship aggregated
+   **Verify per-operator on the reference cluster in phase 2**; upstream CloudNativePG does ship aggregated
    edit/view roles, but it is not vendored here and could not be confirmed offline.
 3. **Delegate the real check to the user's own kubectl**, emitted unconditionally as the first
    command: `kubectl auth can-i create clusters.postgresql.cnpg.io -n <ns>`. That *is* a
@@ -1055,7 +1055,7 @@ degraded paths are what a developer can actually see.
 2. **Facts + the reference page.** `facts/*` (including `gatherFacts`), the `accept` override on
    `kubeApiGet`, the RBAC ClusterRole, `GET /api/provisioning/capabilities`, and
    `app/provisioning/cluster-support/page.tsx`. Storage classes and nodes are real on minikube, so
-   this is verifiable there. Immediately useful to the team on its own ("what does ee-lte-1
+   this is verifiable there. Immediately useful to the team on its own ("what does the reference cluster
    actually offer?"), and it de-risks every later phase.
    **Settle the RBAC-aggregation question here** (see the discovery section) — the answer decides
    whether the whole feature can even hand a beginner a manifest they can apply.
@@ -1127,8 +1127,8 @@ Manual, end to end:
   untestable on a real cluster. Then get a genuine inner loop for one offering with
   `helm install cnpg cloudnative-pg/cloudnative-pg` (~30s): real CRDs, real discovery output,
   and a real webhook to dry-run against.
-- **ee-lte-1** (`skaffold run`): the only place the real matrix exists. Check per-offering
-  availability against `values.ee-lte-1.yaml`; check a plan into a real sandbox namespace
+- **The reference cluster** (`skaffold run`): the only place the real matrix exists. Check per-offering
+  availability against `values.<cluster>.yaml`; check a plan into a real sandbox namespace
   produces the quota, LimitRange and Cilium findings above; then take the emitted YAML and run
   `kubectl apply --server-side --dry-run=server` with a tenant kubeconfig. **If the apiserver
   accepts it, the manifest is correct by definition** — CRD schema, Kyverno, quota and every
@@ -1138,7 +1138,7 @@ Manual, end to end:
 - **RBAC**: `kubectl auth can-i --as=system:serviceaccount:driftmowers:driftmower-ui list storageclasses`
   for each new rule, and confirm the app degrades to `known: false` — not a 500 — when the
   ClusterRole has not rolled out yet.
-- **MCP**: connect a client to `https://driftmower-ui.ee-lte-1.codemowers.io/api/mcp`, confirm the
+- **MCP**: connect a client to `https://driftmower-ui.<cluster-domain>/api/mcp`, confirm the
   metadata document and the `WWW-Authenticate` header on a 401, then confirm `plan_provision` for a
   3×20Gi Postgres into a small sandbox comes back blocked with the storage-quota reason in prose.
 

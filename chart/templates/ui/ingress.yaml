@@ -1,0 +1,20 @@
+{{- if .Values.ui.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-ui
+spec:
+  rules:
+    - host: dashboard
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-ui
+                port:
+                  number: 80
+{{- end }}

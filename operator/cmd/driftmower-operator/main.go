@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -68,7 +70,10 @@ func run(ctx context.Context, cancel context.CancelFunc) error {
 	if err != nil {
 		return err
 	}
-	cfg := scanner.Config{Namespace: ns, Image: os.Getenv("SCANNER_IMAGE"), TrivyImage: os.Getenv("TRIVY_IMAGE"), DatabaseImage: os.Getenv("TRIVY_DB_IMAGE"), URL: "http://driftmower-operator." + ns + ".svc:8080", Audience: "driftmower-scans." + ns, CacheDir: "/cache/sbom", PriorityClass: os.Getenv("SCAN_PRIORITY_CLASS"), MaxBytes: int64(integer("SBOM_CACHE_MIB", 2048)) << 20}
+	cfg := scanner.Config{ReaderServiceAccount: os.Getenv("SCANNER_READER_ACCOUNT"), Instance: os.Getenv("SCANNER_INSTANCE"), ServiceAccount: os.Getenv("SCANNER_SERVICE_ACCOUNT"), Namespace: ns, Image: os.Getenv("SCANNER_IMAGE"), TrivyImage: os.Getenv("TRIVY_IMAGE"), DatabaseImage: os.Getenv("TRIVY_DB_IMAGE"), URL: os.Getenv("SCANNER_URL"), Audience: "driftmower-scans." + ns, CacheDir: "/cache/sbom", PriorityClass: os.Getenv("SCAN_PRIORITY_CLASS"), MaxBytes: int64(integer("SBOM_CACHE_MIB", 2048)) << 20, Parallelism: integer("SCAN_PARALLELISM", 2), PullSecrets: strings.FieldsFunc(os.Getenv("IMAGE_PULL_SECRETS"), func(r rune) bool { return r == ',' })}
+	if cfg.URL == "" {
+		cfg.URL = "http://driftmower-operator." + ns + ".svc:8080"
+	}
 	if cfg.Image == "" || cfg.TrivyImage == "" || cfg.DatabaseImage == "" || cfg.PriorityClass == "" {
 		return errors.New("SCANNER_IMAGE, TRIVY_IMAGE, TRIVY_DB_IMAGE and SCAN_PRIORITY_CLASS are required")
 	}
@@ -80,9 +85,13 @@ func run(ctx context.Context, cancel context.CancelFunc) error {
 			cancel()
 		}
 	}()
+	lockName := "driftmower-scanner"
+	if cfg.Instance != "" {
+		lockName = cfg.Instance + "-scanner"
+	}
 	hostname, _ := os.Hostname()
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-		Lock:          &resourcelock.LeaseLock{LeaseMeta: metav1.ObjectMeta{Name: "driftmower-scanner", Namespace: ns}, Client: kube.CoordinationV1(), LockConfig: resourcelock.ResourceLockConfig{Identity: hostname}},
+		Lock:          &resourcelock.LeaseLock{LeaseMeta: metav1.ObjectMeta{Name: lockName, Namespace: ns}, Client: kube.CoordinationV1(), LockConfig: resourcelock.ResourceLockConfig{Identity: hostname}},
 		LeaseDuration: 30 * time.Second, RenewDeadline: 20 * time.Second, RetryPeriod: 5 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{OnStartedLeading: func(ctx context.Context) {
 			if err := controller.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
@@ -96,27 +105,59 @@ func run(ctx context.Context, cancel context.CancelFunc) error {
 	return server.Shutdown(shutdown)
 }
 func upload(ctx context.Context) error {
-	output := "/result/sbom.json"
-	info, err := os.Stat(output)
-	if err != nil {
-		return err
-	}
-	if info.Size() > 32<<20 {
-		return errors.New("SBOM exceeds 32 MiB result limit")
-	}
-	body, err := os.ReadFile(output)
-	if err != nil {
-		return err
-	}
 	token, err := os.ReadFile("/token/token")
 	if err != nil {
 		return err
 	}
-	return uploadArtifact(ctx, &http.Client{Timeout: 10 * time.Second}, os.Getenv("UPLOAD_URL"), strings.TrimSpace(string(token)), body, time.Second)
+	return uploadFile(ctx, &http.Client{Timeout: 10 * time.Second}, os.Getenv("UPLOAD_URL"), strings.TrimSpace(string(token)), "/result/sbom.json", time.Second)
+}
+
+func uploadFile(ctx context.Context, client *http.Client, url, token, output string, delay time.Duration) error {
+	info, err := os.Stat(output)
+	if err != nil {
+		return err
+	}
+	contentType := "application/vnd.cyclonedx+json"
+	var body []byte
+	if info.Size() > scanner.MaxSBOMBytes {
+		// Report the measured size to the long-lived operator so it can expose
+		// metrics even though the artifact itself cannot be accepted.
+		body, err = json.Marshal(scanner.SBOMSizeReport{SizeBytes: info.Size()})
+		contentType = scanner.OversizedSBOMMediaType
+	} else {
+		body, err = os.ReadFile(output)
+		if err == nil {
+			metadata, readErr := os.ReadFile(filepath.Join(filepath.Dir(output), "db-metadata.json"))
+			if readErr == nil {
+				var db struct{ UpdatedAt time.Time }
+				if err = json.Unmarshal(metadata, &db); err != nil {
+					return err
+				}
+				if db.UpdatedAt.IsZero() {
+					return errors.New("database version timestamp missing")
+				}
+				reason, reasonErr := os.ReadFile(filepath.Join(filepath.Dir(output), "partial-reason"))
+				if reasonErr != nil && !errors.Is(reasonErr, os.ErrNotExist) {
+					return reasonErr
+				}
+				body, err = scanner.AnnotateArtifact(body, db.UpdatedAt.UTC().Format(time.RFC3339Nano), string(reason))
+			} else if !errors.Is(readErr, os.ErrNotExist) {
+				return readErr
+			}
+		}
+	}
+	if err != nil {
+		return err
+	}
+	err = uploadArtifact(ctx, client, url, token, contentType, body, delay)
+	if err == nil && info.Size() > scanner.MaxSBOMBytes {
+		return errors.New("SBOM exceeds 32 MiB result limit")
+	}
+	return err
 }
 
 // Retry transient startup/network failures without rerunning the image scan.
-func uploadArtifact(ctx context.Context, client *http.Client, url, token string, body []byte, delay time.Duration) error {
+func uploadArtifact(ctx context.Context, client *http.Client, url, token, contentType string, body []byte, delay time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	var lastErr error
@@ -135,7 +176,7 @@ func uploadArtifact(ctx context.Context, client *http.Client, url, token string,
 			return err
 		}
 		request.Header.Set("Authorization", "Bearer "+token)
-		request.Header.Set("Content-Type", "application/vnd.cyclonedx+json")
+		request.Header.Set("Content-Type", contentType)
 		response, err := client.Do(request)
 		if err != nil {
 			lastErr = err

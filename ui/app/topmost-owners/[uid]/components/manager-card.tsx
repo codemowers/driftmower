@@ -51,6 +51,10 @@ function HelmCard({ releaseInfo, releaseUid, reportId }: Extract<Props, { kind: 
   )
 }
 
+const ARGO_LINK_HINT =
+  "Links to Argo CD are off: the MCP server has no Argo CD address. Set the chart value mcp.argocd.url " +
+  "to Argo CD's public URL; with Skaffold, put ARGO_URL=https://<argocd host> in skaffold.env.<cluster> and deploy again."
+
 function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { kind: "argo" }>) {
   const subtext = resourceKind && resourceRef ? `${resourceKind} · ${resourceRef}` : "application"
   const inner = (
@@ -65,13 +69,7 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
         </div>
         <p className="font-mono text-xs text-muted-foreground">{subtext}</p>
       </div>
-      {url ? (
-        <ExternalLink className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-text" />
-      ) : (
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">
-          ARGO_URL env var not set
-        </span>
-      )}
+      {url && <ExternalLink className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-text" />}
     </>
   )
 
@@ -83,7 +81,7 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
           {inner}
         </a>
       ) : (
-        <div className={CARD_BASE}>{inner}</div>
+        <div className={CARD_BASE} title={ARGO_LINK_HINT}>{inner}</div>
       )}
     </div>
   )

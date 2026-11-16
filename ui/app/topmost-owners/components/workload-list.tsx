@@ -70,7 +70,7 @@ function WorkloadRow({
     <>
       {/* Kind */}
       <div className="self-start text-right">
-        <span className="rounded-md bg-brand-bg px-2.5 py-1 text-xs font-semibold text-brand-label">
+        <span className={cn("rounded-md px-2.5 py-1 text-xs font-semibold", entry.orphan ? "bg-status-minor-bg text-status-minor-label" : "bg-brand-bg text-brand-label")}>
           {kind}
         </span>
       </div>
@@ -81,8 +81,6 @@ function WorkloadRow({
           <span className="font-semibold text-foreground truncate">{name}</span>
         </div>
         <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
-        {entry.sourceState === "unlinked" && <span className="block text-xs text-muted-foreground">No source repository associated</span>}
-        {entry.sourceState === "linked" && ["no_data", "no_version"].includes(entry.worstStatus) && <span className="block text-xs text-muted-foreground">Source linked · version data unavailable</span>}
         {repoHint.length > 0 && (
           <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             <Layers className="size-3 shrink-0" />
@@ -96,7 +94,9 @@ function WorkloadRow({
 
       {/* Manager */}
       <div className="min-w-0">
-        {manager.kind === "standalone" ? (
+        {entry.orphan ? (
+          <span className="font-mono text-sm text-status-minor-label">Orphaned</span>
+        ) : manager.kind === "standalone" ? (
           <span className="font-mono text-sm text-muted-foreground">Standalone</span>
         ) : managerLinkable ? (
           <span
@@ -116,14 +116,16 @@ function WorkloadRow({
         )}
       </div>
 
-      {focus.renderCells(entry)}
+      {entry.orphan === "bucket"
+        ? <span className="col-span-3 text-sm text-muted-foreground">{entry.orphanSummary}</span>
+        : focus.renderCells(entry)}
     </>
   )
 
   return (
     <PrefetchLink
       href={href}
-      className={cn("grid items-center gap-4 pl-6 pr-4 py-4 hover:bg-brand-bg/40 transition-colors", focus.gridCols)}
+      className={cn("grid items-center gap-4 pl-6 pr-4 py-4 transition-colors", entry.orphan ? "bg-status-minor-bg/30 hover:bg-status-minor-bg/50" : "hover:bg-brand-bg/40", focus.gridCols)}
     >
       {cells}
     </PrefetchLink>
@@ -151,6 +153,7 @@ export default function WorkloadList({
   const [showFinished, setShowFinished] = useState(() => initialTokens.has("showfinished"))
   const [hideHelmManaged, setHideHelmManaged] = useState(() => initialTokens.has("hidehelm"))
   const [hideArgoManaged, setHideArgoManaged] = useState(() => initialTokens.has("hideargo"))
+  const [hideOrphaned, setHideOrphaned] = useState(() => initialTokens.has("hideorphaned"))
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
 
   useEffect(() => {
@@ -161,6 +164,7 @@ export default function WorkloadList({
       ...(showDownscaled ? ["showdownscaled"] : []),
       ...(hideHelmManaged ? ["hidehelm"] : []),
       ...(hideArgoManaged ? ["hideargo"] : []),
+      ...(hideOrphaned ? ["hideorphaned"] : []),
     ].join(",")
     const params = new URLSearchParams(searchParams.toString())
     if (filters) params.set("filters", filters)
@@ -171,7 +175,7 @@ export default function WorkloadList({
     if (next !== searchParams.toString()) {
       router.replace(next ? `?${next}` : window.location.pathname)
     }
-  }, [syncUrl, activeTokens, showFinished, showDownscaled, hideHelmManaged, hideArgoManaged, searchQuery, searchParams, router, focus])
+  }, [syncUrl, activeTokens, showFinished, showDownscaled, hideHelmManaged, hideArgoManaged, hideOrphaned, searchQuery, searchParams, router, focus])
 
   function handleTokenToggle(token: string) {
     setActiveTokens(prev => {
@@ -188,6 +192,7 @@ export default function WorkloadList({
     setShowDownscaled(false)
     setHideHelmManaged(false)
     setHideArgoManaged(false)
+    setHideOrphaned(false)
     setSearchQuery("")
   }
 
@@ -196,10 +201,11 @@ export default function WorkloadList({
     downscaled: entries.filter(isDownscaled).length,
     helm: entries.filter(e => e.manager.kind === "helm").length,
     argo: entries.filter(e => e.manager.kind === "argo").length,
+    orphaned: entries.filter(e => e.orphan).length,
   }), [entries])
 
   const isModified =
-    activeTokens.size > 0 || searchQuery !== "" || showFinished || showDownscaled || hideHelmManaged || hideArgoManaged
+    activeTokens.size > 0 || searchQuery !== "" || showFinished || showDownscaled || hideHelmManaged || hideArgoManaged || hideOrphaned
 
   const sortedEntries = useMemo(() => [...entries].sort(focus.compare), [entries, focus])
 
@@ -211,6 +217,7 @@ export default function WorkloadList({
     .filter(e => showDownscaled || !isDownscaled(e))
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
     .filter(e => !hideArgoManaged || e.manager.kind !== "argo")
+    .filter(e => !hideOrphaned || !e.orphan)
     .filter(e => q === "" || matchesIdentity(e, q) || matchingRepos(e, q).length > 0)
 
   if (q !== "") {
@@ -236,6 +243,8 @@ export default function WorkloadList({
         onToggleHelmManaged={() => setHideHelmManaged(v => !v)}
         hideArgoManaged={hideArgoManaged}
         onToggleArgoManaged={() => setHideArgoManaged(v => !v)}
+        hideOrphaned={hideOrphaned}
+        onToggleOrphaned={() => setHideOrphaned(v => !v)}
         counts={counts}
         onReset={handleReset}
       />

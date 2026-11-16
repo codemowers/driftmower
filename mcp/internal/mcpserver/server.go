@@ -17,6 +17,7 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/metrics"
 	"github.com/codemowers/driftmower/mcp/internal/observability"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
+	"github.com/codemowers/driftmower/mcp/internal/useraccess"
 )
 
 // Deps are the services behind the tools. A nil service leaves its tools
@@ -43,6 +44,9 @@ type Deps struct {
 	// Workloads.
 	Findings     FindingsSource
 	DriftHistory *observability.Service
+	// Enables list_oidc_users, get_oidc_user_access, list_service_accounts and
+	// get_service_account_access.
+	UserAccess *useraccess.Service
 }
 
 // New returns a server for every session. Per-caller state never lives on
@@ -65,6 +69,9 @@ func New(d Deps) *mcp.Server {
 	var s *mcp.Server
 	dashboardSubscriptions(opts, d, &s)
 	s = mcp.NewServer(&mcp.Implementation{Name: d.Cluster.MCPServerName, Version: d.Version}, opts)
+	if d.Metrics != nil {
+		s.AddReceivingMiddleware(toolMetrics(d.Metrics))
+	}
 
 	s.AddResource(&mcp.Resource{
 		Name:        "cluster-discovery-guide",
@@ -80,9 +87,22 @@ func New(d Deps) *mcp.Server {
 
 	if d.Workloads != nil {
 		addWorkloadTools(s, d.Workloads, d.Mapping)
+		addWorkloadSourcesTool(s, d.Workloads, d.Mapping)
+		addImageScanTool(s, d.Workloads, d.Mapping)
+		addBaseImageTools(s, d.Workloads)
 		addApplicationsTool(s, d.Workloads, d.Mapping)
+		addOIDCClientsTool(s, d.Workloads, d.Mapping)
+		addTrustBundlesTool(s, d.Workloads, d.Mapping)
 		addHelmTool(s, d.Workloads, d.Mapping)
+		addHelmReleaseTool(s, d.Workloads, d.Mapping)
 		addWorkloadObjectTool(s, d.Workloads, d.Mapping)
+		addImageMetadataTools(s, d.Workloads, d.Mapping)
+		addMCPServersTool(s, d.Workloads, d.Mapping)
+		addClusterRegistryTool(s, d.Workloads)
+		// Reading as the caller needs the impersonation restart enables.
+		if d.Workloads.Actions != nil {
+			addOwnerRecordTool(s, d.Workloads, d.Mapping)
+		}
 	}
 	addClusterIdentityTool(s, d.Cluster, usage)
 	if d.Catalog != nil {
@@ -93,20 +113,47 @@ func New(d Deps) *mcp.Server {
 	}
 	if d.Findings != nil && d.Workloads != nil {
 		addFindingsTools(s, d.Findings, d.Workloads, d.Mapping)
+		if changes, ok := d.Findings.(ChangesSource); ok {
+			addImageChangesTool(s, d.Findings, changes, d.Workloads, d.Mapping)
+		}
+	}
+	if d.Workloads != nil {
 		clusterID := d.Cluster.MCPServerName
 		if d.Cluster.ID != nil {
 			clusterID = *d.Cluster.ID
 		}
-		addDashboardTool(s, d.Findings, d.Workloads, d.Mapping, clusterID)
+		var prometheusURL func(context.Context) *string
+		if d.Observability != nil {
+			prometheusURL = d.Observability.PublicURL
+		}
+		addInventoryTools(s, d.Workloads, d.Mapping, clusterID, prometheusURL)
 	}
 	if d.DriftHistory != nil {
 		addDriftHistoryTool(s, d.DriftHistory, d.Mapping)
 	}
 	if d.Observability != nil {
+		if d.Workloads != nil && d.Observability.MetricsEnabled() {
+			addImageScanStatusesTool(s, d.Observability, d.Mapping)
+		}
 		addObservabilityTools(s, d.Observability, d.Mapping)
+		if d.Workloads != nil && d.Observability.LogsEnabled {
+			addWorkloadLogsTool(s, d.Workloads, d.Observability, d.Mapping)
+		}
+		if d.Workloads != nil && d.Observability.MetricsEnabled() {
+			addWorkloadUsageTool(s, d.Workloads, d.Observability, d.Mapping)
+		}
+		if d.Observability.MetricsEnabled() {
+			addNamespaceSummariesTool(s, d.Observability, d.Mapping)
+		}
+		if d.Observability.LogRateEnabled() {
+			addLogRateTool(s, d.Observability, d.Mapping)
+		}
 	}
 	if d.Provisioning != nil {
 		addProvisioningTools(s, d.Provisioning, d.Mapping, d.Logger)
+	}
+	if d.UserAccess != nil {
+		addUserAccessTools(s, d.UserAccess, d.Mapping)
 	}
 
 	return s
@@ -136,14 +183,15 @@ func usageInstructions(d Deps) string {
 	add(d.Catalog != nil, "Use list_admission_policies to discover policies and their bindings for the intended resource and namespace before relying on admission defaults or requirements. "+
 		"Use list_storage_classes when selecting volume storage. Keep each resource or policy’s own defaults and requirements separate; do not assume optional components or redirect to an alternative whose availability has not been discovered.")
 	add(d.Workloads != nil, "For applications, workload discovery, what runs in a namespace, and resource relationships, start with get_workloads. "+
-		"Use a specified namespace directly; omit namespace only for an overview. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness.")
+		"Use a specified namespace directly; omit namespace only for an overview. Follow nextOffset across every page when enumerating or updating all workloads; supply revision to detect inventory changes. Its text is a summary; read structuredContent for the inventory and inspect warnings before claiming completeness.")
 	add(d.Scope != nil, "Use list_accessible_namespaces when namespace scope is unknown; visibility does not imply write permission.")
 	add(d.Observability != nil && d.Observability.MetricsEnabled(), "For current resource usage, prefer get_pod_resource_usage or get_cluster_resource_usage. "+
 		"Use their history endpoints only for trends, past usage, peaks or statistics. Use query_metrics for specific metrics outside those fixed summaries. Missing metrics or low coverage are not evidence of zero usage.")
 	add(d.Findings != nil && d.Workloads != nil, "For version drift and security advisories, use get_workload_findings for a workload or namespace and get_source_findings across sources. "+
 		"Findings are crawled every few hours; absence of findings is not proof of absence.")
-	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload and terminate_pod mutate resources. "+
+	add(d.Workloads != nil && d.Workloads.Actions != nil, "restart_workload, terminate_pod and expand_volume mutate resources. "+
 		"Use only for an explicit user request, using UID from current workload inventory; never treat them as diagnostic probes or automatically retry uncertain results.")
+	add(d.UserAccess != nil, "For administrators auditing access, list_oidc_users and list_service_accounts list OIDC users and ServiceAccounts, and get_oidc_user_access and get_service_account_access evaluate one subject's effective rights; call them only for a subject the request names.")
 	add(true, "Use only tools exposed by this connection. Narrow requests to the namespace, pod, metric or resource needed; avoid collecting unrelated namespaces or histories.")
 
 	return strings.Join(parts, " ")

@@ -2,40 +2,80 @@ package scanner
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-const succeededJobTTL int32 = 120
-const failedJobTTL int32 = 48 * 60 * 60
-
-func jobRetention(job *batchv1.Job) int32 {
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-			return succeededJobTTL
-		}
-	}
-	// The safe initial default also protects failures while the operator is down.
-	return failedJobTTL
-}
+const succeededPodRetention = 2 * time.Minute
+const failedPodRetention = 48 * time.Hour
 
 func (c *Controller) updateRetention(ctx context.Context) error {
-	jobs, err := c.Kube.BatchV1().Jobs(c.Config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=driftmower-scan"})
+	pods, err := c.Kube.CoreV1().Pods(c.Config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=" + c.Config.scanServiceAccount()})
 	if err != nil {
 		return err
 	}
-	for _, job := range jobs.Items {
-		ttl := jobRetention(&job)
-		if job.DeletionTimestamp != nil || job.Spec.TTLSecondsAfterFinished != nil && *job.Spec.TTLSecondsAfterFinished == ttl {
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		patch := []byte(fmt.Sprintf(`{"metadata":{"resourceVersion":%q},"spec":{"ttlSecondsAfterFinished":%d}}`, job.ResourceVersion, ttl))
-		if _, err := c.Kube.BatchV1().Jobs(c.Config.Namespace).Patch(ctx, job.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		retention := failedPodRetention
+		digest := pod.Annotations["driftmower.io/platform-digest"]
+		obsoleteExpired := pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed &&
+			scanPodFailure(&pod) != "" &&
+			digest != "" && pod.Annotations["driftmower.io/artifact-key"] != Key(digest, c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)
+		if pod.Status.Phase == corev1.PodSucceeded {
+			retention = succeededPodRetention
+		} else if obsoleteExpired {
+			retention = 0
+		} else if pod.Status.Phase != corev1.PodFailed {
+			continue
+		}
+		finishedAt := pod.CreationTimestamp.Time
+		for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+			if term := status.State.Terminated; term != nil && term.FinishedAt.After(finishedAt) {
+				finishedAt = term.FinishedAt.Time
+			}
+		}
+		if finishedAt.IsZero() || time.Since(finishedAt) < retention {
+			continue
+		}
+		imageName := pod.Annotations["driftmower.io/container-image"]
+		if imageName == "" {
+			continue
+		}
+		image, err := c.Dynamic.Resource(images).Get(ctx, imageName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !ownsScanPod(&pod, image, pod.Annotations["driftmower.io/artifact-key"], c.Config.scanServiceAccount()) {
+			continue
+		}
+		// Obsolete timed-out attempts cannot satisfy the current configuration;
+		// release their slots even if their state has already been superseded.
+		// Current attempts retain their evidence until the outcome is durable.
+		recorded := obsoleteExpired
+		for _, raw := range image.GetAnnotations() {
+			var state scanState
+			if json.Unmarshal([]byte(raw), &state) != nil {
+				continue
+			}
+			for _, attempt := range state.Attempts {
+				if attempt.Pod == pod.Name && attempt.Outcome != "" {
+					recorded = true
+				}
+			}
+		}
+		if !recorded {
+			continue
+		}
+		if err := c.Kube.CoreV1().Pods(c.Config.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &pod.UID}}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -48,6 +88,12 @@ func (c *Controller) reconcileRetention(ctx context.Context) {
 	for {
 		if err := c.updateRetention(ctx); err != nil && ctx.Err() == nil {
 			c.Log.Warn("scan retention deferred", "error", err)
+		}
+		// Pending image-volume failures and scheduling stalls may produce no
+		// further updates. Recheck deadlines without depending on Pod events.
+		objects := c.informer.GetStore().List()
+		for _, obj := range objects {
+			c.queue.Add(obj.(interface{ GetName() string }).GetName())
 		}
 		select {
 		case <-ctx.Done():

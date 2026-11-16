@@ -56,4 +56,3 @@ function setEntry(ip: string, entry: RdnsEntry): void {
     return { cache, revision: prev.revision + 1 }
   })
 }
-

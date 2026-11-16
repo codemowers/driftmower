@@ -159,7 +159,8 @@ export function buildDiagnosisFacts(
   const nodes = [...new Set(siblingPods.map(r => r.nodeName).filter((n): n is string => Boolean(n)))].slice(0, SIBLING_NODES_MAX)
 
   const node = pod.nodeName ? nodeDrift?.nodes.find(n => n.name === pod.nodeName) ?? null : null
-  const storage = pod.nodeName ? nodeStorage?.[pod.nodeName] ?? null : null
+  // Evictions follow the node's ephemeral storage, not its LVM pool.
+  const storage = pod.nodeName ? nodeStorage?.[pod.nodeName]?.ephemeral ?? null : null
 
   return {
     key: diagnosisKey(pod),

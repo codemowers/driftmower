@@ -1,6 +1,7 @@
 import type { ImageUsage, Issue, Report, ScrapeStatus, StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 import { resolvedVersion } from "@/lib/utils/image-artifacts"
+import { sourceRepoUrl } from "@/lib/utils/oci-labels"
 
 export type ImageWorkload = {
   uid: string
@@ -20,6 +21,7 @@ export type ImageEntry = {
   containerCount: number
   digests: string[]
   issueCount: number
+  sourceUrl: string | null
 }
 
 export type ImageVersion = {
@@ -97,6 +99,7 @@ function toEntry(key: string, usages: ImageUsage[], issues: Report["issues"]): I
     containerCount: usages.length,
     digests: [...new Set(usages.map(u => u.imageInfo.digest).filter(present))],
     issueCount: matchingIssues(key, usages, issues).length,
+    sourceUrl: usages.map(u => u.imageInfo.crawlerSource?.url ?? sourceRepoUrl(u.imageInfo.labels) ?? u.imageInfo.sourceRepositories?.[0]?.url).find(present) ?? null,
   }
 }
 

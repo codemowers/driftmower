@@ -5,6 +5,11 @@ import type { PodSummary } from "@/lib/utils/pods-by-root"
 import type { SeriesStats, Span } from "@/lib/features/drift-history/types"
 
 export type WorkloadEntry = {
+  // Held in the namespace's orphan bucket: the bucket itself, or a Pod
+  // without an owner.
+  orphan?: "bucket" | "pod"
+  // What an orphan bucket holds, for its row.
+  orphanSummary?: string
   sourceState?: "linked" | "unlinked" | "unknown"
   desiredReplicas?: number
   completed?: boolean

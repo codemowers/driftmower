@@ -4,16 +4,19 @@ import { useParams } from "next/navigation"
 import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { classifyPod } from "@/lib/cluster/styles/pod-status-style"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { cn } from "@/lib/utils/cn"
 import { workloadMetricQueries } from "@/lib/features/prometheus/workload-metrics"
-import ResourceHeader from "@/app/components/resource-header"
+import ResourceHeader, { type Chip } from "@/app/components/resource-header"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import WorkloadStats from "./components/workload-stats"
 import ManagerCard from "./components/manager-card"
+import ProvenanceCard from "./components/provenance-card"
 import NetworkCard from "@/app/components/network-card"
+import LogsCard from "@/app/components/logs-card"
 import AiInsightsCard from "./components/ai-insights-card"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
@@ -25,11 +28,21 @@ import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
 import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
 import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
 import PageLoading from "@/app/components/page-loading"
+import OrphanBucket from "./components/orphan-bucket"
 
 const NO_USAGES: ImageUsage[] = []
 const RESTARTABLE_KINDS = new Set(["Deployment", "StatefulSet"])
+// One Pod per node, run to completion, or a lone Pod: replica count says
+// nothing about availability.
+const NOT_REPLICATED = new Set(["DaemonSet", "Job", "CronJob", "Pod"])
 
-export default function WorkloadDetailPage() {
+// Orphan buckets have UIDs "namespace:<name>"; every other UID is a workload root.
+export default function WorkloadPage() {
+  const { uid } = useParams<{ uid: string }>()
+  return uid.startsWith("namespace:") ? <OrphanBucket uid={uid} /> : <WorkloadDetailPage />
+}
+
+function WorkloadDetailPage() {
   const { uid } = useParams<{ uid: string }>()
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
@@ -50,11 +63,13 @@ export default function WorkloadDetailPage() {
   const name = rootInfo?.name ?? ""
   const kindLabel = rootInfo?.qualifiedKind ?? kind
   const root = findWorkloadRoot(clusterResources, { uid, kind, name, namespace })
-  const livePods = clusterResources && root ? collectOwnedPods(clusterResources, root.uid) : []
+  const ownedPods = clusterResources && root ? collectOwnedPods(clusterResources, root.uid) : []
+  // Completed and failed Pods no longer run anything.
+  const livePods = ownedPods.filter(p => !["succeeded", "failed"].includes(classifyPod(p)))
   const livePodNames = livePods.map(p => p.name)
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
   const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
-  const workloadMetrics = useWorkloadMetrics(namespace, podNames)
+  const workloadMetrics = useWorkloadMetrics(namespace, root?.uid ?? uid, podNames)
   const actionUsages = match?.[1] ?? NO_USAGES
   const actionRows = deriveActions(actionUsages, root, vulnerabilityReports)
   const currentCharts = currentChartScopes(actionUsages)
@@ -96,8 +111,10 @@ export default function WorkloadDetailPage() {
     usages.some(u => u.image.includes(i.image))
   ).length
 
-  const totalContainers = usages.length
-  const totalPods = new Set(usages.map(u => u.podName)).size
+  const finished = new Set(ownedPods.filter(p => !livePods.includes(p)).map(p => p.name))
+  const running = usages.filter(u => !finished.has(u.podName))
+  const totalContainers = running.length
+  const totalPods = new Set(running.map(u => u.podName)).size
 
   const ri = usages[0]?.releaseInfo
   const releaseUid = ri
@@ -110,12 +127,12 @@ export default function WorkloadDetailPage() {
   const isArgo = !isHelm && !!argoApp
   const liveWorkloadUid = root?.uid ?? uid
   const restartTarget: RestartTarget | null =
-    restartEnabled && root && !root.ownerUID && RESTARTABLE_KINDS.has(root.kind)
-      ? { kind: root.kind, namespace: root.namespace, name: root.name, uid: root.uid, managerKind: root.argoApp ? "argo" : "standalone" }
+    restartEnabled && root && !root.ownerUID && root.apiVersion && RESTARTABLE_KINDS.has(root.kind)
+      ? { kind: root.kind, apiVersion: root.apiVersion, namespace: root.namespace, name: root.name, uid: root.uid, managerKind: root.argoApp ? "argo" : "standalone" }
       : null
   const containerLabel = totalContainers === 1 ? "1 container" : `${totalContainers} containers`
   const podLabel = totalPods === 1 ? "1 pod" : `${totalPods} pods`
-  const headerChips: { label: string; tone?: "brand" | "muted" }[] = [{ label: kind, tone: "brand" }]
+  const headerChips: Chip[] = [{ label: kind, tone: "brand" }]
   if (!isHelm && !isArgo) headerChips.push({ label: "standalone", tone: "muted" })
 
   return (
@@ -128,7 +145,7 @@ export default function WorkloadDetailPage() {
           copyValue={name}
           breadcrumbs={[
             { label: "Workloads", href: backHref },
-            { label: `Namespace ${namespace}` },
+            { label: `Namespace ${namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(namespace)}`) },
             { label: `${kindLabel} ${name}` },
           ]}
           chips={headerChips}
@@ -143,8 +160,9 @@ export default function WorkloadDetailPage() {
           distinctRepoCount={distinctRepoCount}
           totalContainers={totalContainers}
           totalPods={totalPods}
-          namespace={namespace}
           worstStatus={worstStatus}
+          pods={livePods}
+          replicated={!NOT_REPLICATED.has(kind)}
         />
 
         {isHelm && ri && releaseUid ? (
@@ -152,6 +170,8 @@ export default function WorkloadDetailPage() {
         ) : isArgo && argoApp ? (
           <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
         ) : null}
+
+        {root && <ProvenanceCard root={root} />}
 
         <LivenessProbeCard probes={livePods.flatMap(p => p.livenessProbes ?? [])} />
 
@@ -163,19 +183,16 @@ export default function WorkloadDetailPage() {
           metrics={workloadMetrics}
           graphQueries={workloadMetricQueries(namespace, podNames)}
           podCount={podNames.length}
-          perPod={workloadMetrics?.perPod}
           qosBreakdown={workloadMetrics?.qosBreakdown}
-          podHref={podName => {
-            const podRes = clusterResources?.find(r => r.kind === "Pod" && r.name === podName && r.namespace === namespace)
-            return podRes ? linkTo(`/topmost-owners/${uid}/${podRes.uid}`, { drop: ["ptab"] }) : null
-          }}
         />
 
-        <div className={cn("grid grid-cols-1 items-start gap-6", restartTarget ? "md:grid-cols-[2.5fr_2fr_auto]" : "md:grid-cols-[3fr_2fr]")}>
+        <div className={cn("grid grid-cols-1 items-start gap-6", restartTarget ? "md:grid-cols-[2.5fr_2fr_2fr_auto]" : "md:grid-cols-[3fr_2fr_2fr]")}>
           <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={rootInfo?.apiGroup} />
           <NetworkCard href={linkTo(`/topmost-owners/${uid}/network-topology`)} />
+          <LogsCard namespace={namespace} podNames={podNames} href={linkTo(`/topmost-owners/${uid}/logs`)} scope="every Pod of this workload" />
           {restartTarget && <RestartTile target={restartTarget} restartedAt={root?.restartedAt ?? null} pods={livePods} />}
         </div>
+
 
         <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} />
       </main>

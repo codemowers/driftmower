@@ -5,17 +5,19 @@ package findings
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/codemowers/driftmower/internal/crawler"
 )
 
-const cacheTTL = 30 * time.Second
+// ErrNoInventory means the crawler has nothing to crawl: the cluster serves
+// no ContainerImage or SourceRepository, whose CRDs nodestatd installs.
+var ErrNoInventory = errors.New("the cluster has no image inventory for the crawler")
 
 // Client fetches the crawler's reports with a projected ServiceAccount token
 // for the crawler's audience, reread on every request as the kubelet rotates
@@ -24,28 +26,34 @@ type Client struct {
 	URL       string
 	TokenFile string
 	HTTP      *http.Client
-
-	mu      sync.Mutex
-	reports []crawler.SourceReport
-	fetched time.Time
 }
 
-// Reports returns the crawler's current reports, cached briefly.
+// Reports reads the crawler directly. The crawler owns the only report cache.
 func (c *Client) Reports(ctx context.Context) ([]crawler.SourceReport, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if time.Since(c.fetched) < cacheTTL {
-		return c.reports, nil
+	return c.reports(ctx, "summary=advisories")
+}
+
+// SourceDetails reads release notes only when one source is requested.
+func (c *Client) SourceDetails(ctx context.Context, source string) ([]crawler.SourceReport, error) {
+	return c.reports(ctx, neturl.Values{"url": {source}}.Encode())
+}
+
+func (c *Client) reports(ctx context.Context, query string) ([]crawler.SourceReport, error) {
+	var token []byte
+	var err error
+	if c.TokenFile != "" {
+		token, err = os.ReadFile(c.TokenFile)
 	}
-	token, err := os.ReadFile(c.TokenFile)
 	if err != nil {
 		return nil, fmt.Errorf("read crawler token: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(c.URL, "/")+"/v1/sources", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(c.URL, "/")+"/v1/sources?"+query, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
+	if len(token) > 0 {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
+	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, err
@@ -56,12 +64,50 @@ func (c *Client) Reports(ctx context.Context) ([]crawler.SourceReport, error) {
 	}
 	var body struct {
 		Sources []crawler.SourceReport `json:"sources"`
+		Missing []string               `json:"missing"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, err
 	}
-	c.reports, c.fetched = body.Sources, time.Now()
-	return c.reports, nil
+	if len(body.Missing) > 0 {
+		return nil, fmt.Errorf("%w: %s not installed; they come with nodestatd", ErrNoInventory, strings.Join(body.Missing, " and "))
+	}
+
+	return body.Sources, nil
+}
+
+// Changes asks the crawler for the releases of url newer than from, parsed
+// at the time of asking. Not cached: a caller asks about one image.
+func (c *Client) Changes(ctx context.Context, url, from string) (*crawler.ChangesReport, error) {
+	var token []byte
+	var err error
+	if c.TokenFile != "" {
+		token, err = os.ReadFile(c.TokenFile)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read crawler token: %w", err)
+	}
+	q := neturl.Values{"url": {url}, "from": {from}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(c.URL, "/")+"/v1/changes?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(token) > 0 {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("crawler: HTTP %d", resp.StatusCode)
+	}
+	var report crawler.ChangesReport
+	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
+		return nil, err
+	}
+	return &report, nil
 }
 
 // Match is a deployed version of a source an image reference resolves to.

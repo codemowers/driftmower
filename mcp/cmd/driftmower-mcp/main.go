@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/codemowers/driftmower/internal/registry"
 	"github.com/codemowers/driftmower/mcp/internal/auth"
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 	"github.com/codemowers/driftmower/mcp/internal/catalog"
@@ -39,7 +40,9 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/observability"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning/facts"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning/service"
-	"github.com/codemowers/driftmower/mcp/internal/ui"
+	"github.com/codemowers/driftmower/mcp/internal/securitymetrics"
+	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
+	"github.com/codemowers/driftmower/mcp/internal/useraccess"
 	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
 
@@ -101,7 +104,10 @@ func newServices(cfg *config.Config) (*services, error) {
 	}
 	reviews := authz.NewCachedReviewer(authz.NewSubjectAccessReviewer(clients.Kubernetes.AuthorizationV1()), cfg.Kubernetes.SARCacheTTL, nil)
 	namespaces := kube.NewNamespaceLister(clients.Kubernetes)
-	judge := authz.NewChecker(reviews)
+	var judge authz.Judge = authz.NewChecker(reviews)
+	if cfg.AuthMode != "rbac" {
+		judge = authz.ReadAll{}
+	}
 	cat := catalog.New(clients.Kubernetes, clients.Dynamic)
 	svc := &services{}
 	f := facts.New(facts.Options{
@@ -131,6 +137,7 @@ func newServices(cfg *config.Config) (*services, error) {
 			MaxNamespaces:  cfg.Tenancy.MaxNamespaces,
 		},
 		mapping: auth.Mapping{
+			ReadAll:        cfg.AuthMode != "rbac",
 			UsernameClaim:  cfg.Kubernetes.UsernameClaim,
 			GroupsClaim:    cfg.Kubernetes.GroupsClaim,
 			UsernamePrefix: cfg.Kubernetes.UsernamePrefix,
@@ -150,11 +157,16 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 
 	// Probes answer not-ready while discovery runs, rather than refusing
 	// connections.
-	var health *http.Server
+	var health, drift *http.Server
 	driftHandler := http.NewServeMux()
 	if cfg.Transport == config.TransportHTTP {
 		var err error
-		if health, err = serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.HealthPort)), httpserver.HealthHandler(&ready, m, driftHandler)); err != nil {
+		if health, err = serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.HealthPort)), httpserver.HealthHandler(&ready, m)); err != nil {
+			return err
+		}
+		// Drift metrics carry every namespace's workloads, so they get a port
+		// of their own that a NetworkPolicy opens only to the drift Prometheus.
+		if drift, err = serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(driftMetricsPort)), driftHandler); err != nil {
 			return err
 		}
 	}
@@ -163,6 +175,9 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if cfg.Transport == config.TransportHTTP {
+		driftHandler.Handle("GET /security-metrics", &securitymetrics.Exporter{Kubernetes: svc.clients.Kubernetes, Logger: logger, ServiceAccountsEnabled: cfg.UserAccess.Enabled})
+	}
 
 	issuer := ""
 	if cfg.OIDC != nil {
@@ -170,7 +185,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	}
 	probeCtx, cancel := context.WithTimeout(gctx, startupProbeTimeout)
 	identity := cluster.Discover(probeCtx, svc.clients.Kubernetes, cfg.Cluster, issuer, logger)
-	if cfg.Transport == config.TransportHTTP {
+	if cfg.Transport == config.TransportHTTP && cfg.AuthMode == "rbac" {
 		checkAuthorizer(probeCtx, svc, logger)
 	}
 	cancel()
@@ -186,15 +201,28 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 			if name == "" {
 				name = "driftmower-mcp"
 			}
-			driftHandler.Handle("/drift-metrics", &drifthistory.Exporter{Source: source, Inventory: live.Cache, Kubernetes: live.Cache.Kubernetes, Dynamic: live.Cache.Dynamic,
+			driftHandler.Handle("GET /drift-metrics", &drifthistory.Exporter{Source: source, Inventory: live.Cache, Kubernetes: live.Cache.Kubernetes, Dynamic: live.Cache.Dynamic,
 				Identity: authz.Identity{User: "system:serviceaccount:" + strings.TrimSpace(string(namespace)) + ":" + name, Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + strings.TrimSpace(string(namespace)), "system:authenticated"}}})
 		}
 	}
 	var history *observability.Service
 	if cfg.DriftPrometheusURL != "" {
-		history = &observability.Service{PrometheusURL: cfg.DriftPrometheusURL, MaxHistoryRange: 90 * 24 * time.Hour, Kubernetes: svc.clients.Kubernetes, Judge: svc.judge,
-			Backend: observability.NewGateway(observability.GatewayOptions{Next: observability.HTTPRequester(20 * time.Second), PrometheusURL: cfg.DriftPrometheusURL, MaxConcurrent: 4, MaxQueued: 16, QueueWait: 20 * time.Second, CacheTTL: 5 * time.Minute, PrometheusTimeout: 19 * time.Second}),
-			Budget:  &observability.Budget{QueriesPerMinute: 240, MaxConcurrentCalls: 4}}
+		history = &observability.Service{PrometheusURL: cfg.DriftPrometheusURL, MaxHistoryRange: 90 * 24 * time.Hour, Alignment: 5 * time.Minute, Kubernetes: svc.clients.Kubernetes, Judge: svc.judge,
+			CVEHistoryEnabled: cfg.CVEHistoryEnabled, SAHistoryEnabled: cfg.SAHistoryEnabled,
+			Backend: observability.NewGateway(observability.GatewayOptions{Next: observability.HTTPRequester(20 * time.Second), PrometheusURL: cfg.DriftPrometheusURL, PrometheusTimeout: 19 * time.Second})}
+	}
+	users := newUserAccess(cfg, svc)
+	m.ObserveCaches(func() map[string]ttlcache.Stats {
+		stats := svc.facts.CacheStats()
+		stats["rbac_reviews"] = svc.reviews.Stats()
+		stats["namespaces"] = svc.namespaces.Stats()
+		if users != nil {
+			stats["user_access"] = users.CacheStats()
+		}
+		return stats
+	})
+	if live != nil {
+		m.ObserveWorkloadObjects(live.Cache.ObjectCounts)
 	}
 	server := mcpserver.New(mcpserver.Deps{
 		Cluster:       identity,
@@ -209,6 +237,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		Observability: obs,
 		Findings:      source,
 		DriftHistory:  history,
+		UserAccess:    users,
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -219,7 +248,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 
 	authenticator := newAuthenticator(cfg, svc)
 	if authenticator == nil {
-		logger.Warn("HTTP transport is serving unauthenticated; do not expose it through an Ingress in this state")
+		logger.Info("Anonymous read-only access enabled")
 	}
 	app, err := serve(g, net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)), httpserver.NewApp(httpserver.AppOptions{
 		BrowserClientID: cfg.BrowserClientID, AllowedOrigins: cfg.AllowedOrigins,
@@ -228,12 +257,13 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		OAuthClientID: cfg.OAuthClientID,
 		MCP:           server,
 		Auth:          authenticator,
+		AnonymousRead: cfg.AuthMode == "anonymous",
 		SessionIdle:   cfg.SessionIdle,
+		BrowserReads:  mcpserver.BrowserReads(obs, live, svc.mapping, history),
 		Invalidate:    newInvalidator(cfg, svc, m, logger),
 		Capabilities: &httpserver.Capabilities{
-			Service: svc.service, Mapping: svc.mapping, Authenticated: authenticator != nil, Logger: logger,
+			Service: svc.service, Mapping: svc.mapping, Authenticated: authenticator != nil || cfg.AuthMode == "anonymous", Logger: logger,
 		},
-		UI:      newExplorer(cfg, svc, identity, live, obs, authenticator, logger),
 		Metrics: m,
 		Logger:  logger,
 	}))
@@ -256,7 +286,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		ready.Store(false)
 		logger.Info("shutting down")
 
-		return shutdown(logger, app, health)
+		return shutdown(logger, app, health, drift)
 	})
 
 	return g.Wait()
@@ -294,7 +324,11 @@ func newWorkloads(ctx context.Context, cfg *config.Config, svc *services, logger
 		MayWatch:   selfMayWatch(svc.clients.Kubernetes),
 	}
 	c.Start(ctx)
-	w := &mcpserver.Workloads{Cache: c, Metadata: svc.clients.Metadata, Judge: svc.judge}
+	w := &mcpserver.Workloads{ScanURL: cfg.ScannerURL, ScanTokenFile: cfg.ScannerTokenFile, Cache: c, Metadata: svc.clients.Metadata, Judge: svc.judge, ArgoCDURL: cfg.ArgoCDURL}
+
+	if cfg.Registry.URL != "" {
+		w.Registry = &registry.Reader{URL: cfg.Registry.URL, TokenFile: cfg.Registry.TokenFile, HTTP: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	}
 	if cfg.WorkloadRestartEnabled {
 		w.Actions = &workloads.Actions{Config: svc.clients.Config, Catalog: svc.catalog}
 	}
@@ -324,32 +358,28 @@ func selfMayWatch(k kubernetes.Interface) func(context.Context, schema.GroupVers
 	}
 }
 
-// newObservability guards the shared Prometheus and Loki: a server-wide
-// concurrency ceiling, identical-query sharing and caching, and a per-caller
-// budget. Without observability configuration only list_volumes is offered,
-// without usage figures.
+// newObservability configures backend access, query sharing and request timeouts.
+// Without observability configuration only list_volumes is offered, without usage figures.
 func newObservability(cfg *config.Config, svc *services, m *metrics.Metrics) *observability.Service {
-	o := &observability.Service{Kubernetes: svc.clients.Kubernetes, Judge: svc.judge}
+	o := &observability.Service{Kubernetes: svc.clients.Kubernetes, Judge: svc.judge, ExpandEnabled: cfg.WorkloadRestartEnabled}
 	c := cfg.Observability
 	if c == nil {
 		return o
 	}
 	outcome := func(o string) { m.ObservabilityGuard.WithLabelValues(o).Inc() }
 	o.PrometheusURL, o.LokiURL, o.LogsEnabled = c.PrometheusURL, c.LokiURL, true
+	o.ScannerNamespace, o.ScannerInstance = cfg.ScannerNamespace, cfg.ScannerInstance
+	o.CVEHistoryEnabled, o.SAHistoryEnabled = cfg.CVEHistoryEnabled, cfg.SAHistoryEnabled
+	o.PrometheusExternalURL = c.PrometheusExternalURL
+	o.AlertmanagerURL, o.AlertmanagerTimeout = c.AlertmanagerURL, c.RequestTimeout
 	o.Backend = observability.NewGateway(observability.GatewayOptions{
 		Next:          observability.HTTPRequester(c.RequestTimeout),
 		PrometheusURL: c.PrometheusURL,
-		MaxConcurrent: c.MaxConcurrentRequests,
-		MaxQueued:     c.MaxQueuedRequests,
-		QueueWait:     c.RequestTimeout,
-		CacheTTL:      c.CacheTTL,
 		// Prometheus stops evaluating just before this server stops waiting.
 		PrometheusTimeout: c.RequestTimeout - time.Second,
 		OnOutcome:         outcome,
 	})
-	o.Budget = &observability.Budget{QueriesPerMinute: c.QueriesPerMinute, MaxConcurrentCalls: c.MaxConcurrentCallsPerCaller}
-	o.Alignment = c.CacheTTL
-	o.OnRefused = outcome
+	o.Alignment = c.Alignment
 
 	return o
 }
@@ -364,35 +394,24 @@ func newFindings(cfg *config.Config) mcpserver.FindingsSource {
 	return &findings.Client{URL: cfg.Crawler.URL, TokenFile: cfg.Crawler.TokenFile, HTTP: &http.Client{Timeout: 30 * time.Second}}
 }
 
-// newExplorer serves the browser explorer when enabled. It signs in with the
-// explorer's public OIDC client and verifies the access token exactly as /mcp
-// does.
-func newExplorer(cfg *config.Config, svc *services, identity cluster.Identity, live *mcpserver.Workloads,
-	obs *observability.Service, authenticator *auth.Authenticator, logger *slog.Logger) http.Handler {
-	if !cfg.WebUI.Enabled || authenticator == nil {
+// newUserAccess enables OIDCUser listing and effective-rights inspection.
+// Rules reviews impersonate the inspected user with this server's account.
+func newUserAccess(cfg *config.Config, svc *services) *useraccess.Service {
+	if !cfg.UserAccess.Enabled {
 		return nil
 	}
-	u := &ui.UI{
-		PublicURL: cfg.PublicURL,
-		Issuer:    cfg.OIDC.Issuer,
-		ClientID:  cfg.WebUI.ClientID,
-		Verify: func(ctx context.Context, raw string) (*auth.Caller, error) {
-			caller, _, err := authenticator.OIDC.Verify(ctx, raw)
 
-			return caller, err
-		},
-		Mapping:       svc.mapping,
-		Cluster:       identity,
-		Scope:         svc.scope,
-		Workloads:     live.Cache,
-		Actions:       live.Actions,
-		Catalog:       svc.catalog,
-		Provisioning:  svc.service,
-		Observability: obs,
-		Logger:        logger,
+	return &useraccess.Service{
+		Dynamic:        svc.clients.Dynamic,
+		Discovery:      svc.clients.Kubernetes.Discovery(),
+		Judge:          svc.judge,
+		Scope:          svc.scope,
+		ListNamespaces: svc.namespaces.List,
+		Mapping:        svc.mapping,
+		Namespace:      cfg.UserAccess.Namespace,
+		Rules:          useraccess.NewImpersonatingReviewer(svc.clients.Config),
+		CacheTTL:       cfg.UserAccess.CacheTTL,
 	}
-
-	return u.Handler()
 }
 
 func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {
@@ -517,6 +536,8 @@ func shutdown(logger *slog.Logger, servers ...*http.Server) error {
 
 	return err
 }
+
+const driftMetricsPort = 3002
 
 // healthcheck probes the local readiness endpoint, for container health
 // checks in images without a shell or HTTP client.

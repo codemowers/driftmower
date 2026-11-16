@@ -12,6 +12,8 @@ import TagIdentity from "@/app/components/image/tag-identity"
 import SupportLifecycle from "@/app/components/image/support-lifecycle"
 import SourceCard from "@/app/components/image/source-card"
 import ImageIssues from "@/app/components/image/image-issues"
+import BaseImageHierarchy from "@/app/components/image/base-image-hierarchy"
+import ImageLicenses from "@/app/components/image/image-licenses"
 import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
 import { artifactTitle, digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 import PageLoading from "@/app/components/page-loading"
@@ -100,6 +102,8 @@ export default function ImageTagDetailPage() {
 
         <ImageTagStats usage={usage} />
 
+        <BaseImageHierarchy images={usage.imageInfo.platforms??[]} targetLabel={fullRef} />
+
         <div className="grid gap-6 items-start md:grid-cols-[1fr_420px]">
           <TagIdentity usage={usage} />
           <div className="flex flex-col gap-6">
@@ -109,6 +113,7 @@ export default function ImageTagDetailPage() {
           </div>
         </div>
 
+        <ImageLicenses digests={usage.imageInfo.digest ? [usage.imageInfo.digest] : []}/>
         <ImageVulnerabilities usage={usage} />
       </main>
     </div>

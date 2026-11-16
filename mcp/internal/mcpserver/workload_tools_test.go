@@ -2,15 +2,18 @@ package mcpserver
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	metadatafake "k8s.io/client-go/metadata/fake"
@@ -49,6 +52,10 @@ func TestWorkloadTools(t *testing.T) {
 		Findings:  staticReports{},
 	}))
 
+	_, initialStatus := call(t, s, "get_inventory_status", map[string]any{})
+	if initialStatus["imageUsages"] != nil || len(k.Actions()) != 0 || len(meta.Actions()) != 0 {
+		t.Fatal("connection status triggered cluster inventory reads")
+	}
 	text, out := call(t, s, "get_workloads", map[string]any{"namespace": "team-a"})
 	if !strings.HasPrefix(text, "0 workloads; 1 namespace orphan buckets.") {
 		t.Errorf("summary = %q", text)
@@ -70,17 +77,43 @@ func TestWorkloadTools(t *testing.T) {
 			t.Errorf("%s registered without actions", tool.Name)
 		}
 	}
-	// The dashboard consumes current inventory, without persisted report identity.
-	_, snapshot := call(t, s, "get_dashboard_snapshot", map[string]any{"namespace": "team-a"})
-	score, ok := snapshot["drift"].(map[string]any)
-	if !ok || score["normalizedScore"] == nil || score["workloadScores"] == nil {
-		t.Fatalf("missing live drift fields: %v", snapshot)
+	_, status := call(t, s, "get_inventory_status", map[string]any{})
+	if status["clusterContext"] != "bravo.example.com" || status["imageUsages"] != nil {
+		t.Fatalf("expected cheap status: %v", status)
 	}
-	if snapshot["report"] != nil || snapshot["id"] != nil || snapshot["imageUsages"] == nil {
-		t.Fatalf("expected live inventory without a report: %v", snapshot)
+	_, page := call(t, s, "list_pod_inventory", map[string]any{"namespace": "team-a"})
+	if len(page["items"].([]any)) != 1 {
+		t.Fatalf("expected runtime pod page: %v", page)
 	}
-	if len(snapshot["workloads"].([]any)) == 0 {
-		t.Fatal("live snapshot must retain inventory even when pods have no image usages")
+	for _, tool := range tools.Tools {
+		if tool.Name == "get_dashboard_snapshot" {
+			t.Fatal("giant snapshot tool is still registered")
+		}
+	}
+
+	for i := 0; i < 105; i++ {
+		_, err := k.CoreV1().Pods("team-a").Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("bulk-%03d", i), Namespace: "team-a", UID: types.UID(fmt.Sprintf("bulk-%03d", i))}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		rows, _, err := c.Pods(ctx, "team-a", authz.Identity{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 106 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Pod watch only observed %d", len(rows))
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_, allPods := call(t, s, "list_pod_inventory", map[string]any{"namespace": "team-a"})
+	if len(allPods["items"].([]any)) != 106 || allPods["nextOffset"] != nil {
+		t.Fatal("inventory was paginated", allPods["total"], allPods["nextOffset"])
 	}
 	_, apps := call(t, s, "list_applications", map[string]any{"namespace": "team-a"})
 	entries := apps["applications"].([]any)

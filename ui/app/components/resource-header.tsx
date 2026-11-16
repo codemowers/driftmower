@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn"
 import type { StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 
-type Chip = { label: string; tone?: "brand" | "muted"; className?: string }
+export type Chip = { label: string; tone?: "brand" | "muted"; className?: string }
 
 type Props = {
   icon: LucideIcon

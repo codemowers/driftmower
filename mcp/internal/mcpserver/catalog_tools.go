@@ -79,6 +79,7 @@ type clusterIssuersOutput struct {
 }
 
 func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, svc *service.Service, m auth.Mapping) {
+	addAdmissionPoliciesTool(s, cat)
 	id := "identity unconfigured"
 	if c.ID != nil {
 		id = *c.ID
@@ -336,6 +337,45 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		}
 
 		return text(csv), nil, nil
+	})
+}
+
+// The dashboard's view of the same catalog: structured, with the creator
+// admission recorded on each policy.
+// The catalog for the dashboard, structured. Admission never runs on
+// admission policies, so no creator is recorded on them.
+type dashboardPolicy struct {
+	policySummary
+}
+
+type dashboardPoliciesOutput struct {
+	Policies         []dashboardPolicy `json:"policies"`
+	UnavailableKinds []string          `json:"unavailableKinds"`
+}
+
+func addAdmissionPoliciesTool(s *mcp.Server, cat *catalog.Catalog) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "get_admission_policies",
+		Title:       "Get admission policies",
+		InputSchema: noArguments(),
+		Description: "The admission policy catalog as structured data, validating and mutating, sorted by name: each policy's description, target resource rules and bindings. " +
+			"For planning prefer list_admission_policies, whose CSV stays small on large catalogs.",
+		Annotations: readOnly("Get admission policies"),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, *dashboardPoliciesOutput, error) {
+		if err := requireCaller(req); err != nil {
+			return nil, nil, err
+		}
+		policies, err := cat.AdmissionPolicies(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		out := &dashboardPoliciesOutput{Policies: []dashboardPolicy{}, UnavailableKinds: policies.UnavailableKinds}
+		for _, p := range policies.Policies {
+			out.Policies = append(out.Policies, dashboardPolicy{policySummary: summarizePolicy(p)})
+		}
+		slices.SortFunc(out.Policies, func(a, b dashboardPolicy) int { return strings.Compare(a.Name, b.Name) })
+
+		return nil, out, nil
 	})
 }
 

@@ -1,4 +1,5 @@
 "use client"
+import { useKubectl } from "@/lib/hooks/use-kubectl"
 
 import { Package } from "lucide-react"
 
@@ -10,10 +11,10 @@ const ROBOT_SECRET = "registry-robot"
 const PULL_SECRET = "registry-pull"
 const SKAFFOLD_DOCS_URL = "https://skaffold.dev/docs/"
 
-function loginCommand(namespace: string, host: string): string {
-  return `kubectl -n ${namespace} get secret ${ROBOT_SECRET} -o jsonpath='{.data.password}' | base64 -d | \\
+function loginCommand(getCommand: string, host: string): string {
+  return `${getCommand} secret ${ROBOT_SECRET} -o jsonpath='{.data.password}' | base64 -d | \\
   docker login ${host} \\
-    --username "$(kubectl -n ${namespace} get secret ${ROBOT_SECRET} -o jsonpath='{.data.username}' | base64 -d)" \\
+    --username "$(${getCommand} secret ${ROBOT_SECRET} -o jsonpath='{.data.username}' | base64 -d)" \\
     --password-stdin`
 }
 
@@ -91,6 +92,7 @@ export default function RegistryCard({
 
 function RegistryDetails({ namespace, registry }: { namespace: string; registry: RegistryFact }) {
   const { host } = registry
+  const kubectl = useKubectl()
 
   return (
     <div className="rounded-lg border border-border bg-card px-5 py-4">
@@ -113,7 +115,7 @@ function RegistryDetails({ namespace, registry }: { namespace: string; registry:
         credential already stored in <code className="font-mono text-xs text-brand-label">{ROBOT_SECRET}</code>.
       </p>
 
-      <CommandBlock label="Log in from a shell" value={loginCommand(namespace, host)} />
+      <CommandBlock label="Log in from a shell" value={loginCommand(kubectl("get", namespace), host)} />
       <CommandBlock label="Tag and push an image" value={pushCommands(host)} />
       <CommandBlock
         label="Or build with skaffold: run next to skaffold.yaml to write skaffold.env"

@@ -9,6 +9,7 @@ import { useContextHref } from "@/lib/hooks/use-context-href"
 import { podMetricQueries } from "@/lib/features/prometheus/pod-metrics"
 import ResourceHeader from "@/app/components/resource-header"
 import NetworkCard from "@/app/components/network-card"
+import LogsCard from "@/app/components/logs-card"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
@@ -25,7 +26,7 @@ export default function PodDetailPage() {
   const { linkTo } = useContextHref()
 
   const pod = clusterResources?.find(r => r.uid === podUid && r.kind === "Pod") ?? null
-  const podMetrics = usePodMetrics(pod?.namespace ?? "", pod?.name ?? "")
+  const podMetrics = usePodMetrics(pod?.namespace ?? "", workloadUid, pod?.name ?? "")
 
   const workloadMatch = data
     ? Object.entries(data.report.workloadGroupMap).find(
@@ -98,7 +99,7 @@ export default function PodDetailPage() {
           copyValue={pod.name}
           breadcrumbs={[
             { label: "Workloads", href: linkTo("/topmost-owners") },
-            { label: `Namespace ${pod.namespace}` },
+            { label: `Namespace ${pod.namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(pod.namespace)}`) },
             { label: `${workloadKind} ${workloadName}`, href: backHref },
             { label: `Pod ${pod.name}` },
           ]}
@@ -115,7 +116,6 @@ export default function PodDetailPage() {
           nodeName={nodeLabel}
           totalContainers={totalContainers}
           staleContainerCount={staleContainerCount}
-          namespace={pod.namespace}
           worstStatus={worstStatus}
           normalizedScore={normalizedScore}
         />
@@ -128,17 +128,15 @@ export default function PodDetailPage() {
           emptyHint={pod.phase && pod.phase !== "Running" ? `pod is ${pod.phase}` : undefined}
         />
 
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-5">
-          <div className="md:col-span-3">
-            <CommandsCard namespace={pod.namespace} name={pod.name} ports={pod.declaredPorts} />
-          </div>
-          <div className="md:col-span-2">
-            <NetworkCard
-              href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/network-topology`)}
-              podIPs={pod.ips ?? []}
-              podUid={pod.uid}
-            />
-          </div>
+
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[3fr_2fr_2fr]">
+          <CommandsCard namespace={pod.namespace} name={pod.name} ports={pod.declaredPorts} />
+          <NetworkCard
+            href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/network-topology`)}
+            podIPs={pod.ips ?? []}
+            podUid={pod.uid}
+          />
+          <LogsCard namespace={pod.namespace} pod={pod.name} href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/logs`)} scope="every container of this Pod" />
         </div>
 
         <IssuesCard issues={podIssues} />

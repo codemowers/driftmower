@@ -5,14 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  {
-    files: ["server.js"],
-    rules: { "@typescript-eslint/no-require-imports": "off" },
-  },
   globalIgnores([
     ".next/**",
+    "static/.next/**",
+    "static/out/**",
     "out/**",
     "build/**",
+    "vendor/**",
+    "lib/features/crawler/license-data.ts",
     "next-env.d.ts",
     "scripts/temp/**",
   ]),

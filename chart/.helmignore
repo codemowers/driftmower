@@ -1,0 +1,3 @@
+# Editor swap and backup files break helm template.
+.*.sw?
+*~

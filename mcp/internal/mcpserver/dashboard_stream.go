@@ -62,6 +62,9 @@ func dashboardSubscriptions(opts *mcp.ServerOptions, d Deps, server **mcp.Server
 			}()
 			ticker := time.NewTicker(15 * time.Second)
 			defer ticker.Stop()
+			// The authorized view is rebuilt only once the cache changed, and
+			// every five minutes for permission changes the cache does not see.
+			seen, unchanged := initial.Revision, 0
 			initial.Revision = ""
 			encoded, _ := json.Marshal(initial)
 			previous := sha256.Sum256(encoded)
@@ -71,6 +74,13 @@ func dashboardSubscriptions(opts *mcp.ServerOptions, d Deps, server **mcp.Server
 					return
 				case <-ticker.C:
 				}
+				version := d.Workloads.Cache.Version()
+				if version == seen && unchanged < 20 {
+					unchanged++
+
+					continue
+				}
+				seen, unchanged = version, 0
 				readCtx, done := context.WithTimeout(lifetime, 10*time.Second)
 				inv, err := d.Workloads.Cache.List(readCtx, "", id)
 				done()

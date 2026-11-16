@@ -11,12 +11,12 @@
             "pod-template-hash": "69874c97f4"
         },
         "ownerUID": "1099e88a-9b73-4b02-9493-85ea85a78d18",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:2:0:7ba3",
             "10.254.130.145"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -69,15 +69,15 @@
             "controller-uid": "66149826-90b4-41a1-9fd0-46c73bee073d",
             "helmcharts.helm.cattle.io/chart": "cnpg-plugin-barman-cloud",
             "job-name": "helm-install-cnpg-plugin-barman-cloud",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "66149826-90b4-41a1-9fd0-46c73bee073d",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -107,7 +107,7 @@
             "fd10::fe01:1:3:0:bda9",
             "10.254.131.76"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -137,7 +137,7 @@
             "fd10::fe01:1:6:0:2541",
             "10.254.134.41"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -165,12 +165,12 @@
             "fd10::fe01:1:2:0:923f",
             "10.254.130.236"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Pending",
         "images": [
             {
-                "name": "zot.ee-lte-1.codemowers.io/ua69abad191/hello-world-cpp",
-                "normalized": "zot.ee-lte-1.codemowers.io/ua69abad191/hello-world-cpp",
+                "name": "zot.alpha.example.com/ua69abad191/hello-world-cpp",
+                "normalized": "zot.alpha.example.com/ua69abad191/hello-world-cpp",
                 "tag": "61914b8-dirty",
                 "digest": "sha256:ae5f3902a0f44f393533acc8fc61bdc8825bab077be9459d2febf31b550b6d8d"
             }
@@ -189,15 +189,15 @@
             "controller-uid": "3e628f32-d3f2-426d-898c-f12075fa9980",
             "helmcharts.helm.cattle.io/chart": "dragonfly-operator",
             "job-name": "helm-install-dragonfly-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "3e628f32-d3f2-426d-898c-f12075fa9980",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -220,15 +220,15 @@
             "controller-uid": "7fd94d5a-a425-4082-9089-dcb70f5bbb86",
             "helmcharts.helm.cattle.io/chart": "kubernetes-secret-generator",
             "job-name": "helm-install-kubernetes-secret-generator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "7fd94d5a-a425-4082-9089-dcb70f5bbb86",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -251,15 +251,15 @@
             "controller-uid": "279876c1-b432-4b9d-92d1-8330d0793570",
             "helmcharts.helm.cattle.io/chart": "loki",
             "job-name": "helm-install-loki",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "279876c1-b432-4b9d-92d1-8330d0793570",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -291,7 +291,7 @@
             "fd10::fe01:1:3:0:390b",
             "10.254.131.209"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -327,7 +327,7 @@
             "fd10::fe01:1:4:0:851d",
             "10.254.132.81"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -350,7 +350,7 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "247fb716-1ab6-4acd-9c0c-4dd4aae74677",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:0:0:fe09",
             "10.254.128.174"
@@ -378,12 +378,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "247fb716-1ab6-4acd-9c0c-4dd4aae74677",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:2:0:fa62",
             "10.254.130.16"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -410,12 +410,12 @@
             "fd10::fe01:1:6:0:fbe1",
             "10.254.134.118"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
-                "name": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui",
-                "normalized": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui",
+                "name": "zot.alpha.example.com/ua69abad191/driftmower-ui",
+                "normalized": "zot.alpha.example.com/ua69abad191/driftmower-ui",
                 "digest": "sha256:0d762fd7ad62791d485ac368bfc06466413142e43a38176ce1adefcef2a6a073"
             }
         ]
@@ -433,15 +433,15 @@
             "controller-uid": "6bff75a9-c909-4061-9c74-c388781ef62e",
             "helmcharts.helm.cattle.io/chart": "cilium",
             "job-name": "helm-install-cilium",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "6bff75a9-c909-4061-9c74-c388781ef62e",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -469,7 +469,7 @@
             "fd10::fe01:1:6:0:a306",
             "10.254.134.252"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -504,7 +504,7 @@
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -532,7 +532,7 @@
             "fd10::fe01:1:4:0:e7a1",
             "10.254.132.150"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -558,7 +558,7 @@
             "fd10::fe01:1:2:0:33d8",
             "10.254.130.43"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -586,7 +586,7 @@
             "fd10:0:0:fe00::44",
             "10.254.0.44"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -617,7 +617,7 @@
             "fd10::fe01:1:6:0:820b",
             "10.254.134.188"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -641,12 +641,12 @@
             "statefulset.kubernetes.io/pod-name": "minio-3"
         },
         "ownerUID": "d5a0238f-e6ea-4cff-923b-bb5eecfd6d4f",
-        "managerUID": "argo-app:argocd:minio-ee-lte-1",
+        "managerUID": "argo-app:argocd:minio-alpha",
         "ips": [
             "fd10::fe01:1:3:0:a8e9",
             "10.254.131.49"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -668,12 +668,12 @@
             "pod-template-hash": "d6f7dfdcb"
         },
         "ownerUID": "28e8cff6-7c39-4d86-b26f-b176c9465693",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:3:0:ed18",
             "10.254.131.131"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -696,8 +696,8 @@
             "app.kubernetes.io/name": "topolvm",
             "controller-revision-hash": "7b8c5f8457",
             "pod-template-generation": "3",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "0f576123-dbf0-4485-a3b7-1f2ff52efd80",
         "managerUID": "helm-release:topolvm-system:topolvm",
@@ -705,7 +705,7 @@
             "fd10::fe01:1:4:0:9",
             "10.254.132.9"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -735,7 +735,7 @@
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -758,15 +758,15 @@
             "controller-uid": "796da62c-bb49-489c-8ac4-13554b473522",
             "helmcharts.helm.cattle.io/chart": "cert-manager",
             "job-name": "helm-install-cert-manager",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "796da62c-bb49-489c-8ac4-13554b473522",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -815,7 +815,7 @@
             "fd10::fe01:1:3:0:c6a4",
             "10.254.131.215"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -835,15 +835,15 @@
         "labels": {
             "app": "registry-scraper",
             "pod-template-hash": "65d6599486",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "5546aab5-619f-453c-9e18-3317132def50",
         "ips": [
             "fd10::fe01:1:6:0:b46e",
             "10.254.134.17"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -866,15 +866,15 @@
             "controller-uid": "a408e794-d1a2-4660-ac25-7217c568d7d0",
             "helmcharts.helm.cattle.io/chart": "kyverno",
             "job-name": "helm-install-kyverno",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "a408e794-d1a2-4660-ac25-7217c568d7d0",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -903,7 +903,7 @@
             "fd10::fe01:1:4:0:4607",
             "10.254.132.162"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -931,7 +931,7 @@
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -962,7 +962,7 @@
             "fd10::fe01:1:2:0:503d",
             "10.254.130.231"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -992,7 +992,7 @@
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -1018,12 +1018,12 @@
             "fd10::fe01:1:6:0:87ea",
             "10.254.134.127"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Pending",
         "images": [
             {
-                "name": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui",
-                "normalized": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-ui",
+                "name": "zot.alpha.example.com/ua69abad191/driftmower-ui",
+                "normalized": "zot.alpha.example.com/ua69abad191/driftmower-ui",
                 "tag": "f6b6bf5-dirty"
             }
         ]
@@ -1045,12 +1045,12 @@
             "fd10::fe01:1:6:0:31f6",
             "10.254.134.50"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
-                "name": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-explorer",
-                "normalized": "zot.ee-lte-1.codemowers.io/ua69abad191/driftmower-explorer",
+                "name": "zot.alpha.example.com/ua69abad191/driftmower-explorer",
+                "normalized": "zot.alpha.example.com/ua69abad191/driftmower-explorer",
                 "digest": "sha256:2868c088c74854333cb1b8abb56937cd51c72d2c3b62c1aa3df5d84fda84a3e9"
             }
         ]
@@ -1068,15 +1068,15 @@
             "controller-uid": "fc10aa71-b943-40a1-bbc0-0cd3c6a3f465",
             "helmcharts.helm.cattle.io/chart": "trivy-operator",
             "job-name": "helm-install-trivy-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "fc10aa71-b943-40a1-bbc0-0cd3c6a3f465",
         "ips": [
             "fd10::fe01:1:6:0:e96f",
             "10.254.134.120"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -1105,7 +1105,7 @@
             "fd10::fe01:1:6:0:23d4",
             "10.254.134.243"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -1138,7 +1138,7 @@
             "fd10::fe01:1:4:0:808c",
             "10.254.132.176"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1163,8 +1163,8 @@
             "control-plane": "controller-manager",
             "helm.sh/chart": "emqx-operator-2.2.29",
             "pod-template-hash": "5454d685f",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "202daa3d-7fb7-442d-9051-dffb5df29c3b",
         "managerUID": "helm-release:emqx-operator-system:emqx-operator",
@@ -1172,7 +1172,7 @@
             "fd10::fe01:1:2:0:8",
             "10.254.130.8"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1195,15 +1195,15 @@
             "controller-uid": "3ca9b994-6d79-45b5-ac33-3d814951da53",
             "helmcharts.helm.cattle.io/chart": "topolvm",
             "job-name": "helm-install-topolvm",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "3ca9b994-6d79-45b5-ac33-3d814951da53",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -1230,7 +1230,7 @@
             "fd10::fe01:1:4:0:a8cc",
             "10.254.132.175"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1254,12 +1254,12 @@
             "statefulset.kubernetes.io/pod-name": "minio-1"
         },
         "ownerUID": "d5a0238f-e6ea-4cff-923b-bb5eecfd6d4f",
-        "managerUID": "argo-app:argocd:minio-ee-lte-1",
+        "managerUID": "argo-app:argocd:minio-alpha",
         "ips": [
             "fd10::fe01:1:4:0:2abf",
             "10.254.132.220"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1287,12 +1287,12 @@
             "statefulset.kubernetes.io/pod-name": "alertmanager-alertmanager-0"
         },
         "ownerUID": "4112d757-f72c-412e-acf9-fb1fcaec1c03",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:4:0:2dfb",
             "10.254.132.132"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1320,12 +1320,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "27fadd7c-af0b-4f60-9410-ccf40f1e50a3",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1363,7 +1363,7 @@
             "fd10::fe01:1:6:0:e3bf",
             "10.254.134.158"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -1400,7 +1400,7 @@
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -1423,15 +1423,15 @@
             "controller-uid": "b6032a68-ee3a-44d0-abcb-28f16a43cce6",
             "helmcharts.helm.cattle.io/chart": "redpanda-operator",
             "job-name": "helm-install-redpanda-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "b6032a68-ee3a-44d0-abcb-28f16a43cce6",
         "ips": [
             "fd10::fe01:1:6:0:7800",
             "10.254.134.215"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -1459,7 +1459,7 @@
             "fd10::fe01:1:3:0:de9a",
             "10.254.131.138"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -1486,7 +1486,7 @@
             "fd10::fe01:1:6:0:c1f1",
             "10.254.134.113"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -1508,12 +1508,12 @@
             "pod-template-hash": "7c98b44d8d"
         },
         "ownerUID": "92a64259-538e-43de-9f6e-e034477ce2a2",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:3:0:ad71",
             "10.254.131.91"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -1537,12 +1537,12 @@
             "pod-template-hash": "5fff4c57"
         },
         "ownerUID": "d0189079-6b03-4f46-aab4-3461f620fc4a",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:3:0:2e53",
             "10.254.131.35"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -1571,7 +1571,7 @@
             "fd10::fe01:1:2:0:9f53",
             "10.254.130.178"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1598,8 +1598,8 @@
             "app.kubernetes.io/instance": "topolvm",
             "app.kubernetes.io/name": "topolvm",
             "pod-template-hash": "7755b59788",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "fa0851d2-2503-406f-b9a5-71d91bb8b71b",
         "managerUID": "helm-release:topolvm-system:topolvm",
@@ -1607,7 +1607,7 @@
             "fd10::fe01:1:2:0:7",
             "10.254.130.7"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1638,7 +1638,7 @@
             "fd10::fe01:1:2:0:362b",
             "10.254.130.51"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1667,7 +1667,7 @@
             "fd10::fe01:1:6:0:fad4",
             "10.254.134.207"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -1690,7 +1690,7 @@
             "app.kubernetes.io/name": "topolvm",
             "controller-revision-hash": "7b8c5f8457",
             "pod-template-generation": "3",
-            "topology.kubernetes.io/region": "ee-lte-1",
+            "topology.kubernetes.io/region": "alpha",
             "topology.kubernetes.io/zone": "rpi400"
         },
         "ownerUID": "0f576123-dbf0-4485-a3b7-1f2ff52efd80",
@@ -1726,7 +1726,7 @@
             "fd10:0:0:fe00::44",
             "10.254.0.44"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -1749,8 +1749,8 @@
             "app.kubernetes.io/name": "topolvm",
             "controller-revision-hash": "7b8c5f8457",
             "pod-template-generation": "3",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "0f576123-dbf0-4485-a3b7-1f2ff52efd80",
         "managerUID": "helm-release:topolvm-system:topolvm",
@@ -1758,7 +1758,7 @@
             "fd10::fe01:1:2:0:9",
             "10.254.130.9"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1785,7 +1785,7 @@
             "fd10::fe01:1:2:0:8d57",
             "10.254.130.177"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1818,7 +1818,7 @@
             "fd10::fe01:1:2:0:922e",
             "10.254.130.132"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1854,7 +1854,7 @@
             "fd10::fe01:1:2:0:8994",
             "10.254.130.107"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1884,7 +1884,7 @@
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -1907,15 +1907,15 @@
             "controller-uid": "a686252f-34df-4de8-9c20-ceef75578eb8",
             "helmcharts.helm.cattle.io/chart": "mongodb-kubernetes-operator",
             "job-name": "helm-install-mongodb-kubernetes-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "a686252f-34df-4de8-9c20-ceef75578eb8",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -1949,7 +1949,7 @@
             "fd10::fe01:1:6:0:13a6",
             "10.254.134.42"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -1977,7 +1977,7 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "27fadd7c-af0b-4f60-9410-ccf40f1e50a3",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10:0:0:fe00::51",
             "10.254.0.51"
@@ -2018,7 +2018,7 @@
             "fd10::fe01:1:4:0:5af3",
             "10.254.132.93"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -2041,11 +2041,11 @@
             "controller-uid": "bc0ff942-b3fc-453b-8875-c0f66ef9f12e",
             "helmcharts.helm.cattle.io/chart": "cert-manager-csi-driver",
             "job-name": "helm-install-cert-manager-csi-driver",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "bc0ff942-b3fc-453b-8875-c0f66ef9f12e",
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -2068,15 +2068,15 @@
             "controller-uid": "4721cf35-9b4d-4a86-8eab-a3ff0dfe096b",
             "helmcharts.helm.cattle.io/chart": "passmower",
             "job-name": "helm-install-passmower",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "4721cf35-9b4d-4a86-8eab-a3ff0dfe096b",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -2104,7 +2104,7 @@
             "fd10::fe01:1:6:0:bd8a",
             "10.254.134.241"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -2130,8 +2130,8 @@
             "app.kubernetes.io/version": "3.8.1",
             "helm.sh/chart": "kyverno-3.8.1",
             "pod-template-hash": "5b85cf6d8d",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "b13ff233-c278-4642-bdd3-baba4a18b2a4",
         "managerUID": "helm-release:kyverno:kyverno",
@@ -2139,7 +2139,7 @@
             "fd10::fe01:1:4:0:6",
             "10.254.132.6"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -2168,7 +2168,7 @@
             "fd10::fe01:1:3:0:a722",
             "10.254.131.69"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2196,7 +2196,7 @@
             "fd10::fe01:1:3:0:5a40",
             "10.254.131.174"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2223,7 +2223,7 @@
             "fd10::fe01:1:6:0:b412",
             "10.254.134.198"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -2252,7 +2252,7 @@
             "fd10::fe01:1:3:0:5157",
             "10.254.131.149"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2278,8 +2278,8 @@
             "app.kubernetes.io/version": "3.8.1",
             "helm.sh/chart": "kyverno-3.8.1",
             "pod-template-hash": "55c46bc6c5",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "895e9778-cc75-4a9f-951e-2d39c0aeb1b1",
         "managerUID": "helm-release:kyverno:kyverno",
@@ -2287,7 +2287,7 @@
             "fd10::fe01:1:4:0:7",
             "10.254.132.7"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -2316,7 +2316,7 @@
             "fd10::fe01:1:2:0:86f2",
             "10.254.130.70"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -2346,7 +2346,7 @@
             "fd10::fe01:1:2:0:b45d",
             "10.254.130.94"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -2380,7 +2380,7 @@
             "fd10::fe01:1:2:0:b91a",
             "10.254.130.6"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -2410,7 +2410,7 @@
             "fd10::fe01:1:3:0:bcbe",
             "10.254.131.246"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2433,15 +2433,15 @@
             "controller-uid": "1c34be35-1c57-4a31-a308-d336c6de1e37",
             "helmcharts.helm.cattle.io/chart": "trivy-ui",
             "job-name": "helm-install-trivy-ui",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "1c34be35-1c57-4a31-a308-d336c6de1e37",
         "ips": [
             "fd10::fe01:1:6:0:1b18",
             "10.254.134.182"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -2464,8 +2464,8 @@
             "app.kubernetes.io/name": "topolvm",
             "controller-revision-hash": "7b8c5f8457",
             "pod-template-generation": "3",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "0f576123-dbf0-4485-a3b7-1f2ff52efd80",
         "managerUID": "helm-release:topolvm-system:topolvm",
@@ -2473,7 +2473,7 @@
             "fd10::fe01:1:3:0:13",
             "10.254.131.19"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2496,15 +2496,15 @@
             "controller-uid": "ad77a82f-534c-4d68-9f02-f32916779b22",
             "helmcharts.helm.cattle.io/chart": "traefik",
             "job-name": "helm-install-traefik",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "ad77a82f-534c-4d68-9f02-f32916779b22",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -2532,7 +2532,7 @@
             "fd10::fe01:1:2:0:b22",
             "10.254.130.235"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -2562,12 +2562,12 @@
             "pod-template-hash": "7cfcb698f9"
         },
         "ownerUID": "8b29fc2f-5c1f-4427-972c-07b15c040a52",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:6:0:ad1e",
             "10.254.134.217"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -2590,12 +2590,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "247fb716-1ab6-4acd-9c0c-4dd4aae74677",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:6:0:416",
             "10.254.134.14"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -2618,12 +2618,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "247fb716-1ab6-4acd-9c0c-4dd4aae74677",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:3:0:1de3",
             "10.254.131.125"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2649,8 +2649,8 @@
             "app.kubernetes.io/version": "3.8.1",
             "helm.sh/chart": "kyverno-3.8.1",
             "pod-template-hash": "75cf48bbc7",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "94448275-99e3-4fea-83dc-28f539d8ceba",
         "managerUID": "helm-release:kyverno:kyverno",
@@ -2658,7 +2658,7 @@
             "fd10::fe01:1:3:0:7",
             "10.254.131.7"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2681,15 +2681,15 @@
             "controller-uid": "28b787eb-af5c-4aad-866d-ed2f38aad42c",
             "helmcharts.helm.cattle.io/chart": "node-feature-discovery",
             "job-name": "helm-install-node-feature-discovery",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "28b787eb-af5c-4aad-866d-ed2f38aad42c",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -2713,7 +2713,7 @@
             "job-name": "kyverno-migrate-resources"
         },
         "ownerUID": "78ff7098-a978-46e6-bfbe-c36e081ac42f",
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Pending",
         "images": [
             {
@@ -2741,12 +2741,12 @@
             "statefulset.kubernetes.io/pod-name": "alertmanager-alertmanager-1"
         },
         "ownerUID": "4112d757-f72c-412e-acf9-fb1fcaec1c03",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:2:0:d50",
             "10.254.130.143"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -2774,12 +2774,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "27fadd7c-af0b-4f60-9410-ccf40f1e50a3",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10:0:0:fe00::44",
             "10.254.0.44"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -2806,12 +2806,12 @@
             "pod-template-hash": "7c98b44d8d"
         },
         "ownerUID": "92a64259-538e-43de-9f6e-e034477ce2a2",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:3:0:d2b1",
             "10.254.131.152"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -2834,11 +2834,11 @@
             "controller-uid": "36d21b4b-2eab-4631-b5ac-00ba11cce834",
             "helmcharts.helm.cattle.io/chart": "opensearch-operator",
             "job-name": "helm-install-opensearch-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "36d21b4b-2eab-4631-b5ac-00ba11cce834",
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -2861,15 +2861,15 @@
             "controller-uid": "6155149f-1e70-443c-ae3b-aaff19e84472",
             "helmcharts.helm.cattle.io/chart": "policy-reporter",
             "job-name": "helm-install-policy-reporter",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "6155149f-1e70-443c-ae3b-aaff19e84472",
         "ips": [
             "fd10::fe01:1:6:0:27ae",
             "10.254.134.156"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -2892,15 +2892,15 @@
             "controller-uid": "59c0fc79-dbfd-488c-b354-89d97aa61b34",
             "helmcharts.helm.cattle.io/chart": "zot",
             "job-name": "helm-install-zot",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "59c0fc79-dbfd-488c-b354-89d97aa61b34",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -2925,12 +2925,12 @@
             "pod-template-hash": "7cfcb698f9"
         },
         "ownerUID": "8b29fc2f-5c1f-4427-972c-07b15c040a52",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:6:0:a70d",
             "10.254.134.161"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Succeeded",
         "images": [
             {
@@ -2964,7 +2964,7 @@
             "fd10::fe01:1:4:0:8265",
             "10.254.132.58"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3002,7 +3002,7 @@
             "fd10::fe01:1:3:0:7935",
             "10.254.131.53"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3035,7 +3035,7 @@
             "fd10::fe01:1:3:0:e2a3",
             "10.254.131.23"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3063,7 +3063,7 @@
             "fd10::fe01:1:2:0:1a53",
             "10.254.130.234"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3116,15 +3116,15 @@
             "controller-uid": "60af92e1-213f-474a-9bb1-788b27fb6bbf",
             "helmcharts.helm.cattle.io/chart": "s3-operator",
             "job-name": "helm-install-s3-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "60af92e1-213f-474a-9bb1-788b27fb6bbf",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -3152,7 +3152,7 @@
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3182,12 +3182,12 @@
             "statefulset.kubernetes.io/pod-name": "prometheus-prometheus-0"
         },
         "ownerUID": "ae35c034-8dce-47bb-a089-1d0a05d2a51f",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:3:0:b42c",
             "10.254.131.139"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3222,8 +3222,8 @@
             "app.kubernetes.io/version": "v0.22.0",
             "helm.sh/chart": "trust-manager-v0.22.0",
             "pod-template-hash": "778589b5c7",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "0b09d98b-9979-4feb-b4a2-e3a546c9b9f3",
         "managerUID": "helm-release:cert-manager:trust-manager",
@@ -3231,7 +3231,7 @@
             "fd10::fe01:1:4:0:4",
             "10.254.132.4"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3266,7 +3266,7 @@
             "fd10::fe01:1:3:0:88d0",
             "10.254.131.126"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3293,7 +3293,7 @@
             "fd10::fe01:1:3:0:5961",
             "10.254.131.105"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3364,7 +3364,7 @@
             "fd10::fe01:1:3:0:a642",
             "10.254.131.254"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3392,12 +3392,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "27fadd7c-af0b-4f60-9410-ccf40f1e50a3",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3432,7 +3432,7 @@
             "fd10::fe01:1:4:0:c0d7",
             "10.254.132.13"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3468,7 +3468,7 @@
             "fd10::fe01:1:2:0:32e3",
             "10.254.130.110"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3498,7 +3498,7 @@
             "fd10:0:0:fe00::44",
             "10.254.0.44"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -3521,15 +3521,15 @@
             "controller-uid": "f72568c2-99cc-4edf-b534-4b8a5758383e",
             "helmcharts.helm.cattle.io/chart": "trust-manager",
             "job-name": "helm-install-trust-manager",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "f72568c2-99cc-4edf-b534-4b8a5758383e",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -3556,7 +3556,7 @@
             "fd10::fe01:1:3:0:81d7",
             "10.254.131.252"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3579,12 +3579,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "27fadd7c-af0b-4f60-9410-ccf40f1e50a3",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3620,7 +3620,7 @@
             "fd10::fe01:1:4:0:7cbf",
             "10.254.132.177"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3647,7 +3647,7 @@
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3677,7 +3677,7 @@
             "fd10::fe01:1:3:0:74d1",
             "10.254.131.250"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3710,7 +3710,7 @@
             "fd10::fe01:1:3:0:9d14",
             "10.254.131.187"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -3747,7 +3747,7 @@
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3775,7 +3775,7 @@
             "fd10::fe01:1:2:0:22e8",
             "10.254.130.68"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3799,12 +3799,12 @@
             "statefulset.kubernetes.io/pod-name": "minio-0"
         },
         "ownerUID": "d5a0238f-e6ea-4cff-923b-bb5eecfd6d4f",
-        "managerUID": "argo-app:argocd:minio-ee-lte-1",
+        "managerUID": "argo-app:argocd:minio-alpha",
         "ips": [
             "fd10::fe01:1:2:0:5c3",
             "10.254.130.176"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3827,12 +3827,12 @@
             "pod-template-generation": "1"
         },
         "ownerUID": "247fb716-1ab6-4acd-9c0c-4dd4aae74677",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "ips": [
             "fd10::fe01:1:4:0:b041",
             "10.254.132.107"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3855,8 +3855,8 @@
             "app.kubernetes.io/name": "topolvm",
             "controller-revision-hash": "7b8c5f8457",
             "pod-template-generation": "3",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4"
         },
         "ownerUID": "0f576123-dbf0-4485-a3b7-1f2ff52efd80",
         "managerUID": "helm-release:topolvm-system:topolvm",
@@ -3864,7 +3864,7 @@
             "fd10::fe01:1:6:0:2172",
             "10.254.134.3"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -3895,7 +3895,7 @@
             "fd10::fe01:1:2:0:a285",
             "10.254.130.179"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -3929,7 +3929,7 @@
             "fd10::fe01:1:4:0:3b86",
             "10.254.132.34"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -3958,12 +3958,12 @@
             "statefulset.kubernetes.io/pod-name": "minio-2"
         },
         "ownerUID": "d5a0238f-e6ea-4cff-923b-bb5eecfd6d4f",
-        "managerUID": "argo-app:argocd:minio-ee-lte-1",
+        "managerUID": "argo-app:argocd:minio-alpha",
         "ips": [
             "fd10::fe01:1:6:0:bb0b",
             "10.254.134.96"
         ],
-        "nodeName": "m75q-4",
+        "nodeName": "node-4",
         "phase": "Running",
         "images": [
             {
@@ -3986,15 +3986,15 @@
             "controller-uid": "d9beb716-20b0-49b5-80b4-8a708d8335dd",
             "helmcharts.helm.cattle.io/chart": "prometheus-operator",
             "job-name": "helm-install-prometheus-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3"
         },
         "ownerUID": "d9beb716-20b0-49b5-80b4-8a708d8335dd",
         "ips": [
             "fd10:0:0:fe00::43",
             "10.254.0.43"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Succeeded",
         "images": [
             {
@@ -4016,12 +4016,12 @@
             "pod-template-hash": "85d5ddd67c"
         },
         "ownerUID": "5c63675b-c23b-4125-b36d-90b83bbed7d9",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:2:0:171e",
             "10.254.130.242"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Pending",
         "images": [
             {
@@ -4044,15 +4044,15 @@
             "controller-uid": "b80277a7-78a2-44dc-b6ec-9b0945664f33",
             "helmcharts.helm.cattle.io/chart": "emqx-operator",
             "job-name": "helm-install-emqx-operator",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "b80277a7-78a2-44dc-b6ec-9b0945664f33",
         "ips": [
             "fd10:0:0:fe00::41",
             "10.254.0.41"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Succeeded",
         "images": [
             {
@@ -4083,7 +4083,7 @@
             "fd10::fe01:1:2:0:eb75",
             "10.254.130.133"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Running",
         "images": [
             {
@@ -4103,16 +4103,16 @@
         "labels": {
             "k8s-app": "kube-dns",
             "pod-template-hash": "5db4c764c8",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "38ec12a3-c787-4003-8c1b-5ca1bf0b4f0f",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1",
+        "managerUID": "argo-app:argocd:kube-system-alpha",
         "ips": [
             "fd10::fe01:1:3:0:ff2c",
             "10.254.131.201"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -4135,15 +4135,15 @@
             "controller-uid": "46bcea02-13fc-43fb-9dbb-9e679a1edd34",
             "helmcharts.helm.cattle.io/chart": "cnpg",
             "job-name": "helm-install-cnpg",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2"
         },
         "ownerUID": "46bcea02-13fc-43fb-9dbb-9e679a1edd34",
         "ips": [
             "fd10:0:0:fe00::42",
             "10.254.0.42"
         ],
-        "nodeName": "m75q-2",
+        "nodeName": "node-2",
         "phase": "Succeeded",
         "images": [
             {
@@ -4169,8 +4169,8 @@
             "app.kubernetes.io/version": "3.8.1",
             "helm.sh/chart": "kyverno-3.8.1",
             "pod-template-hash": "64d574fd64",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1"
         },
         "ownerUID": "d9b5053f-b9ef-4749-aabc-e743fd05aa45",
         "managerUID": "helm-release:kyverno:kyverno",
@@ -4178,7 +4178,7 @@
             "fd10::fe01:1:3:0:6",
             "10.254.131.6"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -4213,7 +4213,7 @@
             "statefulset.kubernetes.io/pod-name": "prometheus-prometheus-1"
         },
         "ownerUID": "ae35c034-8dce-47bb-a089-1d0a05d2a51f",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1",
+        "managerUID": "argo-app:argocd:monitoring-alpha",
         "phase": "Pending"
     },
     {
@@ -4235,7 +4235,7 @@
             "fd10::fe01:1:3:0:e79f",
             "10.254.131.180"
         ],
-        "nodeName": "m75q-1",
+        "nodeName": "node-1",
         "phase": "Running",
         "images": [
             {
@@ -4268,7 +4268,7 @@
             "fd10::fe01:1:4:0:f6f4",
             "10.254.132.134"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -4306,7 +4306,7 @@
             "fd10::fe01:1:4:0:166",
             "10.254.132.181"
         ],
-        "nodeName": "m75q-3",
+        "nodeName": "node-3",
         "phase": "Running",
         "images": [
             {
@@ -4331,7 +4331,7 @@
             "beta.kubernetes.io/arch": "arm64",
             "beta.kubernetes.io/instance-type": "k3s",
             "beta.kubernetes.io/os": "linux",
-            "failure-domain.beta.kubernetes.io/region": "ee-lte-1",
+            "failure-domain.beta.kubernetes.io/region": "alpha",
             "failure-domain.beta.kubernetes.io/zone": "rpi400",
             "feature.node.kubernetes.io/cpu-hardware_multithreading": "false",
             "feature.node.kubernetes.io/cpu-model.family": "15",
@@ -4353,7 +4353,7 @@
             "kubernetes.io/hostname": "rpi400",
             "kubernetes.io/os": "linux",
             "node.kubernetes.io/instance-type": "k3s",
-            "topology.kubernetes.io/region": "ee-lte-1",
+            "topology.kubernetes.io/region": "alpha",
             "topology.kubernetes.io/zone": "rpi400",
             "topology.topolvm.io/node": "rpi400"
         }
@@ -4363,7 +4363,7 @@
         "uid": "5aedc74b-4698-4ae2-8fdf-76563f081f0f",
         "kind": "Node",
         "apiGroup": "v1",
-        "name": "m75q-1",
+        "name": "node-1",
         "labels": {
             "beta.kubernetes.io/arch": "amd64",
             "beta.kubernetes.io/instance-type": "k3s",
@@ -4389,14 +4389,14 @@
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.major": "26",
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.minor": "04",
             "kubernetes.io/arch": "amd64",
-            "kubernetes.io/hostname": "m75q-1",
+            "kubernetes.io/hostname": "node-1",
             "kubernetes.io/os": "linux",
             "node-role.kubernetes.io/control-plane": "true",
             "node-role.kubernetes.io/etcd": "true",
             "node.kubernetes.io/instance-type": "k3s",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-1",
-            "topology.topolvm.io/node": "m75q-1"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-1",
+            "topology.topolvm.io/node": "node-1"
         }
     },
     {
@@ -4404,14 +4404,14 @@
         "uid": "8fa9c5ab-bad7-4c1f-86de-2e7e0b60b81e",
         "kind": "Node",
         "apiGroup": "v1",
-        "name": "m75q-2",
+        "name": "node-2",
         "labels": {
             "beta.kubernetes.io/arch": "amd64",
             "beta.kubernetes.io/instance-type": "k3s",
             "beta.kubernetes.io/os": "linux",
             "codemowers.io/node-group-monitoring": "true",
-            "failure-domain.beta.kubernetes.io/region": "ee-lte-1",
-            "failure-domain.beta.kubernetes.io/zone": "m75q-2",
+            "failure-domain.beta.kubernetes.io/region": "alpha",
+            "failure-domain.beta.kubernetes.io/zone": "node-2",
             "feature.node.kubernetes.io/cpu-cpuid.AVX": "true",
             "feature.node.kubernetes.io/cpu-cpuid.AVX2": "true",
             "feature.node.kubernetes.io/cpu-hardware_multithreading": "true",
@@ -4432,14 +4432,14 @@
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.major": "26",
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.minor": "04",
             "kubernetes.io/arch": "amd64",
-            "kubernetes.io/hostname": "m75q-2",
+            "kubernetes.io/hostname": "node-2",
             "kubernetes.io/os": "linux",
             "node-role.kubernetes.io/control-plane": "true",
             "node-role.kubernetes.io/etcd": "true",
             "node.kubernetes.io/instance-type": "k3s",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-2",
-            "topology.topolvm.io/node": "m75q-2"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-2",
+            "topology.topolvm.io/node": "node-2"
         }
     },
     {
@@ -4447,14 +4447,14 @@
         "uid": "0bee52dd-a259-465a-aa60-e64b8aefff8a",
         "kind": "Node",
         "apiGroup": "v1",
-        "name": "m75q-3",
+        "name": "node-3",
         "labels": {
             "beta.kubernetes.io/arch": "amd64",
             "beta.kubernetes.io/instance-type": "k3s",
             "beta.kubernetes.io/os": "linux",
             "codemowers.io/node-group-monitoring": "true",
-            "failure-domain.beta.kubernetes.io/region": "ee-lte-1",
-            "failure-domain.beta.kubernetes.io/zone": "m75q-3",
+            "failure-domain.beta.kubernetes.io/region": "alpha",
+            "failure-domain.beta.kubernetes.io/zone": "node-3",
             "feature.node.kubernetes.io/cpu-cpuid.AVX": "true",
             "feature.node.kubernetes.io/cpu-cpuid.AVX2": "true",
             "feature.node.kubernetes.io/cpu-hardware_multithreading": "true",
@@ -4475,14 +4475,14 @@
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.major": "26",
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.minor": "04",
             "kubernetes.io/arch": "amd64",
-            "kubernetes.io/hostname": "m75q-3",
+            "kubernetes.io/hostname": "node-3",
             "kubernetes.io/os": "linux",
             "node-role.kubernetes.io/control-plane": "true",
             "node-role.kubernetes.io/etcd": "true",
             "node.kubernetes.io/instance-type": "k3s",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-3",
-            "topology.topolvm.io/node": "m75q-3"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-3",
+            "topology.topolvm.io/node": "node-3"
         }
     },
     {
@@ -4490,14 +4490,14 @@
         "uid": "de5966a4-4683-4189-b331-35701528c68c",
         "kind": "Node",
         "apiGroup": "v1",
-        "name": "m75q-4",
+        "name": "node-4",
         "labels": {
             "beta.kubernetes.io/arch": "amd64",
             "beta.kubernetes.io/instance-type": "k3s",
             "beta.kubernetes.io/os": "linux",
             "codemowers.io/node-group-monitoring": "true",
-            "failure-domain.beta.kubernetes.io/region": "ee-lte-1",
-            "failure-domain.beta.kubernetes.io/zone": "m75q-4",
+            "failure-domain.beta.kubernetes.io/region": "alpha",
+            "failure-domain.beta.kubernetes.io/zone": "node-4",
             "feature.node.kubernetes.io/cpu-cpuid.AVX": "true",
             "feature.node.kubernetes.io/cpu-cpuid.AVX2": "true",
             "feature.node.kubernetes.io/cpu-hardware_multithreading": "true",
@@ -4518,12 +4518,12 @@
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.major": "26",
             "feature.node.kubernetes.io/system-os_release.VERSION_ID.minor": "04",
             "kubernetes.io/arch": "amd64",
-            "kubernetes.io/hostname": "m75q-4",
+            "kubernetes.io/hostname": "node-4",
             "kubernetes.io/os": "linux",
             "node.kubernetes.io/instance-type": "k3s",
-            "topology.kubernetes.io/region": "ee-lte-1",
-            "topology.kubernetes.io/zone": "m75q-4",
-            "topology.topolvm.io/node": "m75q-4"
+            "topology.kubernetes.io/region": "alpha",
+            "topology.kubernetes.io/zone": "node-4",
+            "topology.topolvm.io/node": "node-4"
         }
     },
     {
@@ -5501,7 +5501,7 @@
             "pod-template-hash": "7c98b44d8d"
         },
         "ownerUID": "430fe68c-0d11-4753-98b3-2affa55fa084",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1"
+        "managerUID": "argo-app:argocd:kube-system-alpha"
     },
     {
         "type": "resource",
@@ -5674,7 +5674,7 @@
             "pod-template-hash": "85d5ddd67c"
         },
         "ownerUID": "d57f0ae6-59ab-46ed-b76f-ba34c9e43d94",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1"
+        "managerUID": "argo-app:argocd:kube-system-alpha"
     },
     {
         "type": "resource",
@@ -5866,7 +5866,7 @@
             "pod-template-hash": "d6f7dfdcb"
         },
         "ownerUID": "b43290f1-f7eb-4808-bd2b-356f41b3c053",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1"
+        "managerUID": "argo-app:argocd:monitoring-alpha"
     },
     {
         "type": "resource",
@@ -6253,7 +6253,7 @@
             "pod-template-hash": "69874c97f4"
         },
         "ownerUID": "3fd3acf7-590a-43d1-b3d5-b79553a640ec",
-        "managerUID": "argo-app:argocd:monitoring-ee-lte-1"
+        "managerUID": "argo-app:argocd:monitoring-alpha"
     },
     {
         "type": "resource",
@@ -6285,7 +6285,7 @@
             "pod-template-hash": "7cfcb698f9"
         },
         "ownerUID": "f56edbc7-6582-4101-96ab-0428e7a4c229",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1"
+        "managerUID": "argo-app:argocd:kube-system-alpha"
     },
     {
         "type": "resource",
@@ -6677,7 +6677,7 @@
             "pod-template-hash": "5db4c764c8"
         },
         "ownerUID": "da960553-210c-4b0a-b15a-d38887b020e3",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1"
+        "managerUID": "argo-app:argocd:kube-system-alpha"
     },
     {
         "type": "resource",
@@ -6978,7 +6978,7 @@
             "pod-template-hash": "5fff4c57"
         },
         "ownerUID": "1c806299-90d7-4119-9374-c6392d8cd550",
-        "managerUID": "argo-app:argocd:kube-system-ee-lte-1"
+        "managerUID": "argo-app:argocd:kube-system-alpha"
     },
     {
         "type": "resource",

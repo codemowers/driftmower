@@ -88,7 +88,7 @@ func (s *Service) QueryMetrics(ctx context.Context, id authz.Identity, in Metric
 	}
 
 	var result *MetricsResult
-	err := s.admit(id, func(backend Requester) error {
+	err := func(backend Requester) error {
 		if err := s.require(ctx, id, authz.Attributes{Namespace: in.Namespace, Resource: "pods", Verb: "list"},
 			"Kubernetes RBAC denied list pods in namespace "+in.Namespace); err != nil {
 			return err
@@ -147,7 +147,7 @@ func (s *Service) QueryMetrics(ctx context.Context, id authz.Identity, in Metric
 			Result: orEmpty(series), Warnings: orEmpty(resp.Warnings), Infos: orEmpty(resp.Infos)}
 
 		return nil
-	})
+	}(s.Backend)
 
 	return result, err
 }
@@ -271,7 +271,7 @@ func (s *Service) QueryLogs(ctx context.Context, id authz.Identity, in LogsInput
 	}
 
 	var result *LogsResult
-	err := s.admit(id, func(backend Requester) error {
+	err := func(backend Requester) error {
 		if err := s.require(ctx, id, authz.Attributes{Namespace: in.Namespace, Resource: "pods", Subresource: "log", Verb: "get", Name: in.Pod},
 			"Kubernetes RBAC denied get pods/log in namespace "+in.Namespace); err != nil {
 			return err
@@ -284,7 +284,7 @@ func (s *Service) QueryLogs(ctx context.Context, id authz.Identity, in LogsInput
 		}
 
 		return err
-	})
+	}(s.Backend)
 
 	return result, err
 }

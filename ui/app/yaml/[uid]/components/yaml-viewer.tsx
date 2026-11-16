@@ -1,4 +1,6 @@
 "use client"
+import { useKubectl } from "@/lib/hooks/use-kubectl"
+import { shellQuote } from "@/lib/utils/shell"
 
 import { useEffect, useMemo, useState } from "react"
 import { Switch } from "@/components/ui/switch"
@@ -22,6 +24,7 @@ type FetchState =
   | { status: "ready"; resource: Record<string, unknown> }
 
 export default function YamlViewer({ uid, kind, namespace, name }: Props) {
+  const kubectl = useKubectl()
   const [state, setState] = useState<FetchState>({ status: "loading" })
   const [managedParam, setManagedParam] = useSearchParam("managed")
 
@@ -61,7 +64,7 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
 
   const lines = showManaged ? views.managed : views.clean
   const hiddenCount = views.managed.length - views.clean.length
-  const command = `kubectl get ${kind.toLowerCase()} ${name} -n ${namespace} -o yaml`
+  const command = `${kubectl("get", namespace || undefined)} ${shellQuote(kind.toLowerCase())} ${shellQuote(name)} -o yaml`
 
   return (
     <DocumentViewer
@@ -69,7 +72,7 @@ export default function YamlViewer({ uid, kind, namespace, name }: Props) {
       filename={`${name}.yaml`}
       toolbar={
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
-          Show managed fields
+          Show status and managed fields
           <Switch checked={showManaged} onCheckedChange={next => setManagedParam(next ? "1" : null)} />
         </label>
       }

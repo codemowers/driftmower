@@ -5,7 +5,7 @@
 // Titles are the product a user has heard of ("PostgreSQL"), never the operator
 // ("cnpg"). The operator is an implementation detail shown on a `via` line.
 
-import type { OfferingId, PresetId, Purpose } from "../types"
+import type { OfferingId,PresetId,Purpose } from "../types"
 
 export type OfferingSpec = {
   id: OfferingId
@@ -241,7 +241,3 @@ export const OFFERINGS: OfferingSpec[] = [
 ]
 
 export const OFFERINGS_BY_ID = new Map(OFFERINGS.map(o => [o.id, o]))
-
-export function offeringFor(group: string, kind: string): OfferingSpec | null {
-  return OFFERINGS.find(o => o.group === group && o.kind === kind) ?? null
-}

@@ -60,7 +60,7 @@ func TestCompare(t *testing.T) {
 	}
 }
 
-// Ranges as GitHub serves them for advisories of sources on ee-lte-1.
+// Ranges as GitHub serves them for advisories of real sources.
 func TestMatchRange(t *testing.T) {
 	for _, tc := range []struct {
 		rng, version string

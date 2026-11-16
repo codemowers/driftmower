@@ -5,10 +5,10 @@ package metrics
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -16,9 +16,18 @@ var routes = map[string]bool{
 	"/":                                     true,
 	"/mcp":                                  true,
 	"/.well-known/oauth-protected-resource": true,
-	"/.well-known/oauth-protected-resource/mcp": true,
-	"/api/provisioning/capabilities":            true,
-	"/api/cache/invalidate":                     true,
+	"/.well-known/oauth-protected-resource/mcp":      true,
+	"/api/provisioning/capabilities":                 true,
+	"/api/cache/invalidate":                          true,
+	"/api/crawler/authorize":                         true,
+	"/api/observability/cluster-health":              true,
+	"/api/observability/alerts":                      true,
+	"/api/observability/namespace-resources":         true,
+	"/api/observability/workload-resources":          true,
+	"/api/observability/log-rate":                    true,
+	"/api/observability/signal-history":              true,
+	"/api/observability/signal-history-capabilities": true,
+	"/api/observability/image-scan-statuses":         true,
 }
 
 var methods = map[string]bool{
@@ -35,6 +44,8 @@ type Metrics struct {
 	OpenSessions       prometheus.Gauge
 	Invalidations      *prometheus.CounterVec
 	ObservabilityGuard *prometheus.CounterVec
+	ToolResponseSize   *prometheus.HistogramVec
+	ToolDuration       *prometheus.HistogramVec
 
 	requests     *prometheus.CounterVec
 	inFlight     prometheus.Gauge
@@ -45,7 +56,9 @@ type Metrics struct {
 
 func New() *Metrics {
 	m := &Metrics{
-		Registry: prometheus.NewRegistry(),
+		Registry:         prometheus.NewRegistry(),
+		ToolResponseSize: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "driftmower_mcp_tool_response_size_bytes", Help: "Serialized MCP tool result JSON bytes, excluding JSON-RPC/SSE framing and compression. Unknown tools use other.", Buckets: []float64{128, 1024, 4096, 16384, 65536, 262144, 1 << 20, 4 << 20, 16 << 20, 64 << 20}}, []string{"tool", "outcome"}),
+		ToolDuration:     prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "driftmower_mcp_tool_duration_seconds", Help: "Server-side MCP tool call duration including handler and output validation, excluding response transport. Unknown/protocol-error calls use other.", Buckets: []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60}}, []string{"tool", "outcome"}),
 		Sessions: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "driftmower_mcp_sessions_total",
 			Help: "MCP sessions initialized.",
@@ -60,7 +73,7 @@ func New() *Metrics {
 		}, []string{"source"}),
 		ObservabilityGuard: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "driftmower_mcp_observability_guard_total",
-			Help: "Observability backend requests by outcome (ok, cached, shared, busy, error) and calls refused per caller (rate_limited, caller_busy).",
+			Help: "Observability backend requests by outcome (ok, shared, error).",
 		}, []string{"outcome"}),
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "driftmower_http_requests_total",
@@ -87,7 +100,10 @@ func New() *Metrics {
 		}),
 	}
 	m.Registry.MustRegister(
+		collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsGC, collectors.MetricsMemory)),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		m.Sessions, m.OpenSessions, m.Invalidations, m.ObservabilityGuard,
+		m.ToolResponseSize, m.ToolDuration,
 		m.requests, m.inFlight, m.latency, m.requestSize, m.responseSize,
 	)
 
@@ -103,8 +119,6 @@ func routeLabel(path string) string {
 	switch {
 	case routes[path]:
 		return path
-	case path == "/ui" || strings.HasPrefix(path, "/ui/"):
-		return "/ui"
 	default:
 		return "other"
 	}

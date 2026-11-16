@@ -10,8 +10,10 @@ import PodsTab from "./pods-tab"
 import DescendantsTab from "./descendants-tab"
 import MetadataTab from "./metadata-tab"
 import HistoryTab from "./history-tab"
+import RelatedResources from "../../components/related-resources"
+import { useClusterState } from "@/lib/cluster/cluster-state"
 
-const TABS = ["Images", "Pods", "Descendants", "Metadata", "History"] as const
+const TABS = ["Images", "Pods", "Resources", "Descendants", "Metadata", "History"] as const
 
 type Props = {
   usages: ImageUsage[]
@@ -24,6 +26,7 @@ type Props = {
 export default function WorkloadTabs({ usages, issues, clusterResources, reportWorkloadUid, liveWorkloadUid }: Props) {
   const [active, setActive] = useTabParam("wtab", TABS)
   const { linkTo, suffix: contextQuery } = useContextHref()
+  const workload = useClusterState(s => s.data?.workloads?.find(w => w.uid === reportWorkloadUid || w.uid === liveWorkloadUid))
   const workloadGroupKey = usages.find(u => u.workloadRootInfo?.groupKey)?.workloadRootInfo?.groupKey
 
   return (
@@ -34,6 +37,7 @@ export default function WorkloadTabs({ usages, issues, clusterResources, reportW
       {active === "Pods" && (
         <PodsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} linkTo={linkTo} />
       )}
+      {active === "Resources" && <RelatedResources deps={workload ?? {}} empty="This workload uses no Services, Ingresses, Certificates, ConfigMaps, Secrets or claims." />}
       {active === "Descendants" && (
         <DescendantsTab clusterResources={clusterResources} reportWorkloadUid={reportWorkloadUid} liveWorkloadUid={liveWorkloadUid} linkTo={linkTo} />
       )}

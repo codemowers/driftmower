@@ -1,0 +1,25 @@
+{{- if and .Values.mcp.enabled .Values.crawler.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-history
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    monitoring.codemowers.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mcp
+  endpoints:
+    - port: drift
+      path: /drift-metrics
+      # The series name each workload's own namespace, not this Pod's.
+      honorLabels: true
+      interval: 5m
+      scrapeTimeout: 30s
+      scheme: http
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: driftmower_(version_.*|image_created_timestamp_seconds)
+          action: keep
+{{- end }}

@@ -1,0 +1,106 @@
+evaluation_interval: 1m
+rule_files:
+- rules.yaml
+tests:
+- interval: 1m
+  input_series:
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-a",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-b",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_image_vulnerabilities{job="driftmower-operator",namespace="driftmower",image="index-a",digest="sha256:a",severity="CRITICAL",fix_status="available"}
+    values: 3+0x60
+  - series: driftmower_image_vulnerabilities{job="driftmower-operator",namespace="driftmower",image="index-b",digest="sha256:a",severity="CRITICAL",fix_status="available"}
+    values: 3+0x60
+  - series: driftmower_image_scan_available{job="driftmower-operator",namespace="driftmower",image="index-a",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_serviceaccount_exposure{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-a",serviceaccount="worker",risk="namespace_admin",permission_scope="namespace/team-a"}
+    values: 1+0x60
+  - series: driftmower_serviceaccount_exposure{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-b",serviceaccount="controller",risk="cluster_admin",permission_scope="cluster"}
+    values: 1+0x60
+  - series: driftmower_scanner_inventory_ready{namespace="driftmower",job="driftmower-operator"}
+    values: 1+0x60
+  - series: driftmower_image_scan_state{namespace="driftmower",job="driftmower-operator",instance="scanner1",digest="sha256:a",state="done"}
+    values: 1+0x60
+  - series: driftmower_image_scan_state{namespace="driftmower",job="driftmower-operator",instance="scanner2",digest="sha256:a",state="done"}
+    values: 1+0x60
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="index-a",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="index-b",digest="sha256:a"}
+    values: 1+0x60
+  promql_expr_test:
+  - expr: sum(driftmower:image_vulnerabilities:max)
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 3
+  - expr: count(ALERTS{alertname="DriftmowerCriticalVulnerabilitiesInUse",alertstate="firing",severity="critical"})
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 2
+  - expr: count(ALERTS{alertname="DriftmowerServiceAccountClusterAdmin",alertstate="firing"})
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: count(ALERTS{alertname="DriftmowerRunningImageScanMissing",alertstate="firing"})
+    eval_time: 40m
+    exp_samples: []
+  - expr: count(ALERTS{alertname="DriftmowerServiceAccountBroadPermissions",alertstate="firing",risk="namespace_admin"})
+    eval_time: 40m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: count(driftmower:image_scan_state:max{state="done"})
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: count(driftmower:image_manifest_info:max * on (digest,driftmower_namespace,driftmower_instance)
+      group_left (state) driftmower:image_scan_state:max)
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 2
+- interval: 1m
+  input_series:
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-a",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-b",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_image_vulnerabilities{job="driftmower-operator",namespace="driftmower",image="index-a",digest="sha256:a",severity="CRITICAL",fix_status="available"}
+    values: 3+0x60
+  - series: driftmower_image_vulnerabilities{job="driftmower-operator",namespace="driftmower",image="index-b",digest="sha256:a",severity="CRITICAL",fix_status="available"}
+    values: 3+0x60
+  - series: driftmower_serviceaccount_exposure{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-a",serviceaccount="worker",risk="namespace_admin",permission_scope="namespace/team-a"}
+    values: 1+0x60
+  - series: driftmower_serviceaccount_exposure{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team-b",serviceaccount="controller",risk="cluster_admin",permission_scope="cluster"}
+    values: 1+0x60
+  - series: driftmower_scanner_inventory_ready{namespace="driftmower",job="driftmower-operator"}
+    values: 1+0x60
+  - series: driftmower_image_scan_state{namespace="driftmower",job="driftmower-operator",instance="scanner1",digest="sha256:a",state="done"}
+    values: 1+0x60
+  - series: driftmower_image_scan_state{namespace="driftmower",job="driftmower-operator",instance="scanner2",digest="sha256:a",state="done"}
+    values: 1+0x60
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="index-a",digest="sha256:a"}
+    values: 1+0x60
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="index-b",digest="sha256:a"}
+    values: 1+0x60
+  promql_expr_test:
+  - expr: count(ALERTS{alertname="DriftmowerRunningImageScanMissing",alertstate="firing"})
+    eval_time: 40m
+    exp_samples:
+    - labels: '{}'
+      value: 2
+  - expr: count(driftmower:image_scan_state:max{state="done"})
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+  - expr: count(driftmower:image_manifest_info:max * on (digest,driftmower_namespace,driftmower_instance)
+      group_left (state) driftmower:image_scan_state:max)
+    eval_time: 20m
+    exp_samples:
+    - labels: '{}'
+      value: 2

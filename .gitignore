@@ -4,3 +4,22 @@ skaffold.env
 /driftmower-mcp
 
 /.build-tmp/
+
+# Local cluster settings
+skaffold.env.*
+!skaffold.env.example
+
+# Derived from the pinned SPDX submodule by the UI prebuild script.
+/ui/lib/features/crawler/license-data.ts
+
+# Native desktop binary and exported browser assets.
+/desktop/build/
+
+# Generated frontend embedded into the native desktop binary.
+/desktop/frontend/
+
+# CI release packages.
+/dist/
+
+# Python release tooling caches.
+__pycache__/

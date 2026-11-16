@@ -1,7 +1,7 @@
-import { fetchJson } from "@/lib/utils/fetch-json"
-import { pairVolumes, type PodVolume, type PromQuery, type ResourceTriplet } from "./query"
+import { fetchMcpJSON } from "@/browser/connection"
+import { type PodVolume,type ResourceTriplet } from "./query"
 
-export type { PodVolume, ResourceTriplet } from "./query"
+export type { PodVolume,ResourceTriplet } from "./query"
 
 export type PodMetrics = {
   memory: ResourceTriplet
@@ -26,40 +26,8 @@ export function podMetricQueries(namespace: string, pod: string) {
   }
 }
 
-export function fetchPodMetrics(namespace: string, pod: string): Promise<PodMetrics | null> {
-  const params = new URLSearchParams({ namespace, pod })
-  return fetchJson<PodMetrics | null>(`/api/prometheus/pod-metrics?${params}`)
-}
-
-export async function loadPodMetrics(prom: PromQuery, namespace: string, pod: string): Promise<PodMetrics | null> {
-  const q = podMetricQueries(namespace, pod)
-  const [memUsage, memLimit, memRequest, cpuUsage, cpuLimit, cpuRequest, usedRows, capacityRows, qosRows] = await Promise.all([
-    prom.scalar(q.memUsage),
-    prom.scalar(q.memLimit),
-    prom.scalar(q.memRequest),
-    prom.scalar(q.cpuUsage),
-    prom.scalar(q.cpuLimit),
-    prom.scalar(q.cpuRequest),
-    prom.vector(q.volUsed),
-    prom.vector(q.volCapacity),
-    prom.vector(q.qos),
-  ])
-
-  const volumes = pairVolumes(usedRows, capacityRows)
-  const qosClass = qosRows.find(row => Number(row.value[1]) === 1)?.metric.qos_class
-    ?? qosRows[0]?.metric.qos_class
-    ?? null
-
-  const allScalarsNull =
-    memUsage === null && memLimit === null && memRequest === null &&
-    cpuUsage === null && cpuLimit === null && cpuRequest === null
-
-  if (allScalarsNull && volumes.length === 0) return null
-
-  return {
-    memory: { usage: memUsage, limit: memLimit, request: memRequest },
-    cpu: { usage: cpuUsage, limit: cpuLimit, request: cpuRequest },
-    volumes,
-    qosClass,
-  }
+// One Pod of a workload, through the same MCP tool as the whole workload.
+export async function fetchPodMetrics(namespace: string, workloadUid: string, pod: string, signal?: AbortSignal): Promise<PodMetrics | null> {
+  if (!namespace || !workloadUid || !pod) return null
+  return fetchMcpJSON<PodMetrics>(`/api/observability/workload-resources?${new URLSearchParams({namespace, uid: workloadUid, pod})}`, { signal })
 }

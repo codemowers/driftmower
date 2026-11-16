@@ -40,7 +40,6 @@ footer svg { flex-shrink: 0; }
 <p>Driftmower MCP connects AI assistants to this Kubernetes cluster through the Model Context Protocol (MCP). Its tools discover available resources and admission policies, inspect workloads and resource usage, and provide provisioning guidance based on the cluster’s live configuration and your permissions.</p>
 <p><a href="https://mcp.codemowers.io">mcp.codemowers.io</a> provides general software engineering guidance for building and deploying applications. Use it alongside this server when you need both development guidance and facts about the target cluster.</p>
 </header>
-{{if .WebUI}}<section><h2>MCP Explorer</h2><p><a href="/ui">Open the explorer</a> to sign in and inspect accessible namespaces, workloads, resource usage and cluster catalogs.</p></section>{{end}}
 <section><h2>Using this server</h2>
 <p>Cluster: <code>{{.ClusterID}}</code><br>
 Kubernetes API: <code>{{.APIURL}}</code></p>
@@ -52,6 +51,13 @@ Kubernetes API: <code>{{.APIURL}}</code></p>
 {{if and .Authenticated .ClientID}}<h3>Codex project config — .codex/config.toml</h3><pre><code>{{.CodexProject}}</code></pre><p>Set <code>callback_url</code> explicitly to match the registered loopback callback path. See <a href="https://github.com/passmower/passmower/issues/276#issuecomment-5875832808">Passmower’s Codex callback guidance</a>.</p>{{end}}
 <h3>Claude Code project config — .mcp.json</h3>
 <pre><code>{{.MCPJSON}}</code></pre>
+<h3>OpenCode</h3>
+<p>Run this from your project directory to add the server{{if and .Authenticated .ClientID}} and merge its OAuth client ID into <code>opencode.json</code> using <code>jq</code>{{end}}. This uses the <a href="https://opencode.ai/docs/mcp-servers/">OpenCode V2 MCP configuration</a>.</p>
+<pre><code>{{.OpenCode}}</code></pre>
+{{if .OpenCodeGlobal}}<p>For the global configuration instead of the project one, merge the client ID into <code>$XDG_CONFIG_HOME/opencode/opencode.json</code>:</p>
+<pre><code>{{.OpenCodeGlobal}}</code></pre>
+{{end}}{{if .Authenticated}}<p>Then sign in:</p>
+<pre><code>{{.OpenCodeAuth}}</code></pre>{{end}}
 <h3>Other MCP clients</h3>
 <pre><code>{{.OtherClients}}</code></pre>
 </section>

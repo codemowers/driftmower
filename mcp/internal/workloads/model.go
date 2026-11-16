@@ -5,6 +5,8 @@
 package workloads
 
 import (
+	"time"
+
 	"slices"
 	"strings"
 
@@ -105,20 +107,34 @@ type OrphanOwner struct {
 	Dependencies
 }
 
+type SourceRepository struct {
+	Name   string   `json:"name,omitempty"`
+	URL    string   `json:"url"`
+	Images []string `json:"images,omitempty"`
+}
+
 // Workload is a root owner, or the namespace's orphan bucket (kind
 // Namespace, name orphaned-workloads).
 type Workload struct {
-	DesiredReplicas      *int32 `json:"desiredReplicas,omitempty"`
-	Completed            bool   `json:"completed,omitempty"`
-	HelmReleaseName      string `json:"helmReleaseName,omitempty"`
-	HelmReleaseNamespace string `json:"helmReleaseNamespace,omitempty"`
-	HelmChart            string `json:"helmChart,omitempty"`
-	Name                 string `json:"name"`
-	Kind                 string `json:"kind"`
-	Namespace            string `json:"namespace"`
-	APIVersion           string `json:"apiVersion,omitempty"`
-	UID                  string `json:"uid,omitempty"`
-	OwnerReferenceOnly   bool   `json:"ownerReferenceOnly,omitempty"`
+	SourceRepositories   []SourceRepository `json:"sourceRepositories,omitempty"`
+	DesiredReplicas      *int32             `json:"desiredReplicas,omitempty"`
+	Completed            bool               `json:"completed,omitempty"`
+	HelmReleaseName      string             `json:"helmReleaseName,omitempty"`
+	HelmReleaseNamespace string             `json:"helmReleaseNamespace,omitempty"`
+	HelmChart            string             `json:"helmChart,omitempty"`
+	// Provenance labels and annotations, by key.
+	Provenance map[string]string `json:"provenance,omitempty"`
+	CreatedAt  *time.Time        `json:"createdAt,omitempty"`
+	// The latest write to the object other than to its status, and the
+	// field manager that made it.
+	UpdatedAt          *time.Time `json:"updatedAt,omitempty"`
+	UpdatedBy          string     `json:"updatedBy,omitempty"`
+	Name               string     `json:"name"`
+	Kind               string     `json:"kind"`
+	Namespace          string     `json:"namespace"`
+	APIVersion         string     `json:"apiVersion,omitempty"`
+	UID                string     `json:"uid,omitempty"`
+	OwnerReferenceOnly bool       `json:"ownerReferenceOnly,omitempty"`
 	Dependencies
 	StandalonePods []StandalonePod `json:"standalonePods,omitempty"`
 	// Qualified kind ("Kind.group") -> owner name -> what it generated.
@@ -128,6 +144,7 @@ type Workload struct {
 // Inventory is the caller's view of one or more namespaces.
 type Inventory struct {
 	Workloads []*Workload `json:"workloads"`
+	Total     int         `json:"total"`
 	Warnings  []string    `json:"warnings,omitempty"`
 	// Opaque; changes whenever the cached cluster state does.
 	Revision string `json:"revision,omitempty"`
@@ -213,8 +230,28 @@ type Node struct {
 	APIVersion string
 	Kind       string
 	Spec       Spec
+	Pod        *PodSnapshot
 	// A custom owner known only from a child's ownerReference.
 	OwnerReferenceOnly bool
+}
+
+// PodSnapshot is a small runtime inventory, without Pod specs, environment
+// values, annotations or image filesystem metadata.
+type PodSnapshot struct {
+	Name                string         `json:"name"`
+	Namespace           string         `json:"namespace"`
+	UID                 string         `json:"uid"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	NodeName            string         `json:"nodeName,omitempty"`
+	Phase               string         `json:"phase"`
+	IPs                 []string       `json:"ips,omitempty"`
+	HasImagePullSecrets bool           `json:"hasImagePullSecrets"`
+	Containers          []PodContainer `json:"containers"`
+}
+type PodContainer struct {
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	ImageID string `json:"imageID,omitempty"`
 }
 
 // DeepCopyObject lets informer stores hold nodes; they are never mutated.
@@ -223,7 +260,47 @@ func (n *Node) DeepCopyObject() runtime.Object { return n }
 func (n *Node) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 // Annotations the inventory reads. Arbitrary annotations can hold secrets.
-var keptAnnotations = []string{"meta.helm.sh/release-name", "meta.helm.sh/release-namespace", "kubernetes.io/config.mirror", "reflector.v1.k8s.emberstack.com/reflects"}
+var keptAnnotations = []string{"meta.helm.sh/release-name", "meta.helm.sh/release-namespace", "kubernetes.io/config.mirror", "reflector.v1.k8s.emberstack.com/reflects",
+	"codemowers.io/created-by", "argocd.argoproj.io/tracking-id"}
+
+// Annotations and labels that record who or what created a root workload:
+// the authenticated creator recorded by admission, and the deploy tools'
+// own markers.
+var provenanceKeys = []string{"codemowers.io/created-by", "argocd.argoproj.io/tracking-id", "skaffold.dev/run-id",
+	"helm.toolkit.fluxcd.io/namespace", "helm.toolkit.fluxcd.io/name", "app.kubernetes.io/managed-by"}
+
+// times reports when a node was created and last written to, and by which
+// field manager; an owner known only from a reference has neither.
+func times(n *Node) (created, updated *time.Time, by string) {
+	if !n.CreationTimestamp.IsZero() {
+		t := n.CreationTimestamp.UTC()
+		created = &t
+	}
+	if len(n.ManagedFields) > 0 {
+		t := n.ManagedFields[0].Time.UTC()
+		updated, by = &t, n.ManagedFields[0].Manager
+	}
+
+	return created, updated, by
+}
+
+func provenance(n *Node) map[string]string {
+	var out map[string]string
+	for _, k := range provenanceKeys {
+		v, ok := n.Annotations[k]
+		if !ok {
+			v, ok = n.Labels[k]
+		}
+		if ok && v != "" {
+			if out == nil {
+				out = map[string]string{}
+			}
+			out[k] = v
+		}
+	}
+
+	return out
+}
 
 func groupOf(apiVersion string) string {
 	if g, _, ok := strings.Cut(apiVersion, "/"); ok {

@@ -1,10 +1,6 @@
-import type { Report } from "@/lib/cluster/reports"
-import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import { ACTIONS_ASSESS_URL } from "@/lib/cluster/constants"
 import { readApiError } from "@/lib/utils/read-api-error"
-import { deriveClusterActions } from "./derive"
-import type { ActionFacts, ActionRow, AssessResponse, AssessState } from "./types"
+import type { ActionFacts,ActionRow,AssessResponse,AssessState } from "./types"
 
 export const MAX_ACTIONS_PER_REQUEST = 500
 
@@ -45,21 +41,4 @@ export async function postAssessAll(actions: ActionFacts[], focus: boolean): Pro
     Object.assign(merged.results, outcome.results)
   }
   return merged
-}
-
-const prewarmed = new Set<string>()
-
-export function prewarmActions(
-  reportId: string,
-  data: Report,
-  clusterResources: ClusterResource[] | null,
-  vulnReports: Record<string, VulnerabilityReport> | null,
-): void {
-  if (prewarmed.has(reportId)) return
-  prewarmed.add(reportId)
-  const actions = deriveClusterActions(data, clusterResources, vulnReports, null).map(row => row.facts)
-  if (actions.length === 0) return
-  void postAssessAll(actions, false)
-    .then(outcome => "results" in outcome && rememberResults(outcome.results))
-    .catch(() => prewarmed.delete(reportId))
 }

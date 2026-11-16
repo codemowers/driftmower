@@ -12,6 +12,10 @@ import { useContextHref } from "@/lib/hooks/use-context-href"
 import { cn } from "@/lib/utils/cn"
 import { hydrateSandboxContext, toggleSandbox, useSandboxContext } from "@/lib/tenancy/sandbox-context"
 import LoadingLine from "@/app/components/loading-line"
+import AccessCard from "@/app/provisioning/components/access-card"
+import HostCard from "@/app/provisioning/components/host-card"
+import Section from "@/app/provisioning/components/section"
+import { useCapabilities } from "@/lib/features/provisioning/use-capabilities"
 
 export default function SandboxDetailPage() {
   const params = useParams<{ sandbox: string }>()
@@ -126,34 +130,39 @@ export default function SandboxDetailPage() {
 
         <KubeconfigPanel key={sandbox.sandbox} sandbox={sandbox.sandbox} />
 
-        {/* linkTo carries the sandbox selection, so Provisioning opens already
-            scoped to this sandbox and shows its hostname rather than asking the
-            user to pick it again. */}
-        <p className="text-sm text-muted-foreground">
-          Deploying into this sandbox?{" "}
-          <PrefetchLink
-            href={linkTo("/provisioning", { drop: ["focus"] })}
-            className="text-brand-label underline decoration-dotted underline-offset-2 hover:text-brand"
-          >
-            Provisioning
-          </PrefetchLink>{" "}
-          shows the hostname it may claim, which storage classes exist, how much quota is left, and the
-          admission rules that will reject a deployment here.
-        </p>
+        <SandboxCapabilities namespace={sandbox.namespace} />
+
         {sandbox.registryEnabled && (
           <p className="text-sm text-muted-foreground">
             This sandbox runs its own container registry. Its{" "}
             <PrefetchLink
-              href={`${linkTo("/provisioning", { drop: ["focus"] })}#registry`}
+              href={linkTo("/registry", { drop: ["focus"] })}
               className="text-brand-label underline decoration-dotted underline-offset-2 hover:text-brand"
             >
               Container registry
             </PrefetchLink>{" "}
-            section has the <code className="font-mono text-xs">docker login</code>, a ready{" "}
+            page has the <code className="font-mono text-xs">docker login</code>, a ready{" "}
             <code className="font-mono text-xs">skaffold.env</code> and a pull example.
           </p>
         )}
       </main>
     </div>
+  )
+}
+
+// What you may do in the sandbox's namespace and the hostnames it may claim.
+function SandboxCapabilities({ namespace }: { namespace: string }) {
+  const state = useCapabilities([namespace])
+  if (state.status === "loading") return <LoadingLine loading="sandbox access" />
+  if (state.status !== "ready") return null
+  return (
+    <>
+      <Section title="Your access" hint="Asked of the cluster as you, for every resource type it serves. Admission policies can still reject an apply these permissions allow.">
+        <AccessCard namespaces={state.capabilities.namespaces} />
+      </Section>
+      <Section title="Hostnames" hint="The ingress controller is shared, so the hostname this sandbox may claim is anchored on its namespace and enforced on admission.">
+        <HostCard ingress={state.capabilities.ingress} />
+      </Section>
+    </>
   )
 }

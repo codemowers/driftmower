@@ -10,6 +10,3 @@ export const DRIFT_CHART_CONFIG = {
   no_data: { label: "No data", color: "var(--color-status-neutral-bg)" },
   rottenness: { label: "Rottenness", color: "var(--color-brand)" },
 } satisfies ChartConfig
-
-
-

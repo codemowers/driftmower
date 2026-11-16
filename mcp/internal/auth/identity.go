@@ -14,6 +14,9 @@ import (
 // review this server sends must reproduce it exactly, or the API server
 // answers confidently about a user that does not exist.
 type Mapping struct {
+	// ReadAll is an explicitly configured read-only mode: verified OIDC
+	// subjects need not map to Kubernetes usernames or groups.
+	ReadAll        bool
 	UsernameClaim  string
 	GroupsClaim    string
 	UsernamePrefix string
@@ -37,6 +40,9 @@ func KubernetesIdentity(c *Caller, m Mapping) (authz.Identity, error) {
 	// carry Kubernetes names and must not gain OIDC prefixes.
 	if c.Kubernetes != nil {
 		return authz.Identity{User: c.Kubernetes.User, Groups: slices.Clone(c.Kubernetes.Groups)}, nil
+	}
+	if m.ReadAll {
+		return authz.Identity{User: "oidc:" + c.Sub}, nil
 	}
 
 	username := c.IdentityClaims.Username

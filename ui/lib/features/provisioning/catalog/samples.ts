@@ -20,6 +20,7 @@ import { OFFERINGS_BY_ID } from "./offerings.ts"
 import type { OfferingId, StorageClassFact } from "../types"
 
 export type SampleInput = {
+  kubectlPrefix?: string
   // "postgresql.cnpg.io/v1" — the version this cluster serves.
   apiVersion: string
   namespace: string | null
@@ -263,5 +264,6 @@ spec:
 }
 
 export function sampleFor(id: OfferingId, input: SampleInput): OfferingSample {
-  return SAMPLES[id](input)
+  const result = SAMPLES[id](input)
+  return { ...result, connect: result.connect && input.kubectlPrefix ? result.connect.replaceAll(kubectl(input.namespace), input.kubectlPrefix) : result.connect }
 }

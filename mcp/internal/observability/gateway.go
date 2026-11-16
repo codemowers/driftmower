@@ -1,6 +1,5 @@
 // Package observability answers metrics, logs, resource-usage and volume
-// questions from Prometheus, Loki and the Kubernetes API, behind guards that
-// keep one caller from exhausting the shared backends.
+// questions from Prometheus, Loki and the Kubernetes API.
 package observability
 
 import (
@@ -14,8 +13,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
-
-	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
 // Response is a backend answer. Status is not checked here; callers decide.
@@ -65,57 +62,29 @@ func HTTPRequester(timeout time.Duration) Requester {
 	})
 }
 
-// Refused is an immediate refusal with a retry hint; nothing waits
-// unboundedly.
-type Refused struct {
-	// busy, rate_limited or caller_busy.
-	Reason            string
-	RetryAfterSeconds int
-	Message           string
-}
-
-func (r *Refused) Error() string { return r.Message }
-
-// GatewayOptions configure the server-wide guard in front of Prometheus and
-// Loki, which every tenant shares.
+// GatewayOptions configure query sharing and backend timeouts.
 type GatewayOptions struct {
 	Next Requester
 	// Requests under this base URL are Prometheus queries: they get its
-	// timeout and may be cached. Matched by URL, since Loki has the same
+	// timeout. Matched by URL, since Loki has the same
 	// /api/v1/query_range suffix.
 	PrometheusURL string
-	MaxConcurrent int
-	MaxQueued     int
-	QueueWait     time.Duration
-	// Successful Prometheus answers are reused this long; zero is off.
-	CacheTTL time.Duration
 	// Sent as Prometheus's timeout so it stops evaluating when we stop
 	// waiting.
 	PrometheusTimeout time.Duration
-	// ok, cached, shared, busy or error.
+	// ok, shared or error.
 	OnOutcome func(outcome string)
 }
 
-// Gateway caps backend requests in flight with a short bounded queue, shares
-// identical requests in flight, and caches identical Prometheus queries.
+// Gateway shares identical requests in flight. Completed responses are never retained.
 type Gateway struct {
 	opts   GatewayOptions
-	slots  chan struct{}
-	queue  chan struct{}
 	flight singleflight.Group
-	cache  *ttlcache.Cache[Response]
 	prom   *url.URL
 }
 
-const maxCachedQueries = 1000
-
 func NewGateway(opts GatewayOptions) *Gateway {
-	g := &Gateway{
-		opts:  opts,
-		slots: make(chan struct{}, opts.MaxConcurrent),
-		queue: make(chan struct{}, opts.MaxQueued),
-		cache: ttlcache.New[Response](opts.CacheTTL, maxCachedQueries, nil),
-	}
+	g := &Gateway{opts: opts}
 	if opts.PrometheusURL != "" {
 		g.prom, _ = url.Parse(strings.TrimRight(opts.PrometheusURL, "/"))
 	}
@@ -135,32 +104,6 @@ func (g *Gateway) isPrometheusQuery(u *url.URL) bool {
 	return u.Path == base+"/api/v1/query" || u.Path == base+"/api/v1/query_range"
 }
 
-func (g *Gateway) acquire(ctx context.Context) error {
-	select {
-	case g.slots <- struct{}{}:
-		return nil
-	default:
-	}
-	select {
-	case g.queue <- struct{}{}:
-	default:
-		return &Refused{Reason: "busy", RetryAfterSeconds: 1, Message: fmt.Sprintf(
-			"The observability backend is at its limit (%d running, %d waiting); retry shortly", g.opts.MaxConcurrent, g.opts.MaxQueued)}
-	}
-	defer func() { <-g.queue }()
-	timer := time.NewTimer(g.opts.QueueWait)
-	defer timer.Stop()
-	select {
-	case g.slots <- struct{}{}:
-		return nil
-	case <-timer.C:
-		return &Refused{Reason: "busy", RetryAfterSeconds: 1, Message: fmt.Sprintf(
-			"The observability backend stayed at its concurrent limit for %d ms; retry shortly", g.opts.QueueWait.Milliseconds())}
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 func (g *Gateway) Get(ctx context.Context, u *url.URL) (Response, error) {
 	prometheus := g.isPrometheusQuery(u)
 	if prometheus && g.opts.PrometheusTimeout > 0 && !u.Query().Has("timeout") {
@@ -171,15 +114,6 @@ func (g *Gateway) Get(ctx context.Context, u *url.URL) (Response, error) {
 		u = &copied
 	}
 	key := u.String()
-	cacheable := prometheus && g.opts.CacheTTL > 0
-	if cacheable {
-		if hit, ok := g.cache.Get(key); ok {
-			g.opts.OnOutcome("cached")
-
-			return hit, nil
-		}
-	}
-
 	// singleflight reports every caller as shared, the one that ran the
 	// request included; only the joiners are shared outcomes.
 	ran := false
@@ -188,10 +122,6 @@ func (g *Gateway) Get(ctx context.Context, u *url.URL) (Response, error) {
 		// Detached from the first caller so its cancellation cannot fail
 		// the others sharing the request.
 		bg := context.WithoutCancel(ctx)
-		if err := g.acquire(bg); err != nil {
-			return Response{}, err
-		}
-		defer func() { <-g.slots }()
 
 		return g.opts.Next.Get(bg, u)
 	})
@@ -200,20 +130,12 @@ func (g *Gateway) Get(ctx context.Context, u *url.URL) (Response, error) {
 		g.opts.OnOutcome("shared")
 	}
 	if err != nil && !shared {
-		var refused *Refused
-		if errors.As(err, &refused) {
-			g.opts.OnOutcome("busy")
-		} else {
-			g.opts.OnOutcome("error")
-		}
+		g.opts.OnOutcome("error")
 	}
 	if err != nil {
 		return Response{}, err
 	}
 	resp := result.(Response)
-	if cacheable && resp.Status == http.StatusOK {
-		g.cache.Set(key, resp)
-	}
 	if !shared {
 		g.opts.OnOutcome("ok")
 	}

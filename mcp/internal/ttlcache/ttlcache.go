@@ -20,6 +20,24 @@ type Cache[V any] struct {
 	entries    map[string]*list.Element
 }
 
+// Stats counts retained entries, including expired values which have not yet
+// been evicted. KeyBytes measures keys only, not the size of cached values.
+type Stats struct{ Entries, Expired, Capacity, Loading, KeyBytes int }
+
+func (c *Cache[V]) Stats() Stats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := Stats{Entries: len(c.entries), Capacity: c.maxEntries}
+	now := c.now()
+	for key, el := range c.entries {
+		s.KeyBytes += len(key)
+		if !now.Before(el.Value.(*entry[V]).expiresAt) {
+			s.Expired++
+		}
+	}
+	return s
+}
+
 type entry[V any] struct {
 	key       string
 	value     V
@@ -147,6 +165,7 @@ type Memo[T any] struct {
 	value     T
 	expiresAt time.Time
 	valid     bool
+	loaded    bool
 	pending   *call[T]
 }
 
@@ -199,10 +218,27 @@ func (m *Memo[T]) run(ctx context.Context, c *call[T]) {
 	m.mu.Lock()
 	if c.err == nil {
 		m.value, m.expiresAt, m.valid = c.value, m.now().Add(m.ttl), true
+		m.loaded = true
 	}
 	m.pending = nil
 	m.mu.Unlock()
 	close(c.done)
+}
+
+func (m *Memo[T]) Stats() Stats {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := Stats{Capacity: 1}
+	if m.loaded {
+		s.Entries = 1
+		if !m.valid || !m.now().Before(m.expiresAt) {
+			s.Expired = 1
+		}
+	}
+	if m.pending != nil {
+		s.Loading = 1
+	}
+	return s
 }
 
 // Invalidate drops the cached value. A load already in flight still stores

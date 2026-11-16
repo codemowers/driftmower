@@ -137,9 +137,9 @@ func TestFindRegistries(t *testing.T) {
 }
 
 func TestSkaffoldEnv(t *testing.T) {
-	id := "ee-lte-1.codemowers.io"
-	got := SkaffoldEnvFor(KubeContextFor(&id, "quake3"), "registry.quake3.ee-lte-1.codemowers.io", "quake3")
-	want := "SKAFFOLD_KUBE_CONTEXT=ee-lte-1.codemowers.io/quake3\nSKAFFOLD_DEFAULT_REPO=registry.quake3.ee-lte-1.codemowers.io\n" +
+	id := "alpha.example.com"
+	got := SkaffoldEnvFor(KubeContextFor(&id, "quake3"), "registry.quake3.alpha.example.com", "quake3")
+	want := "SKAFFOLD_KUBE_CONTEXT=alpha.example.com/quake3\nSKAFFOLD_DEFAULT_REPO=registry.quake3.alpha.example.com\n" +
 		"SKAFFOLD_NAMESPACE=quake3\nSKAFFOLD_CLEANUP=false"
 	if got != want {
 		t.Errorf("SkaffoldEnvFor = %q", got)

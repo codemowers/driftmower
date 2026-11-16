@@ -1,4 +1,5 @@
 "use client"
+import { shellQuote } from "@/lib/utils/shell"
 
 import { useEffect, useState } from "react"
 import { Check, Copy, Download } from "lucide-react"
@@ -66,7 +67,8 @@ export default function KubeconfigPanel({ sandbox }: { sandbox: string }) {
   }, [sandbox])
 
   const filename = `kubeconfig-${sandbox}.yaml`
-  const command = `kubectl --kubeconfig ${filename} get pods`
+  const downloadedContext = state.status === "ready" ? readContext(state.yaml, sandbox).context : "<context>"
+  const command = `kubectl get --kubeconfig ${shellQuote(filename)} --context ${shellQuote(downloadedContext)} pods`
 
   // Same merge recipe platform-manager hands out: write the sandbox config to a
   // scratch file, let `kubectl config view --raw` fold it into the existing

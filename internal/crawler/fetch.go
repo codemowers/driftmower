@@ -24,12 +24,15 @@ const (
 )
 
 var errNotFound = errors.New("not found")
+var errResponseTooLarge = errors.New("response too large")
 
 // fetcher makes conditional GET requests, reusing a cached body on 304, and
 // paces GitHub requests by the rate limit GitHub reports.
 type fetcher struct {
 	client      *http.Client
 	githubToken string
+	githubBase  string
+	metrics     *fetchMetrics
 
 	mu        sync.Mutex
 	cache     map[string]cachedResponse
@@ -43,25 +46,52 @@ type cachedResponse struct {
 }
 
 func newFetcher(client *http.Client, githubToken string) *fetcher {
-	return &fetcher{client: client, githubToken: githubToken, cache: map[string]cachedResponse{}, remaining: -1}
+	return &fetcher{client: client, githubToken: githubToken, githubBase: githubAPI, metrics: newFetchMetrics(), cache: map[string]cachedResponse{}, remaining: -1}
 }
 
 // getJSON fetches url and decodes it into out. It returns errNotFound for 404.
-func (f *fetcher) getJSON(ctx context.Context, url string, out any) error {
-	github := strings.HasPrefix(url, githubAPI+"/")
+func (f *fetcher) getJSON(ctx context.Context, url string, out any) (err error) {
+	observe := f.observeFetch(url)
+	defer func() { observe(err) }()
+	body, err := f.get(ctx, url, false)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, out)
+}
+
+// getRaw fetches a file's contents as they are, such as a changelog.
+func (f *fetcher) getRaw(ctx context.Context, url string) (body []byte, err error) {
+	observe := f.observeFetch(url)
+	defer func() { observe(err) }()
+	return f.get(ctx, url, true)
+}
+
+func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error) {
+	base := f.githubBase
+	if base == "" {
+		base = githubAPI
+	}
+	github := strings.HasPrefix(url, base+"/")
 	if github {
 		if err := f.waitGitHub(ctx); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
+	if raw {
+		req.Header.Set("Accept", "*/*")
+	}
 	if github {
 		req.Header.Set("Accept", "application/vnd.github+json")
+		if raw {
+			req.Header.Set("Accept", "application/vnd.github.raw")
+		}
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 		if f.githubToken != "" {
 			req.Header.Set("Authorization", "Bearer "+f.githubToken)
@@ -79,8 +109,9 @@ func (f *fetcher) getJSON(ctx context.Context, url string, out any) error {
 		}
 	}
 	resp, err := f.client.Do(req)
+	f.observeHTTP(url, resp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if github {
@@ -91,13 +122,13 @@ func (f *fetcher) getJSON(ctx context.Context, url string, out any) error {
 	case resp.StatusCode == http.StatusNotModified && hasCache:
 		body = cached.body
 	case resp.StatusCode == http.StatusNotFound:
-		return errNotFound
+		return nil, errNotFound
 	case resp.StatusCode == http.StatusOK:
 		if body, err = io.ReadAll(io.LimitReader(resp.Body, maxBody+1)); err != nil {
-			return err
+			return nil, err
 		}
 		if len(body) > maxBody {
-			return fmt.Errorf("%s: response too large", url)
+			return nil, fmt.Errorf("%s: %w", url, errResponseTooLarge)
 		}
 		if etag, modified := resp.Header.Get("ETag"), resp.Header.Get("Last-Modified"); etag != "" || modified != "" {
 			f.mu.Lock()
@@ -105,13 +136,15 @@ func (f *fetcher) getJSON(ctx context.Context, url string, out any) error {
 			f.mu.Unlock()
 		}
 	default:
-		return fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+		return nil, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
-	return json.Unmarshal(body, out)
+	return body, nil
 }
 
 // postJSON sends in as JSON and decodes the response into out.
-func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) error {
+func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) (err error) {
+	observe := f.observeFetch(url)
+	defer func() { observe(err) }()
 	data, err := json.Marshal(in)
 	if err != nil {
 		return err
@@ -123,6 +156,7 @@ func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) error {
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := f.client.Do(req)
+	f.observeHTTP(url, resp)
 	if err != nil {
 		return err
 	}

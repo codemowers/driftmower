@@ -26,19 +26,42 @@ function displayPath(path: string): string {
   return `…${path.slice(path.length - MAX_PATH_CHARS + 1)}`
 }
 
-const KEY_LINE = /^(\s*(?:- )?)([^:\s][^:]*):(\s.*)?$/
+const KEY_LINE = /^(\s*(?:- )*)([^:\s][^:]*):(?:(\s+)(.*))?$/
+const ITEM_LINE = /^(\s*(?:- )+)(.*)$/
+
+// A YAML scalar coloured by type: numbers, booleans and null, quoted and
+// plain strings, and block indicators.
+function Scalar({ text }: { text: string }) {
+  if (text === "") return null
+  if (/^(true|false|null|~)$/i.test(text)) return <span className="text-status-minor-label">{text}</span>
+  if (/^[+-]?(\d+(\.\d+)?([eE][+-]?\d+)?|0x[0-9a-fA-F]+)$/.test(text)) return <span className="text-status-ahead-label">{text}</span>
+  if (/^[|>][+-]?$/.test(text) || text === "{}" || text === "[]") return <span className="text-muted-foreground">{text}</span>
+  return <span className="text-status-ok-label">{text}</span>
+}
+
+function Dashes({ text }: { text: string }) {
+  const indent = text.length - text.trimStart().length
+  return <>{text.slice(0, indent)}<span className="text-muted-foreground">{text.slice(indent)}</span></>
+}
 
 function LineText({ text }: { text: string }) {
-  const match = KEY_LINE.exec(text)
-  if (!match) return <span className="text-foreground">{text}</span>
-  const [, prefix, key, rest] = match
-  return (
-    <span className="text-foreground">
-      {prefix}
-      <span className="text-brand-label">{key}</span>
-      {`:${rest ?? ""}`}
-    </span>
-  )
+  const key = KEY_LINE.exec(text)
+  if (key) {
+    const [, prefix, name, space, value] = key
+    return (
+      <span className="text-foreground">
+        <Dashes text={prefix} />
+        <span className="text-brand-label">{name}</span>
+        <span className="text-muted-foreground">:</span>
+        {space}
+        <Scalar text={value ?? ""} />
+      </span>
+    )
+  }
+  const item = ITEM_LINE.exec(text)
+  if (item) return <span className="text-foreground"><Dashes text={item[1]} /><Scalar text={item[2]} /></span>
+  const indent = text.length - text.trimStart().length
+  return <span className="text-foreground">{text.slice(0, indent)}<Scalar text={text.slice(indent)} /></span>
 }
 
 export default function DocumentViewer({ lines, filename, toolbar, footer, className, paneClassName }: Props) {

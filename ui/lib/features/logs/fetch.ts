@@ -1,33 +1,47 @@
-import { LOGS_CONTAINERS_URL, LOGS_URL } from "@/lib/cluster/constants"
-import { readApiError } from "@/lib/utils/read-api-error"
-import { TAIL_LINES } from "./constants"
-import type { ContainersResponse, LogsResponse, LogSource } from "./types"
+import { callTool } from "@/browser/connection"
+import { nsToRFC3339 } from "./line"
+import { parseLogLine } from "./parse"
+import type { LogsResponse } from "./types"
 
-export async function fetchLogs(args: {
-  ns: string
-  pod: string
-  uid: string
-  container?: string
-  sinceNs: string | null
-  limit?: number
-  sourceHint?: LogSource | null
-  previous?: boolean
-}): Promise<LogsResponse> {
-  const params = new URLSearchParams({ ns: args.ns, pod: args.pod, uid: args.uid })
-  if (args.container) params.set("container", args.container)
-  if (args.sinceNs) params.set("sinceNs", args.sinceNs)
-  params.set("limit", String(args.limit ?? TAIL_LINES))
-  if (args.sourceHint === "kube API") params.set("source", "kube")
-  if (args.previous) params.set("previous", "1")
-
-  const res = await fetch(`${LOGS_URL}?${params}`, { cache: "no-store" })
-  if (!res.ok) throw new Error(await readApiError(res))
-  return (await res.json()) as LogsResponse
+type WorkloadLogs = {
+  source: "loki" | "kubernetes" | "none"
+  selector: "labels" | "pods" | "namespace"
+  containers: string[]
+  entries: { tsNs: string; pod: string; container: string; line: string }[]
+  warnings: string[]
 }
 
-export async function fetchContainers(ns: string, pod: string): Promise<string[]> {
-  const params = new URLSearchParams({ ns, pod })
-  const res = await fetch(`${LOGS_CONTAINERS_URL}?${params}`, { cache: "no-store" })
-  if (!res.ok) throw new Error(await readApiError(res))
-  return ((await res.json()) as ContainersResponse).containers ?? []
+// One workload's logs, one of its Pods', or without a workload the whole
+// namespace's, merged oldest first by MCP.
+export async function fetchLogs(args: {
+  namespace: string
+  workloadUid?: string
+  pod?: string
+  container?: string
+  sinceNs: string | null
+  limit: number
+}): Promise<LogsResponse> {
+  const r = await callTool<WorkloadLogs>("query_workload_logs", {
+    namespace: args.namespace,
+    ...(args.workloadUid ? { uid: args.workloadUid } : {}),
+    ...(args.pod ? { pod: args.pod } : {}),
+    ...(args.container ? { container: args.container } : {}),
+    ...(args.sinceNs ? { start: nsToRFC3339(args.sinceNs) } : {}),
+    limit: args.limit,
+  })
+  return {
+    source: r.source === "loki" ? "loki" : r.source === "kubernetes" ? "kube API" : null,
+    selector: r.selector,
+    containers: r.containers,
+    warnings: r.warnings,
+    lines: r.entries.map(e => ({
+      tsNs: e.tsNs,
+      tsMs: Number(BigInt(e.tsNs) / BigInt(1_000_000)),
+      pod: e.pod,
+      container: e.container,
+      message: e.line,
+      key: `${e.tsNs}|${e.pod}|${e.container}|${e.line}`,
+      parsed: parseLogLine(e.line),
+    })),
+  }
 }

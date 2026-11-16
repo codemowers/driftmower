@@ -6,10 +6,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -28,6 +30,10 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "registry" {
+		registryMain()
+		return
+	}
 	var kubeconfig, listenAddr, healthAddr, uiAddr, audience, allowed, giteaHosts, logLevel string
 	var cfg crawler.Config
 	flag.StringVar(&kubeconfig, "kubeconfig", env("KUBECONFIG", ""), "kubeconfig path; in-cluster configuration when empty")
@@ -45,6 +51,27 @@ func main() {
 	// The token stays out of flags, which show in process listings.
 	cfg.GitHubToken = os.Getenv("GITHUB_TOKEN")
 	cfg.GiteaHosts = split(giteaHosts)
+	if raw := os.Getenv("GITHUB_ENTERPRISE_TOKEN_FILES"); raw != "" {
+		files := map[string]string{}
+		if err := json.Unmarshal([]byte(raw), &files); err != nil {
+			slog.Error("invalid GITHUB_ENTERPRISE_TOKEN_FILES")
+			os.Exit(1)
+		}
+		cfg.GitHubEnterprise = map[string]string{}
+		for host, file := range files {
+			parsed, err := url.Parse("https://" + host)
+			if err != nil || parsed.Host != host || parsed.User != nil || parsed.Path != "" || host == "github.com" || host == "api.github.com" {
+				slog.Error("invalid GitHub Enterprise host", "host", host)
+				os.Exit(1)
+			}
+			token, err := os.ReadFile(file)
+			if err != nil && !os.IsNotExist(err) {
+				slog.Error("cannot read GitHub Enterprise token file", "host", host)
+				os.Exit(1)
+			}
+			cfg.GitHubEnterprise[host] = strings.TrimSpace(string(token))
+		}
+	}
 
 	var level slog.Level
 	if level.UnmarshalText([]byte(logLevel)) != nil {
@@ -87,8 +114,21 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 		return id.User, nil
 	}
 	api := &crawler.API{Crawler: c, Authenticate: authenticate, Allowed: allowed}
+	mux := http.NewServeMux()
+	mux.Handle("/v1/", api)
+
+	if authorizeURL := os.Getenv("BROWSER_AUTHORIZE_URL"); authorizeURL != "" {
+		origins := split(os.Getenv("BROWSER_ALLOWED_ORIGINS"))
+		for _, key := range []string{"BROWSER_MCP_ORIGIN", "BROWSER_UI_ORIGIN"} {
+			if origin := os.Getenv(key); origin != "" {
+				origins = append(origins, strings.TrimRight(origin, "/"))
+			}
+		}
+		mux.Handle("/crawler/", http.StripPrefix("/crawler", crawler.BrowserAPI(c, authorizeURL, origins)))
+	}
 
 	health := http.NewServeMux()
+	health.Handle("GET /metrics", c.Metrics())
 	health.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	health.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
 		if !c.Synced() {
@@ -100,7 +140,7 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error { c.Run(ctx); return ctx.Err() })
-	group.Go(func() error { return serve(ctx, listenAddr, api) })
+	group.Go(func() error { return serve(ctx, listenAddr, mux) })
 	group.Go(func() error { return serve(ctx, healthAddr, health) })
 	if uiAddr != "" {
 		group.Go(func() error { return serve(ctx, uiAddr, c.UI()) })

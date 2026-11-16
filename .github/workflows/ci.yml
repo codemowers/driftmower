@@ -7,9 +7,27 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
 jobs:
+  release-info:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+      chart_version: ${{ steps.version.outputs.chart_version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: python3 scripts/release.py metadata
+
   go:
     name: Go vet, lint & test
+    needs: ui
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,6 +35,14 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-frontend
+          path: desktop/frontend
+
+      - name: Release publisher tests
+        run: python3 -m unittest discover -s scripts -p 'test_release.py'
 
       - name: Vet
         run: go vet ./...
@@ -38,6 +64,8 @@ jobs:
         working-directory: ui
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v7
         with:
@@ -50,67 +78,252 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-frontend
+          path: ui/static/out
+          if-no-files-found: error
+          retention-days: 1
 
-  # Every component is built from the same commit. Pushes to main publish
-  # `latest` and `sha-<commit>`; a tag such as 0.9.0 publishes that version
-  # of every image.
+  desktop:
+    name: Desktop (${{ matrix.os }}/${{ matrix.arch }})
+    needs: [go, ui]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: linux, arch: amd64, runner: ubuntu-24.04}
+          - {os: linux, arch: arm64, runner: ubuntu-24.04-arm}
+          - {os: darwin, arch: amd64, runner: macos-15-intel}
+          - {os: darwin, arch: arm64, runner: macos-15}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-frontend
+          path: desktop/frontend
+      - name: Test and build native executable
+        env:
+          TARGET: ${{ matrix.os }}-${{ matrix.arch }}
+        run: |
+          test "$(go env GOOS)-$(go env GOARCH)" = "$TARGET"
+          go test ./desktop/...
+          mkdir -p dist
+          CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "dist/driftmower-desktop-$TARGET" ./desktop
+          file "dist/driftmower-desktop-$TARGET"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-binary-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/driftmower-desktop-${{ matrix.os }}-${{ matrix.arch }}
+          if-no-files-found: error
+
   images:
-    name: Build & push ${{ matrix.name }}
-    runs-on: ubuntu-latest
-    needs:
-      - go
-      - ui
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    name: Build ${{ matrix.name }} (${{ matrix.arch }})
+    needs: [go, ui, release-info]
+    if: needs.release-info.outputs.publish == 'true'
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
       matrix:
+        name: [crawler, mcp, ui, operator, trivy-db]
         include:
-          - name: crawler
-            context: .
-            file: crawler/Dockerfile
-            platforms: linux/amd64
-          - name: mcp
-            context: .
-            file: mcp/Dockerfile
-            platforms: linux/amd64
-          - name: ui
-            context: ui
-            file: ui/Dockerfile
-            platforms: linux/amd64,linux/arm64
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+        # The architecture axis selects a native runner for every component.
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v7
-
+        with:
+          submodules: recursive
       - uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/metadata-action@v5
-        id: meta
+      - id: meta
+        uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/codemowers/driftmower/${{ matrix.name }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long
-            type=ref,event=tag
-
-      - uses: docker/build-push-action@v7
+          images: ghcr.io/${{ github.repository_owner }}/driftmower-${{ matrix.name }}
+      - name: Select Dockerfile
+        id: source
+        env:
+          COMPONENT: ${{ matrix.name }}
+        run: |
+          if [ "$COMPONENT" = trivy-db ]; then
+            echo 'file=operator/database.Dockerfile' >> "$GITHUB_OUTPUT"
+          else
+            echo "file=$COMPONENT/Dockerfile" >> "$GITHUB_OUTPUT"
+          fi
+      - id: build
+        uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
-          platforms: ${{ matrix.platforms }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          context: .
+          file: ${{ steps.source.outputs.file }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/driftmower-${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true
+          no-cache: ${{ matrix.name == 'trivy-db' }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+            VERSION=${{ github.ref_name }}
             BUILD_REVISION=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          cache-from: type=gha,scope=${{ matrix.name }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ matrix.arch }}
+      - name: Record architecture digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          printf '%s' "$DIGEST" > digests/${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.name }}-${{ matrix.arch }}
+          path: digests/*
+
+  image-indexes:
+    name: Publish ${{ matrix.name }} image index
+    needs: [images, release-info]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        name: [crawler, mcp, ui, operator, trivy-db]
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.name }}-*
+          path: digests
+          merge-multiple: true
+      - name: Publish index and record immutable reference
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/driftmower-${{ matrix.name }}
+          VERSION: ${{ github.ref_name }}
+          COMPONENT: ${{ matrix.name }}
+        run: |
+          amd64="$(cat digests/amd64)"
+          arm64="$(cat digests/arm64)"
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:$GITHUB_SHA" "$IMAGE@$amd64" "$IMAGE@$arm64"
+          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' > manifest.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          digest=json.loads(Path('manifest.json').read_text())['digest']
+          Path(os.environ['COMPONENT']+'.json').write_text(json.dumps({'component':os.environ['COMPONENT'],'image':os.environ['IMAGE']+'@'+digest}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-image-${{ matrix.name }}
+          path: ${{ matrix.name }}.json
+
+  chart:
+    name: Validate Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.20.0
+      - run: helm lint chart --strict
+      - run: helm template driftmower chart --namespace driftmower > /dev/null
+      - run: helm template another chart --namespace chart-review > /dev/null
+
+  publish-chart:
+    name: Publish OCI chart with release images
+    runs-on: ubuntu-latest
+    needs: [chart, image-indexes, release-info]
+    if: needs.release-info.outputs.publish == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.20.0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-image-*
+          path: release-images
+          merge-multiple: true
+      - name: Package chart with immutable images
+        env:
+          VERSION: ${{ needs.release-info.outputs.version }}
+          CHART_VERSION: ${{ needs.release-info.outputs.chart_version }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          images={}
+          for file in Path('release-images').glob('*.json'):
+              item=json.loads(file.read_text()); images[item['component']]=item['image']
+          assert set(images)=={'crawler','mcp','ui','operator','trivy-db'}
+          image_components={name:images[name] for name in ('crawler','mcp','ui','operator')}
+          image_components['registryScraper']=images['crawler']
+          path=Path('chart/values.yaml'); result=[]; component=''; replaced=set()
+          for line in path.read_text().splitlines():
+              if line and not line.startswith((' ', '#')) and line.endswith(':'): component=line[:-1]
+              if line.startswith('  image:') and component in image_components:
+                  line='  image: '+image_components[component]; replaced.add(component)
+              if line.startswith('  databaseImage:') and component=='operator':
+                  line='  databaseImage: '+images['trivy-db']; replaced.add('trivy-db')
+              result.append(line)
+          assert replaced==set(image_components)|{'trivy-db'}, replaced
+          path.write_text('\n'.join(result)+'\n')
+          PY
+          helm lint chart --strict
+          helm package chart --version "$CHART_VERSION" --app-version "$VERSION" --destination dist
+          helm template driftmower dist/*.tgz --namespace driftmower > /dev/null
+      - name: Publish to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GHCR_USER" --password-stdin
+          helm push dist/*.tgz "oci://ghcr.io/$OWNER/charts"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: dist/*.tgz
+
+  publish-release:
+    name: Publish GitHub release assets
+    needs: [desktop, publish-chart, release-info]
+    if: needs.release-info.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-binary-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-chart
+          path: dist
+      - name: Publish binaries, chart and checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.release-info.outputs.version }}
+        run: python3 scripts/release.py publish --repo "$GH_REPO" --tag "$VERSION" --directory dist

@@ -1,6 +1,0 @@
-apiVersion: v2
-name: driftmower-crawler
-description: Releases, version drift and security advisories for the sources of a cluster's images
-type: application
-version: 0.1.0
-appVersion: 0.1.0

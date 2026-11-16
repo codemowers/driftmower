@@ -1,0 +1,17 @@
+{{- if and .Values.crawler.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Release.Name }}-crawler
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-crawler
+  podMetricsEndpoints:
+    - port: health
+      path: /metrics
+      interval: 30s
+{{- end }}

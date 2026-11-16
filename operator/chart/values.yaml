@@ -1,8 +1,0 @@
-image: driftmower-operator:latest
-trivyImage: aquasec/trivy:0.75.0
-# Populated by Skaffold with a digest-pinned DB filesystem image.
-databaseImage: ""
-parallelism: 2
-priorityClassName: driftmower-scan
-priorityValue: 100000
-sbomCacheMiB: 2048

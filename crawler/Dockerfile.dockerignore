@@ -1,4 +1,6 @@
 # Deny by default: only the crawler's build inputs enter the Docker context.
+# Re-include each directory as well as its files: Skaffold does not descend
+# into an excluded directory to find re-included files.
 **
 !go.mod
 !go.sum
@@ -10,3 +12,4 @@
 !internal/
 !internal/**/*.go
 !internal/**/*.html
+**/*_test.go

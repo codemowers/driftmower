@@ -1,4 +1,6 @@
 "use client"
+import { useKubectlConnection } from "@/lib/hooks/use-kubectl"
+import { scopeActionCommand } from "@/lib/kubernetes/contexts"
 
 import { useState } from "react"
 import { ChevronRight, SquareTerminal } from "lucide-react"
@@ -29,6 +31,8 @@ function buildForwardCommands(namespace: string, name: string, ports: number[]):
 }
 
 function CommandRow({ label, value }: Command) {
+  const connection = useKubectlConnection()
+  value = scopeActionCommand(value, connection)
   return (
     <div className="flex items-center gap-3 rounded-lg bg-gray-100 px-3 py-2">
       <span className="w-24 shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -52,6 +56,8 @@ export default function CommandsCard({ namespace, name, ports }: Props) {
 
   const summaryParts = ["inspect", "logs", "events"]
   if (forward.length) summaryParts.push("forward")
+  summaryParts.push("delete")
+  const remove: Command = { label: "delete", value: `kubectl delete pod -n ${namespace} ${name}` }
 
   return (
     <div>
@@ -94,6 +100,10 @@ export default function CommandsCard({ namespace, name, ports }: Props) {
                 ))}
               </div>
             )}
+
+            <div className="mt-3 flex flex-col gap-2.5 border-t border-gray-200 pt-3">
+              <CommandRow {...remove} />
+            </div>
           </div>
         )}
       </div>

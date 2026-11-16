@@ -1,0 +1,104 @@
+{{- if .Values.history.enabled }}
+# Dedicated drift history. No general cluster-monitoring targets are selected.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-prometheus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-prometheus
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  serviceAccountName: {{ .Release.Name }}-prometheus
+  # Without fsGroup a fresh volume stays root-owned and Prometheus cannot
+  # write its data; clusters without admission defaults need these set here.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 2000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+  scrapeInterval: 5m
+  scrapeTimeout: 30s
+  evaluationInterval: 5m
+  retention: 90d
+  retentionSize: 8GB
+  serviceMonitorSelector:
+    matchLabels:
+      monitoring.codemowers.io/instance: {{ .Release.Name }}
+  podMonitorSelector:
+    matchLabels:
+      monitoring.codemowers.io/instance: {{ .Release.Name }}
+  ruleSelector:
+    matchLabels:
+      monitoring.codemowers.io/instance: {{ .Release.Name }}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        {{- with .Values.history.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  name: {{ .Release.Name }}-prometheus
+spec:
+  selector:
+    prometheus: {{ .Release.Name }}
+  ports:
+    - name: web
+      port: 9090
+      targetPort: web
+
+{{- end }}

@@ -1,8 +1,9 @@
-import { callTool, selectedEndpoint } from "@/browser/connection"
-import { HISTORY_SEVERITY } from "@/lib/cluster/styles/status-style"
+import { callTool,selectedEndpoint } from "@/browser/connection"
 import type { StatusType } from "@/lib/cluster/reports"
-import type { Observation, SeriesSource } from "./build-series"
+import { HISTORY_SEVERITY } from "@/lib/cluster/styles/status-style"
+import type { Observation,SeriesSource } from "./build-series"
 import { seriesKey } from "./build-series"
+import {historyRequest} from "./request"
 import type { RottennessPoint } from "./types"
 
 export type DriftHistoryData = {
@@ -30,19 +31,27 @@ async function load(): Promise<DriftHistoryData> {
  const rows:Series[]=[]
  const counts=new Map<string,number>()
  const identity=(m:Record<string,string>,seconds:number)=>JSON.stringify([m.namespace,m.uid,m.image,m.version,m.latest,seconds])
- // Bound fan-out; the MCP service independently authorizes each namespace.
- for (const namespace of namespaces) {
-  const result=await callTool<{result:Series[];warnings:string[]}>("query_drift_history",{namespace,metric:"driftmower_version_releases_behind",start:start.toISOString(),end:end.toISOString(),stepSeconds:900,limit:1000})
-  if(result.warnings?.length)throw new Error(result.warnings.join("; "))
-  rows.push(...result.result)
-  const coverage=await callTool<{result:Series[];warnings:string[]}>("query_drift_history",{namespace,metric:"driftmower_version_status",start:start.toISOString(),end:end.toISOString(),stepSeconds:900,limit:1000})
-  if(coverage.warnings?.length)throw new Error(coverage.warnings.join("; "))
+ // Four namespaces at a time, the MCP's per-caller concurrency budget; the
+ // service independently authorizes each namespace.
+ async function namespaceRows(namespace:string){
+  const out:Series[]=[]
+  const query=async(metric:string)=>{
+   const result=await historyRequest(()=>callTool<{result:Series[];warnings:string[]}>("query_drift_history",{namespace,metric,start:start.toISOString(),end:end.toISOString(),stepSeconds:900,limit:1000}))
+   if(result.warnings?.length)throw new Error(result.warnings.join("; "))
+   return result.result
+  }
+  out.push(...await query("driftmower_version_releases_behind"))
   // Explicit unknown observations keep gaps from looking like deleted workloads.
-  for(const series of coverage.result)if(series.metric.status==="unknown")rows.push({...series,values:series.values?.filter(([,value])=>Number(value)===1).map(([time])=>[time,"-1"])})
-  const observed=await callTool<{result:Series[];warnings:string[]}>("query_drift_history",{namespace,metric:"driftmower_version_container_count",start:start.toISOString(),end:end.toISOString(),stepSeconds:900,limit:1000})
-  if(observed.warnings?.length)throw new Error(observed.warnings.join("; "))
-  for(const series of observed.result)for(const [seconds,count] of series.values??[])counts.set(identity(series.metric,seconds),Number(count))
+  for(const series of await query("driftmower_version_status"))if(series.metric.status==="unknown")out.push({...series,values:series.values?.filter(([,value])=>Number(value)===1).map(([time])=>[time,"-1"])})
+  for(const series of await query("driftmower_version_container_count"))for(const [seconds,count] of series.values??[])counts.set(identity(series.metric,seconds),Number(count))
+  return out
  }
+ const perNamespace:Series[][]=new Array(namespaces.length)
+ let next=0
+ await Promise.all(Array.from({length:Math.min(4,namespaces.length)},async()=>{
+  while(next<namespaces.length){const i=next++;perNamespace[i]=await namespaceRows(namespaces[i])}
+ }))
+ for(const part of perNamespace)rows.push(...part)
  const sources=new Map<string,SeriesSource>()
  const timeline=new Set<number>()
  for(const row of rows){
@@ -82,9 +91,6 @@ export async function loadDriftHistory(context:string):Promise<DriftHistoryData>
  const hit=cache.get(key);if(hit&&hit.expires>Date.now())return hit.promise
  const promise=load().catch(error=>{cache.delete(key);throw error})
  cache.set(key,{expires:Date.now()+300_000,promise});return promise
-}
-export async function refreshDriftHistory(context:string):Promise<DriftHistoryData>{
- cache.delete(`${await selectedEndpoint()}|${context}`);return loadDriftHistory(context)
 }
 
 function merge(observations:Observation[]):Observation[]{

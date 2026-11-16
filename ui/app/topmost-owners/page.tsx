@@ -11,7 +11,8 @@ import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./fo
 import type { FocusKey, WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "@/lib/utils/pods-by-root"
 import { useWorkloadHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
-import { reportWorkloadRoots } from "@/lib/utils/report-roots"
+import { orphanBuckets, reportWorkloadRoots } from "@/lib/utils/report-roots"
+import { resourceSummary } from "./components/related-resources"
 import SandboxEmptyState from "../components/sandbox-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
@@ -116,6 +117,7 @@ function TopmostOwnersContent() {
       }, "no_data")
 
       return {
+        orphan: root.orphan ? "pod" : undefined,
         sourceState: usages.some(u => u.imageInfo.sourceStatus === "linked") ? "linked" : usages.length > 0 && usages.every(u => u.imageInfo.sourceStatus === "unlinked") ? "unlinked" : "unknown",
         desiredReplicas: root.desiredReplicas,
         completed: root.completed,
@@ -136,23 +138,44 @@ function TopmostOwnersContent() {
       }
     })
 
+  const bucketEntries = orphanBuckets(data).map((bucket): WorkloadEntry => {
+    const owners = Object.entries(bucket.orphaned ?? {}).map(([kind, byName]) => {
+      const n = Object.keys(byName).length
+      return `${n} ${kind.split(".")[0]}${n === 1 ? "" : "s"}`
+    })
+    return {
+      orphan: "bucket",
+      orphanSummary: [...owners, resourceSummary(bucket)].filter(Boolean).join(" · "),
+      groupKey: `Namespace/${bucket.namespace}/${bucket.name}`,
+      uid: bucket.uid,
+      kind: "Namespace",
+      name: "Orphaned resources",
+      namespace: bucket.namespace,
+      manager: { kind: "standalone" },
+      worstStatus: "no_data",
+      repos: [],
+      drift: { containerCount: 0, staleRepoCount: 0, distinctRepoCount: 0 },
+    }
+  })
+
   const scopeSet = namespaces ? new Set(namespaces) : null
-  const scoped = reportEntries.filter(w => !scopeSet || scopeSet.has(w.namespace))
+  const scoped = [...reportEntries, ...bucketEntries].filter(w => !scopeSet || scopeSet.has(w.namespace))
   const workloads = focus.key === "history"
     ? scoped.map(w => ({ ...w, history: history[w.groupKey] }))
     : scoped
+  const rooted = workloads.filter(w => w.orphan !== "bucket")
 
   return (
     <div className="min-h-full flex flex-col items-center">
       <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Topmost Owners" subtitle="Controllers at the root of each workload subtree" />
+        <PageHeader title="Workloads" subtitle="Controllers at the root of each workload subtree" />
         {(fetching || (!data && !error)) && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />{data ? "Updating workloads…" : "Loading workloads…"}</p>}
         {!data && error && <p role="alert">Could not load workloads: {error}</p>}
         {data && <><StatusSummaryBar
           totalLabel="workloads"
-          totalCount={workloads.length}
-          secondary={focus.secondary(workloads)}
-          pills={focus.pills(workloads)}
+          totalCount={rooted.length}
+          secondary={focus.secondary(rooted)}
+          pills={focus.pills(rooted)}
           leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
         {scopedSandboxes.length > 0 && workloads.length === 0 ? (

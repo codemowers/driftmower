@@ -1,4 +1,6 @@
 "use client"
+import { useKubectlConnection } from "@/lib/hooks/use-kubectl"
+import { scopeActionCommand } from "@/lib/kubernetes/contexts"
 
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
@@ -20,6 +22,8 @@ const VISIBLE_BULLETS = 4
 const SECTION_LABEL = "text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
 
 function CommandLine({ command }: { command: HowCommand }) {
+  const connection = useKubectlConnection()
+  command = { ...command, value: command.value ? scopeActionCommand(command.value, connection) : command.value }
   return (
     <div className="flex flex-col gap-1.5">
       {command.value && (

@@ -319,18 +319,3 @@ func TestAlignedEvaluationTime(t *testing.T) {
 		t.Errorf("times = %v", times)
 	}
 }
-
-func TestUsageChargesEveryQuery(t *testing.T) {
-	b := defaultUsageBackend()
-	svc := usageService(b, &judge{})
-	svc.Budget = &Budget{QueriesPerMinute: 1000, MaxConcurrentCalls: 1}
-	if _, err := svc.PodUsage(context.Background(), alice, podIn, nil); err != nil {
-		t.Fatal(err)
-	}
-	svc.Budget.mu.Lock()
-	tokens := svc.Budget.callers[alice.User].Value.(*callerState).tokens
-	svc.Budget.mu.Unlock()
-	if charged := 1000 - math.Round(tokens); int(charged) != b.calls() || b.calls() <= 5 {
-		t.Errorf("charged %v for %d queries", charged, b.calls())
-	}
-}

@@ -1,0 +1,239 @@
+{{- if .Values.registryScraper.enabled }}
+{{- $githubSecret := .Values.registryScraper.githubTokenSecret | default .Values.crawler.githubTokenSecret }}
+{{- if not .Values.registryScraper.configMapName }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+data:
+  repositories.json: |
+    {{- .Values.registryScraper.config | default (.Files.Get "files/base-images.json" | fromJson) | toPrettyJson | nindent 4 }}
+---
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+rules:
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-registry-scraper
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-registry-scraper
+    namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  serviceName: {{ .Release.Name }}-registry-scraper
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-registry-scraper
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app: {{ .Release.Name }}-registry-scraper
+    spec:
+      serviceAccountName: {{ .Release.Name }}-registry-scraper
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      {{- with compact .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: registry-scraper
+          image: {{ .Values.registryScraper.image | default .Values.crawler.image | quote }}
+          command: [/driftmower-crawler, registry]
+          env:
+            {{- if .Values.registryScraper.credentialsSecretName }}
+            - name: REGISTRY_CREDENTIALS_FILE
+              value: /var/run/secrets/driftmower/registry-auth/config.json
+            {{- end }}
+            {{- if $githubSecret }}
+            - name: GHCR_TOKEN_FILE
+              value: /var/run/secrets/driftmower/github/token
+            {{- end }}
+            {{- with .Values.registryScraper.githubUsername }}
+            - name: GHCR_USERNAME
+              value: {{ . | quote }}
+            {{- end }}
+            - name: REGISTRY_AUDIENCE
+              value: {{ printf "%s-registry-scraper.%s" .Release.Name .Release.Namespace | quote }}
+            - name: ALLOWED_CALLERS
+              value: system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-mcp
+          ports:
+            - name: metrics
+              containerPort: 8081
+            - name: api
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: api
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: api
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: api
+            periodSeconds: 5
+            failureThreshold: 60
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 1Gi
+              ephemeral-storage: 128Mi
+          volumeMounts:
+            {{- if .Values.registryScraper.credentialsSecretName }}
+            - name: registry-auth
+              mountPath: /var/run/secrets/driftmower/registry-auth
+              readOnly: true
+            {{- end }}
+            {{- if $githubSecret }}
+            - name: github
+              mountPath: /var/run/secrets/driftmower/github
+              readOnly: true
+            {{- end }}
+            - name: config
+              mountPath: /etc/driftmower-registry
+              readOnly: true
+            - name: catalog
+              mountPath: /data
+      volumes:
+        {{- if .Values.registryScraper.credentialsSecretName }}
+        - name: registry-auth
+          secret:
+            secretName: {{ .Values.registryScraper.credentialsSecretName | quote }}
+            optional: true
+            items:
+              - key: {{ .Values.registryScraper.credentialsSecretKey | quote }}
+                path: config.json
+        {{- end }}
+        {{- if $githubSecret }}
+        - name: github
+          secret:
+            secretName: {{ $githubSecret | quote }}
+            optional: true
+            items:
+              - key: token
+                path: token
+        {{- end }}
+        - name: config
+          configMap:
+            name: {{ .Values.registryScraper.configMapName | default (printf "%s-registry-scraper" .Release.Name) }}
+  volumeClaimTemplates:
+    - metadata:
+        name: catalog
+        labels:
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+          skaffold.dev/keep: "true"
+      spec:
+        {{- with .Values.registryScraper.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.registryScraper.storageSize | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-registry-scraper
+  ports:
+    - name: api
+      port: 8080
+      targetPort: api
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-registry-scraper
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: metrics
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .Release.Name }}-mcp
+      ports:
+        - port: api
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Release.Name }}-registry-scraper
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    monitoring.codemowers.io/instance: {{ .Release.Name | quote }}
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-registry-scraper
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+{{- end }}
+{{- end }}

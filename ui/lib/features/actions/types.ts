@@ -1,6 +1,6 @@
 import type { StatusType } from "@/lib/cluster/reports"
-import type { VulnerabilitySeverity } from "@/lib/features/vulnerability/types"
 import type { LivePatchUpgradeTarget } from "@/lib/features/live-patch-upgrade/types"
+import type { VulnerabilitySeverity } from "@/lib/features/vulnerability/types"
 
 export const PROMPT_VERSION = 7
 
@@ -94,8 +94,6 @@ export type AssessState =
   | { state: "pending"; chartAppVersions?: ChartAppVersions | null }
   | { state: "ready"; result: AssessResult; computedAt: number }
   | { state: "failed"; result: AssessResult; computedAt: number }
-
-export type AssessRequest = { focus: boolean; actions: ActionFacts[] }
 export type AssessResponse = { results: Record<string, AssessState> }
 
 export type HowCommand = {

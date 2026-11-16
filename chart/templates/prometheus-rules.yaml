@@ -1,0 +1,288 @@
+{{/* Rules consuming Driftmower metrics ship beside their producers. */}}
+{{- if and (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PrometheusRule") (or .Values.operator.enabled .Values.mcp.enabled .Values.crawler.enabled .Values.registryScraper.enabled) }}
+{{- $scanner := printf "{namespace=%q,job=%q}" .Release.Namespace (printf "%s-operator" .Release.Name) }}
+{{- $mcp := printf "{job=%q,driftmower_namespace=%q}" (printf "%s-mcp" .Release.Name) .Release.Namespace }}
+{{- $owned := printf "driftmower_namespace=%q,driftmower_instance=%q" .Release.Namespace .Release.Name }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-security
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    monitoring.codemowers.io/instance: {{ .Release.Name | quote }}
+spec:
+  groups:
+{{- if .Values.operator.enabled }}
+    - name: driftmower.security.scanner
+      rules:
+        - record: driftmower:image_scan_state:max
+          expr: max by (digest, state, trivy_version, db_version, coverage, reason) (driftmower_image_scan_state{{ $scanner }}) and on () (max(driftmower_scanner_inventory_ready{{ $scanner }}) == 1)
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:image_manifest_info:max
+          expr: max by (image, digest) (driftmower_image_manifest_info{{ $scanner }})
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:image_scan_available:max
+          expr: max by (digest, trivy_version, db_version, coverage, reason) (driftmower_image_scan_available{{ $scanner }})
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:image_scan_accepted_timestamp_seconds:max
+          expr: max by (digest, trivy_version, db_version, coverage, reason) (driftmower_image_scan_accepted_timestamp_seconds{{ $scanner }})
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:image_vulnerabilities:max
+          expr: max by (digest, severity, fix_status, trivy_version, db_version, coverage, reason) (driftmower_image_vulnerabilities{{ $scanner }})
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - alert: DriftmowerSBOMTooLarge
+          expr: |-
+            driftmower_sbom_size_limit_exceeded_bytes{{ $scanner }} > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Security artifact exceeds the size limit for {{ $labels.image }}" }}'
+            description: |-
+              {{ "Signal: ContainerImage {{ $labels.image }}, platform {{ $labels.digest }}, produced {{ $value }} SBOM bytes, exceeding the 32 MiB acceptance limit." }}
+              Impact: This artifact was rejected; vulnerability coverage may be incomplete.
+              Next steps: Inspect the scan status, scanner logs and image contents; arrange a valid scan before relying on vulnerability conclusions.
+              Limitations: The gauge clears after a valid upload or operator restart. Resolution alone does not prove restored coverage.
+        - alert: DriftmowerScannerInventoryUnavailable
+          expr: |-
+            driftmower_scanner_inventory_ready{{ $scanner }} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Scanner inventory is unavailable"
+            description: |-
+              Signal: Scanner inventory has been unsynchronized for 10 minutes.
+              Impact: The scanner cannot establish image coverage.
+              Next steps: Check operator leadership, readiness, ContainerImage CRD availability, list/watch permissions and API connectivity.
+              Limitations: A missing scrape is handled by monitoring target alerts; zero is explicitly unknown coverage.
+{{- end }}
+{{- if and .Values.mcp.enabled (or .Values.operator.enabled .Values.mcp.userAccess.enabled) }}
+    - name: driftmower.security.inventory
+      rules:
+        - alert: DriftmowerSecurityMetricsUnavailable
+          expr: |-
+            up{job={{ printf "%s-mcp" .Release.Name | quote }},endpoint="drift",driftmower_namespace={{ .Release.Namespace | quote }}} == 0
+            or absent(up{job={{ printf "%s-mcp" .Release.Name | quote }},endpoint="drift",driftmower_namespace={{ .Release.Namespace | quote }}})
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Security inventory metrics are unavailable
+            description: |-
+              Signal: the security metrics target is failing or undiscovered for 15 minutes.
+              Impact: running image and service-account exposure coverage is unknown; resolved finding alerts do not establish a clean security state.
+              Next steps: inspect the security ServiceMonitor selection, dedicated metrics port access, MCP health, Pod/RBAC list permissions, and unresolved Role references. Restore a complete inventory scrape.
+              Limitations: this exporter intentionally fails incomplete reads rather than publishing an empty successful inventory.
+        - record: driftmower:running_image_containers:max
+          expr: max by (namespace, digest) (driftmower_running_image_containers{{ $mcp }})
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+{{- if .Values.operator.enabled }}
+        - alert: DriftmowerRunningImageUnresolved
+          expr: |-
+            max by (namespace) (driftmower_running_image_unresolved_containers{{ $mcp }}) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Running image digests are unresolved in {{ $labels.namespace }}" }}'
+            description: |-
+              {{ "Signal: {{ $value }} running containers have no supported immutable sha256 image ID for 30 minutes." }}
+              Impact: These containers cannot be matched reliably to scan findings.
+              Next steps: Inspect runtime image IDs, Pod status and ContainerImage discovery; restore digest-based matching.
+              Limitations: No vulnerability-free conclusion can be drawn for unresolved images.
+{{- end }}
+{{- if .Values.mcp.userAccess.enabled }}
+        - alert: DriftmowerServiceAccountClusterAdmin
+          expr: |-
+            max by (namespace, serviceaccount, risk, permission_scope) (driftmower_serviceaccount_exposure{job="{{ .Release.Name }}-mcp",driftmower_namespace="{{ .Release.Namespace }}",risk="cluster_admin"}) > 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: '{{ "Active Pods use cluster-admin-equivalent SA {{ $labels.namespace }}/{{ $labels.serviceaccount }}" }}'
+            description: |-
+              {{ "Signal: {{ $value }} Running or Pending Pods are assigned this ServiceAccount; a ClusterRoleBinding grants unrestricted resource verbs, API groups and resources cluster-wide, observed for 15 minutes." }}
+              Impact: A usable credential for this identity grants broad cluster control.
+              Next steps: Inspect the binding and resolved ClusterRole, identify the owning workloads and intended operations, then replace excessive grants with reviewed least-privilege RBAC.
+              Limitations: Legitimate controllers may need broad access. This proves an RBAC grant and Pod assignment, not token mounting, exploitation, external cloud rights or every possible privilege-escalation path.
+        - alert: DriftmowerServiceAccountBroadPermissions
+          expr: |-
+            max by (namespace, serviceaccount, risk, permission_scope) (driftmower_serviceaccount_exposure{job="{{ .Release.Name }}-mcp",driftmower_namespace="{{ .Release.Namespace }}",risk!="cluster_admin"}) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Review {{ $labels.risk }} on SA {{ $labels.namespace }}/{{ $labels.serviceaccount }}" }}'
+            description: |-
+              {{ "Signal: {{ $value }} active Pods use an identity with {{ $labels.risk }} rights in {{ $labels.permission_scope }}, observed for 30 minutes. Group bindings and cross-namespace subjects are included." }}
+              Impact: The grant may expose credentials or allow privileged operations beyond workload needs.
+              Next steps: Inspect the resolved Roles/ClusterRoles and bindings for this identity and its standard groups. Review required Secret access, wildcard writes, token creation, impersonation or RBAC bind/escalate rights; narrow only grants confirmed unnecessary.
+              Limitations: Namespace-scoped bindings do not grant cluster-wide permissions. Named-object reads are not classified as unrestricted Secret access; named impersonation and RBAC escalation grants are still reported. This is evidence of permission, not compromise.
+{{- end }}
+{{- end }}
+{{- if and .Values.mcp.enabled .Values.operator.enabled }}
+    - name: driftmower.security.deployed_images
+      rules:
+        - alert: DriftmowerCriticalVulnerabilitiesInUse
+          expr: |-
+            (driftmower:running_image_containers:max{ {{ $owned }} } > bool 0)
+              * on (digest) group_left ()
+              sum by (digest) (driftmower:image_vulnerabilities:max{ {{ $owned }},severity="CRITICAL"}) > 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: '{{ "Running image has critical findings in {{ $labels.namespace }}" }}'
+            description: |-
+              {{ "Signal: Image {{ $labels.digest }} has {{ $value }} unique critical vulnerability/component findings in an observed running image, present for 15 minutes." }}
+              Impact: Deployed software contains scanner-reported critical vulnerabilities.
+              Next steps: Open the image vulnerability report, review affected packages, applicability and fix availability, then rebuild or update the owning workloads and verify their rollout.
+              Limitations: Counts deduplicate image aliases and scanner replicas per digest. Findings do not prove exploitability, network exposure or a known exploited CVE; full IDs and package details remain in the scan API.
+        - alert: DriftmowerFixableHighVulnerabilitiesInUse
+          expr: |-
+            (driftmower:running_image_containers:max{ {{ $owned }} } > bool 0)
+              * on (digest) group_left ()
+              sum by (digest) (driftmower:image_vulnerabilities:max{ {{ $owned }},severity="HIGH",fix_status="available"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Running image has fixable high findings in {{ $labels.namespace }}" }}'
+            description: |-
+              {{ "Signal: Image {{ $labels.digest }} has {{ $value }} high-severity vulnerability/component findings with an explicitly reported remediation, present for 15 minutes." }}
+              Impact: An image rebuild or dependency update may remove known high-severity findings.
+              Next steps: Inspect the image report and recommended package versions; rebuild, scan, deploy and verify the replacement image.
+              Limitations: A reported fix is not proof that it is compatible, available from the current package source or sufficient for every affected component.
+        - alert: DriftmowerRunningImageScanMissing
+          expr: |-
+            driftmower:running_image_containers:max{ {{ $owned }} }
+              unless on (digest) (driftmower:image_scan_available:max{ {{ $owned }} } == 1)
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Running image has no usable current scan in {{ $labels.namespace }}" }}'
+            description: |-
+              {{ "Signal: {{ $value }} containers run image {{ $labels.digest }} without a readable summarized artifact for the current scanner/database configuration, for 30 minutes." }}
+              Impact: Security coverage is unknown; missing findings do not mean the image is clean.
+              Next steps: Check ContainerImage discovery, scanner readiness, pending/failed attempts, cache eviction and artifact size. Restore a usable scan.
+              Limitations: A cache restart briefly rebuilds bounded summaries. Metrics describe available artifacts, not vulnerability database freshness.
+        - alert: DriftmowerRunningImageScanOld
+          expr: |-
+            (driftmower:running_image_containers:max{ {{ $owned }} } > bool 0)
+              * on (digest) group_left ()
+              (time() - driftmower:image_scan_accepted_timestamp_seconds:max{ {{ $owned }} }) > 604800
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Running image scan artifact is older than seven days"
+            description: |-
+              {{ "Signal: Image {{ $labels.digest }} in {{ $labels.namespace }} was accepted {{ $value | humanizeDuration }} ago; age has exceeded seven days for one hour." }}
+              Impact: The artifact may predate newly published findings.
+              Next steps: Review scanner and vulnerability database versions, refresh them as appropriate, and regenerate this image scan.
+              Limitations: Artifact acceptance time is not database publication time and does not prove the database is stale. Updating scanner/database identity creates a new scan key.
+        - alert: DriftmowerRunningImageScanExhausted
+          expr: |-
+            (driftmower:running_image_containers:max{ {{ $owned }} } > bool 0)
+              * on (digest) group_left ()
+              max by (digest) (driftmower:image_scan_state:max{ {{ $owned }},state="failed"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Running image scan has exhausted its attempt budget"
+            description: |-
+              {{ "Signal: The current scan for {{ $labels.digest }} in {{ $labels.namespace }} has exhausted its retry budget without a usable artifact, for 15 minutes." }}
+              Impact: Automatic attempts have stopped for this scan cycle; vulnerability coverage is unknown.
+              Next steps: Inspect the persisted scan attempts, failure reasons, node/image-volume support and registry credentials. Correct the cause and start a new supported scan cycle.
+              Limitations: Do not infer that the image is clean or bypass digest verification to make a scan succeed.
+{{- end }}
+{{- if .Values.registryScraper.enabled }}
+    - name: driftmower.catalog.registry
+      rules:
+        - alert: DriftmowerRegistryThrottled
+          expr: |-
+            max by (registry) (driftmower_registry_state{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-registry-scraper",state="throttled"}) == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Registry {{ $labels.registry }} has been throttled for 30 minutes" }}'
+            description: |-
+              Signal: The registry scheduler continuously reports throttled state for 30 minutes.
+              Impact: Registry metadata and base-image hierarchy updates may be delayed.
+              Next steps: Inspect registry activity, latest HTTP status and retry deadline. Verify the optional registry credential mount and upstream quota; let the configured backoff expire.
+              Limitations: Throttled can include upstream errors or authorization backoff, not just HTTP 429. Existing catalog records remain available.
+        - alert: DriftmowerRegistryScrapesFailing
+          expr: |-
+            sum by (registry) (increase(driftmower_registry_scrapes_total{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-registry-scraper",result="error"}[1h])) >= 2
+            and on (registry)
+            sum by (registry) (increase(driftmower_registry_scrapes_total{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-registry-scraper",result="success"}[1h])) == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: '{{ "Registry {{ $labels.registry }} has repeated failures without success" }}'
+            description: |-
+              {{ "Signal: At least {{ $value }} failed repository scrapes and no successful scrape were observed in the last hour, with this condition persisting 15 minutes." }}
+              Impact: New registry catalog observations are not being completed for this upstream.
+              Next steps: Inspect repository errors, credentials, rate limits, TLS and upstream availability; correct the reported cause.
+              Limitations: These counters reset on scraper restart. A failed scrape may still have indexed partial results; the alert does not mean the stored catalog is empty.
+{{- end }}
+{{- if .Values.crawler.enabled }}
+    - name: driftmower.security.advisory_coverage
+      rules:
+        - alert: DriftmowerAdvisorySourcesIncomplete
+          expr: |-
+            sum(driftmower_crawler_sources{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-crawler",state="failed"}) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Source advisory collection is incomplete"
+            description: |-
+              {{ "Signal: {{ $value }} source repositories have latest scrape errors or partial failures, with at least one source remaining incomplete for 30 minutes." }}
+              Impact: Advisory matching may omit affected deployed versions.
+              Next steps: Open Source Repositories, inspect per-source scrape errors, and verify GitHub credentials, rate limits and repository access.
+              Limitations: The affected source set may change during this interval. No matching advisories is not a clean security result while coverage is incomplete.
+        - alert: DriftmowerAdvisorySourcesPending
+          expr: |-
+            sum(driftmower_crawler_sources{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-crawler",state="pending"}) > 0
+          for: 6h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Source repositories remain unscanned"
+            description: |-
+              {{ "Signal: {{ $value }} source repositories have no completed scrape; at least one source has remained pending for six hours." }}
+              Impact: Some source release and advisory data is unavailable.
+              Next steps: Inspect the crawler queue, authentication, upstream throttling and source definitions.
+              Limitations: The pending set may change; this is an aggregate backlog signal, not the age of every individual repository.
+        - alert: DriftmowerCrawlerInventoryUnavailable
+          expr: |-
+            driftmower_crawler_inventory_ready{namespace="{{ .Release.Namespace }}",job="{{ .Release.Name }}-crawler"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Crawler inventory is unavailable"
+            description: |-
+              Signal: Source or image inventories are unsynchronized, or a required CRD is absent, for 10 minutes.
+              Impact: The crawler cannot establish source/advisory coverage.
+              Next steps: Inspect crawler readiness, list/watch permissions, ContainerImage and SourceRepository CRDs and API connectivity.
+              Limitations: This alert concerns inventory availability; individual scrape failures have their own signal.
+{{- end }}
+{{- end }}
