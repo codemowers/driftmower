@@ -19,3 +19,6 @@ PY
 cp "$root/chart/tests/security-rules.test.yaml" "$task_dir/tests.yaml"
 "${PROMTOOL:-promtool}" check rules "$task_dir/rules.yaml"
 "${PROMTOOL:-promtool}" test rules "$task_dir/tests.yaml"
+
+cp "$root/chart/tests/scan-coverage.test.yaml" "$task_dir/scan-coverage.test.yaml"
+"${PROMTOOL:-promtool}" test rules "$task_dir/scan-coverage.test.yaml"

@@ -41,7 +41,6 @@ type OIDCOptions struct {
 	GroupsClaim   string
 }
 
-// clockSkew tolerates small clock differences with the issuer.
 const clockSkew = time.Minute
 
 // OIDCVerifier verifies access tokens against the issuer's published keys.
@@ -68,7 +67,6 @@ func NewOIDCVerifier(opts OIDCOptions) *OIDCVerifier {
 	}
 }
 
-// Verify checks the token and returns the caller it identifies.
 func (v *OIDCVerifier) Verify(ctx context.Context, raw string) (*Caller, *auth.TokenInfo, error) {
 	token, err := v.verifier.Verify(ctx, raw)
 	if err != nil {

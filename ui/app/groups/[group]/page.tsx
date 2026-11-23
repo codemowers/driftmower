@@ -1,8 +1,10 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
 import { ExternalLink } from "lucide-react"
-import Breadcrumbs from "../../components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import { ICONS } from "@/app/components/layout/icons"
 import LoadingLine from "@/app/components/loading-line"
 import LoadError from "@/app/components/load-error"
 import PrefetchLink from "@/app/components/prefetch-link"
@@ -19,20 +21,15 @@ export default function GroupDetailPage() {
   const members = state.status === "ready" ? groupsFromUsers(state.users).find(g => g.id === id)?.members ?? [] : []
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <Breadcrumbs items={[{ label: "Groups", href: linkTo("/groups") }, { label: id }]} />
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{info.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{id}</span>{info.source && <> · from {info.source}</>}
-          </p>
-          {info.github && (
-            <a href={info.github.url} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-1 text-sm text-brand hover:underline">
+    <>
+      <Page>
+        <ResourceHeader icon={ICONS.groups} iconAriaLabel="Group" title={info.name} breadcrumbs={[{ label: "Groups", href: linkTo("/groups") }, { label: id }]}
+          subtitle={<><span className="font-mono">{id}</span>{info.source && <> · from {info.source}</>}</>}
+          actions={info.github && (
+            <a href={info.github.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
               GitHub team {info.github.org}/{info.github.team}<ExternalLink className="size-3" aria-hidden />
             </a>
-          )}
-        </header>
+          )} />
 
         {state.status === "loading" && <LoadingLine loading="members" />}
         {state.status === "error" && <LoadError message={`Failed to load members: ${state.message}`} onRetry={retry} />}
@@ -60,7 +57,7 @@ export default function GroupDetailPage() {
             )}
           </section>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

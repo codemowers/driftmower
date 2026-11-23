@@ -8,9 +8,11 @@ export type NodePressure = {
 
 // One Node as list_nodes reports it, with its roles joined for grouping.
 export type NodeDrift = {
+  memory?: {used:number;total:number;graph?:string[]} | null
   name: string
   role: string
   readiness: Readiness
+  conditions?: string[]
   schedulable: boolean
   pressure: NodePressure
   version: string
@@ -19,6 +21,7 @@ export type NodeDrift = {
   containerRuntime: string
   architecture: string
   creationTimestamp: string | null
+  bootTime?: string | null
 }
 
 export type ClusterNodesResponse = {

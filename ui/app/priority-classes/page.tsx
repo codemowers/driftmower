@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import PageHeader from "@/app/components/page-header"
 import LoadingLine from "@/app/components/loading-line"
@@ -16,9 +18,9 @@ export default function PriorityClassesPage() {
   for (const r of resources ?? []) if (r.kind === "Pod" && r.priorityClassName) pods.set(r.priorityClassName, (pods.get(r.priorityClassName) ?? 0) + 1)
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Priority classes" subtitle="Scheduling priority: higher values schedule first and may preempt lower ones" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.priorityClasses} title="Priority classes" subtitle="Scheduling priority: higher values schedule first and may preempt lower ones" />
         {error && <LoadError message={`Failed to load priority classes: ${error}`} />}
         {!classes && !error && <LoadingLine loading="priority classes" />}
         {classes && (
@@ -45,7 +47,7 @@ export default function PriorityClassesPage() {
             </table>
           </div>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

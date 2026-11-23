@@ -1,8 +1,10 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import Breadcrumbs from "@/app/components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import { ICONS } from "@/app/components/layout/icons"
 import LoadingLine from "@/app/components/loading-line"
 import LoadError from "@/app/components/load-error"
 import { Button } from "@/components/ui/button"
@@ -34,36 +36,32 @@ export default function ServiceAccountPage() {
   const reload = (refresh: boolean) => { setState({ status: "loading" }); setRequest(r => ({ attempt: r.attempt + 1, refresh })) }
 
   const breadcrumbs = [
-    { label: "Users", href: linkTo("/users") },
+    { label: "Service accounts", href: linkTo("/service-accounts") },
     { label: `Namespace ${namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(namespace)}`) },
     { label: `ServiceAccount ${name}` },
   ]
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <Breadcrumbs items={breadcrumbs} />
+    <>
+      <Page>
+        {state.status !== "ready" && <ResourceHeader icon={ICONS.serviceAccounts} iconAriaLabel="ServiceAccount" title={name} breadcrumbs={breadcrumbs} subtitle={`ServiceAccount in ${namespace}`} />}
 
         {state.status === "loading" && <LoadingLine loading="effective rights" />}
         {state.status === "error" && <LoadError message={`Failed to evaluate ${namespace}/${name}: ${state.message}`} onRetry={() => reload(false)} />}
 
         {state.status === "ready" && (
           <>
-            <header className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">{name}</h1>
-                <p className="font-mono text-sm text-muted-foreground">{state.access.identity.user}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1">
+            <ResourceHeader icon={ICONS.serviceAccounts} iconAriaLabel="ServiceAccount" title={name} breadcrumbs={breadcrumbs}
+              subtitle={<span className="font-mono">{state.access.identity.user}</span>}
+              actions={<>
                 <Button type="button" variant="outline" size="sm" onClick={() => reload(true)}>Re-evaluate</Button>
                 <span className="text-xs text-muted-foreground" title={state.access.evaluatedAt}>Evaluated {new Date(state.access.evaluatedAt).toLocaleString()}</span>
-              </div>
-            </header>
+              </>} />
 
             <AccessRights access={state.access} />
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

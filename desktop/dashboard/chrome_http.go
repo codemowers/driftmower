@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 func (d *Dashboard) setChromeProfile(w http.ResponseWriter, r *http.Request) {
@@ -32,11 +33,19 @@ func (d *Dashboard) openChromeConnection(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Key string `json:"key"`
+		Key      string `json:"key"`
+		ReturnTo string `json:"returnTo"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil || body.Key == "" {
 		http.Error(w, "connection required", 400)
 		return
+	}
+	if body.ReturnTo != "" {
+		target, err := url.Parse(body.ReturnTo)
+		if err != nil || !strings.HasPrefix(body.ReturnTo, "/") || strings.HasPrefix(body.ReturnTo, "//") || strings.ContainsAny(body.ReturnTo, "\\\r\n") || target.IsAbs() || target.Host != "" {
+			http.Error(w, "returnTo must be a local application path", http.StatusBadRequest)
+			return
+		}
 	}
 	contexts, _ := d.discovery.Snapshot()
 	for _, connection := range contexts {
@@ -64,6 +73,9 @@ func (d *Dashboard) openChromeConnection(w http.ResponseWriter, r *http.Request)
 		}
 		d.discovery.Retry(connection.Key)
 		query := url.Values{"connect": {body.Key}, "chrome-profile": {connection.ChromeProfile.Directory}}
+		if body.ReturnTo != "" {
+			query.Set("return-to", body.ReturnTo)
+		}
 		target := DesktopOrigin + "/settings?" + query.Encode()
 		if err := d.cfg.ChromeProfiles.launch(connection.ChromeProfile.Directory, target, true); err != nil {
 			http.Error(w, err.Error(), 502)
@@ -88,6 +100,7 @@ func (d *ContextDiscovery) Retry(key string) bool {
 	}
 	d.mu.Unlock()
 	if found {
+		d.notify()
 		select {
 		case d.wake <- struct{}{}:
 		default:

@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils/cn"
-import { relativeTimeFromNow } from "@/lib/utils/format-time"
+import { relativeTimeFromNow, isoDate } from "@/lib/utils/format-time"
 import type { ImageUsage } from "@/lib/cluster/reports"
 
 type Tone = "ok" | "minor" | "major"
@@ -13,10 +13,6 @@ const TONE_TEXT: Record<Tone, string> = {
 }
 
 const SIX_MONTHS_MS = 182 * 24 * 60 * 60 * 1000
-
-function isoDate(iso: string): string {
-  return iso.slice(0, 10)
-}
 
 function eolTone(iso: string): Tone {
   const ms = Date.parse(iso)
@@ -55,8 +51,8 @@ export default function SupportLifecycle({ usage }: { usage: ImageUsage }) {
   if (!endOfLifeDate && !endOfActiveSupportDate) return null
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="-mx-6 mb-4 border-b border-gray-200 px-6 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+      <p className="-mx-5 mb-4 border-b border-gray-200 px-5 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Support lifecycle
       </p>
 

@@ -30,7 +30,6 @@ type landingPage struct {
 	OtherClients   string
 }
 
-// shellQuote quotes s for a POSIX shell.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }

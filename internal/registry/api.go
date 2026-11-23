@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -36,29 +35,12 @@ func (a *API) Handler() http.Handler {
 		writeJSON(w, r, out)
 	})
 	mux.HandleFunc("GET /v1/repository", func(w http.ResponseWriter, r *http.Request) {
-		offset, limit := 0, 50
-		if raw := r.URL.Query().Get("offset"); raw != "" {
-			n, err := strconv.Atoi(raw)
-			if err != nil || n < 0 {
-				http.Error(w, "invalid offset", 400)
-				return
-			}
-			offset = n
-		}
-		if raw := r.URL.Query().Get("limit"); raw != "" {
-			n, err := strconv.Atoi(raw)
-			if err != nil || n < 1 || n > 100 {
-				http.Error(w, "limit must be 1 to 100", 400)
-				return
-			}
-			limit = n
-		}
 		digest := r.URL.Query().Get("digest")
 		if digest != "" && !digestPattern.MatchString(digest) {
 			http.Error(w, "invalid manifest digest", 400)
 			return
 		}
-		page, ok := a.Store.Page(r.URL.Query().Get("name"), offset, limit, digest)
+		page, ok := a.Store.Repository(r.URL.Query().Get("name"), digest)
 		if !ok {
 			http.NotFound(w, r)
 			return

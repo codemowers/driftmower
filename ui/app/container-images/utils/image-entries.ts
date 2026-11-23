@@ -1,7 +1,8 @@
+import { driftIssues } from "@/lib/cluster/issues"
 import type { ImageUsage, Issue, Report, ScrapeStatus, StatusType } from "@/lib/cluster/reports"
 import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
 import { resolvedVersion } from "@/lib/utils/image-artifacts"
-import { sourceRepoUrl } from "@/lib/utils/oci-labels"
+import { ownSourceRepoUrl } from "@/lib/utils/oci-labels"
 
 export type ImageWorkload = {
   uid: string
@@ -98,8 +99,8 @@ function toEntry(key: string, usages: ImageUsage[], issues: Report["issues"]): I
     workloads,
     containerCount: usages.length,
     digests: [...new Set(usages.map(u => u.imageInfo.digest).filter(present))],
-    issueCount: matchingIssues(key, usages, issues).length,
-    sourceUrl: usages.map(u => u.imageInfo.crawlerSource?.url ?? sourceRepoUrl(u.imageInfo.labels) ?? u.imageInfo.sourceRepositories?.[0]?.url).find(present) ?? null,
+    issueCount: matchingIssues(key, usages, issues).length+driftIssues(usages).length,
+    sourceUrl: usages.map(u => u.imageInfo.crawlerSource?.url ?? ownSourceRepoUrl(u.imageInfo) ?? u.imageInfo.sourceRepositories?.[0]?.url).find(present) ?? null,
   }
 }
 
@@ -228,7 +229,7 @@ export function tagResolution(data: Report | null, key: string): TagResolution |
   }
 }
 
-export function imageUsagesForKey(data: Report | null, key: string, scopeNamespaces: Set<string> | null): ImageUsage[] {
+function imageUsagesForKey(data: Report | null, key: string, scopeNamespaces: Set<string> | null): ImageUsage[] {
   if (!data) return []
   return groupUsagesByRepo(data, scopeNamespaces).get(key) ?? []
 }

@@ -83,3 +83,7 @@ export function kubectlAge(iso: string): string {
   if (d < 365 * 2) return `${d}d`
   return `${Math.floor(d / 365)}y`
 }
+
+export function isoDate(iso: string): string {
+  return iso.slice(0, 10)
+}

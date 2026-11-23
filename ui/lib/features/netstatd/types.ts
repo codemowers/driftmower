@@ -50,24 +50,6 @@ export type UpstreamHealth = {
   connected: number
 }
 
-export type ConnDelta = {
-  key: string
-  direction: AggregateDirection
-  localIP: string
-  peerIP: string
-  peer: PeerRef
-  port: number
-  protocol: Protocol
-  count: number
-  lastSeen: number
-}
-
-export type HostWire = {
-  nodeName: string
-  hostIPs: string[]
-  hostNetNS: number
-}
-
 export type NetstatdState = {
   status: NetstatdStatus
   error: string | null

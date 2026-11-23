@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
@@ -26,18 +25,15 @@ type ImageScanStatuses struct {
 
 func (s *Service) ImageScanStatuses(ctx context.Context, id authz.Identity, digests []string) (*ImageScanStatuses, error) {
 	if s.PrometheusURL == "" {
-		return nil, errors.New("Prometheus is not configured")
+		return nil, errors.New("prometheus is not configured")
 	}
-	if len(digests) == 0 || len(digests) > 100 {
-		return nil, errors.New("provide 1 to 100 digests")
+	if len(digests) == 0 {
+		return nil, errors.New("provide at least one digest")
 	}
-	platforms, images := []string{}, []string{}
 	for _, digest := range digests {
 		if len(digest) != 71 || !strings.HasPrefix(digest, "sha256:") || strings.Trim(digest[7:], "0123456789abcdef") != "" {
 			return nil, errors.New("invalid sha256 digest")
 		}
-		platforms = append(platforms, regexp.QuoteMeta(digest))
-		images = append(images, regexp.QuoteMeta(strings.Replace(digest, "sha256:", "sha256-", 1)))
 	}
 	owner := []string{}
 	if s.ScannerNamespace != "" {
@@ -54,8 +50,10 @@ func (s *Service) ImageScanStatuses(ctx context.Context, id authz.Identity, dige
 		return "{" + base + extra + "}"
 	}
 	state := `driftmower:image_scan_state:max`
-	query := `max by (image,digest,state) (` + state + filter("digest=~"+promString(strings.Join(platforms, "|"))) + ` or (` +
-		`driftmower:image_manifest_info:max` + filter("image=~"+promString(strings.Join(images, "|"))) +
+	// Every image's state is read once and filtered here, so any number of
+	// digests costs one query.
+	query := `max by (image,digest,state) (` + state + filter("") + ` or (` +
+		`driftmower:image_manifest_info:max` + filter("") +
 		` * on (digest,driftmower_namespace,driftmower_instance) group_left (state) ` + state + filter("") + `))`
 	out := &ImageScanStatuses{Images: map[string]ImageScanStatus{}}
 	err := func(backend Requester) error {

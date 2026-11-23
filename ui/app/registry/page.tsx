@@ -1,4 +1,5 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
 
 import CapabilitiesPage from "@/app/provisioning/components/capabilities-page"
 import ClusterRegistry from "@/app/components/cluster-registry"
@@ -9,7 +10,7 @@ import Section from "@/app/provisioning/components/section"
 // selected sandbox's own registry, whose credentials are already provisioned.
 export default function RegistryPage() {
   return (
-    <CapabilitiesPage title="Container registry" subtitle="Where to push images: the cluster's shared Zot registry, and your sandbox's own when it runs one.">
+    <CapabilitiesPage icon={ICONS.registry} title="Container registry" subtitle="Where to push images: the cluster's shared Zot registry, and your sandbox's own when it runs one.">
       {({ scoped, sandboxes, capabilities }) => (
         <div className="flex flex-col gap-8">
           <ClusterRegistry />

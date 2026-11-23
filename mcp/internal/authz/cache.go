@@ -88,7 +88,6 @@ func (c *CachedReviewer) InvalidateUser(user string) int {
 	return c.cache.DeleteWhere(func(_ string, a answer) bool { return a.user == user })
 }
 
-// Clear drops every answer and reports how many there were.
 func (c *CachedReviewer) Clear() int {
 	return c.cache.Clear()
 }

@@ -1,42 +1,28 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
-import { Layers } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { StatusType } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
 import CopyButton from "@/app/components/copy-button"
+import { useImageAnalysis } from "@/lib/features/image-analysis"
 import ImageTagStats from "@/app/components/image/image-tag-stats"
 import TagIdentity from "@/app/components/image/tag-identity"
 import SupportLifecycle from "@/app/components/image/support-lifecycle"
 import SourceCard from "@/app/components/image/source-card"
 import ImageIssues from "@/app/components/image/image-issues"
-import BaseImageHierarchy from "@/app/components/image/base-image-hierarchy"
-import ImageLicenses from "@/app/components/image/image-licenses"
-import ImageVulnerabilities from "@/app/components/image/image-vulnerabilities"
-import { artifactTitle, digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
+import SubpageNav from "@/app/components/layout/subpage-nav"
+import VulnerabilitiesCard from "@/app/components/findings/vulnerabilities-card"
+import { artifactTitle, containerImageHref, digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 import PageLoading from "@/app/components/page-loading"
-
-const STATUS_LABEL: Record<StatusType, string> = {
-  major_behind: "Major",
-  minor_behind: "Minor",
-  patch_behind: "Patch",
-  up_to_date:   "OK",
-  ahead:        "Ahead",
-  behind:       "Behind",
-  no_data:      "No data",
-  no_version:   "No version",
-}
-
-function statusLabel(status: string): string {
-  return STATUS_LABEL[status as StatusType] ?? status.replace(/_/g, " ")
-}
 
 export default function ImageTagDetailPage() {
   const params = useParams<{ uid: string; digest: string }>()
   const workloadUid = params.uid
   const digest = decodeURIComponent(params.digest)
+  const analysis = useImageAnalysis([digest])
   const data = useClusterState(s => s.data)
   const { linkTo } = useContextHref()
 
@@ -53,9 +39,9 @@ export default function ImageTagDetailPage() {
   if (!data || !workloadMatch || !usage) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Image not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -71,16 +57,15 @@ export default function ImageTagDetailPage() {
   const version = resolvedVersion(usage)
 
   const imageIssues = data.issues.filter(i => usage.image.includes(i.image))
-  const status = usage.versionStatus.statusType
 
   const rootHref = linkTo("/topmost-owners")
   const workloadHref = linkTo(`/topmost-owners/${workloadUid}`)
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={Layers}
+          icon={ICONS.containerImages}
           iconAriaLabel="OCI image tag"
           title={artifactTitle(repository, version)}
           breadcrumbs={[
@@ -90,7 +75,6 @@ export default function ImageTagDetailPage() {
             { label: `Image ${repository}@${digestCrumb(digest)}` },
           ]}
           chips={[{ label: "Image Tag", tone: "brand" }]}
-          scoreChip={{ status, score: 0, label: statusLabel(status) }}
           issueCount={imageIssues.length}
           subtitle={
             <span className="flex items-center gap-1.5">
@@ -99,10 +83,16 @@ export default function ImageTagDetailPage() {
             </span>
           }
         />
+        <SubpageNav items={[
+          { label: "Overview", href: linkTo(`/topmost-owners/${encodeURIComponent(workloadUid)}/images/${encodeURIComponent(digest)}`) },
+          ...(usage.imageInfo.digest ? [
+            { label: "SBOM", href: linkTo(containerImageHref(`${usage.imageInfo.registry}/${usage.imageInfo.repository}`, usage.imageInfo.digest, "sbom")) },
+            { label: "Base image", href: linkTo(containerImageHref(`${usage.imageInfo.registry}/${usage.imageInfo.repository}`, usage.imageInfo.digest, "base-image")) },
+          ] : []),
+        ]} />
 
-        <ImageTagStats usage={usage} />
+        <ImageTagStats usage={usage} analysis={analysis} />
 
-        <BaseImageHierarchy images={usage.imageInfo.platforms??[]} targetLabel={fullRef} />
 
         <div className="grid gap-6 items-start md:grid-cols-[1fr_420px]">
           <TagIdentity usage={usage} />
@@ -113,9 +103,8 @@ export default function ImageTagDetailPage() {
           </div>
         </div>
 
-        <ImageLicenses digests={usage.imageInfo.digest ? [usage.imageInfo.digest] : []}/>
-        <ImageVulnerabilities usage={usage} />
-      </main>
+        <VulnerabilitiesCard usages={[usage]} limit={10} />
+      </Page>
     </div>
   )
 }

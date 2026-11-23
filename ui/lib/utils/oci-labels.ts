@@ -37,6 +37,12 @@ export function sortedLabelEntries(labels: Record<string, string> | undefined): 
   })
 }
 
+// The image's own source label, or null when MCP found the labels were
+// inherited from a base image (copied metadata is not provenance).
+export function ownSourceRepoUrl(info: { labels?: Record<string, string>; inheritedSource?: string }): string | null {
+  return info.inheritedSource ? null : sourceRepoUrl(info.labels)
+}
+
 export function sourceRepoUrl(labels: Record<string, string> | undefined): string | null {
   const source = labels?.[OCI_SOURCE] ?? labels?.["org.label-schema.vcs-url"]
   if (!source?.startsWith("http")) return null

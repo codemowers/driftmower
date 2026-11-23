@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 type MetricsInput struct {
@@ -144,7 +145,7 @@ func (s *Service) QueryMetrics(ctx context.Context, id authz.Identity, in Metric
 			series = series[:in.Limit]
 		}
 		result = &MetricsResult{Source: "prometheus", Namespace: in.Namespace, Query: query, ResultType: resp.Data.ResultType,
-			Result: orEmpty(series), Warnings: orEmpty(resp.Warnings), Infos: orEmpty(resp.Infos)}
+			Result: nonnil.Slice(series), Warnings: nonnil.Slice(resp.Warnings), Infos: nonnil.Slice(resp.Infos)}
 
 		return nil
 	}(s.Backend)
@@ -203,14 +204,6 @@ func (in *MetricsInput) normalise() error {
 	}
 
 	return nil
-}
-
-func orEmpty[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-
-	return items
 }
 
 type LogsInput struct {
@@ -330,7 +323,7 @@ func (s *Service) lokiLogs(ctx context.Context, backend Requester, in LogsInput,
 		}
 	}
 
-	return &LogsResult{Source: "loki", Namespace: in.Namespace, Pod: in.Pod, Query: query, Streams: orEmpty(resp.Data.Result), Warnings: []string{}}, nil
+	return &LogsResult{Source: "loki", Namespace: in.Namespace, Pod: in.Pod, Query: query, Streams: nonnil.Slice(resp.Data.Result), Warnings: []string{}}, nil
 }
 
 func (s *Service) kubernetesLogs(ctx context.Context, in LogsInput, start, end time.Time) (*LogsResult, error) {
@@ -359,7 +352,7 @@ func (s *Service) kubernetesLogs(ctx context.Context, in LogsInput, start, end t
 		entries = entries[len(entries)-in.Limit:]
 	}
 	slices.Reverse(entries)
-	result := &LogsResult{Source: "kubernetes", Namespace: in.Namespace, Pod: in.Pod, Entries: orEmpty(entries), Warnings: []string{
+	result := &LogsResult{Source: "kubernetes", Namespace: in.Namespace, Pod: in.Pod, Entries: nonnil.Slice(entries), Warnings: []string{
 		"Kubernetes returns only retained logs from the current container instance. Results are limited to the latest requested lines and 1 MiB before time/text filtering; " +
 			"archived or deleted pod logs are unavailable. Specify container for multi-container pods.",
 	}}

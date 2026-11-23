@@ -1,8 +1,10 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import Breadcrumbs from "../../components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import { ICONS } from "@/app/components/layout/icons"
 import LoadingLine from "@/app/components/loading-line"
 import LoadError from "@/app/components/load-error"
 import { Button } from "@/components/ui/button"
@@ -37,9 +39,9 @@ export default function UserDetailPage() {
   const breadcrumbs = [{ label: "Users", href: linkTo("/users") }, { label: name }]
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <Breadcrumbs items={breadcrumbs} />
+    <>
+      <Page>
+        {state.status !== "ready" && <ResourceHeader icon={ICONS.users} iconAriaLabel="User" title={name} breadcrumbs={breadcrumbs} subtitle="OIDC user" />}
 
         {state.status === "loading" && <LoadingLine loading="effective rights" />}
         {state.status === "error" && <LoadError message={`Failed to evaluate ${name}: ${state.message}`} onRetry={() => reload(false)} />}
@@ -48,28 +50,20 @@ export default function UserDetailPage() {
           const a = state.access
           return (
             <>
-              <header className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <h1 className="text-2xl font-semibold">{a.user.displayName || a.user.name}</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {a.user.name}{a.user.primaryEmail && <> · {a.user.primaryEmail}</>} · last sign-in {formatSignIn(a.user.lastSignIn).toLowerCase()}
-                  </p>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {a.user.groups.map(g => <GroupChip key={g} id={g} />)}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
+              <ResourceHeader icon={ICONS.users} iconAriaLabel="User" title={a.user.displayName || a.user.name} breadcrumbs={breadcrumbs}
+                subtitle={<>{a.user.name}{a.user.primaryEmail && <> · {a.user.primaryEmail}</>} · last sign-in {formatSignIn(a.user.lastSignIn).toLowerCase()}</>}
+                actions={<>
                   <Button type="button" variant="outline" size="sm" onClick={() => reload(true)}>Re-evaluate</Button>
                   <span className="text-xs text-muted-foreground" title={a.evaluatedAt}>Evaluated {new Date(a.evaluatedAt).toLocaleString()}</span>
-                </div>
-              </header>
+                </>} />
+              {a.user.groups.length > 0 && <div className="flex flex-wrap gap-1">{a.user.groups.map(g => <GroupChip key={g} id={g} />)}</div>}
 
               <AccessRights access={a} />
               <UserCommands key={a.user.name + a.evaluatedAt} user={a.user} />
             </>
           )
         })()}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

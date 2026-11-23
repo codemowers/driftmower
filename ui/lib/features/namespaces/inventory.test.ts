@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { namespaceWorkloadRoots,isTerminalPod } from "./inventory.ts"
+import { namespaceWorkloadRoots,isTerminalPod,namespacePods } from "./inventory.ts"
 import type { Report } from "../../cluster/reports"
 import type { ClusterResource } from "../../cluster/cluster-state"
 
@@ -13,4 +13,18 @@ test("namespace views exclude image owners and terminal Pods while keeping unhea
  assert.deepEqual(namespaceWorkloadRoots(data,resources).map(root=>root.uid),["crashing","unknown","failed-job","broken-deployment","scaled-zero"])
  assert.equal(isTerminalPod(crashing as ClusterResource),false)
  assert.equal(data.workloads?.length,6)
+})
+
+test("namespace Pod lists retain terminal Job evidence and hide retired non-Job Pods", () => {
+ const pod=(uid:string,phase:string,extra:object={})=>({uid,phase,kind:"Pod",name:uid,namespace:"team",...extra}) as ClusterResource
+ const resources=[pod("live","Running"),pod("failed","Failed"),pod("done","Succeeded"),pod("terminating","Running",{terminating:true}),pod("job-failed","Failed",{jobOwned:true}),pod("cronjob-done","Succeeded",{jobOwned:true,ownerUID:"cron"}),pod("other","Running",{namespace:"other"})]
+ assert.deepEqual(namespacePods(resources,"team").map(p=>p.uid),["live","job-failed","cronjob-done"])
+})
+
+test("namespace inventory retains failed scans for the explicit Show scan Pods checkbox",()=>{
+ const scan={uid:"scan",name:"ordinary-name",kind:"Pod",namespace:"team",phase:"Failed",scanPod:true} as ClusterResource
+ const ordinary={...scan,uid:"ordinary",scanPod:false}
+ const pods=namespacePods([scan,ordinary],"team")
+ assert.deepEqual(pods,[scan])
+ assert.deepEqual(pods.filter(pod=>!pod.scanPod),[])
 })

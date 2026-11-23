@@ -68,7 +68,6 @@ func impliesClause(topology StorageTopology, reclaimPolicy string, allowExpansio
 	return strings.Join(parts, "; ")
 }
 
-// StorageClassInput is what the storage fact reads from a StorageClass.
 type StorageClassInput struct {
 	Name              string
 	Provisioner       string

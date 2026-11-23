@@ -23,7 +23,9 @@ func TestClientReadsCompactReportsWithoutRetainingThem(t *testing.T) {
 		if calls == 3 && r.URL.Query().Get("url") != "https://example.com/app" {
 			t.Error("detail did not select one source")
 		}
-		fmt.Fprintf(w, `{"sources":[{"url":"https://example.com/app","deployed":[{"version":"%d"}]}]}`, calls)
+		if _, err := fmt.Fprintf(w, `{"sources":[{"url":"https://example.com/app","deployed":[{"version":"%d"}]}]}`, calls); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer s.Close()
 	file := filepath.Join(t.TempDir(), "token")

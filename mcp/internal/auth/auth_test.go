@@ -279,6 +279,26 @@ func TestServiceAccountRouting(t *testing.T) {
 	}
 }
 
+func TestServiceAccountStableAudience(t *testing.T) {
+	const user, internal = "system:serviceaccount:workers:agent", "mcp.driftmower"
+	for _, audience := range []string{internal, resource} {
+		r, sent := reviewing(authenticationv1.TokenReviewStatus{Authenticated: true, Audiences: []string{audience}, User: authenticationv1.UserInfo{Username: user, Groups: []string{"system:serviceaccounts:workers"}}}, nil)
+		_, _, handled, err := r.VerifyServiceAccount(context.Background(), saToken(user, audience), resource, internal)
+		if !handled || err != nil || len(*sent) != 1 || !slices.Equal((*sent)[0].Audiences, []string{audience}) {
+			t.Fatalf("audience %s: handled=%v err=%v review=%+v", audience, handled, err, *sent)
+		}
+		a := &Authenticator{ServiceAccounts: r, Resource: resource, ServiceAccountAudience: internal}
+		if _, err := a.Verify(context.Background(), saToken(user, audience), nil); err != nil {
+			t.Fatalf("transport rejected %s: %v", audience, err)
+		}
+	}
+	r, sent := reviewing(authenticationv1.TokenReviewStatus{}, nil)
+	_, _, _, err := r.VerifyServiceAccount(context.Background(), saToken(user, "https://kubernetes.default.svc"), resource, internal)
+	if !errors.Is(err, auth.ErrInvalidToken) || len(*sent) != 0 {
+		t.Fatalf("API-server token accepted: %v %+v", err, *sent)
+	}
+}
+
 func TestServiceAccountReviewFailures(t *testing.T) {
 	const user = "system:serviceaccount:workers:agent"
 	cases := map[string]authenticationv1.TokenReviewStatus{

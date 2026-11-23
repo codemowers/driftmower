@@ -43,11 +43,9 @@ export default function TagHistoryCard({
   const summary = scrapeSummary(scrape)
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Tag history
-      </p>
-      <div className="rounded-xl border border-gray-200 bg-white">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tag history</h2>
+      <div className="">
         <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-3">
           <p className="text-xs text-muted-foreground">
             Tags the scraper found for this repository · the candidates “latest” is resolved from
@@ -126,6 +124,6 @@ export default function TagHistoryCard({
           </p>
         )}
       </div>
-    </div>
+    </section>
   )
 }

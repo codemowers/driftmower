@@ -36,11 +36,9 @@ type Config struct {
 	KubeLogin bool
 }
 
-// LoadConfig populates a Config from flags and environment variables.
 func LoadConfig(args []string) *Config {
 	cfg := &Config{}
 
-	// Use a local flagset to avoid polluting the global flag namespace
 	fs := flag.NewFlagSet("dashboard", flag.ContinueOnError)
 	fs.BoolVar(&cfg.InstallDesktop, "install-desktop", false, "Install the Linux application launcher and icon, then exit")
 	fs.StringVar(&cfg.ChromeProfile, "chrome-profile", "", "Open the desktop window in this existing Chrome profile directory")
@@ -53,7 +51,6 @@ func LoadConfig(args []string) *Config {
 	fs.BoolVar(&cfg.Restart, "restart", false, "Stop the running desktop and start this executable")
 	cfg.FlagError = fs.Parse(args)
 
-	// Environment variables (the source of truth for Docker)
 	cfg.AssetDir = os.Getenv("ASSET_DIR")
 	if cfg.AssetDir == "" {
 		cfg.AssetDir = "/app/public"

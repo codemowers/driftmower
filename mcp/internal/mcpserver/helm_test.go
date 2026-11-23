@@ -59,7 +59,7 @@ func TestImageMetadataUsesOCIMetadataAndSourceCRD(t *testing.T) {
 	source := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "codemowers.io/v1alpha1", "kind": "SourceRepository", "metadata": map[string]any{"name": "github-example-app"}, "spec": map[string]any{"url": "https://github.com/example/app"}}}
 	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{containerImagesGVR: "ContainerImageList", sourceRepositoriesGVR: "SourceRepositoryList"}, image, source)
 	w := &Workloads{Judge: allowAll{}, Cache: &workloads.Cache{Dynamic: dyn}}
-	out, warnings := imageMetadataIndex(context.Background(), w, authz.Identity{})
+	out, warnings := selectedImageMetadata(context.Background(), w, authz.Identity{}, nil)
 	if len(warnings) > 0 {
 		t.Fatal(warnings)
 	}
@@ -70,8 +70,32 @@ func TestImageMetadataUsesOCIMetadataAndSourceCRD(t *testing.T) {
 		}
 	}
 	w.Judge = denyImages{}
-	out, _ = imageMetadataIndex(context.Background(), w, authz.Identity{})
+	out, _ = selectedImageMetadata(context.Background(), w, authz.Identity{}, nil)
 	if len(out) > 0 {
 		t.Fatal("metadata exposed without permission")
+	}
+}
+
+func TestImageMetadataConfigCreationMatchesImageDetail(t *testing.T) {
+	old, recent := "2018-09-28T17:05:09Z", "2026-01-01T00:00:00Z"
+	image := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "codemowers.io/v1alpha1", "kind": "ContainerImage", "metadata": map[string]any{"name": "sha256-index"}, "manifests": []any{map[string]any{"digest": "sha256:old", "created": old}, map[string]any{"digest": "sha256:recent", "created": recent}}}}
+	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{containerImagesGVR: "ContainerImageList", sourceRepositoriesGVR: "SourceRepositoryList"}, image)
+	w := &Workloads{Judge: allowAll{}, Cache: &workloads.Cache{Dynamic: dyn}}
+	out, warnings := selectedImageMetadata(context.Background(), w, authz.Identity{}, nil)
+	if len(warnings) > 0 {
+		t.Fatal(warnings)
+	}
+	for digest, want := range map[string]string{"sha256:index": old, "sha256:old": old, "sha256:recent": recent} {
+		if out[digest].ConfigCreated != want {
+			t.Fatalf("%s config creation %q want %q", digest, out[digest].ConfigCreated, want)
+		}
+	}
+	image.Object["created"] = old
+	if got := imageConfigCreated(image, "sha256:recent"); got != recent {
+		t.Fatalf("platform timestamp overridden: %s", got)
+	}
+	image.Object["manifests"] = []any{map[string]any{"digest": "sha256:single"}}
+	if got := imageConfigCreated(image, "sha256:single"); got != old {
+		t.Fatalf("single-platform config lost: %s", got)
 	}
 }

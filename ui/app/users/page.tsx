@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useState } from "react"
 import PageHeader from "../components/page-header"
@@ -29,9 +31,9 @@ export default function UsersPage() {
   const users = showUngrouped ? matching : matching.filter(u => u.groups.length > 0)
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Users" subtitle="Passmower OIDC users; open one to see their effective Kubernetes rights" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.users} title="Users" subtitle="Passmower OIDC users; open one to see their effective Kubernetes rights" />
 
         {state.status === "loading" && <LoadingLine loading="users" />}
         {state.status === "error" && <LoadError message={`Failed to load users: ${state.message}`} onRetry={retry} />}
@@ -62,7 +64,7 @@ export default function UsersPage() {
                   <tbody>
                     {users.map(u => (
                       <tr key={`${u.namespace}/${u.name}`} className="border-t border-border align-top">
-                        <td className="py-2 pr-4">
+                        <td className="whitespace-nowrap py-2 pr-4">
                           <PrefetchLink href={linkTo(`/users/${encodeURIComponent(u.name)}`)} className="font-medium text-brand hover:underline">
                             {u.displayName || u.name}
                           </PrefetchLink>
@@ -88,7 +90,7 @@ export default function UsersPage() {
             )}
           </section>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

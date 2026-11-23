@@ -259,17 +259,3 @@ export type CapabilityResponse = {
   // not be evaluated). Their facts are withheld, not absent.
   withheld: string[]
 }
-
-export type FindingSeverity = "blocker" | "warning" | "note"
-
-export type WizardStep = "offering" | "where" | "size" | "options" | "review" | "apply"
-
-export type ChoiceOption<T> = {
-  value: T
-  label: string
-  hint?: string
-  disabled?: boolean
-  // A disabled option must always explain itself; that is most of the teaching
-  // in the sizing step.
-  disabledReason?: string
-}

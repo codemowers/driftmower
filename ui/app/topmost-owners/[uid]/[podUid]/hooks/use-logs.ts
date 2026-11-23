@@ -75,11 +75,16 @@ export function useLogs(namespace: string, workloadUid: string | undefined, pod:
       })
     }
 
-    void tick()
-    const id = setInterval(tick, POLL_INTERVAL_MS)
+    // The next poll starts after the previous answer, never alongside it.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const loop = async () => {
+      await tick()
+      if (!cancelled) timer = setTimeout(loop, POLL_INTERVAL_MS)
+    }
+    void loop()
     return () => {
       cancelled = true
-      clearInterval(id)
+      clearTimeout(timer)
     }
   }, [namespace, workloadUid, pod, container])
 

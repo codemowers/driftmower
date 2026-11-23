@@ -2,11 +2,12 @@
 
 import { FileKey2, LoaderCircle } from "lucide-react"
 import { createContext, useContext, useEffect, useState } from "react"
+import DownloadProgress from "@/app/components/download-progress"
 import CopyButton from "@/app/components/copy-button"
 import MyAccess from "@/app/users/components/my-access"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
-import { deploymentConfig, ensureChromeProfile, kubernetesSignIn, loginToEndpoint, saveChromeProfile, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
+import { deploymentConfig, subscribeDesktopConfig, ensureChromeProfile, kubernetesSignIn, loginToEndpoint, saveChromeProfile, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
 
 // A context's state: green when its MCP is available, yellow when the API
 // server answers but credentials need a sign-in or refresh, red when the
@@ -51,14 +52,14 @@ export default function SettingsPage() {
  async function signIn(context:string){setError("");setSigningIn(context);try{const selected=config?.contexts?.find(c=>c.name===context);if(selected&&!(await ensureChromeProfile(selected.key)))return;await kubernetesSignIn(context);setConfig(await deploymentConfig(true))}catch(e){setError((e as Error).message)}finally{setSigningIn(null)}}
  async function connect(url:string,contextKey?:string){setError("");setNotice("");setConnectingKey(contextKey??"configured");try{const profile=await loginToEndpoint(url,contextKey);setConfig(await deploymentConfig(true));if(profile)setNotice(`Opened in Chrome profile ${profile}`)}catch(e){setError((e as Error).message)}finally{setConnectingKey(null)}}
  async function setProfile(key:string,directory:string){setError("");setNotice("");setSavingProfile(key);try{setConfig(await saveChromeProfile(key,directory))}catch(e){setError((e as Error).message)}finally{setSavingProfile(null)}}
- useEffect(()=>{let cancelled=false;async function refresh(){try {const result=await deploymentConfig(true);if(!cancelled){setConfig(result)}}catch(e){if(!cancelled)setError((e as Error).message)}}void refresh();const timer=setInterval(()=>void refresh(),5000);return()=>{cancelled=true;clearInterval(timer)}},[])
+ useEffect(()=>subscribeDesktopConfig(setConfig,error=>setError(error.message)),[])
  return <div className="mx-auto max-w-4xl space-y-8 p-6">
   <h1 className="text-2xl font-semibold">Settings</h1>
   <p className="text-sm text-muted-foreground">Connect to a context to open the dashboard views.</p>
   {error&&<p role="alert" className="text-red-700">{error}</p>}
   {notice&&<p role="status" className="text-sm text-muted-foreground">{notice}</p>}
   {config?.chromeProfilesError&&<p role="alert" className="text-red-700">{config.chromeProfilesError}</p>}
-  {config?.mcpUrl&&<section className="flex items-center justify-between gap-4 rounded border p-3"><div><h2 className="font-medium">Configured context</h2><p className="break-all font-mono text-sm">{contextTitle(config.mcpUrl)}</p></div><button disabled={connecting} className="rounded border px-3 py-1 text-sm disabled:opacity-50" onClick={()=>void connect(config.mcpUrl!)}>{connectingTo===config.mcpUrl?<span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden/>Connecting…</span>:"Connect"}</button></section>}
+  {config?.mcpUrl&&<section className="flex items-center justify-between gap-4 rounded border p-3"><div><h2 className="font-medium">Configured context</h2><p className="break-all font-mono text-sm">{contextTitle(config.mcpUrl)}</p></div><button disabled={connecting} className="rounded border px-3 py-1 text-sm disabled:opacity-50" onClick={()=>void connect(config.mcpUrl!)}>{connectingTo===config.mcpUrl?<span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden/>Connecting…<DownloadProgress /></span>:"Connect"}</button></section>}
   <section className="space-y-3"><h2 className="text-lg font-medium">Updates</h2>
    <label className="flex items-start gap-3"><input type="checkbox" checked={streamUpdates} onChange={e=>setStreamUpdates(e.target.checked)}/><span>Stream updates<span className="block text-sm text-muted-foreground">Refresh from MCP notifications, with polling fallback.</span></span></label>
   </section>
@@ -81,7 +82,7 @@ export default function SettingsPage() {
       </div>
       <div className="flex flex-wrap gap-2">
         {c.signIn && <button className="rounded border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40" disabled={signingIn !== null} title={c.signInCommand || "Runs kubelogin; finish signing in in your browser"} onClick={() => void signIn(c.name)}>{signingIn === c.name ? <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Waiting for browser…</span> : "Sign in"}</button>}
-        <button className="rounded border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40" disabled={connecting||connectingKey!==null} onClick={() => void connect(c.url ?? "", c.key)}>{connectingKey===c.key || (connectingTo === c.url && !!c.url) ? <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Connecting…</span> : "Connect"}</button>
+        <button className="rounded border px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-40" disabled={connecting||connectingKey!==null} onClick={() => void connect(c.url ?? "", c.key)}>{connectingKey===c.key || (connectingTo === c.url && !!c.url) ? <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Connecting…<DownloadProgress /></span> : "Connect"}</button>
       </div>
     </div>)}{config.contexts?.length === 0 && <p className="p-3 text-sm">No kubeconfig contexts found.</p>}</div>
    </>}

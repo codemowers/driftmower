@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -64,7 +66,7 @@ func dispatchTest(t *testing.T, c *Controller, image *unstructured.Unstructured,
 	if err != nil {
 		return err
 	}
-	_, err = c.start(ctx, pendingScan{image: fresh, digest: "sha256:target", arch: "amd64", key: key}, nodes.Items)
+	_, err = c.start(ctx, pendingScan{image: fresh, digest: "sha256:target", arch: "amd64", key: key}, nodes.Items, nil)
 	return err
 }
 
@@ -243,6 +245,14 @@ func TestLostRecordAdoptsExistingPod(t *testing.T) {
 		t.Fatal(err)
 	}
 	pod := currentPod(t, c)
+	pod.UID = "existing-scan-uid"
+	if _, err := c.Kube.CoreV1().Pods(pod.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Real client-go returns an empty, non-nil Pod with AlreadyExists.
+	c.Kube.(*fake.Clientset).PrependReactor("create", "pods", func(ktesting.Action) (bool, runtime.Object, error) {
+		return true, &corev1.Pod{}, apierrors.NewAlreadyExists(corev1.Resource("pods"), pod.Name)
+	})
 	fresh, _ := c.Dynamic.Resource(images).Get(context.Background(), "image", metav1.GetOptions{})
 	annotations := fresh.GetAnnotations()
 	delete(annotations, c.stateAnnotation("sha256:target"))
@@ -254,7 +264,7 @@ func TestLostRecordAdoptsExistingPod(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := readState(t, c)
-	if len(state.Attempts) != 1 || state.Attempts[0].Pod != pod.Name || state.Attempts[0].Hostname != pod.Spec.NodeSelector["kubernetes.io/hostname"] || state.Attempts[0].Reference != testRef {
+	if len(state.Attempts) != 1 || state.Attempts[0].Pod != pod.Name || state.Attempts[0].UID != pod.UID || state.Attempts[0].Hostname != pod.Spec.NodeSelector["kubernetes.io/hostname"] || state.Attempts[0].Reference != testRef {
 		t.Fatalf("existing Pod not adopted: %+v", state)
 	}
 	pods, _ := c.Kube.CoreV1().Pods("test").List(context.Background(), metav1.ListOptions{})
@@ -308,7 +318,7 @@ func TestSuccessfulArtifactRegeneratesAfterEviction(t *testing.T) {
 		t.Fatal(err)
 	}
 	pod := currentPod(t, c)
-	if err := os.WriteFile(filepath.Join(c.Config.CacheDir, key+".json"), []byte(`{"bomFormat":"CycloneDX"}`), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(c.Config.CacheDir, key+artifactSuffix), gzipTestBytes(t, []byte(`{"bomFormat":"CycloneDX"}`)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.reconcile(context.Background(), image.GetName()); err != nil {
@@ -317,7 +327,7 @@ func TestSuccessfulArtifactRegeneratesAfterEviction(t *testing.T) {
 	if readState(t, c).Attempts[0].Outcome != "succeeded" {
 		t.Fatal("success was not persisted before Pod cleanup")
 	}
-	if err := os.Remove(filepath.Join(c.Config.CacheDir, key+".json")); err != nil {
+	if err := os.Remove(filepath.Join(c.Config.CacheDir, key+artifactSuffix)); err != nil {
 		t.Fatal(err)
 	}
 	// A retained successful Pod must not collide with the next scan cycle.
@@ -360,5 +370,60 @@ func TestCachedReferencePreservesPulledIndex(t *testing.T) {
 	manifests = append(manifests, map[string]any{"architecture": "amd64", "digest": "sha256:variant"})
 	if _, err = cachedReference([]string{"registry/app@sha256:index"}, manifests, "amd64", "sha256:platform"); err == nil {
 		t.Fatal("must not attribute ambiguous platform to a manifest")
+	}
+}
+
+func TestImageCacheFailureEventsEndAttemptAndMoveToAnotherNode(t *testing.T) {
+	for _, tc := range []struct {
+		name, reason, message string
+		otherPod              bool
+		retry                 bool
+	}{
+		{"missing image volume", "Failed", `Error: failed to mount image volume: ImageVolumeMountFailed: failed to get image volume ref "sha256:target": image "sha256:target": not found`, false, true},
+		{"never pull event", "ErrImageNeverPull", `Container image "registry/app" is not present with pull policy of Never`, false, true},
+		{"transient mount failure", "Failed", `failed to mount image volume: ImageVolumeMountFailed: context deadline exceeded`, false, false},
+		{"old Pod event", "ErrImageNeverPull", "image is not present", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, image, key := testController(t, 2)
+			if err := dispatchTest(t, c, image, key); err != nil {
+				t.Fatal(err)
+			}
+			pod := currentPod(t, c)
+			pod.UID = "current-pod"
+			pod.Status.Phase = corev1.PodPending
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: "trivy", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}}}
+			if _, err := c.Kube.CoreV1().Pods("test").Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			ref := corev1.ObjectReference{Kind: "Pod", Namespace: "test", Name: pod.Name, UID: pod.UID}
+			if tc.otherPod {
+				ref.UID = "old-pod"
+			}
+			event := &corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "mount-failure", Namespace: "test"}, Type: corev1.EventTypeWarning, Reason: tc.reason, Message: tc.message, InvolvedObject: ref}
+			if _, err := c.Kube.CoreV1().Events("test").Create(context.Background(), event, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchTest(t, c, image, key); err != nil {
+				t.Fatal(err)
+			}
+			state := readState(t, c)
+			_, err := c.Kube.CoreV1().Pods("test").Get(context.Background(), pod.Name, metav1.GetOptions{})
+			if !tc.retry {
+				if err != nil || len(state.Attempts) != 1 || state.Attempts[0].Outcome != "" {
+					t.Fatalf("unrelated event ended attempt: %+v err=%v", state, err)
+				}
+				return
+			}
+			if !apierrors.IsNotFound(err) {
+				t.Fatalf("cache miss kept its scan slot: %v", err)
+			}
+			if len(state.Attempts) != 2 || !strings.Contains(state.Attempts[0].Reason, tc.message) {
+				t.Fatalf("lost cache-miss evidence: %+v", state)
+			}
+			if state.Attempts[0].Node == state.Attempts[1].Node {
+				t.Fatalf("retried same Node: %+v", state)
+			}
+		})
 	}
 }

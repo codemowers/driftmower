@@ -38,10 +38,6 @@ func AvailabilityOf(servesKind bool, operator *OperatorHealth, installHref *stri
 	}
 }
 
-func IsOfferable(a Availability) bool {
-	return a.State == StateReady || a.State == StateDegraded
-}
-
 // PodSecurityFact is Pod Security Admission's level for a namespace. It is a
 // built-in controller, so it appears in no ValidatingAdmissionPolicy listing.
 type PodSecurityFact struct {

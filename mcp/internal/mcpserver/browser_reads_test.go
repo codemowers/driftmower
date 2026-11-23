@@ -62,7 +62,7 @@ func TestHistoryBrowserReadsUseDedicatedPrometheusAndPrivateGETCaching(t *testin
 	var calls atomic.Int32
 	history := &observability.Service{PrometheusURL: "http://history", Judge: allowAll{}, Alignment: 5 * time.Minute, Backend: observability.RequesterFunc(func(_ context.Context, u *url.URL) (observability.Response, error) {
 		calls.Add(1)
-		if u.Host != "history" || !strings.Contains(u.Query().Get("query"), "driftmower_image_created_timestamp_seconds") {
+		if u.Host != "history" || !strings.Contains(u.Query().Get("query"), "driftmower_image_created_timestamp_seconds") || u.Query().Get("step") != "15" {
 			t.Errorf("unexpected backend %s", u)
 		}
 		return observability.Response{Status: 200, Body: []byte(`{"status":"success","data":{"resultType":"matrix","result":[]}}`)}, nil
@@ -71,10 +71,44 @@ func TestHistoryBrowserReadsUseDedicatedPrometheusAndPrivateGETCaching(t *testin
 		return auth.NewTokenInfo(&auth.Caller{Sub: "alice", IdentityClaims: auth.IdentityClaims{Username: "alice"}}, nil, time.Now().Add(time.Hour)), nil
 	}, nil)(BrowserReads(nil, nil, auth.Mapping{}, history))
 	for _, method := range []string{"GET", "POST"} {
-		path, body := "/api/observability/signal-history?signal=technical_debt&namespaces=team&hoursPerUpgrade=2&buildAgeDaysPerUpgrade=365", ""
+		path, body := "/api/observability/signal-history?signal=technical_debt&hours=1&namespaces=team&hoursPerUpgrade=2&buildAgeDaysPerUpgrade=365", ""
 		if method == "POST" {
 			path = "/api/observability/signal-history"
-			body = `{"signal":"technical_debt","namespaces":["team"],"hoursPerUpgrade":2,"buildAgeDaysPerUpgrade":365}`
+			body = `{"signal":"technical_debt","hours":1,"namespaces":["team"],"hoursPerUpgrade":2,"buildAgeDaysPerUpgrade":365}`
+		}
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer valid")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 200 {
+			t.Fatalf("%s: %d %s", method, w.Code, w.Body)
+		}
+		if method == "GET" && !strings.Contains(w.Header().Get("Cache-Control"), "private") || method == "POST" && w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal(w.Header())
+		}
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("queries %d", calls.Load())
+	}
+}
+
+func TestCurrentSignalsBrowserGETPOSTUseInstantHistoryBackend(t *testing.T) {
+	var calls atomic.Int32
+	history := &observability.Service{PrometheusURL: "http://history", Judge: allowAll{}, Alignment: 5 * time.Minute, Backend: observability.RequesterFunc(func(_ context.Context, u *url.URL) (observability.Response, error) {
+		calls.Add(1)
+		if u.Host != "history" || u.Path != "/api/v1/query" || u.Query().Get("time") == "" || u.Query().Has("start") {
+			t.Errorf("expected instant history backend: %s", u)
+		}
+		return observability.Response{Status: 200, Body: []byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`)}, nil
+	})}
+	h := sdkauth.RequireBearerToken(func(context.Context, string, *http.Request) (*sdkauth.TokenInfo, error) {
+		return auth.NewTokenInfo(&auth.Caller{Sub: "alice", IdentityClaims: auth.IdentityClaims{Username: "alice"}}, nil, time.Now().Add(time.Hour)), nil
+	}, nil)(BrowserReads(nil, nil, auth.Mapping{}, history))
+	for _, method := range []string{"GET", "POST"} {
+		path, body := "/api/observability/signal-history?signal=drift&current=true&namespaces=team", ""
+		if method == "POST" {
+			path = "/api/observability/signal-history"
+			body = `{"signal":"drift","current":true,"namespaces":["team"]}`
 		}
 		r := httptest.NewRequest(method, path, strings.NewReader(body))
 		r.Header.Set("Authorization", "Bearer valid")

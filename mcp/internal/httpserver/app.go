@@ -15,7 +15,6 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/metrics"
 )
 
-// AppOptions configure the main port.
 type AppOptions struct {
 	PublicURL       string
 	Cluster         cluster.Identity
@@ -90,6 +89,7 @@ func NewApp(opts AppOptions) http.Handler {
 		})
 		mux.Handle("/api/observability/", reads)
 		mux.Handle("/api/crawler/authorize", reads)
+		mux.Handle("/api/image-scans/", reads)
 	}
 	mux.HandleFunc("GET /api/client-config", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -108,7 +108,7 @@ func NewApp(opts AppOptions) http.Handler {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, http.StatusOK, map[string]any{"authMode": "oidc", "clientId": clientID, "issuer": opts.Auth.Issuer, "resource": a.resource, "scopes": opts.Auth.Metadata().ScopesSupported})
+		writeJSON(w, http.StatusOK, map[string]any{"authMode": "oidc", "clientId": clientID, "nativeClientId": opts.OAuthClientID, "issuer": opts.Auth.Issuer, "resource": a.resource, "scopes": opts.Auth.Metadata().ScopesSupported})
 	})
 	mux.HandleFunc("GET /{$}", a.serveLanding)
 	if capabilities != nil {
@@ -121,5 +121,5 @@ func NewApp(opts AppOptions) http.Handler {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 	})
 
-	return opts.Metrics.Instrument(browserOrigins(mux, opts.PublicURL, opts.AllowedOrigins))
+	return opts.Metrics.Instrument(browserOrigins(Gzip(mux), opts.PublicURL, opts.AllowedOrigins))
 }

@@ -51,12 +51,9 @@ func resolveImage(reports []crawler.SourceReport, image string) (findings.Match,
 
 func addImageChangesTool(s *mcp.Server, source FindingsSource, changes ChangesSource, w *Workloads, m auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_image_changes",
-		Title: "What later releases change for an image",
-		Description: "Use to see what upgrading an image would bring, such as which security fixes are in later versions. Resolves the image (by digest) to its source repository and deployed version, " +
-			"then lists every newer stable release on the same tag prefix, newest first, with the lines of its release notes, or of the repository changelog where the notes list nothing, " +
-			"each categorized security, breaking, bug or feature, and totals. Categories are read from headings, [TAGS], conventional-commit prefixes, CVE/GHSA identifiers and wording; " +
-			"uncategorized lines have no category. Callers who may list ContainerImages may ask about any image; others about images their own workloads run.",
+		Name:        "get_image_changes",
+		Title:       "What later releases change for an image",
+		Description: "Newer stable releases of an image's source on the same tag prefix, newest first, with release-note lines categorized security, breaking, bug or feature.",
 		InputSchema: inputSchema[imageChangesInput](func(p map[string]*jsonschema.Schema) {
 			p["image"].MinLength, p["image"].MaxLength = jsonschema.Ptr(1), jsonschema.Ptr(512)
 			p["categories"].Items.Enum = []any{crawler.CategorySecurity, crawler.CategoryBreaking, crawler.CategoryBug, crawler.CategoryFeature}

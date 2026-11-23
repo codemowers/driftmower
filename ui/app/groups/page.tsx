@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useState } from "react"
 import { ExternalLink } from "lucide-react"
@@ -21,9 +23,9 @@ export default function GroupsPage() {
     : []
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Groups" subtitle="Passmower group memberships of OIDC users, as carried in their tokens" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.groups} title="Groups" subtitle="Passmower group memberships of OIDC users, as carried in their tokens" />
 
         {state.status === "loading" && <LoadingLine loading="groups" />}
         {state.status === "error" && <LoadError message={`Failed to load groups: ${state.message}`} onRetry={retry} />}
@@ -70,7 +72,7 @@ export default function GroupsPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

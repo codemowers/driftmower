@@ -5,6 +5,8 @@ package crawler
 
 import (
 	"context"
+	"errors"
+	"github.com/codemowers/driftmower/internal/imagesource"
 	"log/slog"
 	"math/rand/v2"
 	"regexp"
@@ -59,15 +61,22 @@ type Crawler struct {
 	mu           sync.RWMutex
 	state        map[string]*sourceState
 	activeSource string
+
+	// provenance indexes image layer chains to recognise source claims
+	// inherited from a base image; rebuilt lazily after image changes.
+	provenanceMu    sync.Mutex
+	provenance      *imagesource.Index
+	provenanceStale atomic.Bool
 }
 
 // sourceState is what the crawler last learned about a source.
 type sourceState struct {
-	checkedAt  time.Time
-	due        time.Time
-	errors     []string
-	releases   []Release
-	advisories []Advisory
+	checkedAt    time.Time
+	due          time.Time
+	errors       []string
+	unauthorized bool
+	releases     []Release
+	advisories   []Advisory
 	// The repository's changelog file as fetched; nil when it has none.
 	changelog *Changelog
 	license   *RepositoryLicense
@@ -94,7 +103,9 @@ func New(cfg Config, client dynamic.Interface, log *slog.Logger) *Crawler {
 	c.sources = dynamicinformer.NewFilteredDynamicInformer(client, sourceRepositories, metav1.NamespaceAll, 0, cache.Indexers{}, nil).Informer()
 	c.images = dynamicinformer.NewFilteredDynamicInformer(client, containerImages, metav1.NamespaceAll, 0, cache.Indexers{
 		sourceIndex: func(obj any) ([]string, error) {
-			source, _, _ := unstructured.NestedString(obj.(*unstructured.Unstructured).Object, "status", "source")
+			// Claims inherited from a base image's metadata are not this
+			// image's source; deployed() also checks extended base images.
+			source := imagesource.Of(obj.(*unstructured.Unstructured).Object, nil).Source
 			if source == "" {
 				return nil, nil
 			}
@@ -106,6 +117,8 @@ func New(cfg Config, client dynamic.Interface, log *slog.Logger) *Crawler {
 	nudge := cache.ResourceEventHandlerFuncs{AddFunc: func(any) { c.nudge() }, UpdateFunc: func(any, any) { c.nudge() }}
 	c.sources.AddEventHandler(nudge)
 	c.images.AddEventHandler(nudge)
+	stale := func() { c.provenanceStale.Store(true) }
+	c.images.AddEventHandler(cache.ResourceEventHandlerFuncs{AddFunc: func(any) { stale() }, UpdateFunc: func(any, any) { stale() }, DeleteFunc: func(any) { stale() }})
 	missing := func(flag *atomic.Bool, resource string) cache.WatchErrorHandlerWithContext {
 		return func(ctx context.Context, r *cache.Reflector, err error) {
 			if apierrors.IsNotFound(err) {
@@ -156,20 +169,36 @@ func keep(fields []string) cache.TransformFunc {
 	}
 }
 
-// keepImage keeps an image's status, references and revision metadata.
+// keepImage keeps an image's status, references, revision metadata and what
+// imagesource needs to tell its own source claim from an inherited one.
 func keepImage(obj any) (any, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return obj, nil
 	}
-	reduced, _ := keep([]string{"status", "repoTags", "repoDigests"})(obj)
+	reduced, _ := keep(nil)(obj)
 	out := reduced.(*unstructured.Unstructured)
-	for _, field := range []string{"annotations", "labels"} {
-		if revision, _, _ := unstructured.NestedString(u.Object, field, "org.opencontainers.image.revision"); revision != "" {
-			unstructured.SetNestedField(out.Object, revision, field, "org.opencontainers.image.revision")
+	for field, value := range imagesource.Reduce(u.Object) {
+		if field != "metadata" && field != "apiVersion" && field != "kind" {
+			out.Object[field] = value
 		}
 	}
 	return out, nil
+}
+
+// provenanceIndex returns the layer-chain index of every known image.
+func (c *Crawler) provenanceIndex() *imagesource.Index {
+	c.provenanceMu.Lock()
+	defer c.provenanceMu.Unlock()
+	if c.provenance == nil || c.provenanceStale.Swap(false) {
+		items := c.images.GetStore().List()
+		objs := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			objs = append(objs, item.(*unstructured.Unstructured).Object)
+		}
+		c.provenance = imagesource.NewIndex(objs)
+	}
+	return c.provenance
 }
 
 func (c *Crawler) nudge() {
@@ -275,12 +304,17 @@ func (c *Crawler) deployed(url string) (map[string]*deployment, []string) {
 	versions := map[string]*deployment{}
 	var revisions []string
 	items, _ := c.images.GetIndexer().ByIndex(sourceIndex, url)
+	index := c.provenanceIndex()
 	for _, item := range items {
 		obj := item.(*unstructured.Unstructured).Object
+		claim := imagesource.Of(obj, index)
+		if claim.Source != url {
+			continue
+		}
 		if unused, _, _ := unstructured.NestedBool(obj, "status", "unused"); unused {
 			continue
 		}
-		version, _, _ := unstructured.NestedString(obj, "status", "version")
+		version := claim.Version
 		if version == "" {
 			continue
 		}
@@ -323,13 +357,25 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 	state := &sourceState{checkedAt: time.Now(), versions: map[string]bool{}, revisions: map[string]bool{}, osv: map[string][]Advisory{}}
 	jitter := time.Duration(rand.Int64N(int64(c.cfg.Interval)/10 + 1))
 	state.due = state.checkedAt.Add(c.cfg.Interval + jitter)
+	loc, supported := c.locate(url)
 	fail := func(what string, err error) {
 		if ctx.Err() == nil {
-			state.errors = append(state.errors, what+": "+err.Error())
+			detail := err.Error()
+			if errors.Is(err, errUnauthorized) {
+				state.unauthorized = true
+			}
+			// The release reader has already tried tags when releases were
+			// missing. Unlike a missing license/changelog, a missing tag
+			// collection means this repository itself cannot be read. GitHub
+			// conceals private repositories behind 404 responses.
+			if what == "releases" && loc.forge == GitHub && errors.Is(err, errNotFound) {
+				state.unauthorized = true
+				detail = "unauthorized: repository not found or inaccessible to the crawler credentials (HTTP 404)"
+			}
+			state.errors = append(state.errors, what+": "+detail)
 		}
 	}
 	versions, revisions := c.deployed(url)
-	loc, supported := c.locate(url)
 	if supported {
 		license, err := c.repositoryLicense(ctx, loc)
 		if err != nil {
@@ -388,7 +434,11 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 	c.state[url] = state
 	c.mu.Unlock()
 	remaining, _ := c.fetch.RateLimit()
-	c.log.Info("crawled", "source", url, "releases", len(state.releases), "advisories", len(state.advisories), "errors", len(state.errors), "githubRemaining", remaining)
+	if len(state.errors) > 0 {
+		c.log.Warn("crawled with errors", "source", url, "releases", len(state.releases), "advisories", len(state.advisories), "errors", len(state.errors), "errorDetails", state.errors, "githubRemaining", remaining)
+	} else {
+		c.log.Info("crawled", "source", url, "releases", len(state.releases), "advisories", len(state.advisories), "githubRemaining", remaining)
+	}
 }
 
 func intStrings(values []int) []string {
@@ -402,17 +452,17 @@ func intStrings(values []int) []string {
 // SourceReport is what the crawler knows about one source, matched against
 // the versions currently deployed.
 type SourceReport struct {
-	License   *RepositoryLicense `json:"license,omitempty"`
-	Scraping  bool               `json:"scraping,omitempty"`
-	URL       string             `json:"url"`
-	CheckedAt time.Time          `json:"checkedAt,omitzero"`
-	NextCrawl time.Time          `json:"nextCrawl,omitzero"`
-	Errors    []string           `json:"errors,omitempty"`
-	// Latest is the newest stable release.
-	Releases   []Release         `json:"releases,omitempty"`
-	Latest     *Release          `json:"latest,omitempty"`
-	Deployed   []DeployedVersion `json:"deployed"`
-	Advisories []Advisory        `json:"advisories,omitempty"`
+	License      *RepositoryLicense `json:"license,omitempty"`
+	Scraping     bool               `json:"scraping,omitempty"`
+	URL          string             `json:"url"`
+	CheckedAt    time.Time          `json:"checkedAt,omitzero"`
+	NextCrawl    time.Time          `json:"nextCrawl,omitzero"`
+	Errors       []string           `json:"errors,omitempty"`
+	Unauthorized bool               `json:"unauthorized,omitempty"`
+	Releases     []Release          `json:"releases,omitempty"`
+	Latest       *Release           `json:"latest,omitempty"`
+	Deployed     []DeployedVersion  `json:"deployed"`
+	Advisories   []Advisory         `json:"advisories,omitempty"`
 	// The changelog file found in the repository; its text is served by
 	// /v1/changes, parsed.
 	Changelog *Changelog `json:"changelog,omitempty"`
@@ -457,6 +507,7 @@ func (c *Crawler) Reports() []SourceReport {
 		} else {
 			report.CheckedAt, report.NextCrawl, report.Errors, report.Changelog = state.checkedAt, state.due, state.errors, state.changelog
 			report.License = state.license
+			report.Unauthorized = state.unauthorized
 		}
 		releases, advisories := stableReleases(state), map[string]Advisory{}
 		for _, release := range releases {

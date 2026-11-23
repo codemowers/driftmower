@@ -36,7 +36,6 @@ type PresetID string
 
 type Verdict = authz.Verdict
 
-// DegradedRead is a fact that could not be read.
 type DegradedRead struct {
 	// The fact family, e.g. "storageclasses". A stable key for consumers.
 	Source  string `json:"source"`
@@ -44,7 +43,6 @@ type DegradedRead struct {
 	Message string `json:"message"`
 }
 
-// WatchedNamespaces is either every namespace or a list.
 type WatchedNamespaces struct {
 	All   bool
 	Names []string
@@ -208,7 +206,6 @@ const (
 
 type Verb string
 
-// Verbs are the columns of the access matrix.
 var Verbs = []Verb{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 
 type ProvisionRow struct {
@@ -404,17 +401,6 @@ type CapabilityResponse struct {
 	Degraded            []DegradedRead      `json:"degraded"`
 }
 
-func ptr[T any](v T) *T { return &v }
-
-// strOrNil returns nil for "", matching TypeScript's `x || null`.
-func strOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-
-	return &s
-}
-
 // localeLess orders strings case-insensitively first, approximating
 // JavaScript's localeCompare closely enough for display order.
 func localeLess(a, b string) bool {
@@ -457,12 +443,4 @@ func unique[T comparable](items []T) []T {
 	}
 
 	return out
-}
-
-func orEmpty[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-
-	return items
 }

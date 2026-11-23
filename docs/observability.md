@@ -63,7 +63,7 @@ hour for old artifacts. Registry throttling/failure and advisory collection
 coverage alerts ship alongside their components. Crawler metrics expose only
 aggregate pending/scraping/failed/ready counts and inventory readiness.
 
-The security ServiceMonitor retains workload namespace labels and is selected
+The security PodMonitor retains workload namespace labels and is selected
 by release-owned history monitoring. To let platform monitoring read the
 dedicated port, set `mcp.metrics.prometheusNamespace`; Skaffold explicitly uses
 `PROMETHEUS_NAMESPACE` or `monitoring`. The selected Prometheus still needs to
@@ -127,7 +127,11 @@ days per upgrade (initially 365). Each workload contributes its highest image
 estimate, multiplied by assumed hours per upgrade (initially 1). Known version
 comparison always takes priority over age. Missing both comparison and build
 timestamp is counted as an incomplete estimate, not zero work. Both assumptions
-are adjustable in the UI and recalculate the full retained window; estimated
+are configured on MCP with `TECHNICAL_DEBT_HOURS_PER_UPGRADE` (default `1`)
+and `TECHNICAL_DEBT_BUILD_AGE_DAYS_PER_UPGRADE` (default `365`), exposed by Helm
+as `mcp.technicalDebt.hoursPerUpgrade` and
+`mcp.technicalDebt.buildAgeDaysPerUpgrade`. Changes recalculate the selected
+window; estimated
 hours are never stored in Prometheus. Version/build facts must have been scraped
 at the historical point: no chart invents observations before collection began.
 
@@ -135,7 +139,13 @@ at the historical point: no chart invents observations before collection began.
 reads use GET/POST `/api/observability/signal-history`, with private aligned GET
 caching and no retained MCP response cache. Cluster scope requires cluster-wide
 list Pods; explicit namespace scopes require authorization for each namespace.
-The window is bounded to 90 days and results to eight aggregate series. Browser
+The window accepts `hours` (1–2160) or `days` (1–90), bounded to 90 days,
+and results to eight aggregate series. Executive Summary has one Time window
+dropdown for all history charts: 3 months (90 days), month (30 days), 2 weeks,
+week (default), 3 days, 48h, 24h and 1h. Short windows use finer query steps.
+Current container counts use `current=true` for an independent instant query;
+current counts, top-five workloads and firing alerts remain current regardless
+of the history selection. The instant request bypasses the browser history queue. Browser
 history tools and charts share a three-request queue; MCP has no per-caller
 observability concurrency limit. `go test ./mcp/internal/observability -run TestSignalHistoryPromQL`
 also runs synthetic query tests when `promtool` is installed.
@@ -160,3 +170,90 @@ an operator PodMonitor and a `DriftmowerSBOMTooLarge` warning PrometheusRule,
 selected by the configured Prometheus. Platform Prometheus instances
 must select their labels to scrape/evaluate them; notification delivery requires
 that Prometheus to have an Alertmanager configured.
+
+
+## Compressed SBOM artifacts
+
+Each scan Pod annotates and gzip-compresses its CycloneDX result before upload.
+The operator accepts gzip artifacts only and retains `<artifact-key>.json.gz`
+on its PVC. There is no plain-JSON cache fallback or migration. Replace the
+old SBOM cache when switching from an older operator. Deploy the updated
+operator before the MCP/browser changes so artifact reads use the new gzip
+contract.
+
+The 32 MiB result limit and size histogram refer to decompressed content.
+Validation checks the gzip checksum and rejects truncated, invalid and oversized
+results. Cache eviction counts compressed file bytes. Prometheus summaries are
+rebuilt from compressed artifacts after restart without retaining full SBOMs.
+
+The scanner derives each artifact's vulnerability findings (CVE, severity,
+score, package, installed and fixed version, a short description) once and
+stores them beside the artifact, inside the same cache budget; a replaced or
+evicted artifact never answers from stale findings. `get_image_scans` with
+`includeFindings` returns them for every requested digest through one scanner
+request, so a view costs one tool call. Full SBOMs are fetched only for the
+SBOM page and the download button, through the authenticated
+`/api/image-scans/sbom` endpoint: MCP rechecks ContainerImage list permission
+and artifact association, then streams the operator's gzip bytes without
+recompression.
+
+## Agent registration and MCP exposure
+
+When the ClusterMCPServer API is available, the chart advertises `driftmower`
+when `mcp.enabled` and either ServiceAccount authentication or anonymous access
+are enabled, and `driftmower-crawler` when `crawler.enabled` and
+`crawler.mcp.enabled` are enabled. Registration URLs use internal Services.
+The source crawler offers compact scrape summaries and, by repository URL,
+fetched releases, licenses and advisories. It never returns deployed image or
+workload associations. Its caller needs an audience-bound Kubernetes token and
+`use` on the `driftmower-crawler` ClusterMCPServer. Existing configured internal
+callers retain access.
+
+`mcp.ingress.enabled` (default true) and `crawler.ingress.enabled` (default false)
+independently expose the main MCP and source crawler. Their `ingress.host` values
+configure the host; the crawler publishes only `/mcp`. Turning off Ingress leaves
+internal Service access and registrations available. The main registration uses
+the stable `mcp.<namespace>` token audience; its public resource audience remains
+accepted too. `mcp.publicUrl`, when set with Ingress enabled, also supplies the
+registration's public URL and client configuration annotations.
+
+Feeds remains owned by the agent chart in `../agent-refuckto`. Its `feeds.enabled`
+setting deploys and registers it, and `publicMCP.feeds` exposes the authenticated
+`/mcp/feeds` endpoint through that chart's existing dashboard Ingress. Driftmower
+has no Feeds namespace setting or duplicate registration.
+
+Pod configuration issues are evaluated once on inventory updates. Missing CPU
+and memory requests/limits join security issues in the same issue list; positive
+Pod-level budgets satisfy the corresponding setting. Ephemeral debug containers
+cannot declare resource budgets and are excluded from those checks. Completed,
+failed and terminating Pods contribute no issues unless their direct controller
+is a Job, including Jobs grouped under a CronJob. Namespace indicators combine
+the already evaluated Pod issues, independently of Prometheus.
+
+## Image scan coverage history
+
+Executive Summary counts distinct running image digests, deduplicated across
+namespaces and container replicas. A digest belongs to exactly one category:
+Trivy + files, files only, legacy Trivy only, or no retained scan evidence.
+Image/index aliases require evidence for every known platform before claiming
+that stage. Trivy availability includes partial results and does not imply Java
+archive coverage or zero vulnerabilities.
+
+`driftmower_image_filesystem_available{image,digest}` reports retained CycloneDX
+filesystem evidence independently of pending, failed or completed Trivy status.
+It uses the scanner's bounded artifact summaries, rebuilt from disk on restart;
+evicted files cease to count. The release-scoped recording rule ships beside
+its producer. `query_signal_history` accepts `signal=scan_coverage` for current
+or historical aggregates, using the same namespace authorization and window.
+Before this filesystem metric exists, or while scanner inventory is unavailable,
+the chart leaves gaps instead of claiming every image lacks a scan.
+
+Scan-coverage alias joins run once per minute in the release-owned
+`driftmower.security.scan_coverage` recording group. It records one observed
+stage per image, then associates that stage with running namespace/image pairs.
+Browser history counts distinct digests from
+`driftmower:running_image_scan_stage:info`, without repeating platform joins
+for every time step. Both recordings retain release identity, and the query
+scopes it to the configured scanner release. Earlier unrecorded periods remain
+gaps. The Cluster node table reuses the same memory-used/capacity breakdown
+as cluster totals; it performs no extra per-node requests.

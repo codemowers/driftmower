@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 type Catalog struct {
@@ -102,16 +103,16 @@ func (c *Catalog) StorageClasses(ctx context.Context) ([]StorageClass, error) {
 		out = append(out, StorageClass{
 			Name:                 r.Metadata.Name,
 			Description:          r.Metadata.description(),
-			Provisioner:          strPtr(r.Provisioner),
+			Provisioner:          nonnil.String(r.Provisioner),
 			FilesystemType:       fsType,
 			Parameters:           params,
-			ReclaimPolicy:        strPtr(r.ReclaimPolicy),
-			VolumeBindingMode:    strPtr(r.VolumeBindingMode),
+			ReclaimPolicy:        nonnil.String(r.ReclaimPolicy),
+			VolumeBindingMode:    nonnil.String(r.VolumeBindingMode),
 			AllowVolumeExpansion: r.AllowVolumeExpansion,
 			IsDefault: a["storageclass.kubernetes.io/is-default-class"] == "true" ||
 				a["storageclass.beta.kubernetes.io/is-default-class"] == "true",
-			MountOptions:      orEmpty(r.MountOptions),
-			AllowedTopologies: orEmpty(r.AllowedTopologies),
+			MountOptions:      nonnil.Slice(r.MountOptions),
+			AllowedTopologies: nonnil.Slice(r.AllowedTopologies),
 		})
 	}
 	slices.SortFunc(out, func(a, b StorageClass) int { return strings.Compare(a.Name, b.Name) })
@@ -119,23 +120,6 @@ func (c *Catalog) StorageClasses(ctx context.Context) ([]StorageClass, error) {
 	return out, nil
 }
 
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-
-	return &s
-}
-
-func orEmpty[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-
-	return items
-}
-
-// IngressClass is an installed ingress class.
 type IngressClass struct {
 	Name       string `json:"name"`
 	Controller string `json:"controller"`
@@ -239,7 +223,7 @@ func (c *Catalog) PlatformClasses(ctx context.Context, issuerVersion, only strin
 			out.PriorityClasses = []PriorityClass{}
 			for _, i := range items {
 				out.PriorityClasses = append(out.PriorityClasses, PriorityClass{
-					Name: i.Metadata.Name, Value: i.Value, IsDefault: i.GlobalDefault, Description: strPtr(i.Description),
+					Name: i.Metadata.Name, Value: i.Value, IsDefault: i.GlobalDefault, Description: nonnil.String(i.Description),
 				})
 			}
 			slices.SortFunc(out.PriorityClasses, func(a, b PriorityClass) int {
@@ -275,9 +259,9 @@ func (c *Catalog) PlatformClasses(ctx context.Context, issuerVersion, only strin
 					if cond.Type == "Ready" {
 						switch cond.Status {
 						case "True":
-							issuer.Ready = ptr(true)
+							issuer.Ready = new(true)
 						case "False":
-							issuer.Ready = ptr(false)
+							issuer.Ready = new(false)
 						}
 
 						break
@@ -306,8 +290,6 @@ func (c *Catalog) PlatformClasses(ctx context.Context, issuerVersion, only strin
 
 	return out
 }
-
-func ptr[T any](v T) *T { return &v }
 
 // groupVersions lists the versions the API server serves for a group, in
 // its preference order.

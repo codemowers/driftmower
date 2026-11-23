@@ -92,11 +92,9 @@ export default function ContainersCard({ usages, reportId }: { usages: ImageUsag
   const containerLabel = entries.length === 1 ? "1 container" : `${entries.length} containers`
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Containers
-      </p>
-      <div className="rounded-xl border border-gray-200 bg-white">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Containers</h2>
+      <div className="">
         <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-4 py-3">
           <p className="text-xs text-muted-foreground">What this chart ships</p>
           <p className="shrink-0 text-xs text-foreground">
@@ -107,6 +105,6 @@ export default function ContainersCard({ usages, reportId }: { usages: ImageUsag
           <ContainerRow key={`${entry.containerName}|${entry.imageLabel}`} entry={entry} reportId={reportId} first={i === 0} />
         ))}
       </div>
-    </div>
+    </section>
   )
 }

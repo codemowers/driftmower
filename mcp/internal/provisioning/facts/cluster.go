@@ -19,6 +19,7 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 	"github.com/codemowers/driftmower/mcp/internal/catalog"
 	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning"
 	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
@@ -37,7 +38,6 @@ type IngressFacts struct {
 	TLSAdvice      string
 }
 
-// Cluster holds the cluster-wide facts.
 type Cluster struct {
 	Surface   *kube.APISurface
 	Offerings []provisioning.OfferingCard
@@ -58,7 +58,6 @@ type Cluster struct {
 	Degraded            []provisioning.DegradedRead
 }
 
-// Options configure fact gathering.
 type Options struct {
 	Kubernetes kubernetes.Interface
 	Dynamic    dynamic.Interface
@@ -120,7 +119,6 @@ func (f *Facts) Surface(ctx context.Context) (*kube.APISurface, error) {
 	return f.surface.Get(ctx)
 }
 
-// Invalidate drops every cached cluster fact.
 func (f *Facts) Invalidate() {
 	f.surface.Invalidate()
 	f.topology.Invalidate()
@@ -386,11 +384,11 @@ func (f *Facts) gather(ctx context.Context) (*Cluster, error) {
 
 	c := &Cluster{
 		Surface:           surface,
-		StorageClasses:    orEmpty(storage),
+		StorageClasses:    nonnil.Slice(storage),
 		Topology:          topology.fact,
 		Policies:          policies,
-		Admission:         orEmpty(validating),
-		Mutations:         orEmpty(mutating),
+		Admission:         nonnil.Slice(validating),
+		Mutations:         nonnil.Slice(mutating),
 		AdmissionPolicies: []provisioning.AdmissionFact{},
 		TenantLabelKey:    provisioning.TenantLabelKeyFor(validating),
 		Ingress: IngressFacts{
@@ -404,7 +402,7 @@ func (f *Facts) gather(ctx context.Context) (*Cluster, error) {
 		// rules can admit node-sourced traffic such as CNPG's health probes.
 		NetworkPolicyEngine: "none",
 		MonitoringOperator:  surface.ServesGroup("monitoring.coreos.com"),
-		Degraded:            orEmpty([]provisioning.DegradedRead(degraded)),
+		Degraded:            nonnil.Slice([]provisioning.DegradedRead(degraded)),
 	}
 	switch {
 	case surface.ServesGroup("cilium.io"):
@@ -421,14 +419,6 @@ func (f *Facts) gather(ctx context.Context) (*Cluster, error) {
 	}
 
 	return c, nil
-}
-
-func orEmpty[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-
-	return items
 }
 
 // loadIngressSuffix reads a parameterised ingress guard's ConfigMap, only
@@ -574,14 +564,12 @@ func toCard(spec provisioning.OfferingSpec, surface *kube.APISurface, lookup fun
 		AdmissionDefaults: provisioning.DefaultsFor(mutations, target),
 	}
 	if ok {
-		card.Resource = ptr(served.Plural + "." + spec.Group)
-		card.APIVersion = ptr(spec.Group + "/" + served.Version)
+		card.Resource = new(served.Plural + "." + spec.Group)
+		card.APIVersion = new(spec.Group + "/" + served.Version)
 	}
 
 	return card, target
 }
-
-func ptr[T any](v T) *T { return &v }
 
 func rank(c provisioning.OfferingCard) int {
 	switch c.Availability.State {

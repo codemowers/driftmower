@@ -26,10 +26,8 @@ rules:
   - apiGroups: [authentication.k8s.io]
     resources: [tokenreviews]
     verbs: [create]
-  # Provisioning facts (all read-only): per-namespace budget and network
-  # posture, node topology, operator Deployments, and the parameter ConfigMap an
-  # admission guard names. The guard chooses its ConfigMap's name, so a chart
-  # cannot know it in advance; set rbac.paramConfigMapNames to narrow the grant.
+  # Provisioning facts. Admission guards name their own parameter ConfigMaps;
+  # set rbac.paramConfigMapNames to narrow the grant.
   - apiGroups: ['']
     resources: [nodes, resourcequotas, limitranges, pods, persistentvolumeclaims]
     verbs: [list]
@@ -38,6 +36,9 @@ rules:
     verbs: [get, list]
   - apiGroups: ['']
     resources: [persistentvolumeclaims]
+    verbs: [get]
+  - apiGroups: ['']
+    resources: [nodes]
     verbs: [get]
   - apiGroups: ['']
     resources: [configmaps]
@@ -94,9 +95,7 @@ rules:
   - apiGroups: [trust.cert-manager.io]
     resources: [bundles]
     verbs: [list]
-  # Workload inventory watches only metadata for Secrets, ConfigMaps, PVCs and
-  # names only. Kubernetes RBAC still grants collection reads; metadata
-  # negotiation does not constrain what this service account could request.
+  # Inventory watches Secrets, ConfigMaps and PVCs as metadata only.
   - apiGroups: ['']
     resources: [pods, replicationcontrollers, persistentvolumeclaims, configmaps, secrets, services]
     verbs: [list, watch]
@@ -124,6 +123,9 @@ rules:
   - apiGroups: [codemowers.io]
     resources: [containerimages, sourcerepositories]
     verbs: [list]
+  - apiGroups: [codemowers.io]
+    resources: [podprocesses]
+    verbs: [get]
   - apiGroups: [helm.cattle.io]
     resources: [helmcharts]
     verbs: [list]
@@ -131,9 +133,7 @@ rules:
   - apiGroups: [codemowers.ai]
     resources: [clustermcpservers, mcpservers]
     verbs: [list]
-  # Every permission answer this server gives is a SubjectAccessReview asked as
-  # the verified caller. This is a permission-probing capability: the server
-  # only ever asks about the identity it just verified from the token.
+  # Access checks are SubjectAccessReviews for the verified caller.
   - apiGroups: [authorization.k8s.io]
     resources: [subjectaccessreviews]
     verbs: [create]
@@ -143,23 +143,16 @@ rules:
     resources: [pods/log]
     verbs: [get]
 {{- if or .Values.mcp.workloadRestart.enabled .Values.mcp.userAccess.enabled }}
-  # Mutations are authorized and admitted as the verified OIDC caller, not this
-  # service account. No patch/delete privileges are granted to the account.
-  # User access inspection sends only SelfSubjectRulesReviews as the inspected
-  # user, and only for callers who may impersonate users and groups themselves.
+  # Mutations and rights inspection impersonate the verified caller or the
+  # inspected subject; the account itself has no write verbs.
   - apiGroups: ['']
     resources: [users, groups]
     verbs: [impersonate]
 {{- end }}
 {{- if .Values.mcp.userAccess.enabled }}
-  # OIDCUsers are read only after the caller's own RBAC allows the same read.
-  # Granted cluster-wide so the release stays in one namespace; the server
-  # reads only mcp.userAccess.oidcUserNamespace.
   - apiGroups: [codemowers.cloud]
     resources: [oidcusers]
     verbs: [get, list]
-  # ServiceAccounts are listed and inspected, as SelfSubjectRulesReviews
-  # impersonating them, only for callers who may do the same themselves.
   - apiGroups: ['']
     resources: [serviceaccounts]
     verbs: [get, list, impersonate]

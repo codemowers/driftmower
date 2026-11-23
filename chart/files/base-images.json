@@ -187,10 +187,6 @@
       "tagPattern": "^(latest|[0-9]{8}|v?[0-9]+\\.[0-9]+\\.[0-9]+)$"
     },
     {
-      "repository": "docker.elastic.co/wolfi/static",
-      "tagPattern": "^(latest|[0-9]+(\\.[0-9]+)*)$"
-    },
-    {
       "repository": "docker.dragonflydb.io/dragonflydb/dragonfly",
       "tagPattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpine|slim|bookworm|trixie|bullseye|noble|jammy|fpm|apache|cli|zts|nonroot|perl|management|ubuntu)[a-zA-Z0-9_.-]*)?$"
     },

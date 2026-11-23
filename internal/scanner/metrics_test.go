@@ -1,10 +1,14 @@
 package scanner
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,11 +39,15 @@ func TestSBOMSizeReportsRequireBoundTokenAndClearAfterUpload(t *testing.T) {
 	}
 	c.Kube.(*fake.Clientset).PrependReactor("create", "tokenreviews", func(action ktesting.Action) (bool, runtime.Object, error) {
 		review := action.(ktesting.CreateAction).GetObject().(*authv1.TokenReview)
+		account := "driftmower-scan"
+		if review.Spec.Token == "reader-token" {
+			account = "driftmower-mcp"
+		}
 		return true, &authv1.TokenReview{Status: authv1.TokenReviewStatus{
-			Authenticated: review.Spec.Token == "bound-token",
+			Authenticated: review.Spec.Token == "bound-token" || review.Spec.Token == "reader-token",
 			Audiences:     []string{c.Config.Audience},
 			User: authv1.UserInfo{
-				Username: "system:serviceaccount:test:driftmower-scan",
+				Username: "system:serviceaccount:test:" + account,
 				Extra: map[string]authv1.ExtraValue{
 					"authentication.kubernetes.io/pod-name": {pod.Name},
 					"authentication.kubernetes.io/pod-uid":  {string(pod.UID)},
@@ -59,7 +67,14 @@ func TestSBOMSizeReportsRequireBoundTokenAndClearAfterUpload(t *testing.T) {
 		{"stream without size report", "bound-token", "application/vnd.cyclonedx+json", strings.Repeat(" ", MaxSBOMBytes+1), 413},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPut, "/internal/scans/"+pod.Name, strings.NewReader(tc.body))
+			var body io.Reader = strings.NewReader(tc.body)
+			if tc.contentType != OversizedSBOMMediaType {
+				body = bytes.NewReader(gzipTestBytes(t, []byte(tc.body)))
+			}
+			req := httptest.NewRequest(http.MethodPut, "/internal/scans/"+pod.Name, body)
+			if tc.contentType != OversizedSBOMMediaType {
+				req.Header.Set("Content-Encoding", "gzip")
+			}
 			req.Header.Set("Authorization", "Bearer "+tc.token)
 			req.Header.Set("Content-Type", tc.contentType)
 			recorder := httptest.NewRecorder()
@@ -99,12 +114,50 @@ func TestSBOMSizeReportsRequireBoundTokenAndClearAfterUpload(t *testing.T) {
 		t.Fatalf("oversized artifact was cached: exists=%v, err=%v", exists, err)
 	}
 	// A later successful upload clears the warning for the same image/platform.
-	req := httptest.NewRequest(http.MethodPut, "/internal/scans/"+pod.Name, strings.NewReader(`{"bomFormat":"CycloneDX"}`))
+	encoded := gzipTestBytes(t, []byte(`{"bomFormat":"CycloneDX"}`+strings.Repeat(" ", 10000)))
+	c.Config.MaxBytes = int64(len(encoded))
+	req := httptest.NewRequest(http.MethodPut, "/internal/scans/"+pod.Name, bytes.NewReader(encoded))
+	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("Authorization", "Bearer bound-token")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("valid upload: %d %s", recorder.Code, recorder.Body)
+	}
+	stored, err := os.ReadFile(filepath.Join(c.Config.CacheDir, key+artifactSuffix))
+	if err != nil || !bytes.Equal(stored, encoded) {
+		t.Fatalf("cached gzip changed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(c.Config.CacheDir, key+".json")); !os.IsNotExist(err) {
+		t.Fatal("plain JSON cache file exists")
+	}
+	read := func(method, encoding, etag string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(method, "/v1/sboms/"+key, nil)
+		request.Header.Set("Authorization", "Bearer reader-token")
+		request.Header.Set("Accept-Encoding", encoding)
+		if etag != "" {
+			request.Header.Set("If-None-Match", etag)
+		}
+		result := httptest.NewRecorder()
+		handler.ServeHTTP(result, request)
+		return result
+	}
+	download := read("GET", "gzip", "")
+	if download.Code != 200 || download.Header().Get("Content-Encoding") != "gzip" || !bytes.Equal(download.Body.Bytes(), encoded) {
+		t.Fatalf("gzip serving changed bytes: %d %s", download.Code, download.Body)
+	}
+	if conditional := read("GET", "gzip", download.Header().Get("ETag")); conditional.Code != 304 || conditional.Body.Len() != 0 {
+		t.Fatal("gzip conditional read failed")
+	}
+	if incompatible := read("GET", "identity", ""); incompatible.Code != 406 {
+		t.Fatal("gzip-only endpoint accepted identity")
+	}
+	plain := httptest.NewRequest(http.MethodPut, "/internal/scans/"+pod.Name, strings.NewReader(`{"bomFormat":"CycloneDX"}`))
+	plain.Header.Set("Authorization", "Bearer bound-token")
+	plainResult := httptest.NewRecorder()
+	handler.ServeHTTP(plainResult, plain)
+	if plainResult.Code != 415 {
+		t.Fatal("plain JSON upload was accepted")
 	}
 	scrape = httptest.NewRecorder()
 	handler.ServeHTTP(scrape, httptest.NewRequest(http.MethodGet, "/metrics", nil))

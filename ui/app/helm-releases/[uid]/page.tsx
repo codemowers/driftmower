@@ -1,18 +1,12 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
-import { useMemo } from "react"
 import { useParams } from "next/navigation"
-import { ShipWheel } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
-import { normalizeDeployDate } from "@/lib/features/helm-releases/chart-versions"
-import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
-import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
+import type { ImageUsage } from "@/lib/cluster/reports"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import ResourceHeader from "@/app/components/resource-header"
-import ActionsCard from "@/app/components/actions-card"
-import ReleaseStats from "./components/release-stats"
 import ChartCard from "./components/chart-card"
 import ReleaseTabs from "./components/release-tabs"
 import PageLoading from "@/app/components/page-loading"
@@ -25,7 +19,6 @@ export default function HelmReleaseDetailPage() {
   const data = useClusterState(s => s.data)
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
-  const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
 
   const score = data
@@ -33,28 +26,19 @@ export default function HelmReleaseDetailPage() {
     : null
 
   const usages = (data && score ? data.report.releaseGroupMap[score.groupKey] : undefined) ?? NO_USAGES
-  const actionRows = useMemo(() => deriveActions(usages, undefined, vulnerabilityReports), [usages, vulnerabilityReports])
-  const currentCharts = useMemo(() => currentChartScopes(usages), [usages])
-  const assessments = useActionAssessments(actionRows, currentCharts)
 
   if (!data) return <PageLoading loading="release" />
 
   if (!data || !score) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Release not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
 
-  const normalizedScore = score.distinctRepoCount > 0 ? score.staleRepoCount / score.distinctRepoCount : 0
-
-  const worstStatus = usages.reduce<StatusType>((worst, u) => {
-    const s = u.versionStatus.statusType
-    return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
-  }, "no_data")
 
   const issueCount = data.issues.filter(i =>
     usages.some(u => u.image.includes(i.image))
@@ -66,14 +50,15 @@ export default function HelmReleaseDetailPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={ShipWheel}
+          icon={ICONS.helmReleases}
           iconAriaLabel="Helm release"
           title={score.releaseInfo.name}
           copyValue={score.releaseInfo.name}
           breadcrumbs={[
             { label: "Helm Releases", href: backHref },
+            { label: `Namespace ${score.releaseInfo.namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(score.releaseInfo.namespace)}`) },
             { label: `Release ${score.releaseInfo.name}` },
           ]}
           chips={[
@@ -87,20 +72,8 @@ export default function HelmReleaseDetailPage() {
                 }]
               : []),
           ]}
-          scoreChip={{ status: worstStatus, score: normalizedScore }}
           issueCount={issueCount}
-          subtitle={`${score.releaseInfo.namespace} · ${containerLabel} · ${workloadLabel}`}
-        />
-
-        <ReleaseStats
-          normalizedScore={normalizedScore}
-          staleRepoCount={score.staleRepoCount}
-          distinctRepoCount={score.distinctRepoCount}
-          namespace={score.releaseInfo.namespace}
-          worstStatus={worstStatus}
-          installedAt={normalizeDeployDate(score.releaseInfo.firstDeployedAt)}
-          upgradedAt={normalizeDeployDate(score.releaseInfo.lastDeployedAt)}
-          revision={score.releaseInfo.revision}
+          subtitle={`${containerLabel} · ${workloadLabel}`}
         />
 
         <ChartCard
@@ -108,7 +81,6 @@ export default function HelmReleaseDetailPage() {
           href={linkTo(`/helm-releases/${uid}/chart`, { drop: ["htab", "focus"] })}
         />
 
-        <ActionsCard {...assessments} />
         <HelmInspection release={score.releaseInfo} />
 
         <ReleaseTabs
@@ -118,7 +90,7 @@ export default function HelmReleaseDetailPage() {
           clusterResources={clusterResources}
           reportId={reportId}
         />
-      </main>
+      </Page>
     </div>
   )
 }

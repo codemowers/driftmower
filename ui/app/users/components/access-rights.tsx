@@ -1,5 +1,6 @@
 "use client"
 
+import {accessWarningReasons} from "@/lib/features/users/access-warnings"
 import type { Grant, UserAccess } from "@/lib/features/users/types"
 
 function verbs(vs: string[]): string {
@@ -57,6 +58,8 @@ function GrantTable({ grants, showNamespaces }: { grants: Grant[]; showNamespace
 // A user's effective rights: cluster-wide grants, then the extra rights per
 // namespace, with incomplete evaluations and warnings.
 export default function AccessRights({ access: a }: { access: UserAccess }) {
+  const incompleteNamespaces=a.incomplete.filter(Boolean)
+  const incompleteScopes=[a.incomplete.includes("")?"cluster-wide":undefined,incompleteNamespaces.length?`${incompleteNamespaces.length} namespaces`:undefined].filter(Boolean).join(" and ")
   return (
     <>
       {a.clusterAdmin ? (
@@ -68,7 +71,7 @@ export default function AccessRights({ access: a }: { access: UserAccess }) {
           <section className="flex flex-col gap-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Everywhere</h2>
             <p className="text-sm text-muted-foreground">Rights in every namespace and on cluster-scoped resources.</p>
-            {a.clusterWide.length ? <GrantTable grants={a.clusterWide} showNamespaces={false} /> : <p className="text-sm">None.</p>}
+            {a.clusterWide.length ? <GrantTable grants={a.clusterWide} showNamespaces={false} /> : <p className="text-sm">{a.incomplete.includes("")?"No cluster-wide grants were resolved; other permissions are unknown.":"None."}</p>}
             {a.nonResourceURLs.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 Non-resource URLs: {a.nonResourceURLs.map(n => `${n.urls.join(", ")} (${verbs(n.verbs)})`).join("; ")}
@@ -80,14 +83,16 @@ export default function AccessRights({ access: a }: { access: UserAccess }) {
             <p className="text-sm text-muted-foreground">
               Additional rights in specific namespaces. {a.examined.length} of {a.totalNamespaces} namespaces examined (those where the user may list Pods).
             </p>
-            {a.namespaced.length ? <GrantTable grants={a.namespaced} showNamespaces /> : <p className="text-sm">None beyond the rights above.</p>}
+            {a.namespaced.length ? <GrantTable grants={a.namespaced} showNamespaces /> : <p className="text-sm">{a.incomplete.some(Boolean)?"No additional grants were resolved; other permissions are unknown.":"None beyond the rights above."}</p>}
           </section>
         </>
       )}
 
-      {[...a.incomplete.map(n => `${n}: evaluation incomplete`), ...a.warnings].map(w => (
-        <p key={w} className="text-sm text-muted-foreground">{w}</p>
-      ))}
+      {a.incomplete.length>0&&<div className="space-y-2 text-sm text-muted-foreground">
+        <p>Only the permissions the API server could enumerate are shown; additional permissions remain unknown, not denied.</p>
+        <details><summary className="cursor-pointer">Incomplete reviews: {incompleteScopes}</summary><p className="mt-1">{a.incomplete.map(scope=>scope||"Cluster-wide").join(", ")}</p></details>
+      </div>}
+      {accessWarningReasons(a).map(w=><p key={w} className="text-sm text-muted-foreground">{w}</p>)}
     </>
   )
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/codemowers/driftmower/internal/httpcache"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -26,7 +25,7 @@ type API struct {
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	w.Header().Set("Cache-Control", "no-store")
-	if r.URL.Path != "/v1/sources" && r.URL.Path != "/v1/changes" && r.URL.Path != "/v1/images" {
+	if r.URL.Path != "/v1/sources" && r.URL.Path != "/v1/changes" {
 		http.NotFound(w, r)
 		return
 	}
@@ -48,31 +47,6 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !slices.Contains(a.Allowed, user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	if r.URL.Path == "/v1/images" {
-
-		offset, limit := 0, 100
-		var parseErr error
-		if raw := r.URL.Query().Get("offset"); raw != "" {
-			offset, parseErr = strconv.Atoi(raw)
-		}
-		if raw := r.URL.Query().Get("limit"); raw != "" && parseErr == nil {
-			limit, parseErr = strconv.Atoi(raw)
-		}
-		if parseErr != nil {
-			http.Error(w, "invalid image pagination", 400)
-			return
-		}
-		out, err := a.Crawler.SourceImages(r.URL.Query().Get("url"), offset, limit)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-
-		httpcache.Private(w.Header(), started, time.Now(), time.Time{}, 15*time.Second)
-
-		httpcache.JSON(w, r, out)
 		return
 	}
 	// The changes after a version, parsed from the stored release notes and

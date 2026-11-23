@@ -21,3 +21,5 @@ skaffold.env.*
 
 desktop/frontend
 desktop/build
+/chart/cluster-values/
+/scripts/promote-images.sh

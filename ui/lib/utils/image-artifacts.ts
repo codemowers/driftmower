@@ -29,6 +29,21 @@ export function imagePath(key: string): string {
   return key.split("/").map(encodeURIComponent).join("/")
 }
 
+// A lone "-" is never a valid OCI repository path component, so it separates
+// the image name from its artifact and subpage: <image>/-/<artifact>[/sbom].
+export function containerImageHref(key: string, artifact?: string, subpage?: "sbom" | "base-image"): string {
+  const base = `/container-images/${imagePath(key)}`
+  if (!artifact) return base
+  return `${base}/-/${encodeURIComponent(artifact).replace(/%3A/gi, ":")}${subpage ? `/${subpage}` : ""}`
+}
+
+export function parseContainerImagePath(segments: string[]): { key: string; artifact?: string; subpage?: string } {
+  const decoded = segments.map(decodeURIComponent).filter(Boolean)
+  const split = decoded.indexOf("-")
+  if (split < 0) return { key: decoded.join("/") }
+  return { key: decoded.slice(0, split).join("/"), artifact: decoded[split + 1], subpage: decoded[split + 2] }
+}
+
 export type IntegrityInfo = { value: string; caption: string; textClass: string }
 export type IntegrityStyle = { label: string; bg: string; text: string }
 

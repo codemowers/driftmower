@@ -1,10 +1,8 @@
 import { scrapeState, type SourceScrape } from "@/lib/features/crawler/sources"
-import { compactRelativeTimeFromNow } from "@/lib/utils/format-time"
-import { cn } from "@/lib/utils/cn"
+import IssueIndicator from "./issue-indicator"
 
-const styles={unknown:"bg-muted text-muted-foreground",pending:"bg-muted text-muted-foreground",scraping:"bg-brand-bg text-brand-label",failed:"bg-status-major-bg text-status-major-label",due:"bg-status-minor-bg text-status-minor-label",ready:"bg-status-ok-bg text-status-ok-label"}
-const labels={unknown:"Status unavailable",pending:"Not scraped",scraping:"Scraping",failed:"Scrape failed",due:"Scrape due",ready:"Scraped"}
 export default function SourceScrapeBadge({scrape}:{scrape?:SourceScrape}){
- const state=scrapeState(scrape)
- return <span className={cn("inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium",styles[state])} title={[scrape?.checkedAt,...(scrape?.errors??[])].filter(Boolean).join("\n")}>{labels[state]}{scrape?.checkedAt?` · ${compactRelativeTimeFromNow(scrape.checkedAt)}`:""}</span>
+ if(scrapeState(scrape)==="unauthorized")return <span title={scrape?.errors?.join("\n") || "Crawler credentials cannot access this repository"} className="rounded bg-status-minor-bg px-2 py-0.5 text-xs font-semibold text-status-minor-label">Unauthorized</span>
+ const issues=[...new Set(scrape?.errors??[])].map(message=>({code:"scrape",severity:"warning" as const,message}))
+ return <IssueIndicator issues={issues}/>
 }

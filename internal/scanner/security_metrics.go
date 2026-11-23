@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,35 +18,61 @@ type vulnerabilitySummary struct {
 	AcceptedAt                                float64
 	Counts                                    map[findingClass]int
 	TrivyVersion, DBVersion, Coverage, Reason string
+	Status                                    string
+	Filesystem                                bool
 }
 
 // summarizeArtifact parses each persisted artifact once, with one parser at a
 // time to bound peak memory. It retains no components, CVE IDs or package data.
-func (c *Controller) summarizeArtifact(key string) error {
+func (c *Controller) summarizeArtifact(key string) (vulnerabilitySummary, error) {
 	c.artifacts.Lock()
 	defer c.artifacts.Unlock()
-	if _, ok := c.summaries.Load(key); ok {
-		return nil
+	if _, err := os.Stat(filepath.Join(c.Config.CacheDir, key+artifactSuffix)); err != nil {
+		c.summaries.Delete(key)
+		return vulnerabilitySummary{}, err
 	}
-	f, err := os.Open(filepath.Join(c.Config.CacheDir, key+".json"))
+	if summary, ok := c.summaries.Load(key); ok {
+		return summary.(vulnerabilitySummary), nil
+	}
+	summary, err := readArtifactSummary(filepath.Join(c.Config.CacheDir, key+artifactSuffix))
 	if err != nil {
-		return err
+		return vulnerabilitySummary{}, err
+	}
+	c.summaries.Store(key, summary)
+	return summary, nil
+}
+
+func readArtifactSummary(path string) (vulnerabilitySummary, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return vulnerabilitySummary{}, err
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return err
+		return vulnerabilitySummary{}, err
 	}
-	if info.Size() > MaxSBOMBytes {
-		return fmt.Errorf("persisted SBOM exceeds size limit")
+	if info.Size() > MaxCompressedSBOMBytes {
+		return vulnerabilitySummary{}, fmt.Errorf("persisted SBOM exceeds size limit")
 	}
-	summary, err := summarizeVulnerabilities(io.LimitReader(f, MaxSBOMBytes+1))
+	reader, err := gzip.NewReader(f)
 	if err != nil {
-		return err
+		return vulnerabilitySummary{}, err
+	}
+	defer reader.Close()
+	bounded := &countingReader{Reader: io.LimitReader(reader, MaxSBOMBytes+1)}
+	summary, err := summarizeVulnerabilities(bounded)
+	if err == nil {
+		_, err = io.Copy(io.Discard, bounded)
+	}
+	if bounded.bytes > MaxSBOMBytes {
+		return vulnerabilitySummary{}, fmt.Errorf("persisted SBOM exceeds uncompressed size limit")
+	}
+	if err != nil {
+		return vulnerabilitySummary{}, err
 	}
 	summary.AcceptedAt = float64(info.ModTime().Unix())
-	c.summaries.Store(key, summary)
-	return nil
+	return summary, nil
 }
 
 func summarizeVulnerabilities(r io.Reader) (vulnerabilitySummary, error) {
@@ -137,6 +164,14 @@ func summarizeVulnerabilities(r io.Reader) (vulnerabilitySummary, error) {
 	}
 	out := vulnerabilitySummary{Counts: map[findingClass]int{}}
 	out.Coverage, out.Reason, out.DBVersion = ScanCoverage(bom.Properties)
+	for _, p := range bom.Properties {
+		switch p.Name {
+		case "driftmower:scan:vulnerabilities-status":
+			out.Status = p.Value
+		case "driftmower:filesystem:schema-version":
+			out.Filesystem = p.Value == "1"
+		}
+	}
 	for _, tool := range bom.Metadata.Tools.Components {
 		if strings.EqualFold(tool.Name, "trivy") {
 			out.TrivyVersion = tool.Version
@@ -149,13 +184,14 @@ func summarizeVulnerabilities(r io.Reader) (vulnerabilitySummary, error) {
 }
 
 var securityDescs = map[string]*prometheus.Desc{
-	"ready":     prometheus.NewDesc("driftmower_scanner_inventory_ready", "Whether scanner inventory is synchronized; zero means coverage is unknown.", nil, nil),
-	"available": prometheus.NewDesc("driftmower_image_scan_available", "Whether the current scanner/database configuration has a readable summarized artifact for this manifest.", []string{"image", "digest", "trivy_version", "db_version", "coverage", "reason"}, nil),
-	"accepted":  prometheus.NewDesc("driftmower_image_scan_accepted_timestamp_seconds", "Artifact file modification Unix timestamp (acceptance time), not vulnerability database age.", []string{"image", "digest", "trivy_version", "db_version", "coverage", "reason"}, nil),
-	"findings":  prometheus.NewDesc("driftmower_image_vulnerabilities", "Unique vulnerability ID/component findings, by highest reported severity and explicit fix availability; no CVE IDs or packages in labels. Zero-count classes are omitted.", []string{"image", "digest", "severity", "fix_status", "trivy_version", "db_version", "coverage", "reason"}, nil),
-	"exhausted": prometheus.NewDesc("driftmower_image_scan_attempts_exhausted", "Whether the current manifest scan has exhausted its retry budget without a usable artifact.", []string{"image", "digest"}, nil),
-	"state":     prometheus.NewDesc("driftmower_image_scan_state", "One current lifecycle per immutable manifest digest, deduplicated across image aliases. No Pod or workload labels. Failed means the retry budget is exhausted; done requires a usable current artifact.", []string{"digest", "state", "trivy_version", "db_version", "coverage", "reason"}, nil),
-	"manifest":  prometheus.NewDesc("driftmower_image_manifest_info", "Image/index digest identity to immutable platform digest relationship; separate from per-digest scan state.", []string{"image", "digest"}, nil),
+	"filesystem": prometheus.NewDesc("driftmower_image_filesystem_available", "Whether a retained readable CycloneDX artifact contains filesystem evidence, independent of Trivy completion. Zero means no retained file evidence for this manifest.", []string{"image", "digest"}, nil),
+	"ready":      prometheus.NewDesc("driftmower_scanner_inventory_ready", "Whether scanner inventory is synchronized; zero means coverage is unknown.", nil, nil),
+	"available":  prometheus.NewDesc("driftmower_image_scan_available", "Whether the current scanner/database configuration has a readable summarized artifact for this manifest.", []string{"image", "digest", "trivy_version", "db_version", "coverage", "reason"}, nil),
+	"accepted":   prometheus.NewDesc("driftmower_image_scan_accepted_timestamp_seconds", "Artifact file modification Unix timestamp (acceptance time), not vulnerability database age.", []string{"image", "digest", "trivy_version", "db_version", "coverage", "reason"}, nil),
+	"findings":   prometheus.NewDesc("driftmower_image_vulnerabilities", "Unique vulnerability ID/component findings, by highest reported severity and explicit fix availability; no CVE IDs or packages in labels. Zero-count classes are omitted.", []string{"image", "digest", "severity", "fix_status", "trivy_version", "db_version", "coverage", "reason"}, nil),
+	"exhausted":  prometheus.NewDesc("driftmower_image_scan_attempts_exhausted", "Whether the current manifest scan has exhausted its retry budget without a usable artifact.", []string{"image", "digest"}, nil),
+	"state":      prometheus.NewDesc("driftmower_image_scan_state", "One current lifecycle per immutable manifest digest, deduplicated across image aliases. No Pod or workload labels. Failed means the retry budget is exhausted; done requires a usable current artifact.", []string{"digest", "state", "trivy_version", "db_version", "coverage", "reason"}, nil),
+	"manifest":   prometheus.NewDesc("driftmower_image_manifest_info", "Image/index digest identity to immutable platform digest relationship; separate from per-digest scan state.", []string{"image", "digest"}, nil),
 }
 
 type securityCollector struct{ controller *Controller }
@@ -168,7 +204,7 @@ func (*securityCollector) Describe(ch chan<- *prometheus.Desc) {
 func (s *securityCollector) Collect(ch chan<- prometheus.Metric) {
 	c := s.controller
 	ready := 0.
-	if c.ready.Load() {
+	if c.ready.Load() && !c.disabled.Load() {
 		ready = 1
 	}
 	ch <- prometheus.MustNewConstMetric(securityDescs["ready"], prometheus.GaugeValue, ready)
@@ -218,19 +254,26 @@ func (s *securityCollector) Collect(ch chan<- prometheus.Metric) {
 					mappings[pair] = true
 				}
 			}
-			key := Key(digest, c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)
+			key := c.Config.artifactKey(digest)
 			available := 0.
 			value := vulnerabilitySummary{Coverage: "unknown"}
+			filesystem := 0.
 			if summary, ok := c.summaries.Load(key); ok {
-				if exists, err := c.artifactExists(key); err == nil && exists {
-					available = 1
+				if _, err := os.Stat(filepath.Join(c.Config.CacheDir, key+artifactSuffix)); err == nil {
 					value = summary.(vulnerabilitySummary)
-					ch <- prometheus.MustNewConstMetric(securityDescs["accepted"], prometheus.GaugeValue, value.AcceptedAt, image.GetName(), digest, value.TrivyVersion, value.DBVersion, value.Coverage, value.Reason)
-					for class, count := range value.Counts {
-						ch <- prometheus.MustNewConstMetric(securityDescs["findings"], prometheus.GaugeValue, float64(count), image.GetName(), digest, class.Severity, class.Fix, value.TrivyVersion, value.DBVersion, value.Coverage, value.Reason)
+					if value.Filesystem {
+						filesystem = 1
+					}
+					if exists, err := c.artifactExists(key); err == nil && exists {
+						available = 1
+						ch <- prometheus.MustNewConstMetric(securityDescs["accepted"], prometheus.GaugeValue, value.AcceptedAt, image.GetName(), digest, value.TrivyVersion, value.DBVersion, value.Coverage, value.Reason)
+						for class, count := range value.Counts {
+							ch <- prometheus.MustNewConstMetric(securityDescs["findings"], prometheus.GaugeValue, float64(count), image.GetName(), digest, class.Severity, class.Fix, value.TrivyVersion, value.DBVersion, value.Coverage, value.Reason)
+						}
 					}
 				}
 			}
+			ch <- prometheus.MustNewConstMetric(securityDescs["filesystem"], prometheus.GaugeValue, filesystem, image.GetName(), digest)
 			ch <- prometheus.MustNewConstMetric(securityDescs["available"], prometheus.GaugeValue, available, image.GetName(), digest, value.TrivyVersion, value.DBVersion, value.Coverage, value.Reason)
 			state := c.scanLifecycle(image, digest, key, available == 1)
 			if available == 1 && value.Coverage == "partial" {

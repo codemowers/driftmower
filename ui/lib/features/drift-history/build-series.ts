@@ -17,6 +17,7 @@ export type SeriesSource = {
   registry: string
   repository: string
   workloadGroupKey: string
+  workloadUid: string
   workloadKind: string
   workloadName: string
   workloadNamespace: string

@@ -27,7 +27,7 @@ func addClusterRegistryTool(s *mcp.Server, w *Workloads) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_cluster_registry",
 		Title:       "Get cluster registry",
-		Description: "Report whether the cluster runs the shared Zot registry (Service zot in namespace registry) and the public host its Ingress publishes, for docker login and skaffold.env.",
+		Description: "Whether the cluster runs the shared Zot registry and its public host, for docker login and skaffold.env.",
 		InputSchema: noArguments(),
 		Annotations: readOnly("Get cluster registry"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, *clusterRegistryOutput, error) {

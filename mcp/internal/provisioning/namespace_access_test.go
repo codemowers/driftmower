@@ -201,7 +201,7 @@ func TestSummariseMatrix(t *testing.T) {
 	if !reflect.DeepEqual(p.Provision, map[OfferingID]Verdict{Postgres: yes, RabbitMQ: no, Bucket: unknown, EMQX: unknown}) {
 		t.Errorf("provision = %+v", p.Provision)
 	}
-	want := []ProvisionRow{{Resource: "rabbitmqclusters.rabbitmq.com", Verdict: no, Reason: ptr("Kubernetes RBAC denies create rabbitmqclusters.rabbitmq.com")}}
+	want := []ProvisionRow{{Resource: "rabbitmqclusters.rabbitmq.com", Verdict: no, Reason: new("Kubernetes RBAC denies create rabbitmqclusters.rabbitmq.com")}}
 	if !reflect.DeepEqual(p.ProvisionDetail[RabbitMQ], want) {
 		t.Errorf("rabbitmq detail = %+v", p.ProvisionDetail[RabbitMQ])
 	}

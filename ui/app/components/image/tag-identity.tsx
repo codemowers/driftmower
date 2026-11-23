@@ -33,8 +33,8 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
   const hiddenLabelCount = labelEntries.length - COLLAPSED_LABEL_COUNT
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="-mx-6 mb-4 border-b border-gray-200 px-6 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+      <p className="-mx-5 mb-4 border-b border-gray-200 px-5 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Tag identity
       </p>
 
@@ -80,7 +80,7 @@ export default function TagIdentity({ usage }: { usage: ImageUsage }) {
         </Row>
       </div>
 
-      <div className="-mx-6 mt-5 grid grid-cols-[140px_1fr] items-center gap-x-4 gap-y-4 border-t border-gray-200 px-6 pt-4">
+      <div className="-mx-5 mt-5 grid grid-cols-[140px_1fr] items-center gap-x-4 gap-y-4 border-t border-gray-200 px-6 pt-4">
         <Row label="Base image">
           {baseImage ? (
             <span className="flex min-w-0 items-center gap-3">

@@ -138,7 +138,13 @@ func TestTerminate(t *testing.T) {
 		t.Errorf("result %+v, delete %+v", result, deleted.DeleteOptions)
 	}
 
-	for name, want := range map[string]string{"owned": "has an owner", "static": "mirror"} {
+	if result, err := a.Terminate(context.Background(), Target{Namespace: "team-a", Name: "owned", UID: "owned-uid"}, alice); err != nil || !strings.Contains(result.Message, "controller will attempt") {
+		t.Fatalf("owned Pod deletion failed: result=%+v error=%v", result, err)
+	}
+	if pre := deleted.DeleteOptions.Preconditions; pre == nil || string(*pre.UID) != "owned-uid" || *pre.ResourceVersion != "7" {
+		t.Fatal("owned Pod deletion lost identity preconditions")
+	}
+	for name, want := range map[string]string{"static": "mirror"} {
 		if _, err := a.Terminate(context.Background(), Target{Namespace: "team-a", Name: name, UID: name + "-uid"}, alice); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: err = %v", name, err)
 		}

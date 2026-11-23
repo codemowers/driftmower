@@ -186,7 +186,7 @@ func chartVersionSeparator(s string) int {
 	return -1
 }
 func addHelmTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
-	mcp.AddTool(s, &mcp.Tool{Name: "list_helm_releases", Title: "List Helm releases", Description: "Discover Rancher HelmChart declarations and Helm release Secret metadata. Match by release name and target namespace; attach roots with explicit Helm ownership annotations. Desired HelmChart versions are separate from installed workload chart-label evidence. Secret payloads are not requested; get_helm_release reads one release's values and manifest. Revision/status are taken from the highest-numbered release Secret. Coverage gaps appear in warnings.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List Helm releases")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, helmOutput, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "list_helm_releases", Title: "List Helm releases", Description: "Helm releases and Rancher HelmCharts with revision, status and attached workload roots.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List Helm releases")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, helmOutput, error) {
 		id, err := callerIdentity(req, mapping)
 		if err != nil {
 			return nil, helmOutput{}, err

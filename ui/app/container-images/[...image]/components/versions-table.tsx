@@ -1,7 +1,8 @@
 "use client"
+import { useContextHref } from "@/lib/hooks/use-context-href"
+import { containerImageHref } from "@/lib/utils/image-artifacts"
 
 import PrefetchLink from "@/app/components/prefetch-link"
-import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
@@ -44,20 +45,17 @@ function headerTotals(versions: ImageVersion[]): string {
 }
 
 export default function VersionsTable({
+  imageKey,
   versions,
   containerCount,
 }: {
+  imageKey: string
   versions: ImageVersion[]
   containerCount: number
 }) {
   const reports = useClusterState(s => s.vulnerabilityReports)
-  const searchParams = useSearchParams()
-
-  function artifactHref(artifactKey: string): string {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("artifact", artifactKey)
-    return `?${params.toString()}`
-  }
+  const { linkTo } = useContextHref()
+  const artifactHref = (artifactKey: string) => linkTo(containerImageHref(imageKey, artifactKey))
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white">

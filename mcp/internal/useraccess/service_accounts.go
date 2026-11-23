@@ -59,7 +59,6 @@ func SubjectOf(username string, m auth.Mapping) Subject {
 	return s
 }
 
-// ServiceAccount is the public summary of one ServiceAccount.
 type ServiceAccount struct {
 	Namespace string    `json:"namespace"`
 	Name      string    `json:"name"`
@@ -118,7 +117,6 @@ func (s *Service) InspectServiceAccount(ctx context.Context, caller authz.Identi
 	if _, err := s.Dynamic.Resource(serviceAccountsGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{}); err != nil {
 		return nil, fmt.Errorf("get ServiceAccount %s/%s: %w", namespace, name, err)
 	}
-	// The groups the API server gives every ServiceAccount token.
 	id := authz.Identity{User: serviceAccountPrefix + namespace + ":" + name,
 		Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
 

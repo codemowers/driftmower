@@ -8,5 +8,4 @@ export const DRIFT_CHART_CONFIG = {
   major_behind: { label: "Major behind", color: "var(--color-status-major-bg)" },
   behind: { label: "Behind", color: "var(--color-status-behind-bg)" },
   no_data: { label: "No data", color: "var(--color-status-neutral-bg)" },
-  rottenness: { label: "Rottenness", color: "var(--color-brand)" },
 } satisfies ChartConfig

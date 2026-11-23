@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SourceItems are one source's cached objects in a namespace.
 type SourceItems struct {
 	Source Source
 	Items  []*Node
@@ -28,6 +27,11 @@ func owner(n *Node) *metav1.OwnerReference {
 	}
 
 	return nil
+}
+
+// ContainerImage owns scan Pods for garbage collection, not application grouping.
+func imageOwner(ref *metav1.OwnerReference) bool {
+	return ref != nil && ref.Kind == "ContainerImage" && groupOf(ref.APIVersion) == "codemowers.io"
 }
 
 func builtIn(kind, apiVersion string, controllersOnly bool) bool {
@@ -113,7 +117,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 			if !isController(n) || ref == nil {
 				continue
 			}
-			if ref.Kind == "Certificate" && groupOf(ref.APIVersion) == "cert-manager.io" {
+			if (ref.Kind == "Certificate" && groupOf(ref.APIVersion) == "cert-manager.io") || imageOwner(ref) {
 				continue
 			}
 			if !builtIn(ref.Kind, ref.APIVersion, false) && byUID[string(ref.UID)] == nil {
@@ -140,6 +144,9 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 				break
 			}
 			ref := owner(root)
+			if imageOwner(ref) {
+				break
+			}
 			seen[string(root.UID)] = true
 			chain = append(chain, root)
 			if seen[string(ref.UID)] {
@@ -179,6 +186,10 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 			all = append(all, w)
 		}
 		rootByNode[string(node.UID)] = w
+		// The Pod projection already excludes retired non-Job Pods.
+		if p := node.Pod; p != nil {
+			mergeIssues(&w.Issues, p.Issues)
+		}
 
 		// Old ReplicaSet and Job templates may keep obsolete references. Use
 		// live pods and the highest loaded controller template, not history.
@@ -380,7 +391,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 		}
 		if pod := byUID[w.UID]; w.Kind == "Pod" && pod != nil && pod.Kind == "Pod" && len(pod.OwnerReferences) == 0 {
 			if _, mirror := pod.Annotations["kubernetes.io/config.mirror"]; !mirror {
-				orphaned.StandalonePods = append(orphaned.StandalonePods, StandalonePod{Name: w.Name, UID: w.UID})
+				orphaned.StandalonePods = append(orphaned.StandalonePods, StandalonePod{Name: w.Name, UID: w.UID, Issues: w.Issues})
 			}
 		}
 		for _, c := range categories {
@@ -388,6 +399,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 				orphaned.add(c, v)
 			}
 		}
+		mergeIssues(&orphaned.Issues, w.Issues)
 		withOrphans = slices.Delete(withOrphans, i, i+1)
 	}
 	slices.SortFunc(orphaned.StandalonePods, func(a, b StandalonePod) int { return compareLocale(a.Name, b.Name) })
@@ -433,6 +445,7 @@ func BuildInventory(namespace string, lists []SourceItems, warnings map[string]b
 
 	out := make([]*Workload, 0, len(withOrphans))
 	for _, w := range withOrphans {
+		sortIssues(w.Issues)
 		w.sort()
 		if w != orphaned || !w.empty() {
 			out = append(out, w)

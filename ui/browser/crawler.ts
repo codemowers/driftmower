@@ -3,6 +3,7 @@ import { enrichSnapshot, type SourceSummary } from "../lib/features/crawler/enri
 import type { DashboardSnapshot } from "./snapshot"
 
 export async function loadCrawlerFindings(snapshot: DashboardSnapshot): Promise<DashboardSnapshot> {
+  if (snapshot.missingComponents?.includes("nodestatd")) return snapshot
   try {
     const data = await sourceFindings<{ sources: SourceSummary[]; missing?: string[] }>({summary:"true"})
     if (data.missing?.length) snapshot.missingComponents = [...new Set([...(snapshot.missingComponents ?? []), "nodestatd"])]

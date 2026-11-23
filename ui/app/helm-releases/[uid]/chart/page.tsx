@@ -1,11 +1,11 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
-import { Map } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { chartDrift, cleanChartTags, newestPatchOfMinor, normalizeChartVersion, normalizeDeployDate, stableVersionsBetween } from "@/lib/features/helm-releases/chart-versions"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 import ResourceHeader from "@/app/components/resource-header"
 import ChartStats from "./components/chart-stats"
 import ChartSourceCard from "./components/chart-source-card"
@@ -37,9 +37,9 @@ export default function ChartDetailPage() {
   if (!data || !score) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Release not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -48,7 +48,6 @@ export default function ChartDetailPage() {
   const chartName = info.chartName ?? info.name
   const deployed = info.chartSourceVersion ?? normalizeChartVersion(info.chartVersion)
   const drift = chartDrift(deployed, info.latestChartTag)
-  const driftStyle = SEVERITY_STYLE[drift]
   const { stable, prerelease } = cleanChartTags(info.chartTags ?? [])
   const behindCount = stableVersionsBetween(stable, deployed, info.latestChartTag)
   const patchUpdate = newestPatchOfMinor(stable, deployed)
@@ -67,9 +66,9 @@ export default function ChartDetailPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={Map}
+          icon={ICONS.helmReleases}
           iconAriaLabel="Helm chart"
           title={chartName}
           copyValue={chartName}
@@ -82,7 +81,6 @@ export default function ChartDetailPage() {
             { label: `Chart ${chartName}` },
           ]}
           chips={info.chartSourceKind ? [{ label: info.chartSourceKind, tone: "muted" }] : []}
-          scoreChip={!isNoData(drift) && driftStyle ? { status: drift, score: 0, label: driftStyle.label } : null}
           subtitle={subtitle}
         />
 
@@ -129,7 +127,7 @@ export default function ChartDetailPage() {
         />
 
         <ChartValuesCard namespace={info.namespace} name={info.name} chartName={chartName} />
-      </main>
+      </Page>
     </div>
   )
 }

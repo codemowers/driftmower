@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"github.com/codemowers/driftmower/internal/imagesource"
 	"github.com/codemowers/driftmower/internal/registry"
 	"github.com/codemowers/driftmower/mcp/internal/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,9 +27,13 @@ type sourceLink struct {
 	URL  string `json:"url"`
 }
 type imageMetadata struct {
-	Labels           map[string]string `json:"labels,omitempty"`
-	Sources          []sourceLink      `json:"sourceRepositories,omitempty"`
-	ContainerImage   string            `json:"containerImage"`
+	ConfigCreated  string            `json:"configCreated,omitempty"`
+	Labels         map[string]string `json:"labels,omitempty"`
+	Sources        []sourceLink      `json:"sourceRepositories,omitempty"`
+	ContainerImage string            `json:"containerImage"`
+	// InheritedSource explains why the image's source metadata was
+	// discarded as inherited from a base image.
+	InheritedSource  string            `json:"inheritedSource,omitempty"`
 	SBOMArtifacts    []string          `json:"sbomArtifacts,omitempty"`
 	Platforms        []registry.Target `json:"platforms,omitempty"`
 	ScannerNamespace string            `json:"scannerNamespace,omitempty"`
@@ -37,10 +43,7 @@ func httpURL(raw string) bool {
 	u, e := url.Parse(raw)
 	return e == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil
 }
-func imageMetadataIndex(ctx context.Context, w *Workloads, id authz.Identity) (map[string]imageMetadata, []string) {
-	return selectedImageMetadata(ctx, w, id, nil, false)
-}
-func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity, wanted map[string]bool, compact bool) (map[string]imageMetadata, []string) {
+func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity, wanted map[string]bool) (map[string]imageMetadata, []string) {
 	out := map[string]imageMetadata{}
 	if w.Judge.MayPerform(ctx, id, listContainerImages).Verdict != authz.Yes {
 		return out, []string{"ContainerImage metadata is not authorized; image labels are unavailable."}
@@ -50,7 +53,7 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 		return out, []string{"ContainerImage metadata is unavailable."}
 	}
 	names := map[string]string{}
-	if !compact && w.Judge.MayPerform(ctx, id, authz.Attributes{Group: "codemowers.io", Resource: "sourcerepositories", Verb: "list"}).Verdict == authz.Yes {
+	if w.Judge.MayPerform(ctx, id, authz.Attributes{Group: "codemowers.io", Resource: "sourcerepositories", Verb: "list"}).Verdict == authz.Yes {
 		if sources, err := w.Cache.Dynamic.Resource(sourceRepositoriesGVR).List(ctx, metav1.ListOptions{}); err == nil {
 			for _, s := range sources.Items {
 				u, _, _ := unstructured.NestedString(s.Object, "spec", "url")
@@ -58,6 +61,11 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 			}
 		}
 	}
+	objects := make([]map[string]any, len(images.Items))
+	for i := range images.Items {
+		objects[i] = images.Items[i].Object
+	}
+	index := imagesource.NewIndex(objects)
 	for _, image := range images.Items {
 		digests := []string{strings.Replace(image.GetName(), "sha256-", "sha256:", 1)}
 		if d, _, _ := unstructured.NestedString(image.Object, "index", "digest"); d != "" {
@@ -90,14 +98,6 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 				continue
 			}
 		}
-		if compact {
-			for _, d := range digests {
-				if wanted[d] {
-					out[d] = imageMetadata{ContainerImage: image.GetName()}
-				}
-			}
-			continue
-		}
 		labels := map[string]string{}
 		for _, field := range []string{"annotations", "labels"} {
 			values, _, _ := unstructured.NestedStringMap(image.Object, field)
@@ -105,17 +105,13 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 				labels[k] = v
 			}
 		}
-		sources := map[string]bool{}
-		source, _, _ := unstructured.NestedString(image.Object, "status", "source")
-		sources[source] = true
-		sources[labels["org.opencontainers.image.source"]] = true
+		// Only the image's own source claim links it; metadata copied from a
+		// base image is unknown provenance and explained instead.
+		claim := imagesource.Of(image.Object, index)
 		links := []sourceLink{}
-		for u := range sources {
-			if httpURL(u) {
-				links = append(links, sourceLink{Name: names[u], URL: u})
-			}
+		if httpURL(claim.Source) {
+			links = append(links, sourceLink{Name: names[claim.Source], URL: claim.Source})
 		}
-		sort.Slice(links, func(i, j int) bool { return links[i].URL < links[j].URL })
 		artifacts := []string{}
 		for name, value := range image.GetAnnotations() {
 			if strings.HasPrefix(name, "driftmower.io/sbom-") && len(value) == 64 && strings.Trim(value, "0123456789abcdef") == "" {
@@ -123,11 +119,12 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 			}
 		}
 		sort.Strings(artifacts)
-		data := imageMetadata{Labels: labels, Sources: links, ContainerImage: image.GetName(), SBOMArtifacts: artifacts, Platforms: imagePlatforms(&image), ScannerNamespace: os.Getenv("POD_NAMESPACE")}
+		data := imageMetadata{Labels: labels, Sources: links, InheritedSource: claim.Inherited, ContainerImage: image.GetName(), SBOMArtifacts: artifacts, Platforms: imagePlatforms(&image), ScannerNamespace: os.Getenv("POD_NAMESPACE")}
 
 		for _, d := range digests {
 			if strings.HasPrefix(d, "sha256:") && (wanted == nil || wanted[d]) {
 				entry := data
+				entry.ConfigCreated = imageConfigCreated(&image, d)
 				for _, p := range data.Platforms {
 					if p.Digest == d {
 						entry.Platforms = []registry.Target{p}
@@ -141,6 +138,37 @@ func selectedImageMetadata(ctx context.Context, w *Workloads, id authz.Identity,
 	return out, nil
 }
 
+// Config creation is a declared build fact even when an image has no OCI
+// created label. An index uses its oldest available platform, matching the
+// image detail's conservative config-time selection.
+func imageConfigCreated(image *unstructured.Unstructured, digest string) string {
+	fallback, _, _ := unstructured.NestedString(image.Object, "created")
+	manifests, _, _ := unstructured.NestedSlice(image.Object, "manifests")
+	oldest := ""
+	var oldestTime time.Time
+	for _, raw := range manifests {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		created, _ := m["created"].(string)
+		if m["digest"] == digest {
+			if created != "" {
+				return created
+			}
+			return fallback
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, created)
+		if err == nil && (oldest == "" || parsed.Before(oldestTime)) {
+			oldest, oldestTime = created, parsed
+		}
+	}
+	if fallback != "" {
+		return fallback
+	}
+	return oldest
+}
+
 func addImageMetadataTools(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 	addLocalSourceImagesTool(s, w, mapping)
 	type input struct {
@@ -150,31 +178,23 @@ func addImageMetadataTools(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 		Images   map[string]imageMetadata `json:"images"`
 		Warnings []string                 `json:"warnings,omitempty"`
 	}
-	for _, compact := range []bool{true, false} {
-		name, description, maxDigests := "get_image_metadata", "Read OCI labels, source links, platform/layer metadata and SBOM references for up to 8 selected running digests. Use only when inspecting those images; not part of inventory bootstrap.", 8
-		if compact {
-			name = "resolve_container_images"
-			description = "Resolve up to 100 running image digests to ContainerImage resource names for get_image_scan. Returns only references; no labels, layers or SBOM contents."
-			maxDigests = 100
+	mcp.AddTool(s, &mcp.Tool{Name: "get_image_metadata", Description: "OCI labels, source links, platforms, layers and SBOM references for running image digests.", InputSchema: inputSchema[input](nil), Annotations: readOnly("Read image metadata")}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, output, error) {
+		out := output{}
+		if len(in.Digests) == 0 {
+			return nil, out, fmt.Errorf("provide at least one digest")
 		}
-		mcp.AddTool(s, &mcp.Tool{Name: name, Description: description, InputSchema: inputSchema[input](nil), Annotations: readOnly(name)}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, output, error) {
-			out := output{}
-			if len(in.Digests) == 0 || len(in.Digests) > maxDigests {
-				return nil, out, fmt.Errorf("provide between 1 and %d digests", maxDigests)
+		wanted := map[string]bool{}
+		for _, d := range in.Digests {
+			if !validDigest(d) {
+				return nil, out, fmt.Errorf("invalid sha256 digest")
 			}
-			wanted := map[string]bool{}
-			for _, d := range in.Digests {
-				if len(d) != 71 || !strings.HasPrefix(d, "sha256:") || strings.Trim(d[7:], "0123456789abcdef") != "" {
-					return nil, out, fmt.Errorf("invalid sha256 digest")
-				}
-				wanted[d] = true
-			}
-			id, err := callerIdentity(req, mapping)
-			if err != nil {
-				return nil, out, err
-			}
-			out.Images, out.Warnings = selectedImageMetadata(ctx, w, id, wanted, compact)
-			return text(fmt.Sprintf("%d image digests resolved.", len(out.Images))), out, nil
-		})
-	}
+			wanted[d] = true
+		}
+		id, err := callerIdentity(req, mapping)
+		if err != nil {
+			return nil, out, err
+		}
+		out.Images, out.Warnings = selectedImageMetadata(ctx, w, id, wanted)
+		return text(fmt.Sprintf("%d image digests resolved.", len(out.Images))), out, nil
+	})
 }

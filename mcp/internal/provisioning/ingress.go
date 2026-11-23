@@ -2,6 +2,8 @@ package provisioning
 
 import (
 	"strings"
+
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // What hostname a user may claim when an admission guard confines hosts. Two
@@ -32,7 +34,7 @@ func HostRuleFor(domainSuffix, tenantID, enforcedBy, namespace string, anchorsOn
 		TenantID:           tenantID,
 		Namespace:          namespace,
 		AnchorsOnNamespace: anchored,
-		CustomDomains:      orEmpty(customDomains),
+		CustomDomains:      nonnil.Slice(customDomains),
 		EnforcedBy:         enforcedBy,
 	}
 	if anchored {

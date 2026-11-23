@@ -38,10 +38,17 @@ export function kubectlCommand(verb: string, connection?: KubeconfigConnection, 
 // Action commands contain a single kubectl invocation and an explicit namespace.
 // Their existing -n is replaced rather than relying on the terminal's context.
 export function scopeActionCommand(command: string, connection?: KubeconfigConnection): string {
-  if (!command.startsWith("kubectl ")) return command
+  if (!command.startsWith("kubectl ") || /(?:^|\s)--context(?:=|\s)/.test(command)) return command
   const match = command.match(/\s+(?:-n|--namespace)(?:=|\s+)([a-z0-9-]+)/)
   const namespace = match?.[1]
   const body = match ? command.replace(match[0], "").slice(8) : command.slice(8)
   const [verb, ...rest] = body.split(" ")
   return `${kubectlCommand(verb, connection, namespace)}${rest.length ? " " + rest.join(" ") : ""}`
+}
+
+// kubectl accepts a singular kind qualified by its API group. This also
+// handles irregular plurals without guessing a CRD's resource name.
+export function kubectlResource(kind: string, apiVersion?: string): string {
+  const group = apiVersion?.includes("/") ? apiVersion.split("/")[0] : apiVersion
+  return `${kind.toLowerCase()}${group && group !== "v1" && group !== "core" ? `.${group}` : ""}`
 }

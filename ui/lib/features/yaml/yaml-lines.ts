@@ -28,7 +28,7 @@ const AMBIGUOUS_SCALAR = /^(true|false|null|yes|no|on|off|~|[+-]?[\d.].*)$/i
 const PLAIN_KEY = /^[A-Za-z0-9_-]+$/
 const HELM_RESERVED = /([.,])/g
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 

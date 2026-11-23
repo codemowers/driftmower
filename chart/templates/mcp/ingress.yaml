@@ -1,12 +1,6 @@
 {{- if and .Values.mcp.enabled .Values.mcp.ingress.enabled }}
-# Publishes the MCP endpoint. Everything behind it verifies a passmower bearer
-# token in-process (src/auth/), because an MCP client is not a browser: a
-# cookie/redirect gate at the edge would be uncompletable by Claude Code,
-# Cursor or any other headless client, and would strip the caller identity the
-# tools need for tenancy scoping.
-#
-# Port 3000 only. The health port (3001) stays cluster-internal: its readiness
-# endpoint exposes process readiness and application metrics.
+# Bearer tokens are verified in-process; an edge login redirect would break
+# headless MCP clients. The health port stays cluster-internal.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,11 +9,9 @@ metadata:
   name: mcp
 spec:
   rules:
-    - host: mcp
+    - host: {{ .Values.mcp.ingress.host | quote }}
       http:
         paths:
-          # One rule covers both /mcp and the RFC 9728 metadata documents under
-          # /.well-known/oauth-protected-resource, which the server routes itself.
           - path: /
             pathType: Prefix
             backend:

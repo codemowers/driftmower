@@ -2,10 +2,9 @@ import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { AlertTriangle } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
+import HeaderIcon from "@/app/components/layout/header-icon"
 import Breadcrumbs, { type BreadcrumbItem } from "@/app/components/breadcrumbs"
 import { cn } from "@/lib/utils/cn"
-import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 
 export type Chip = { label: string; tone?: "brand" | "muted"; className?: string }
 
@@ -16,9 +15,10 @@ type Props = {
   copyValue?: string
   breadcrumbs: BreadcrumbItem[]
   chips?: Chip[]
-  scoreChip?: { status: StatusType; score: number; label?: string } | null
   issueCount?: number
   subtitle: ReactNode
+  // Controls and status on the right, such as refresh or evaluation time.
+  actions?: ReactNode
 }
 
 const CHIP_TONE: Record<NonNullable<Chip["tone"]>, string> = {
@@ -33,27 +33,17 @@ export default function ResourceHeader({
   copyValue,
   breadcrumbs,
   chips,
-  scoreChip,
   issueCount,
   subtitle,
+  actions,
 }: Props) {
-  const scoreStyle = scoreChip ? SEVERITY_STYLE[scoreChip.status] : undefined
-  const scoreLabel = scoreChip
-    ? scoreChip.label ?? (isNoData(scoreChip.status) ? "—" : scoreChip.score.toFixed(2))
-    : ""
-
   return (
     <header className="flex items-start justify-between gap-8">
       <div className="flex min-w-0 flex-col gap-3">
         <Breadcrumbs items={breadcrumbs} />
 
         <div className="flex items-center gap-3">
-          <div
-            className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-brand-icon"
-            aria-label={iconAriaLabel}
-          >
-            <Icon className="size-6" />
-          </div>
+          <HeaderIcon icon={Icon} label={iconAriaLabel} />
 
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2.5">
@@ -61,7 +51,7 @@ export default function ResourceHeader({
                 {title}
               </h1>
               {copyValue && <CopyButton value={copyValue} />}
-              {chips?.map((chip, i) => (
+              {chips?.filter(chip => !breadcrumbs.some(crumb => crumb.label === chip.label || crumb.label.startsWith(`${chip.label} `))).map((chip, i) => (
                 <span
                   key={i}
                   className={cn(
@@ -72,16 +62,6 @@ export default function ResourceHeader({
                   {chip.label}
                 </span>
               ))}
-              {scoreChip && (
-                <span
-                  className={cn(
-                    "rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums",
-                    scoreStyle ? [scoreStyle.bg, scoreStyle.text] : "bg-gray-100 text-muted-foreground",
-                  )}
-                >
-                  {scoreLabel}
-                </span>
-              )}
               {issueCount !== undefined && issueCount > 0 && (
                 <span className="flex items-center gap-1 rounded-md bg-status-minor-bg px-1.5 py-0.5 text-status-minor-label">
                   <AlertTriangle className="size-3" />
@@ -95,8 +75,7 @@ export default function ResourceHeader({
         </div>
       </div>
 
-      <div className="shrink-0 p-1">
-      </div>
+      {actions && <div className="flex shrink-0 flex-col items-end gap-1">{actions}</div>}
     </header>
   )
 }

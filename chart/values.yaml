@@ -1,8 +1,11 @@
-# Components are enabled by default; Helm installs can disable individual components.
 
 # Pull Secrets added to every driftmower Pod, scan Pods included, for images
 # in a registry the cluster does not supply credentials for.
 imagePullSecrets: []
+
+# Existing PriorityClass for long-running Driftmower components; scan Pods use
+# operator.priorityClassName independently.
+priorityClassName: ""
 
 # Independent registry metadata catalog, using the crawler image's registry mode.
 registryScraper:
@@ -15,7 +18,6 @@ registryScraper:
   # Optional full replacement for files/base-images.json. Mounted updates reload.
   config: {}
   # Optional Docker auth JSON Secret. Missing Secret means anonymous access.
-  # Never copy tokens into this file or the ConfigMap.
   credentialsSecretName: driftmower-dockerhub
   credentialsSecretKey: .dockerconfigjson
   # Empty reuses crawler.githubTokenSecret (optional); mounted only in scraper.
@@ -30,6 +32,11 @@ registryScraper:
 #   open http://localhost:8082/
 crawler:
   enabled: true
+  mcp:
+    enabled: true
+  ingress:
+    enabled: false
+    host: crawler
   image: driftmower-crawler
   logLevel: info
   # Interval between crawls of one source.
@@ -53,6 +60,9 @@ crawler:
 
 mcp:
   enabled: true
+  technicalDebt:
+    hoursPerUpgrade: 1
+    buildAgeDaysPerUpgrade: 365
   auth:
     # rbac: OIDC + caller Kubernetes RBAC (default).
     # oidc: verified OIDC login grants cluster-wide read access, no caller RBAC.
@@ -61,6 +71,7 @@ mcp:
     mode: rbac
   ingress:
     enabled: true
+    host: mcp
   # Explicit advertised origin for deployments without Passmower.
   publicUrl: ""
   metrics:
@@ -97,13 +108,13 @@ mcp:
     enabled: false
 
   # Optional caller-authorized mutations: workload restart, standalone Pod
-  # termination and PVC expansion. Disabled by default.
+  # termination and PVC expansion.
   workloadRestart:
     enabled: false
 
   # OIDCUser listing and per-user effective rights (tools).
   # Grants this server impersonate on users and groups; only callers who may
-  # impersonate themselves can view rights. Disabled by default.
+  # impersonate themselves can view rights.
   userAccess:
     enabled: false
     oidcUserNamespace: passmower
@@ -129,9 +140,25 @@ operator:
   trivyImage: aquasec/trivy:0.75.0
   databaseImage: driftmower-trivy-db
   trivy:
+    # operatorNamespace: scan cached images in this release's namespace.
+    # workloadNamespace: scan on a consuming Pod's Node, in its namespace,
+    # using its imagePullSecrets. Creates unprivileged scan ServiceAccounts
+    # there and mirrors only configured scanner infrastructure pull Secrets.
+    # Images without a running consuming Pod remain pending.
+    strategy: operatorNamespace
+    # Background scan CPU reservation; analysis can burst above this request.
+    cpuRequest: 100m
     # Scan Pods the operator runs at once. It picks a random unscanned image
     # for each free slot, fewest failed attempts first.
     parallelism: 2
+    # Stop starting new scans when this many failed scan Pods are retained.
+    # Inspect and fix their cause, then remove reviewed failed Pods to resume.
+    maxFailedPods: 20
+    # Trivy runs as root of the scan Pod's user namespace. Without this it
+    # cannot read private files of other image users, and such scans fail.
+    # Grants CAP_DAC_READ_SEARCH inside that namespace only; admission policy
+    # must allow it.
+    dacReadSearch: false
   priorityClassName: ""
   priorityValue: 100000
   sbomCacheMiB: 2048

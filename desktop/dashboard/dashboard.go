@@ -6,8 +6,9 @@ import (
 	"sync/atomic"
 )
 
-// DashboardConfigResponse is the JSON payload sent to the frontend.
 type DashboardConfigResponse struct {
+	ConfigUpdates         bool                `json:"configUpdates,omitempty"`
+	DiscoveryError        string              `json:"discoveryError,omitempty"`
 	ChromeProfiles        []ChromeProfile     `json:"chromeProfiles,omitempty"`
 	ChromeProfilesEnabled bool                `json:"chromeProfilesEnabled,omitempty"`
 	ChromeProfilesError   string              `json:"chromeProfilesError,omitempty"`
@@ -18,7 +19,6 @@ type DashboardConfigResponse struct {
 	DiscoveryEnabled      bool                `json:"discoveryEnabled"`
 }
 
-// Dashboard manages the state of the dashboard, including discovery and configuration.
 type Dashboard struct {
 	cfg       *Config
 	discovery *ContextDiscovery
@@ -30,45 +30,31 @@ type Dashboard struct {
 // Close releases discovery and desktop-owned port-forward listeners.
 func (d *Dashboard) Close() { d.discovery.Close() }
 
-// New creates a new Dashboard instance.
 func New(cfg *Config) *Dashboard {
 	d := &Dashboard{
 		cfg: cfg,
 	}
 
-	// Parse clusters from MCP_ENDPOINTS env var
 	if cfg.McpEndpoints != "" {
-		if err := json.Unmarshal([]byte(cfg.McpEndpoints), &d.clusters); err != nil {
-			// In a real app, we might want to log this or handle it better.
-			// For now, we'll just have an empty cluster list.
-		}
+		_ = json.Unmarshal([]byte(cfg.McpEndpoints), &d.clusters)
 	}
-
-	// Start discovery if enabled
-	// We pass the kubeconfig path (either from flag or default)
-	kubeconfigPath := cfg.Kubeconfig
-	if kubeconfigPath == "" {
-		// In a real app, we might want to resolve the default path here.
-		// But we'll let StartDiscovery handle it if we pass an empty string.
-	}
-	d.discovery = StartDiscovery(cfg.DiscoverKubeconfig, kubeconfigPath, cfg.KubeLogin, cfg.ChromeProfiles)
+	d.discovery = StartDiscovery(cfg.DiscoverKubeconfig, cfg.Kubeconfig, cfg.KubeLogin, cfg.ChromeProfiles)
 
 	return d
 }
 
-// GetConfig returns the current dashboard configuration for the frontend.
 func (d *Dashboard) GetConfig() DashboardConfigResponse {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	contexts, availableClusters := d.discovery.Snapshot()
 
-	// Merge manually provided clusters with discovered ones
-	// (In the current implementation, they are appended)
 	allClusters := append([]ClusterEndpoint{}, d.clusters...)
 	allClusters = append(allClusters, availableClusters...)
 
 	result := DashboardConfigResponse{
+		ConfigUpdates:    d.cfg.KubeLogin,
+		DiscoveryError:   d.discovery.watchError(),
 		KubeContext:      d.cfg.KubeContext,
 		McpURL:           d.cfg.McpURL,
 		Clusters:         allClusters,
@@ -86,7 +72,6 @@ func (d *Dashboard) GetConfig() DashboardConfigResponse {
 	return result
 }
 
-// GetConfigJSON returns the configuration as a JSON byte slice.
 func (d *Dashboard) GetConfigJSON() ([]byte, error) {
 	return json.Marshal(d.GetConfig())
 }

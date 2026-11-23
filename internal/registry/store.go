@@ -202,7 +202,7 @@ func (s *Store) Summaries() []RepositorySummary {
 	return out
 }
 
-func (s *Store) Page(name string, offset, limit int, digest string) (*RepositoryPage, bool) {
+func (s *Store) Repository(name, digest string) (*RepositoryDetail, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	repo := s.repositories[name]
@@ -218,10 +218,16 @@ func (s *Store) Page(name string, offset, limit int, digest string) (*Repository
 			}
 		}
 	}
-	start := min(offset, len(filtered))
-	end := start + min(limit, len(filtered)-start)
-	images := append([]Image{}, filtered[start:end]...)
-	return &RepositoryPage{RepositorySummary: summary(repo), Images: images, Offset: offset, Limit: limit, Total: len(filtered)}, true
+	images := append([]Image{}, filtered...)
+	if digest == "" {
+		// The listing omits per-image detail; select a digest for layers and labels.
+		for i := range images {
+			images[i].LayerCount = len(images[i].Layers)
+			images[i].Layers, images[i].Labels, images[i].Annotations = nil, nil, nil
+			images[i].Entrypoint, images[i].Cmd, images[i].WorkingDir, images[i].User = nil, nil, "", ""
+		}
+	}
+	return &RepositoryDetail{RepositorySummary: summary(repo), Images: images}, true
 }
 
 // The trie indexes full image chains at their terminal node, allowing a

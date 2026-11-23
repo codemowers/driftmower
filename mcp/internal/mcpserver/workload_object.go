@@ -21,7 +21,7 @@ type objectInput struct {
 }
 
 func addWorkloadObjectTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
-	mcp.AddTool(s, &mcp.Tool{Name: "get_workload_object", Title: "Read workload object", Description: "Read a Pod, Deployment, ReplicaSet, StatefulSet or DaemonSet for YAML inspection. Requires get permission on that exact resource. Supply UID to reject a replaced object. Does not read Secrets or ConfigMaps.", InputSchema: inputSchema[objectInput](nil), Annotations: readOnly("Read workload object")}, func(ctx context.Context, req *mcp.CallToolRequest, in objectInput) (*mcp.CallToolResult, map[string]any, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "get_workload_object", Title: "Read workload object", Description: "One Pod, Deployment, ReplicaSet, StatefulSet or DaemonSet object. Pass uid to reject a replaced object.", InputSchema: inputSchema[objectInput](nil), Annotations: readOnly("Read workload object")}, func(ctx context.Context, req *mcp.CallToolRequest, in objectInput) (*mcp.CallToolResult, map[string]any, error) {
 		id, err := callerIdentity(req, mapping)
 		if err != nil {
 			return nil, nil, err

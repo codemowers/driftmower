@@ -62,7 +62,6 @@ func CallerFrom(ti *auth.TokenInfo) *Caller {
 	return c
 }
 
-// Subject names the caller for audit lines.
 func Subject(c *Caller) string {
 	if c == nil {
 		return "anonymous"

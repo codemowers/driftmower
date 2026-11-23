@@ -1,5 +1,6 @@
 "use client"
 
+import NetworkSummary from "@/app/components/network-summary"
 import { useNetstatdMissing, type NetstatdStatus, type UpstreamHealth } from "@/lib/features/netstatd"
 import { cn } from "@/lib/utils/cn"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -114,7 +115,7 @@ export default function NetworkTopologyHeader({
       </div>
 
       <div className="relative min-h-6">
-        <SummarySentence
+        <NetworkSummary
           name={name}
           peerTotal={peerTotal}
           portTotal={portTotal}
@@ -129,42 +130,5 @@ export default function NetworkTopologyHeader({
         </p>
       )}
     </header>
-  )
-}
-
-function SummarySentence({
-  name,
-  peerTotal,
-  portTotal,
-  inboundCount,
-  externalTotal,
-}: {
-  name: string
-  peerTotal: number
-  portTotal: number
-  inboundCount: number
-  externalTotal: number
-}) {
-  if (peerTotal + portTotal + inboundCount + externalTotal === 0) return null
-  return (
-    <p className="text-sm leading-relaxed text-muted-foreground">
-      <span className="font-mono text-foreground">{name}</span>
-      {" talks to "}
-      <strong className="font-mono font-semibold tabular-nums text-foreground">{peerTotal}</strong>
-      {peerTotal === 1 ? " in-cluster peer, " : " in-cluster peers, "}
-      {externalTotal > 0 && (
-        <>
-          reaches{" "}
-          <strong className="font-mono font-semibold tabular-nums text-foreground">{externalTotal}</strong>
-          {externalTotal === 1 ? " external endpoint, " : " external endpoints, "}
-        </>
-      )}
-      accepts{" "}
-      <strong className="font-mono font-semibold tabular-nums text-foreground">{inboundCount}</strong>
-      {inboundCount === 1 ? " inbound client, " : " inbound clients, "}
-      and exposes{" "}
-      <strong className="font-mono font-semibold tabular-nums text-foreground">{portTotal}</strong>
-      {portTotal === 1 ? " socket." : " sockets."}
-    </p>
   )
 }

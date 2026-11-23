@@ -23,7 +23,6 @@ type CRDVersion struct {
 	Storage bool   `json:"storage"`
 }
 
-// CustomResource identifies an installed custom-resource API.
 type CustomResource struct {
 	Name        string       `json:"name"`
 	Description *string      `json:"description"`

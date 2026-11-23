@@ -1,101 +1,41 @@
+"use client"
+import { useCallback } from "react"
+import Card from "@/app/components/layout/card"
 import PrefetchLink from "@/app/components/prefetch-link"
-import { cn } from "@/lib/utils/cn"
-import type { ImageUsage } from "@/lib/cluster/reports"
-import type { StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER } from "@/lib/cluster/styles/status-style"
-import type { ReportReadiness } from "@/lib/cluster/report-readiness"
+import { callTool } from "@/browser/connection"
+import { useQuery } from "@/lib/hooks/use-query"
+import { useClusterState } from "@/lib/cluster/cluster-state"
+import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
+import { useContextHref } from "@/lib/hooks/use-context-href"
+import { BAND_STYLE } from "@/lib/features/drift-history/band-style"
 
-const SEVERITY_STYLE: Partial<Record<StatusType, { bg: string; text: string; label: string }>> = {
-  major_behind: { bg: "bg-status-major-bg", text: "text-status-major-label", label: "major" },
-  minor_behind: { bg: "bg-status-minor-bg", text: "text-status-minor-label", label: "minor" },
-  patch_behind: { bg: "bg-status-patch-bg", text: "text-status-patch-label", label: "patch" },
+type Entry = {uid:string;kind:string;name:string;namespace:string;currentTag:string;latestTag:string;class:"major"|"minor"|"patch"|"behind";releasesBehind:number}
+type Result = { available:boolean;entries:Entry[];warnings:string[] }
+export default function MostOutdatedWorkloads() {
+  const cluster=useClusterState(s=>s.clusterName)
+  const { namespaces }=useSandboxScope()
+  const {linkTo}=useContextHref()
+  const scope=JSON.stringify(namespaces?[...namespaces].sort():null)
+  const load=useCallback(async(signal:AbortSignal)=>{
+    let selected=JSON.parse(scope) as string[]|null
+    if(selected===null){const accessible=await callTool<{namespaces:string[];unknown:string[];truncated:boolean}>("list_accessible_namespaces",{},signal);if(accessible.truncated||accessible.unknown.length)throw new Error("Namespace coverage is incomplete");selected=accessible.namespaces}
+    if(!selected.length)return {available:false,entries:[],warnings:[]}
+    return callTool<Result>("query_outdated_workloads",{namespaces:selected},signal)
+  },[scope])
+  const result=useQuery({key:cluster?JSON.stringify([cluster,"outdated-workloads",scope]):null,load,interval:300_000,keepDataOnError:false})
+  return <Card flush title="Most outdated workloads" meta="top 5 · releases behind">
+    {result.error ? <p role="alert" className="px-5 py-4 text-sm text-status-major-label">Workload drift unavailable: {result.error} <button onClick={result.retry} className="underline">Retry</button></p>
+      : !result.data ? <p className="px-5 py-4 text-sm text-muted-foreground">Reading current workload drift…</p>
+      : !result.data.entries.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{result.data.available ? "No workloads with a known version comparison are behind." : "Current workload drift observations are unavailable."}</p>
+      : <div className="divide-y">{result.data.entries.map(e=>{
+        const status=e.class==="behind"?"behind":`${e.class}_behind` as "major_behind"|"minor_behind"|"patch_behind"
+        const style=BAND_STYLE[status]
+        return <PrefetchLink key={`${e.namespace}/${e.uid}`} href={linkTo(`/topmost-owners/${e.uid}`)} className="flex items-center gap-4 px-5 py-3 hover:bg-brand-bg/30">
+          <div className="min-w-0 flex-1"><p className="truncate font-semibold">{e.name}</p><p className="font-mono text-xs text-muted-foreground">{e.namespace} · {e.kind}</p></div>
+          <div className="shrink-0 text-right text-sm"><p>{e.currentTag || "—"}{e.latestTag && e.latestTag!==e.currentTag && <> → {e.latestTag}</>}</p><p className="text-xs text-muted-foreground">{e.releasesBehind} release{e.releasesBehind===1?"":"s"} behind</p></div>
+          <span className={`rounded px-2 py-1 text-xs ${style.bg}`}>{style.label}</span>
+        </PrefetchLink>
+      })}</div>}
+    {result.data?.warnings.map(w=><p key={w} className="px-5 py-2 text-xs text-status-minor-label">{w}</p>)}
+  </Card>
 }
-
-function worstStatus(usages: ImageUsage[]): StatusType {
-  return usages.reduce<StatusType>((worst, u) => {
-    const s = u.versionStatus.statusType
-    return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
-  }, "no_data")
-}
-
-export type OutdatedWorkloadEntry = {
-  key: string
-  uid: string
-  kind: string
-  name: string
-  namespace: string
-  currentTag: string
-  latestTag: string | null
-  statusType: StatusType
-}
-
-type Props = {
-  entries: OutdatedWorkloadEntry[]
-  reportId: string | null
-  matchHeight?: number | null
-  readiness: ReportReadiness
-}
-
-const EMPTY_TEXT: Record<ReportReadiness, string> = {
-  loading: "Loading workloads…",
-  "no-reports": "Nothing analysed yet.",
-  unresolved: "No workload has a version to compare.",
-  ready: "No data available.",
-}
-
-export default function MostOutdatedWorkloads({ entries, reportId, matchHeight, readiness }: Props) {
-  return (
-    <div
-      className="flex flex-col rounded-xl border border-gray-200 bg-white py-5"
-      style={matchHeight ? { minHeight: matchHeight } : undefined}
-    >
-      <p className="mb-4 px-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Top 5 Most Outdated Workloads
-      </p>
-      {entries.length === 0 ? (
-        <p className="px-6 text-sm text-muted-foreground">{EMPTY_TEXT[readiness]}</p>
-      ) : (
-        <div className="flex flex-col divide-y divide-gray-100">
-          {entries.map(e => {
-            const style = SEVERITY_STYLE[e.statusType]
-            const href = reportId
-              ? `/topmost-owners/${e.uid}?report=${reportId}`
-              : `/topmost-owners/${e.uid}`
-            return (
-              <PrefetchLink
-                key={e.key}
-                href={href}
-                className="flex items-center gap-4 px-6 py-2.5 transition-colors hover:bg-brand-bg/30"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-foreground">{e.name}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{e.namespace} · {e.kind}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 text-sm tabular-nums text-muted-foreground">
-                  <span>{e.currentTag}</span>
-                  {e.latestTag && e.latestTag !== e.currentTag && (
-                    <>
-                      <span>→</span>
-                      <span className="text-foreground">{e.latestTag}</span>
-                    </>
-                  )}
-                </div>
-                {style ? (
-                  <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", style.bg, style.text)}>
-                    {style.label}
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                    no data
-                  </span>
-                )}
-              </PrefetchLink>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-export { worstStatus }

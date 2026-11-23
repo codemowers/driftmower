@@ -11,7 +11,7 @@ export function NetstatdMissingStatus() {
 
 export function NetstatdMissingNotice() {
   return (
-    <div className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white px-6 py-6">
+    <div className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white px-5 py-6">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-muted-foreground">
         <Activity className="size-6" strokeWidth={2} />
       </div>

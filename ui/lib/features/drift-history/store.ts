@@ -1,15 +1,12 @@
-import { callTool,selectedEndpoint } from "@/browser/connection"
+import { callTool } from "@/browser/connection"
 import type { StatusType } from "@/lib/cluster/reports"
 import { HISTORY_SEVERITY } from "@/lib/cluster/styles/status-style"
 import type { Observation,SeriesSource } from "./build-series"
 import { seriesKey } from "./build-series"
 import {historyRequest} from "./request"
-import type { RottennessPoint } from "./types"
 
 export type DriftHistoryData = {
   timeline: number[]
-  reportTimes: Map<string, number>
-  rottenness: RottennessPoint[]
   sources: SeriesSource[]
 }
 type Series = { metric: Record<string,string>; values?: [number,string][] }
@@ -22,36 +19,21 @@ function status(behind: number, version: string, latest: string): StatusType {
  if (!a||!b) return "behind"
  return Number(b[1])>Number(a[1])?"major_behind":Number(b[2])>Number(a[2])?"minor_behind":"patch_behind"
 }
-async function load(): Promise<DriftHistoryData> {
- const scope=await callTool<{namespaces:string[];unknown:string[];truncated:boolean}>("list_accessible_namespaces")
+export async function loadDriftHistory(signal?: AbortSignal, namespaces?: string[] | null, item: { workload?: string; kind?: string; image?: string; points?: number } = {}): Promise<DriftHistoryData> {
+ const scope=namespaces ? {namespaces,unknown:[],truncated:false} : await callTool<{namespaces:string[];unknown:string[];truncated:boolean}>("list_accessible_namespaces",{},signal)
  if(scope.truncated||scope.unknown.length)throw new Error("Historical namespace coverage is incomplete")
- const namespaces=scope.namespaces.sort()
- const end=new Date(Math.floor(Date.now()/300_000)*300_000)
- const start=new Date(end.getTime()-90*86400_000)
+ const selected=[...scope.namespaces].sort()
  const rows:Series[]=[]
  const counts=new Map<string,number>()
  const identity=(m:Record<string,string>,seconds:number)=>JSON.stringify([m.namespace,m.uid,m.image,m.version,m.latest,seconds])
- // Four namespaces at a time, the MCP's per-caller concurrency budget; the
- // service independently authorizes each namespace.
- async function namespaceRows(namespace:string){
-  const out:Series[]=[]
-  const query=async(metric:string)=>{
-   const result=await historyRequest(()=>callTool<{result:Series[];warnings:string[]}>("query_drift_history",{namespace,metric,start:start.toISOString(),end:end.toISOString(),stepSeconds:900,limit:1000}))
-   if(result.warnings?.length)throw new Error(result.warnings.join("; "))
-   return result.result
-  }
-  out.push(...await query("driftmower_version_releases_behind"))
+ if(selected.length){
+  const history=await historyRequest(()=>callTool<{metrics:Record<string,Series[]>;warnings:string[]}>("query_drift_history",{namespaces:selected,points:100,...item,metrics:["driftmower_version_releases_behind","driftmower_version_status","driftmower_version_container_count"]},signal),signal)
+  if(history.warnings?.length)throw new Error(history.warnings.join("; "))
+  rows.push(...history.metrics.driftmower_version_releases_behind??[])
   // Explicit unknown observations keep gaps from looking like deleted workloads.
-  for(const series of await query("driftmower_version_status"))if(series.metric.status==="unknown")out.push({...series,values:series.values?.filter(([,value])=>Number(value)===1).map(([time])=>[time,"-1"])})
-  for(const series of await query("driftmower_version_container_count"))for(const [seconds,count] of series.values??[])counts.set(identity(series.metric,seconds),Number(count))
-  return out
+  for(const series of history.metrics.driftmower_version_status??[])if(series.metric.status==="unknown")rows.push({...series,values:series.values?.filter(([,value])=>Number(value)===1).map(([time])=>[time,"-1"])})
+  for(const series of history.metrics.driftmower_version_container_count??[])for(const [seconds,count] of series.values??[])counts.set(identity(series.metric,seconds),Number(count))
  }
- const perNamespace:Series[][]=new Array(namespaces.length)
- let next=0
- await Promise.all(Array.from({length:Math.min(4,namespaces.length)},async()=>{
-  while(next<namespaces.length){const i=next++;perNamespace[i]=await namespaceRows(namespaces[i])}
- }))
- for(const part of perNamespace)rows.push(...part)
  const sources=new Map<string,SeriesSource>()
  const timeline=new Set<number>()
  for(const row of rows){
@@ -66,7 +48,7 @@ async function load(): Promise<DriftHistoryData> {
   const workloadGroupKey=`${m.kind}/${m.namespace}/${m.workload}`
   const key=seriesKey(workloadGroupKey,registry,repository)
   let source=sources.get(key)
-  if(!source){source={key,registry,repository,workloadGroupKey,workloadKind:m.kind,workloadName:m.workload,workloadNamespace:m.namespace,observations:[],byDigest:new Map()};sources.set(key,source)}
+  if(!source){source={key,registry,repository,workloadGroupKey,workloadUid:m.uid,workloadKind:m.kind,workloadName:m.workload,workloadNamespace:m.namespace,observations:[],byDigest:new Map()};sources.set(key,source)}
   for(const [seconds,raw] of row.values??[]){
    const behind=Number(raw);if(!Number.isFinite(behind))continue
    const t=seconds*1000;timeline.add(t)
@@ -83,14 +65,7 @@ async function load(): Promise<DriftHistoryData> {
   source.observations=merge(source.observations)
   for(const [digest,observations] of source.byDigest)source.byDigest.set(digest,merge(observations))
  }
- return {timeline:[...timeline].sort((a,b)=>a-b),reportTimes:new Map(),rottenness:[],sources:[...sources.values()]}
-}
-const cache=new Map<string,{expires:number;promise:Promise<DriftHistoryData>}>()
-export async function loadDriftHistory(context:string):Promise<DriftHistoryData>{
- const key=`${await selectedEndpoint()}|${context}`
- const hit=cache.get(key);if(hit&&hit.expires>Date.now())return hit.promise
- const promise=load().catch(error=>{cache.delete(key);throw error})
- cache.set(key,{expires:Date.now()+300_000,promise});return promise
+ return {timeline:[...timeline].sort((a,b)=>a-b),sources:[...sources.values()]}
 }
 
 function merge(observations:Observation[]):Observation[]{

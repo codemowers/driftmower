@@ -1,8 +1,10 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import NetworkTopologyHeader from "./components/network-topology-header"
+import { PodNav } from "@/app/components/layout/resource-navs"
 import NetworkTopologyGraph from "./components/network-topology-graph"
 import { NetstatdMissingNotice } from "@/app/components/netstatd-missing"
 import { useNetstatdMissing } from "@/lib/features/netstatd"
@@ -24,9 +26,9 @@ export default function PodNetworkTopologyPage() {
   if (!data || !pod || !workloadMatch) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Pod not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -38,7 +40,7 @@ export default function PodNetworkTopologyPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <main className="flex w-full min-h-0 flex-1 flex-col gap-6 px-7 py-8">
+      <Page fill>
         <NetworkTopologyHeader
           workloadUid={workloadUid}
           workloadName={workloadName}
@@ -49,6 +51,7 @@ export default function PodNetworkTopologyPage() {
           nodeName={pod.nodeName ?? null}
           podIPs={pod.ips ?? []}
         />
+        <PodNav workloadUid={workloadUid} podUid={podUid} namespace={pod.namespace} pod={pod.name} />
         {missing ? (
           <NetstatdMissingNotice />
         ) : (
@@ -56,7 +59,7 @@ export default function PodNetworkTopologyPage() {
             <NetworkTopologyGraph podName={pod.name} podNamespace={pod.namespace} podIPs={pod.ips ?? []} />
           </div>
         )}
-      </main>
+      </Page>
     </div>
   )
 }

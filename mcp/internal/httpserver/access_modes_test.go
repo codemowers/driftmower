@@ -15,12 +15,16 @@ func TestReadAllAccessModes(t *testing.T) {
 			var client *http.Client
 			if mode == "oidc" {
 				if session, err := connect(t, f, nil); err == nil {
-					session.Close()
+					if err := session.Close(); err != nil {
+						t.Error(err)
+					}
 					t.Fatal("OIDC-only accepted no token")
 				}
 				wrong := f.issuer.Token(t, "nobody", "wrong-audience", nil)
 				if session, err := connect(t, f, oidctest.BearerClient(wrong)); err == nil {
-					session.Close()
+					if err := session.Close(); err != nil {
+						t.Error(err)
+					}
 					t.Fatal("OIDC-only accepted wrong audience")
 				}
 				// This caller has no Kubernetes RBAC in either namespace.
@@ -30,7 +34,11 @@ func TestReadAllAccessModes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer session.Close()
+			defer func() {
+				if err := session.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			res, out := callJSON(t, session, "list_accessible_namespaces")
 			if res.IsError {
 				t.Fatalf("read-all denied: %+v", res)
@@ -45,7 +53,9 @@ func TestReadAllAccessModes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				t.Error(err)
+			}
 			if resp.StatusCode != 200 {
 				t.Fatalf("browser reads: %d", resp.StatusCode)
 			}
@@ -55,8 +65,13 @@ func TestReadAllAccessModes(t *testing.T) {
 					t.Fatal(err)
 				}
 				var config map[string]any
-				json.NewDecoder(resp.Body).Decode(&config)
-				resp.Body.Close()
+				decodeErr := json.NewDecoder(resp.Body).Decode(&config)
+				if err := resp.Body.Close(); err != nil {
+					t.Error(err)
+				}
+				if decodeErr != nil {
+					t.Fatal(decodeErr)
+				}
 				if config["authMode"] != "anonymous" || config["issuer"] != nil {
 					t.Fatalf("anonymous config %v", config)
 				}

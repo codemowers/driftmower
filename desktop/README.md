@@ -52,7 +52,7 @@ The existing Chrome profiles and their credentials are preserved.
 `desktop/` runs the same dashboard on `localhost:17843` and
 opens it as a Google Chrome application window, falling back to Chromium. It
 uses the person's own Chrome profile, so passkeys work for MCP sign-in, and it
-exits a few minutes after the window stops polling. The built executable embeds the HTML, JavaScript, CSS and icon; no separate
+exits a few minutes after the last dashboard window disconnects. The built executable embeds the HTML, JavaScript, CSS and icon; no separate
 `public/` directory is needed. `ASSET_DIR` can override the embedded UI during
 development.
 
@@ -135,7 +135,11 @@ credentials. Only contexts where the `mcp` Service (or the previous `driftmower-
 `driftmower` and
 advertises a public endpoint are offered for connection. Discovery uses the
 Service's `driftmower.io/mcp-url` annotation or a matching Ingress; it does not
-guess endpoints from Kubernetes API hostnames. Discovery refreshes every minute.
+guess endpoints from Kubernetes API hostnames. Kubeconfig changes use native filesystem
+notifications (inotify on Linux and kqueue on macOS), including atomic saves and
+changes to any file in `KUBECONFIG`. Settings and navigation receive pushed
+updates from the desktop; they do not poll the configuration. Sign-in, Retry and
+tunnel lifecycle events also trigger discovery.
 
 The dashboard binds to localhost. Kubernetes credentials remain on its server;
 the browser signs into MCP separately with PKCE. Tokens stay in memory; only

@@ -211,7 +211,7 @@ func TestStandalonePodsAndScaledToZero(t *testing.T) {
 	o := find(w, "Namespace")
 	eq(t, "orphan pods", o.Pods, []string{"standalone"})
 	eq(t, "orphan images", o.Images, []string{"one:1"})
-	if !slices.Equal(o.StandalonePods, []StandalonePod{{Name: "standalone", UID: "Pod/standalone"}}) {
+	if len(o.StandalonePods) != 1 || o.StandalonePods[0].Name != "standalone" || o.StandalonePods[0].UID != "Pod/standalone" {
 		t.Errorf("standalone = %v", o.StandalonePods)
 	}
 	d := find(w, "Deployment")
@@ -526,5 +526,31 @@ func TestReduceMetaKeepsLatestWrite(t *testing.T) {
 	created, updated, by := times(&Node{ObjectMeta: m})
 	if !created.Equal(early.Time) || !updated.Equal(late.Time) || by != "argocd-controller" || m.ManagedFields[0].FieldsV1 != nil {
 		t.Fatalf("created %v updated %v by %q", created, updated, by)
+	}
+}
+
+func TestContainerImageScanOwnersNeverBecomeWorkloads(t *testing.T) {
+	for _, controller := range []bool{false, true} {
+		ref := ownerRef("ContainerImage", "sha256-example", "codemowers.io/v1alpha1")
+		if !controller {
+			ref.Controller = nil
+		}
+		scan := pod(t, "scan-image", corev1.PodSpec{Containers: []corev1.Container{{Name: "upload", Image: "operator:test"}}}, opts{owners: []metav1.OwnerReference{ref}})
+		app := deployment(t, "application", corev1.PodSpec{}, opts{})
+		workloads, warnings := graph(t, scan, app)
+		if find(workloads, "ContainerImage") != nil || find(workloads, "Deployment") == nil {
+			t.Fatalf("scan ownership produced workloads: %+v", workloads)
+		}
+		if len(warnings) != 0 {
+			t.Fatalf("scan ownership warnings: %v", warnings)
+		}
+	}
+}
+
+func TestPodInventoryPreservesSchedulingPriority(t *testing.T) {
+	priority := int32(10000000)
+	node := pod(t, "priority-pod", corev1.PodSpec{PriorityClassName: "observability-critical", Priority: &priority}, opts{})
+	if node.Pod == nil || node.Pod.PriorityClassName != "observability-critical" || node.Pod.Priority == nil || *node.Pod.Priority != priority {
+		t.Fatalf("priority missing from Pod snapshot: %+v", node.Pod)
 	}
 }

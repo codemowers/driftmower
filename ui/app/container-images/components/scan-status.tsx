@@ -12,14 +12,11 @@ export function useImageScanStatuses(digests:string[]){
  const load=useCallback(async(signal:AbortSignal)=>{
   if(!(await toolNames()).has("get_image_scan_statuses"))throw new Error("Scan status metadata is not available from this MCP server")
   const digests=JSON.parse(selected) as string[]
-  const rows:Record<string,ScanStatus>={}
-  for(let offset=0;offset<digests.length;offset+=100){
-   const params=new URLSearchParams()
-   for(const digest of digests.slice(offset,offset+100))params.append("digests",digest)
-   const result=await fetchMcpJSON<{images:Record<string,ScanStatus>}>(`/api/observability/image-scan-statuses?${params}`,{signal})
-   Object.assign(rows,result.images)
-  }
-  return rows
+  const path="/api/observability/image-scan-statuses"
+  const result=digests.length<=50
+   ?await fetchMcpJSON<{images:Record<string,ScanStatus>}>(`${path}?${new URLSearchParams(digests.map(d=>["digests",d]))}`,{signal})
+   :await fetchMcpJSON<{images:Record<string,ScanStatus>}>(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({digests}),signal})
+  return result.images
  },[selected])
  return useQuery({key:cluster&&selected!=="[]"?JSON.stringify([cluster,"scan-statuses",selected]):null,load,interval:30_000,keepDataOnError:false})
 }

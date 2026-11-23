@@ -70,11 +70,9 @@ type storedRelease struct {
 
 func addHelmReleaseTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_helm_release",
-		Title: "Read a Helm release's values and manifest",
-		Description: "Read the deployed revision of one Helm release from its release Secret: the values set at install or upgrade (overrides), the chart's defaults, " +
-			"and the rendered manifest split into documents. Requires the caller to get that Secret. Values under keys that name passwords, tokens, secrets or credentials, " +
-			"and the data of rendered Secrets, are redacted.",
+		Name:        "get_helm_release",
+		Title:       "Read a Helm release's values and manifest",
+		Description: "Deployed revision of one Helm release: user values, chart defaults and rendered manifests. Credential-like values and Secret data are redacted.",
 		InputSchema: inputSchema[helmReleaseInput](func(p map[string]*jsonschema.Schema) {
 			p["namespace"].MinLength = jsonschema.Ptr(1)
 			p["name"].MinLength = jsonschema.Ptr(1)

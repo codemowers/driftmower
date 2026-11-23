@@ -63,11 +63,11 @@ func TestParseCPUAndCount(t *testing.T) {
 
 var healthy = OperatorHealth{
 	Deployment: "cnpg-cloudnative-pg", Namespace: "cnpg-system", ReadyReplicas: 1, DesiredReplicas: 1,
-	Version: ptr("1.24.1"), WatchedNamespaces: WatchedNamespaces{All: true},
+	Version: new("1.24.1"), WatchedNamespaces: WatchedNamespaces{All: true},
 }
 
 func TestAvailabilityOf(t *testing.T) {
-	a := AvailabilityOf(false, nil, ptr("https://cloudnative-pg.io/"))
+	a := AvailabilityOf(false, nil, new("https://cloudnative-pg.io/"))
 	if a.State != StateNotInstalled || *a.InstallHref != "https://cloudnative-pg.io/" {
 		t.Errorf("not installed = %+v", a)
 	}
@@ -83,11 +83,6 @@ func TestAvailabilityOf(t *testing.T) {
 	if a := AvailabilityOf(true, &healthy, nil); a.State != StateReady || *a.Version != "1.24.1" {
 		t.Errorf("ready = %+v", a)
 	}
-
-	if !IsOfferable(AvailabilityOf(true, &healthy, nil)) || !IsOfferable(AvailabilityOf(true, &down, nil)) ||
-		IsOfferable(AvailabilityOf(true, nil, nil)) || IsOfferable(AvailabilityOf(false, nil, nil)) {
-		t.Error("IsOfferable wrong")
-	}
 }
 
 func TestAvailabilityJSON(t *testing.T) {
@@ -95,15 +90,15 @@ func TestAvailabilityJSON(t *testing.T) {
 		a    Availability
 		want string
 	}{
-		{Availability{State: StateReady, Version: ptr("1.2"), WatchedNamespaces: WatchedNamespaces{All: true}},
+		{Availability{State: StateReady, Version: new("1.2"), WatchedNamespaces: WatchedNamespaces{All: true}},
 			`{"state":"ready","version":"1.2","watchedNamespaces":"all"}`},
 		{Availability{State: StateReady, WatchedNamespaces: WatchedNamespaces{Names: []string{"a", "b"}}},
 			`{"state":"ready","version":null,"watchedNamespaces":["a","b"]}`},
 		{Availability{State: StateReady}, `{"state":"ready","version":null,"watchedNamespaces":[]}`},
-		{Availability{State: StateDegraded, Version: ptr("1"), Reason: "r"}, `{"state":"degraded","version":"1","reason":"r"}`},
+		{Availability{State: StateDegraded, Version: new("1"), Reason: "r"}, `{"state":"degraded","version":"1","reason":"r"}`},
 		{Availability{State: StateCRDsOnly, Reason: "r"}, `{"state":"crds-only","reason":"r"}`},
 		{Availability{State: StateNotInstalled}, `{"state":"not-installed","installHref":null}`},
-		{Availability{State: StateNotInstalled, InstallHref: ptr("x")}, `{"state":"not-installed","installHref":"x"}`},
+		{Availability{State: StateNotInstalled, InstallHref: new("x")}, `{"state":"not-installed","installHref":"x"}`},
 	}
 	for _, tc := range cases {
 		b, err := json.Marshal(tc.a)

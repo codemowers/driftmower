@@ -1,7 +1,10 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
-import Breadcrumbs from "@/app/components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import { WorkloadNav } from "@/app/components/layout/resource-navs"
 import PageLoading from "@/app/components/page-loading"
 import LogsTab from "@/app/topmost-owners/[uid]/[podUid]/components/logs-tab"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -20,19 +23,21 @@ export default function WorkloadLogsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <main className="flex min-h-0 w-full flex-1 flex-col gap-4 px-7 py-6">
+      <Page fill>
         {!info ? <p className="text-sm text-muted-foreground">Workload not found</p> : (
           <>
-            <Breadcrumbs items={[
-              { label: "Workloads", href: linkTo("/topmost-owners") },
-              { label: `Namespace ${info.namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(info.namespace)}`) },
-              { label: `${info.qualifiedKind ?? info.kind} ${info.name}`, href: linkTo(`/topmost-owners/${uid}`) },
-              { label: "Logs" },
-            ]} />
+            <ResourceHeader icon={ICONS.logs} iconAriaLabel="Workload logs" title={info.name} copyValue={info.name} subtitle="Logs of every Pod of this workload"
+              breadcrumbs={[
+                { label: "Workloads", href: linkTo("/topmost-owners") },
+                { label: `Namespace ${info.namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(info.namespace)}`) },
+                { label: `${info.qualifiedKind ?? info.kind} ${info.name}`, href: linkTo(`/topmost-owners/${uid}`) },
+                { label: "Logs" },
+              ]} />
+            <WorkloadNav uid={uid} namespace={info.namespace} />
             <LogsTab namespace={info.namespace} workloadUid={root?.uid ?? uid} />
           </>
         )}
-      </main>
+      </Page>
     </div>
   )
 }

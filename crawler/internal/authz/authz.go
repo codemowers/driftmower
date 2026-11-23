@@ -20,7 +20,6 @@ const (
 	maxEntries = 10_000
 )
 
-// Identity is an authenticated caller.
 type Identity struct {
 	User   string
 	UID    string
@@ -97,4 +96,16 @@ func store[K comparable, V any](a *Authorizer, m map[K]entry[V], key K, value V,
 		}
 	}
 	m[key] = entry[V]{value: value, expires: time.Now().Add(ttl)}
+}
+
+// MayUseMCP checks the registration permission for the verified caller.
+func (a *Authorizer) MayUseMCP(ctx context.Context, id *Identity, name string) error {
+	result, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(ctx, &authzv1.SubjectAccessReview{Spec: authzv1.SubjectAccessReviewSpec{User: id.User, UID: id.UID, Groups: id.Groups, Extra: id.Extra, ResourceAttributes: &authzv1.ResourceAttributes{Group: "codemowers.ai", Resource: "clustermcpservers", Name: name, Verb: "use"}}}, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	if !result.Status.Allowed {
+		return errors.New("use of MCP server is not authorized")
+	}
+	return nil
 }

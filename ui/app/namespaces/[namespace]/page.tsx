@@ -1,28 +1,35 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import Breadcrumbs from "@/app/components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import Card from "@/app/components/layout/card"
+import { NamespaceNav } from "@/app/components/layout/resource-navs"
 import GraphLink from "@/app/components/graph-link"
 import { ResourceGauge } from "@/app/components/prometheus-resource-usage-card"
-import LogsCard from "@/app/components/logs-card"
 import SubjectLink from "@/app/users/components/subject-link"
-import NamespaceVolumes from "./components/namespace-volumes"
+import VolumesCard from "@/app/components/scope/volumes-card"
 import { relativeTimeFromNow } from "@/lib/utils/format-time"
 import type { Subject } from "@/lib/features/users/types"
-import WorkloadAdvisories from "@/app/components/workload-advisories"
+import DetailLayout from "@/app/components/layout/detail-layout"
+import ScopeFindings from "@/app/components/findings/scope-findings"
+import AlertsCard from "@/app/components/findings/alerts-card"
+import ResourceCommandsCard from "@/app/components/resource-commands-card"
+import { StatGrid, StatCell, StatValue, StatCaption } from "@/app/components/stats-card"
+import { aggregateIssues, scopeImageIssues } from "@/lib/cluster/scope"
+import { driftStats } from "@/lib/cluster/drift-stats"
+import { useScopeUsages } from "@/lib/hooks/use-scope"
 import LoadingLine from "@/app/components/loading-line"
 import LoadError from "@/app/components/load-error"
-import PrefetchLink from "@/app/components/prefetch-link"
+import ImagesCard from "@/app/components/scope/images-card"
+import PodsCard from "@/app/components/scope/pods-card"
 import { fetchMcpJSON } from "@/browser/connection"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useContextHref } from "@/lib/hooks/use-context-href"
-import { cn } from "@/lib/utils/cn"
 import { formatBytes } from "@/lib/utils/format-bytes"
-import { namespaceWorkloadRoots,isTerminalPod } from "@/lib/features/namespaces/inventory"
-import { orphanBuckets } from "@/lib/utils/report-roots"
-import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "@/lib/utils/pods-by-root"
-import { findWorkloadRoot } from "@/lib/cluster/workload-root"
+import { namespacePods, namespaceWorkloadRoots } from "@/lib/features/namespaces/inventory"
 
 type Compute = { quotaRequests: number | null; quotaLimits: number | null; requests: number | null; limits: number | null; usage: number | null }
 type NamespaceResources = {
@@ -54,22 +61,10 @@ function Resource({ title, usage, request, ceilings, format }: { title: string; 
   )
 }
 
-// A workload as one chip: its kind on the brand colour, then its name.
-function WorkloadChip({ href, kind, name, orphan, title }: { href: string; kind: string; name: string; orphan?: boolean; title?: string }) {
-  return (
-    <PrefetchLink href={href} title={title}
-      className={cn("inline-flex max-w-full overflow-hidden rounded-md border text-xs", orphan ? "border-status-minor-bg hover:bg-status-minor-bg/50" : "border-brand-bg hover:bg-brand-bg/40")}>
-      <span className={cn("shrink-0 px-2 py-1 font-semibold", orphan ? "bg-status-minor-bg text-status-minor-label" : "bg-brand-bg text-brand-label")}>{kind}</span>
-      <span className="truncate bg-white/0 px-2 py-1 font-medium">{name}</span>
-    </PrefetchLink>
-  )
-}
-
 export default function NamespacePage() {
   const { namespace } = useParams<{ namespace: string }>()
   const name = decodeURIComponent(namespace)
   const { linkTo } = useContextHref()
-  const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const [state, setState] = useState<{ status: "loading" } | { status: "error"; message: string } | { status: "ready"; resources: NamespaceResources }>({ status: "loading" })
 
@@ -78,88 +73,92 @@ export default function NamespacePage() {
     .catch((e: unknown) => setState({ status: "error", message: e instanceof Error ? e.message : String(e) })), [name])
   useEffect(() => { void load() }, [load])
 
-  const summaries = summarizePodsByRoot((clusterResources??[]).filter(resource=>!isTerminalPod(resource)))
-  const roots = namespaceWorkloadRoots(data,clusterResources).filter(r => r.namespace === name).sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name))
-  const orphans = orphanBuckets(data).find(b => b.namespace === name)
+  const data = useClusterState(s => s.data)
+  const pods = namespacePods(clusterResources ?? [], name)
+  const usages = useScopeUsages({ kind: "namespace", namespace: name })
+  const drift = driftStats(usages ?? [])
+  const workloads = namespaceWorkloadRoots(data, clusterResources).filter(root => root.namespace === name)
+  const containers = usages?.length ?? 0
+  const resourceIssues = aggregateIssues(pods)
+  const namespaceIssueCount = resourceIssues.length + (usages && data ? scopeImageIssues(data.issues, usages).length : 0)
+  const failing = pods.filter(p => p.issues?.some(i => i.severity === "critical")).length
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <Breadcrumbs items={[{ label: "Workloads", href: linkTo("/topmost-owners") }, { label: `Namespace ${name}` }]} />
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{name}</h1>
-          {state.status === "ready" && (state.resources.createdBy || state.resources.createdAt) && (
-            <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+    <>
+      <Page>
+        <ResourceHeader
+          icon={ICONS.namespaces}
+          iconAriaLabel="Namespace"
+          title={name}
+          copyValue={name}
+          breadcrumbs={[{ label: "Workloads", href: linkTo("/topmost-owners") }, { label: `Namespace ${name}` }]}
+          chips={[{ label: "Namespace", tone: "brand" }]}
+          issueCount={namespaceIssueCount}
+          subtitle={state.status === "ready" && (state.resources.createdBy || state.resources.createdAt) ? (
+            <span className="flex flex-wrap items-center gap-1.5">
               Created
               {state.resources.createdBy && <>by <SubjectLink subject={state.resources.createdBy} /></>}
               {state.resources.createdAt && <time dateTime={state.resources.createdAt} title={new Date(state.resources.createdAt).toLocaleString()}>{relativeTimeFromNow(state.resources.createdAt)}</time>}
-            </p>
-          )}
-        </div>
+            </span>
+          ) : "Namespace"}
+        />
+        <NamespaceNav namespace={name} />
 
-        {state.status === "loading" && <LoadingLine loading="namespace resources" />}
-        {state.status === "error" && <LoadError message={`Failed to load resources: ${state.message}`} onRetry={() => { setState({ status: "loading" }); void load() }} />}
-        {state.status === "ready" && (() => {
-          const r = state.resources
-          const q = (key: string) => r.queries[key]
-          return (
-            <div className="rounded-xl border border-gray-200 bg-white">
-              <header className="border-b border-gray-200 px-5 py-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Namespace resources</span>
-              </header>
-              <div className="flex flex-col gap-4 px-5 py-4">
-                {(["cpu", "memory"] as const).map(kind => (
-                  <Resource key={kind} title={kind === "cpu" ? "CPU" : "Memory"} format={kind === "cpu" ? cores : formatBytes}
-                    usage={{ label: "Usage", value: r[kind].usage, query: q(`${kind}.usage`) }}
-                    request={{ label: "Requests", value: r[kind].requests, query: q(`${kind}.requests`) }}
+        <DetailLayout
+          main={<>
+            <ResourceCommandsCard kind="Namespace" namespace="" name={name} />
+            <AlertsCard scope={{ namespace: name }} hideWhenEmpty />
+            <ScopeFindings scope={{ kind: "namespace", namespace: name }} resourceIssues={resourceIssues} />
+            <ImagesCard usages={usages ?? []} showWorkload />
+            <PodsCard pods={clusterResources ? pods : null} resources={clusterResources} />
+            <VolumesCard namespace={name} />
+          </>}
+          aside={<>
+            <StatGrid vertical>
+              <StatCell label="Workloads">
+                <StatValue>{data ? workloads.length : "—"}</StatValue>
+                <StatCaption>{drift.distinctRepoCount ? `${drift.staleRepoCount} of ${drift.distinctRepoCount} image repositories stale` : "no image repositories"}</StatCaption>
+              </StatCell>
+              <StatCell label="Pods">
+                <StatValue>{clusterResources ? pods.length : "—"}</StatValue>
+                <StatCaption>{containers} {containers === 1 ? "container" : "containers"}{failing ? ` · ${failing} with critical issues` : ""}</StatCaption>
+              </StatCell>
+            </StatGrid>
+            {state.status === "loading" && <Card title="Namespace resources"><LoadingLine loading="namespace resources" /></Card>}
+            {state.status === "error" && <LoadError message={`Failed to load resources: ${state.message}`} onRetry={() => { setState({ status: "loading" }); void load() }} />}
+            {state.status === "ready" && (() => {
+              const r = state.resources
+              const q = (key: string) => r.queries[key]
+              return (
+                <Card title="Namespace resources">
+                  {(["cpu", "memory"] as const).map(kind => (
+                    <Resource key={kind} title={kind === "cpu" ? "CPU" : "Memory"} format={kind === "cpu" ? cores : formatBytes}
+                      usage={{ label: "Usage", value: r[kind].usage, query: q(`${kind}.usage`) }}
+                      request={{ label: "Requests", value: r[kind].requests, query: q(`${kind}.requests`) }}
+                      ceilings={[
+                        { label: "Limits", value: r[kind].limits, query: q(`${kind}.limits`) },
+                        { label: "Quota requests", value: r[kind].quotaRequests, query: q(`${kind}.quotaRequests`) },
+                        { label: "Quota limits", value: r[kind].quotaLimits, query: q(`${kind}.quotaLimits`) },
+                      ]} />
+                  ))}
+                  <Resource title="Persistent volume claims" format={formatBytes}
+                    usage={{ label: "Usage", value: r.storage.usage, query: q("storage.usage") }}
+                    request={null}
                     ceilings={[
-                      { label: "Limits", value: r[kind].limits, query: q(`${kind}.limits`) },
-                      { label: "Quota requests", value: r[kind].quotaRequests, query: q(`${kind}.quotaRequests`) },
-                      { label: "Quota limits", value: r[kind].quotaLimits, query: q(`${kind}.quotaLimits`) },
+                      { label: "Capacity", value: r.storage.capacity, query: q("storage.capacity") },
+                      { label: "Quota", value: r.storage.quota, query: q("storage.quota") },
                     ]} />
-                ))}
-                <Resource title="Persistent volume claims" format={formatBytes}
-                  usage={{ label: "Usage", value: r.storage.usage, query: q("storage.usage") }}
-                  request={null}
-                  ceilings={[
-                    { label: "Capacity", value: r.storage.capacity, query: q("storage.capacity") },
-                    { label: "Quota", value: r.storage.quota, query: q("storage.quota") },
-                  ]} />
-                <Resource title={`Buckets${r.buckets.count ? ` · ${r.buckets.count}` : ""}`} format={formatBytes}
-                  usage={{ label: "Usage", value: r.buckets.usage, query: q("buckets.usage") }}
-                  request={null}
-                  ceilings={[{ label: "Quota", value: r.buckets.requests, query: q("buckets.requests") }]} />
-                {r.warnings.length > 0 && <ul className="border-t border-gray-100 pt-3 text-xs text-muted-foreground">{r.warnings.map(w => <li key={w}>{w}</li>)}</ul>}
-              </div>
-            </div>
-          )
-        })()}
-
-        <NamespaceVolumes namespace={name} />
-
-
-        <WorkloadAdvisories namespace={name} />
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workloads · {roots.length}</h2>
-          {roots.length === 0 && !orphans
-            ? <p className="text-sm text-muted-foreground">No workloads visible in this namespace.</p>
-            : (
-              <div className="flex flex-wrap gap-2">
-                {roots.map(root => {
-                  const live = findWorkloadRoot(clusterResources, root)
-                  const pods = live ? summaries.get(live.uid) ?? EMPTY_POD_SUMMARY : null
-                  return (
-                    <WorkloadChip key={root.uid} href={linkTo(`/topmost-owners/${root.uid}`)} kind={root.kind} name={root.name} orphan={root.orphan}
-                      title={pods ? `${pods.total} pod${pods.total === 1 ? "" : "s"}` : undefined} />
-                  )
-                })}
-                {orphans && <WorkloadChip href={linkTo(`/topmost-owners/${orphans.uid}`)} kind="Namespace" name="Orphaned resources" orphan />}
-              </div>
-            )}
-        </section>
-        <LogsCard namespace={name} href={linkTo(`/namespaces/${encodeURIComponent(name)}/logs`)} scope="every container in this namespace" />
-      </main>
-    </div>
+                  <Resource title={`Buckets${r.buckets.count ? ` · ${r.buckets.count}` : ""}`} format={formatBytes}
+                    usage={{ label: "Usage", value: r.buckets.usage, query: q("buckets.usage") }}
+                    request={null}
+                    ceilings={[{ label: "Quota", value: r.buckets.requests, query: q("buckets.requests") }]} />
+                  {r.warnings.length > 0 && <ul className="border-t border-gray-100 pt-3 text-xs text-muted-foreground">{r.warnings.map(w => <li key={w}>{w}</li>)}</ul>}
+                </Card>
+              )
+            })()}
+          </>}
+        />
+      </Page>
+    </>
   )
 }

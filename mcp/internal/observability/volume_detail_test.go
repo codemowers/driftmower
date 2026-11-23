@@ -83,3 +83,30 @@ func TestVolumeDetailsDoNotTargetReplacementClaim(t *testing.T) {
 		t.Fatalf("stale locator overrode live binding: %+v %v", detail, err)
 	}
 }
+
+func TestResizeFailuresAppearInBothVolumeResponses(t *testing.T) {
+	s, k, _, _ := volumeFixture()
+	ctx := context.Background()
+	claim, err := k.CoreV1().PersistentVolumeClaims("team").Get(ctx, "data", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claim.Status.AllocatedResourceStatuses = map[corev1.ResourceName]corev1.ClaimResourceStatus{corev1.ResourceStorage: corev1.PersistentVolumeClaimControllerResizeInProgress}
+	claim.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{Type: corev1.PersistentVolumeClaimControllerResizeError, Status: corev1.ConditionTrue, Message: "not enough space"}}
+	if _, err := k.CoreV1().PersistentVolumeClaims("team").UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := s.GetVolume(ctx, alice, VolumeDetailInput{Namespace: "team", Claim: "data"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	volumes, err := s.ListVolumes(ctx, alice, "team", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, projected := range []*Claim{detail.Claim, &volumes.Claims[0]} {
+		if projected.ResizeStatus != corev1.PersistentVolumeClaimControllerResizeInProgress || len(projected.Conditions) != 1 || projected.Conditions[0].Message != "not enough space" {
+			t.Fatalf("resize failure omitted: %+v", projected)
+		}
+	}
+}

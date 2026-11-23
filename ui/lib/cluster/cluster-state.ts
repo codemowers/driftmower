@@ -5,10 +5,8 @@ import type { PodSecurity } from "./pod-security"
 import type { Subject } from "@/lib/features/users/types"
 import type { VulnerabilityReport } from "@/lib/features/vulnerability/types"
 import type { ClusterNodesResponse } from "@/lib/cluster-resources/types"
-import type { AlertGroup } from "@/lib/features/prometheus/types"
 import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
-import type { LivePatchUpgradeListResponse } from "@/lib/features/live-patch-upgrade/types"
 
 export type PodContainerStatus = {
   name: string
@@ -31,6 +29,8 @@ export type PodStatus = {
 export type LivenessProbe = { container: string; check: string }
 
 export type ClusterResource = {
+  scanPod?: boolean
+  issues?: import("@/lib/cluster/issues").WorkloadIssue[]
   uid: string
   kind: string
   apiVersion?: string
@@ -47,6 +47,8 @@ export type ClusterResource = {
   restartedAt?: string
   hostNetwork?: boolean
   nodeName?: string
+  jobOwned?: boolean
+  terminating?: boolean
   phase?: string
   podStatus?: PodStatus
   priorityClassName?: string
@@ -67,6 +69,8 @@ export type ClusterResource = {
 
 export type ClusterState = {
   imageScanStatuses: Record<string,string>
+  // Latest failure reason of an unfinished scan, by digest.
+  imageScanFailures: Record<string, string | undefined>
   clusterName: string | null
   data: Report | null
   reportId: string | null
@@ -79,12 +83,10 @@ export type ClusterState = {
   lastRefreshed: Date | null
   clusterResources: ClusterResource[] | null
   clusterResourcesError: string | null
-  livePatchUpgrades: LivePatchUpgradeListResponse | null
   nodeDrift: ClusterNodesResponse | null
   nodeDriftError: string | null
   vulnerabilityReports: Record<string, VulnerabilityReport> | null
   vulnerabilityReportsError: string | null
-  prometheusAlerts: AlertGroup[] | null
   prometheusUrl: string | null
   clusterMetrics: ClusterMetrics | null
   nodeStorage: NodeStorageMap | null
@@ -103,13 +105,12 @@ export const useClusterState = create<ClusterState>(() => ({
   lastRefreshed: null,
   clusterResources: null,
   clusterResourcesError: null,
-  livePatchUpgrades: null,
   nodeDrift: null,
   nodeDriftError: null,
   imageScanStatuses: {},
+  imageScanFailures: {},
   vulnerabilityReports: null,
   vulnerabilityReportsError: null,
-  prometheusAlerts: null,
   prometheusUrl: null,
   clusterMetrics: null,
   nodeStorage: null,

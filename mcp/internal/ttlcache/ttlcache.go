@@ -81,7 +81,6 @@ func (c *Cache[V]) Get(key string) (V, bool) {
 	return e.value, true
 }
 
-// Set stores value under key for the cache's TTL.
 func (c *Cache[V]) Set(key string, value V) {
 	c.SetWithTTL(key, value, c.ttl)
 }
@@ -129,7 +128,6 @@ func (c *Cache[V]) DeleteWhere(predicate func(key string, value V) bool) int {
 	return removed
 }
 
-// Clear removes every entry and reports how many there were.
 func (c *Cache[V]) Clear() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()

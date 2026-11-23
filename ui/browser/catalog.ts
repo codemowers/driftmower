@@ -10,6 +10,6 @@ export async function sourceFindings<T extends {sources:unknown[];missing?:strin
  return {...result,sources:result.sources.map(source=>({...source,latest:source.latest?{tag:source.latest}:undefined,deployed:source.deployed.map(version=>({...version,images:version.images??[],references:version.references??[]})),advisories:source.deployed.flatMap(version=>(version.findings??[]).map(finding=>({id:finding.advisory,summary:finding.summary,url:finding.url})))}))} as T
 }
 
-export async function sourceImages(url:string,offset=0,signal?:AbortSignal):Promise<import("@/lib/features/crawler/sources").SourceImagesPage>{
- return callTool("list_source_images",{url,offset,limit:100},signal)
+export async function sourceImages(url:string,signal?:AbortSignal):Promise<import("@/lib/features/crawler/sources").SourceImages>{
+ return callTool("list_source_images",{url},signal)
 }

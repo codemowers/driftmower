@@ -7,7 +7,7 @@ import { AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
 import type { ReleaseInfo, StatusType } from "@/lib/cluster/reports"
 import { parseFilterTokens, statusesFromTokens, statusTokens } from "@/lib/utils/filter-params"
-import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
+import { SEVERITY_STYLE, isNoData, staleColor } from "@/lib/cluster/styles/status-style"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import ReleaseFilters from "./release-filters"
 
@@ -21,12 +21,6 @@ export type ReleaseEntry = {
   totalWorkloadCount: number
   worstStatus: StatusType
   issueCount: number
-}
-
-function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
-  if (staleRepoCount === 0) return "text-muted-foreground"
-  if (staleRepoCount === distinctRepoCount) return "text-status-major-label"
-  return "text-status-minor-label"
 }
 
 function ReleaseItem({ entry, linkTo }: { entry: ReleaseEntry; linkTo: LinkTo }) {

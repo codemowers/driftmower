@@ -10,7 +10,6 @@ import (
 // Grant is one row of effective rights: verbs on one resource, optionally
 // limited to named objects, in the listed namespaces or cluster-wide.
 type Grant struct {
-	// API group; "" is the core group and "*" every group.
 	Group    string `json:"group"`
 	Resource string `json:"resource"`
 	// Kind from discovery, when the resource is served; empty for wildcards.
@@ -61,7 +60,6 @@ func matches(pattern, value string) bool {
 	if pattern == "*" || pattern == value {
 		return true
 	}
-	// RBAC allows `pods/*` for every subresource of pods.
 	if base, ok := strings.CutSuffix(pattern, "/*"); ok {
 		return strings.HasPrefix(value, base+"/")
 	}
@@ -97,7 +95,6 @@ func isClusterAdmin(rules []atom) bool {
 	})
 }
 
-// grantKey identifies a row before verbs are merged.
 type grantKey struct{ group, resource, names string }
 
 // collapse merges atoms into rows of verbs per resource and name set. A "*"
@@ -155,7 +152,6 @@ func (k grantKey) grant(verbs []string, kinds kindLookup) Grant {
 	return g
 }
 
-// clusterGrants turns the baseline into sorted rows.
 func clusterGrants(baseline []atom, kinds kindLookup) []Grant {
 	rows := collapse(baseline)
 	out := make([]Grant, 0, len(rows))

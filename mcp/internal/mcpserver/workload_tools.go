@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -15,14 +16,14 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/workloads"
 )
 
-// Workloads enables the live workload tools.
 type Workloads struct {
-	Registry      *registry.Reader
-	ScanURL       string
-	ScanTokenFile string
-	Cache         *workloads.Cache
-	Metadata      metadata.Interface
-	Judge         authz.Judge
+	MissingComponents []string
+	Registry          *registry.Reader
+	ScanURL           string
+	ScanTokenFile     string
+	Cache             *workloads.Cache
+	Metadata          metadata.Interface
+	Judge             authz.Judge
 	// Argo CD's public address; empty leaves application links out.
 	ArgoCDURL string
 	// Nil leaves restart_workload and terminate_pod unregistered.
@@ -31,7 +32,9 @@ type Workloads struct {
 
 type workloadInput struct {
 	namespaceInput
-	IncludeSources bool `json:"includeSources,omitempty" jsonschema:"Resolve source-repository references for these workloads; excludes layers and crawler results"`
+	IncludeSources  bool `json:"includeSources,omitempty" jsonschema:"Resolve source-repository references for these workloads; excludes layers and crawler results"`
+	IncludeFinished bool `json:"includeFinished,omitempty" jsonschema:"Also list Succeeded and Failed Pods"`
+	IncludeOrphans  bool `json:"includeOrphans,omitempty" jsonschema:"Also list each namespace's unclaimed resources"`
 }
 
 type namespaceInput struct {
@@ -76,24 +79,15 @@ func targetProperties(props map[string]*jsonschema.Schema) {
 
 func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_workloads",
-		Title: "Get live workloads",
-		Description: "Returns all matching workloads in one response. For bulk image updates, list workloads, use get_workload_findings/get_image_changes to select versions, then apply changes through the caller's Kubernetes/GitOps workflow. Start here for questions about applications, workloads, what runs in a namespace, or which resources belong together. Specify namespace when known; omit it only for a cross-namespace overview of namespaces visible to the caller. " +
-			"Set includeSources to resolve SourceRepository references for these workloads, or use get_workload_sources for one root. Returns current root owners with pods, images, ConfigMaps, Secrets, PVCs, Services, Ingresses and Certificates; shared dependencies may appear under several roots. Includes scaled-to-zero built-in controllers. " +
-			"Built-in controller ancestry is resolved recursively; custom roots are terminal owner references marked ownerReferenceOnly unless a fixed adapter verifies them. " +
-			"When the CNPG API is available and the caller can list Clusters, a fixed adapter associates explicit TLS Secret and monitoring query references; it does not verify health or traverse further custom ancestry. " +
-			"Certificates join consumers through pod Secret references or associated Ingress TLS. Namespace/orphaned-workloads holds unclaimed resources; its orphaned mapping groups auxiliary generating owners by Kind.api-group and name. " +
-			"Unused kube-root-ca.crt ConfigMaps, reflected copies, trust-manager bundles and Helm release records are excluded from orphan buckets; consumed copies remain workload dependencies. Orphaned does not mean safe to delete. " +
-			"Namespace orphan buckets also include standalonePods name/UID pairs for ownerless, non-static pods. Empty lists and empty orphan buckets are omitted. " +
-			"Read workloads in structuredContent; the text content is only a count and warning summary. Requires authenticated list pods permission; each collection is additionally filtered by caller list permission. " +
-			"Warnings identify incomplete inventory: missing objects or dependencies must not be treated as confirmed absent. Secret and ConfigMap contents are never returned. " +
-			"Watch-backed cached snapshot with opaque revision; no resource-usage or historical analysis.",
+		Name:        "get_workloads",
+		Title:       "Get live workloads",
+		Description: "Start here for applications and what runs in a namespace. A tree of root owners with their running Pods, images, ConfigMaps, Secrets, PVCs, Services, Ingresses and Certificates; a standalone Pod is its own owner. Pod facts every Pod of an owner shares are on the owner. includeFinished adds finished Pods, includeOrphans each namespace's unclaimed resources (orphaned does not mean safe to delete), includeSources source repositories.",
 		InputSchema: inputSchema[workloadInput](func(props map[string]*jsonschema.Schema) {
 			namespaceProperty(props["namespace"])
 		}),
-		OutputSchema: schemaFor[*workloads.Inventory](),
+		OutputSchema: schemaFor[*inventoryTree](),
 		Annotations:  readOnly("Get live workloads"),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, in workloadInput) (*mcp.CallToolResult, *workloads.Inventory, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in workloadInput) (*mcp.CallToolResult, *inventoryTree, error) {
 		id, err := callerIdentity(req, m)
 		if err != nil {
 			return nil, nil, fmt.Errorf("workload listing requires an authenticated caller: %w", err)
@@ -104,7 +98,6 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 		}
 		copyInv := *inv
 		inv = &copyInv
-		inv.Total = len(inv.Workloads)
 		if in.IncludeSources {
 			var warnings []string
 			inv.Workloads, warnings, err = workloadSources(ctx, w, id, inv.Workloads)
@@ -113,26 +106,23 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 			}
 			inv.Warnings = append(inv.Warnings, warnings...)
 		}
-		buckets := 0
-		for _, wl := range inv.Workloads {
-			if wl.Kind == "Namespace" {
-				buckets++
-			}
+		pods, podWarnings, err := w.Cache.Pods(ctx, in.Namespace, id)
+		if err != nil {
+			return nil, nil, err
 		}
-		summary := fmt.Sprintf("%d workloads; %d namespace orphan buckets.", len(inv.Workloads)-buckets, buckets)
-		if len(inv.Warnings) > 0 {
-			summary += " " + strings.Join(inv.Warnings, " ")
+		inv.Warnings = append(slices.Clone(inv.Warnings), podWarnings...)
+		tree := buildInventoryTree(inv, pods, in.IncludeFinished, in.IncludeOrphans)
+		summary := fmt.Sprintf("%d owners.", len(tree.Owners))
+		if len(tree.Warnings) > 0 {
+			summary += " " + strings.Join(tree.Warnings, " ")
 		}
-
-		return text(summary), inv, nil
+		return text(summary), tree, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_pods",
-		Title: "List pod names",
-		Description: "Use when only current pod names in a known namespace are needed, such as choosing a pod for logs or resource usage. For application inventory, owner relationships and dependencies, prefer get_workloads when available. " +
-			"Requires authenticated list pods permission and reads metadata only. Returns sorted names; no pod status, containers or ownership. " +
-			"Deleted pods are absent; a known deleted pod name may still have resource usage history. An incomplete listing is an error.",
+		Name:        "list_pods",
+		Title:       "List pod names",
+		Description: "Pod names in a namespace.",
 		InputSchema: inputSchema[podsInput](func(props map[string]*jsonschema.Schema) {
 			namespaceProperty(props["namespace"])
 		}),
@@ -156,17 +146,12 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 	if w.Actions == nil {
 		return
 	}
-	mutating := &mcp.ToolAnnotations{DestructiveHint: boolPtr(true), OpenWorldHint: boolPtr(false)}
+	mutating := &mcp.ToolAnnotations{DestructiveHint: new(true), OpenWorldHint: new(false)}
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "restart_workload",
-		Title: "Restart a workload",
-		Description: "Mutating operation, available only when MCP_WORKLOAD_RESTART_ENABLED is true. Use only when the user requests a restart. Obtain namespace, name, UID, kind and apiVersion from current get_workloads inventory; never infer UID. " +
-			"Supports apps/v1 Deployment, StatefulSet and DaemonSet rollout restart, and postgresql.cnpg.io/v1 Cluster through its restart annotation. " +
-			"Supports Redpanda cluster.redpanda.com/v1alpha1 or v1alpha2 via clusterSpec.statefulset.podTemplate.annotations, and Dragonfly dragonflydb.io/v1alpha1 via spec.annotations; verifies the installed operator schema before patching. " +
-			"Operators manage pod recreation. Jobs, CronJobs, ReplicaSets and unknown operators are unsupported. Paused, OnDelete and partitioned rollouts are rejected. " +
-			"Executes as the verified Kubernetes caller: requires get and patch on the exact target, and admission still applies. UID/resourceVersion guard against stale inventory and concurrent changes. " +
-			"Returns request acceptance, not completed rollout or verified health. Can interrupt service; do not automatically retry an uncertain outcome.",
+		Name:        "restart_workload",
+		Title:       "Restart a workload",
+		Description: "Rollout-restart a Deployment, StatefulSet, DaemonSet, CNPG Cluster, Redpanda or Dragonfly. Take UID and resourceVersion from get_workloads. Only on explicit user request; do not retry an uncertain result.",
 		InputSchema: strict(inputSchema[restartInput](func(props map[string]*jsonschema.Schema) {
 			targetProperties(props)
 			props["apiVersion"].Enum = []any{"apps/v1", "postgresql.cnpg.io/v1", "cluster.redpanda.com/v1alpha1", "cluster.redpanda.com/v1alpha2", "dragonflydb.io/v1alpha1"}
@@ -189,12 +174,9 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "terminate_pod",
-		Title: "Terminate a standalone pod",
-		Description: "Mutating operation, available only when MCP_WORKLOAD_RESTART_ENABLED is true. Use only when the user explicitly requests termination of a standalone pod. Obtain name and UID from the namespace orphan bucket standalonePods in get_workloads. " +
-			"Requires get and delete pods as the verified caller. Rechecks live ownerReferences and rejects owned pods (including Job/CronJob pods) and static mirror pods. " +
-			"Deletes with UID/resourceVersion preconditions and the normal grace period; never force deletes. A standalone pod has no controller to recreate it. " +
-			"Returns termination acceptance, not completed deletion. Do not automatically retry an uncertain outcome.",
+		Name:        "terminate_pod",
+		Title:       "Delete a Pod",
+		Description: "Delete one Pod by its UID using the caller’s Kubernetes permissions and normal grace period. Its controller may create a replacement when applicable; standalone Pods are not recreated automatically. Static mirror Pods are rejected. Only on explicit user request; do not retry an uncertain result.",
 		InputSchema: strict(inputSchema[terminateInput](targetProperties)),
 		Annotations: mutating,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in terminateInput) (*mcp.CallToolResult, *workloads.ActionResult, error) {
@@ -210,12 +192,9 @@ func addWorkloadTools(s *mcp.Server, w *Workloads, m auth.Mapping) {
 		return text(result.Message), result, nil
 	})
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "expand_volume",
-		Title: "Expand a PersistentVolumeClaim",
-		Description: "Mutating operation, available only when MCP_WORKLOAD_RESTART_ENABLED is true. Use only when the user requests more space for a claim. Obtain namespace, name and UID from list_volumes, where canExpand marks claims this caller may expand. " +
-			"Sets the claim's storage request to storage, an absolute Kubernetes quantity computed by the client (for example the current request plus 20%), at most double the current request. Idempotent: a size at or below the current request changes nothing, so a repeated submission does not grow the volume twice. Requires a Bound claim whose StorageClass sets allowVolumeExpansion. " +
-			"Executes as the verified Kubernetes caller: requires get and patch on the claim, and admission still applies. UID guards against a replaced claim. " +
-			"Volumes cannot shrink back. Returns request acceptance; the CSI driver resizes asynchronously. Do not automatically retry an uncertain outcome.",
+		Name:        "expand_volume",
+		Title:       "Expand a PersistentVolumeClaim",
+		Description: "Set a PVC's storage request to an absolute size, at most double the current one; smaller sizes are no-ops. Take UID from list_volumes (canExpand). Volumes cannot shrink. Only on explicit user request.",
 		InputSchema: strict(inputSchema[expandInput](func(props map[string]*jsonschema.Schema) {
 			targetProperties(props)
 			props["storage"].MinLength, props["storage"].MaxLength = jsonschema.Ptr(1), jsonschema.Ptr(64)

@@ -1,6 +1,6 @@
-{{- if and .Values.mcp.enabled (or .Values.operator.enabled .Values.mcp.userAccess.enabled) (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") }}
+{{- if and .Values.mcp.enabled (or .Values.operator.enabled .Values.mcp.userAccess.enabled) (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") }}
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   name: {{ .Release.Name }}-security
   labels:
@@ -11,7 +11,7 @@ spec:
   selector:
     matchLabels:
       app: {{ .Release.Name }}-mcp
-  endpoints:
+  podMetricsEndpoints:
     - port: drift
       path: /security-metrics
       honorLabels: true

@@ -37,9 +37,6 @@ func KindKey(group, version, kind string) string {
 // back to one request per group version otherwise. A group version that fails
 // to list (it can vanish between calls) keeps its version entry but
 // contributes no kinds.
-//
-// Discovery needs no RBAC of its own: system:discovery grants it to every
-// authenticated principal.
 func LoadAPISurface(d discovery.DiscoveryInterface) (*APISurface, error) {
 	groups, lists, err := d.ServerGroupsAndResources()
 	var partial *discovery.ErrGroupDiscoveryFailed

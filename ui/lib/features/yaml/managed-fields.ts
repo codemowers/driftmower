@@ -1,4 +1,4 @@
-import type { YamlAnnotation } from "@/lib/features/yaml/yaml-lines"
+import { isPlainObject, type YamlAnnotation } from "@/lib/features/yaml/yaml-lines"
 
 const GENERATED_METADATA_KEYS = new Set([
   "uid",
@@ -10,10 +10,6 @@ const GENERATED_METADATA_KEYS = new Set([
 ])
 
 const GENERATED_ANNOTATIONS = new Set(["kubectl.kubernetes.io/last-applied-configuration"])
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
 
 export function isGeneratedPath(keys: (string | number)[]): boolean {
   const [leaf, parent, grandparent] = [keys.at(-1), keys.at(-2), keys.at(-3)]

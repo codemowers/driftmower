@@ -1,26 +1,33 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
-import { Package } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
+import type { ImageUsage } from "@/lib/cluster/reports"
+import { STALE_STATUSES } from "@/lib/cluster/styles/status-style"
 import { useContextHref } from "@/lib/hooks/use-context-href"
 import { podMetricQueries } from "@/lib/features/prometheus/pod-metrics"
 import ResourceHeader from "@/app/components/resource-header"
-import NetworkCard from "@/app/components/network-card"
-import LogsCard from "@/app/components/logs-card"
+import { PodNav } from "@/app/components/layout/resource-navs"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import CommandsCard from "./components/commands-card"
 import PodStats from "./components/pod-stats"
-import IssuesCard from "./components/issues-card"
+import DetailLayout from "@/app/components/layout/detail-layout"
+import ScopeFindings from "@/app/components/findings/scope-findings"
+import AlertsCard from "@/app/components/findings/alerts-card"
 import PodTabs from "./components/pod-tabs"
-import DiagnosisCard from "./components/diagnosis-card"
+import ImagesCard from "@/app/components/scope/images-card"
+import VolumesCard from "@/app/components/scope/volumes-card"
 import { usePodMetrics } from "./hooks/use-pod-metrics"
+import PodShellAccess from "@/app/components/pod-shell-access"
+import DeletePodAction from "@/app/components/delete-pod-action"
+import { useFeatureFlags } from "@/app/components/feature-flags-init"
 import PageLoading from "@/app/components/page-loading"
 
 export default function PodDetailPage() {
   const { uid: workloadUid, podUid } = useParams<{ uid: string; podUid: string }>()
+  const restartEnabled = useFeatureFlags(s => s.workloadRestart)
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
   const { linkTo } = useContextHref()
@@ -39,9 +46,9 @@ export default function PodDetailPage() {
   if (!data || !pod || !workloadMatch) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Pod not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -58,23 +65,6 @@ export default function PodDetailPage() {
     ? ownUsages
     : [...new Map(workloadUsages.map(u => [`${u.containerName}/${u.image}`, u])).values()]
 
-  const repoStatus = new Map<string, StatusType>()
-  for (const u of podUsages) {
-    const repo = `${u.imageInfo.registry}/${u.imageInfo.repository}`
-    const prev = repoStatus.get(repo)
-    const cur = u.versionStatus.statusType
-    if (prev === undefined || SEVERITY_ORDER[cur] > SEVERITY_ORDER[prev]) {
-      repoStatus.set(repo, cur)
-    }
-  }
-  const distinctRepoCount = repoStatus.size
-  const staleRepoCount = Array.from(repoStatus.values()).filter(s => STALE_STATUSES.includes(s)).length
-  const normalizedScore = distinctRepoCount > 0 ? staleRepoCount / distinctRepoCount : 0
-
-  const worstStatus = podUsages.reduce<StatusType>((worst, u) => {
-    const s = u.versionStatus.statusType
-    return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
-  }, "no_data")
 
   const podIssues = data.issues.filter(i =>
     podUsages.some(u => u.image.includes(i.image)),
@@ -91,9 +81,9 @@ export default function PodDetailPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={Package}
+          icon={ICONS.pod}
           iconAriaLabel="Pod"
           title={pod.name}
           copyValue={pod.name}
@@ -106,43 +96,38 @@ export default function PodDetailPage() {
           chips={[
             { label: "Pod", tone: "brand" },
           ]}
-          scoreChip={{ status: worstStatus, score: normalizedScore }}
-          issueCount={podIssues.length}
+          issueCount={podIssues.length + (pod.issues?.length ?? 0)}
           subtitle={`${pod.namespace} · ${nodeLabel} · ${containerLabel}`}
         />
+        <PodNav workloadUid={workloadUid} podUid={podUid} namespace={pod.namespace} pod={pod.name} />
 
-        <PodStats
-          pod={pod}
-          nodeName={nodeLabel}
-          totalContainers={totalContainers}
-          staleContainerCount={staleContainerCount}
-          worstStatus={worstStatus}
-          normalizedScore={normalizedScore}
+        <DetailLayout
+          main={<>
+            <CommandsCard namespace={pod.namespace} name={pod.name} ports={pod.declaredPorts} />
+            <AlertsCard scope={{ namespace: pod.namespace, pods: [pod.name] }} hideWhenEmpty />
+            <ScopeFindings scope={{ kind: "pod", namespace: pod.namespace, name: pod.name, workloadUid }} resourceIssues={pod.issues} />
+            <PodShellAccess namespace={pod.namespace} name={pod.name} usages={ownUsages} />
+            <ImagesCard usages={podUsages} livenessProbes={pod.livenessProbes ?? []} />
+            <VolumesCard namespace={pod.namespace} pods={[pod.name]} />
+            <PodTabs pod={pod} />
+          </>}
+          aside={<>
+            {restartEnabled && <DeletePodAction namespace={pod.namespace} name={pod.name} uid={pod.uid} />}
+            <PodStats
+              pod={pod}
+              nodeName={nodeLabel}
+              totalContainers={totalContainers}
+              staleContainerCount={staleContainerCount}
+            />
+            <PrometheusResourceUsageCard
+              metrics={podMetrics}
+              graphQueries={podMetricQueries(pod.namespace, pod.name)}
+              emptyHint={pod.phase && pod.phase !== "Running" ? `pod is ${pod.phase}` : undefined}
+              vertical
+            />
+          </>}
         />
-
-        <DiagnosisCard pod={pod} workloadUid={workloadUid} />
-
-        <PrometheusResourceUsageCard
-          metrics={podMetrics}
-          graphQueries={podMetricQueries(pod.namespace, pod.name)}
-          emptyHint={pod.phase && pod.phase !== "Running" ? `pod is ${pod.phase}` : undefined}
-        />
-
-
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[3fr_2fr_2fr]">
-          <CommandsCard namespace={pod.namespace} name={pod.name} ports={pod.declaredPorts} />
-          <NetworkCard
-            href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/network-topology`)}
-            podIPs={pod.ips ?? []}
-            podUid={pod.uid}
-          />
-          <LogsCard namespace={pod.namespace} pod={pod.name} href={linkTo(`/topmost-owners/${workloadUid}/${podUid}/logs`)} scope="every container of this Pod" />
-        </div>
-
-        <IssuesCard issues={podIssues} />
-
-        <PodTabs pod={pod} usages={podUsages} issues={data.issues} workloadUid={workloadUid} />
-      </main>
+      </Page>
     </div>
   )
 }

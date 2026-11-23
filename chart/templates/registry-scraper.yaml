@@ -66,6 +66,9 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         app: {{ .Release.Name }}-registry-scraper
     spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       serviceAccountName: {{ .Release.Name }}-registry-scraper
       securityContext:
         runAsNonRoot: true

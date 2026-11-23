@@ -1,10 +1,13 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useCallback, useState } from "react"
 import { useQuery } from "@/lib/hooks/use-query"
 import CommandSnippet from "@/app/components/command-snippet"
 import { useKubectlConnection } from "@/lib/hooks/use-kubectl"
-import { volumeCommands } from "@/lib/features/volumes/commands"
+import { volumeCleanupCommands } from "@/lib/features/volumes/commands"
+import VolumeResizeStatus from "./components/resize-status"
 import MetricBar from "@/app/components/metric-bar"
 import PageHeader from "../components/page-header"
 import { FilterSearchInput } from "../components/filter-bar"
@@ -128,10 +131,12 @@ export default function VolumesPage() {
     ].filter(Boolean).join(" ").toLowerCase().includes(search))
     : []
 
+  const cleanup = state.status === "ready" ? volumeCleanupCommands(state.volumes, connection) : null
+
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Volumes" subtitle="PersistentVolumeClaims and their PersistentVolumes, fullest first, with kubelet space and inode usage" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.volumes} title="Volumes" subtitle="PersistentVolumeClaims and their PersistentVolumes, fullest first, with kubelet space and inode usage" />
 
         {state.status === "loading" && <LoadingLine loading="volumes" />}
         {state.status === "error" && <LoadError message={`Failed to load volumes: ${state.message}`} onRetry={result.retry} />}
@@ -139,15 +144,20 @@ export default function VolumesPage() {
         {state.status === "ready" && (
           <>
             <div className="flex items-center gap-4">
-              <FilterSearchInput value={query} onChange={setQuery} placeholder="Search claim, pod, volume, class, driver, node or zone..." />
-              <label className="flex shrink-0 items-center gap-2 text-xs"><input type="checkbox" checked={showDelete} onChange={event=>setShowDelete(event.target.checked)}/>Show delete commands for unused volumes</label>
+              {!showDelete && <FilterSearchInput value={query} onChange={setQuery} placeholder="Search claim, pod, volume, class, driver, node or zone..." />}
+              <label className="flex shrink-0 items-center gap-2 text-xs"><input type="checkbox" checked={showDelete} onChange={event=>setShowDelete(event.target.checked)}/>Clean up commands</label>
             </div>
-            {state.volumes.degraded.length > 0 && (
+            {!showDelete && state.volumes.degraded.length > 0 && (
               <ul className="text-sm text-muted-foreground">
                 {state.volumes.degraded.map(d => <li key={`${d.source}-${d.message}`}>{d.source}: {d.message}</li>)}
               </ul>
             )}
-            {visible.length === 0 ? (
+            {showDelete && cleanup ? (
+              <div className="space-y-6">
+                <CommandSnippet title="kubectl delete pvc" command={cleanup.pvc} open fullHeight />
+                <CommandSnippet title="kubectl delete pv" command={cleanup.pv} open fullHeight />
+              </div>
+            ) : visible.length === 0 ? (
               <p className="text-sm text-muted-foreground">{search ? "No volumes match that search." : "No PersistentVolumeClaims or PersistentVolumes were found."}</p>
             ) : (
               <div className="overflow-x-auto">
@@ -159,7 +169,6 @@ export default function VolumesPage() {
                       <th className="py-2 pr-4 font-semibold">Affinity</th>
                       <th className="py-2 pr-4 font-semibold">Space</th>
                       <th className="py-2 pr-4 font-semibold">Inodes</th>
-                      {showDelete&&<th className="py-2 pr-4 font-semibold">Delete unused volume</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -206,9 +215,7 @@ export default function VolumesPage() {
                               : (claim ? claim.provisionedStorage ?? claim.requestedStorage : pv?.capacityStorage) ?? null}
                             href={claim && space !== null ? graphLink(prometheusUrl, claim, "kubelet_volume_stats_(used|capacity)_bytes") : null}
                           />
-                          {claim?.requestedStorage && claim.provisionedStorage && claim.requestedStorage !== claim.provisionedStorage && (
-                            <div className="text-xs text-status-minor-label">resizing to {claim.requestedStorage}</div>
-                          )}
+                          {claim && <VolumeResizeStatus claim={claim} />}
                         </td>
                         <td className="py-2 pr-4">
                           <Meter
@@ -217,13 +224,7 @@ export default function VolumesPage() {
                             href={claim && inodes !== null ? graphLink(prometheusUrl, claim, "kubelet_volume_stats_inodes(_used)?") : null}
                           />
                         </td>
-                        {showDelete&&<td className="max-w-xl py-2 pr-4">{(() => {
-                          const podsUnknown = state.volumes.degraded.some(d => /pods/i.test(d.source))
-                          const unused = claim ? !podsUnknown && claim.usedBy.length === 0 : !!pv && (!pv.claim || pv.phase === "Released")
-                          if (!unused) return <span className="text-xs text-muted-foreground">{podsUnknown ? "Pod usage unavailable" : "In use or binding unverified"}</span>
-                          const command = volumeCommands({claim, persistentVolume:pv, storageClass:null, claimState:claim?"exists":pv?.claim?"missing":"unbound", warnings:[]}, "", connection)
-                          return command?.remove ? <><p className="mb-2 text-xs text-muted-foreground">{claim ? "No Pods reference this PVC." : "Unclaimed PV."} Reclaim policy: {pv?.reclaimPolicy ?? classes.get(claim?.storageClass??"")?.reclaimPolicy ?? "unknown"}.</p><CommandSnippet title={`Delete ${command.target}`} command={command.remove} open/></> : null
-                        })()}</td>}
+
                       </tr>
                     ))}
                   </tbody>
@@ -232,7 +233,7 @@ export default function VolumesPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

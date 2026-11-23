@@ -24,7 +24,6 @@ type Judgement struct {
 	Reason  string  `json:"reason,omitempty"`
 }
 
-// Judge decides access questions.
 type Judge interface {
 	MayPerform(ctx context.Context, id Identity, attrs Attributes) Judgement
 }

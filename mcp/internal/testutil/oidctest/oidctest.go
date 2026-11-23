@@ -70,7 +70,6 @@ func (i *Issuer) Token(t testing.TB, sub, audience string, extra map[string]any)
 	return raw
 }
 
-// BearerClient returns an HTTP client that sends token on every request.
 func BearerClient(token string) *http.Client {
 	return &http.Client{Transport: bearer{token: token}}
 }

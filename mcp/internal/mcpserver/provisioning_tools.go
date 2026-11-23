@@ -85,15 +85,10 @@ func addProvisioningTools(s *mcp.Server, svc *service.Service, m auth.Mapping, l
 	p := provisioningTools{svc: svc, mapping: m, logger: logger}
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "describe_provisioning_platform",
-		Title:       "Describe the provisioning platform",
-		InputSchema: noArguments(),
-		Description: "Use for an initial interpreted overview when planning provisioning or choosing platform capabilities. Returns cluster facts for provisioning: storage classes and what each implies for data, zones and " +
-			"schedulable nodes, priority classes, the published ingress domain and TLS advice, enforced admission " +
-			"policies and the tenant label they scope on, Kyverno policies, the network policy engine and whether " +
-			"the Prometheus operator is present. Everything is discovered from the cluster; an optional component " +
-			"that is absent degrades one fact rather than the answer. Read-only. For raw CRD and catalog listings " +
-			"use list_custom_resource_definitions, list_ingress_classes, list_cluster_issuers and list_priority_classes.",
+		Name:         "describe_provisioning_platform",
+		Title:        "Describe the provisioning platform",
+		InputSchema:  noArguments(),
+		Description:  "Platform facts for provisioning: storage classes, zones, priority classes, ingress domain and TLS, admission and Kyverno policies, network policy engine and Prometheus operator.",
 		OutputSchema: schemaFor[*service.Platform](),
 		Annotations:  readOnly("Describe the provisioning platform"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, *service.Platform, error) {
@@ -109,13 +104,9 @@ func addProvisioningTools(s *mcp.Server, svc *service.Service, m auth.Mapping, l
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_offerings",
-		Title: "List provisionable offerings",
-		Description: "Use to choose a supported database, cache, queue or object-store offering; supply offering to narrow the catalog and namespace to check creation permissions. Returns each offering with whether it is " +
-			"actually available on this cluster and, when it is not, why, plus the admission defaults that " +
-			"rewrite its resources on create, each with what its policy says it requires. Presets describe sizing intent, not configured replica counts, placement or backups; discover applicable policies before selecting those settings. With `namespace`, each offering also " +
-			"carries whether the cluster authorizer lets you create it there, checked as the verified caller for " +
-			"every resource the offering needs, with enforced admission policies considered. Read-only.",
+		Name:        "list_offerings",
+		Title:       "List provisionable offerings",
+		Description: "Database, cache, queue and object-store offerings with availability and the admission defaults that rewrite them. With namespace, whether the caller may create each there. Presets express sizing intent, not replicas or backups.",
 		InputSchema: inputSchema[listOfferingsInput](func(props map[string]*jsonschema.Schema) {
 			props["offering"].Enum = enumOf(provisioning.OfferingIDs)
 			namespaceProperty(props["namespace"])
@@ -136,15 +127,9 @@ func addProvisioningTools(s *mcp.Server, svc *service.Service, m auth.Mapping, l
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "describe_namespace_readiness",
-		Title: "Describe namespace readiness",
-		Description: "Use before provisioning in known namespaces to assess readiness and constraints. Pass only relevant namespaces; add offering for an offering-specific creation check. Returns quota and remaining headroom, LimitRange defaults, network posture and " +
-			"any policies that select on an exact instance name, Pod Security enforcement, the hostnames the " +
-			"namespace may claim, any container registry published from the namespace with the skaffold.env " +
-			"to build against it, and your access there as the cluster authorizer reports it (per resource type " +
-			"as a plain creatableResources array, without a permission matrix). With `offering`, whether you " +
-			"may create that offering there. Namespaces where you may not list pods are withheld, not empty. " +
-			"Read-only.",
+		Name:        "describe_namespace_readiness",
+		Title:       "Describe namespace readiness",
+		Description: "Per namespace: quota headroom, LimitRange defaults, network posture, Pod Security, claimable hostnames, published registry and creatable resources. With offering, whether it may be created there.",
 		InputSchema: inputSchema[readinessInput](func(props map[string]*jsonschema.Schema) {
 			ns := props["namespaces"]
 			ns.Types, ns.Type = nil, "array"
@@ -182,14 +167,9 @@ func addProvisioningTools(s *mcp.Server, svc *service.Service, m auth.Mapping, l
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "check_access",
-		Title: "Check one permission",
-		Description: "Use before a specific operation to check authorization; namespace visibility alone is insufficient. Supply API group, plural resource name and verb (plus namespace/name when applicable). Asks the cluster authorizer, as the verified caller, whether the operation is allowed: " +
-			"any group and resource, cluster-scoped or in a namespace, subresources such as pods/log, a named " +
-			"object. Discovered enforced admission constraints are reported alongside; an " +
-			"RBAC yes does not guarantee that create, update or delete will pass admission, including conditions this tool cannot evaluate. For create and update it also lists the mutating admission " +
-			"policies that rewrite the object, with what each says it requires, such as a Secret to provision first. " +
-			"Use it for anything outside the offering catalog. Read-only.",
+		Name:        "check_access",
+		Title:       "Check one permission",
+		Description: "Whether the caller may perform a verb on a resource, plus the admission policies that constrain or mutate it.",
 		InputSchema: inputSchema[checkAccessInput](func(props map[string]*jsonschema.Schema) {
 			props["verb"].Enum = enumOf(checkVerbs)
 			props["group"].MaxLength = jsonschema.Ptr(253)

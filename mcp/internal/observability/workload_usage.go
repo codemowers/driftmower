@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // ResourceTriplet is current usage beside the summed requests and limits;
@@ -146,7 +147,7 @@ func (s *Service) WorkloadUsage(ctx context.Context, id authz.Identity, namespac
 			}
 		}
 
-		out = &WorkloadResources{Namespace: namespace, Volumes: []ClaimUsage{}, QOSBreakdown: []QOSCount{}, Warnings: orEmpty(warnings)}
+		out = &WorkloadResources{Namespace: namespace, Volumes: []ClaimUsage{}, QOSBreakdown: []QOSCount{}, Warnings: nonnil.Slice(warnings)}
 		sum := func(dst **float64, v *float64) {
 			if v != nil {
 				if *dst == nil {

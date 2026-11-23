@@ -1,4 +1,5 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
 
 import CapabilitiesPage from "@/app/provisioning/components/capabilities-page"
 import OfferingList from "@/app/provisioning/components/offering-list"
@@ -7,7 +8,7 @@ import OfferingList from "@/app/provisioning/components/offering-list"
 // would accept at the API version it serves.
 export default function OperatorsPage() {
   return (
-    <CapabilitiesPage title="Operators" subtitle="Databases and other services this cluster runs operators for. Each sample is sized for trying something out: one replica, a small disk.">
+    <CapabilitiesPage icon={ICONS.operators} title="Operators" subtitle="Databases and other services this cluster runs operators for. Each sample is sized for trying something out: one replica, a small disk.">
       {({ capabilities }) => (
         <OfferingList
           offerings={capabilities.offerings.filter(o => o.availability.state === "ready")}

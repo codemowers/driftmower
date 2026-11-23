@@ -1,4 +1,5 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -17,9 +18,9 @@ export default function NetworkTopologyPage() {
   if (!data || !match) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Workload not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -28,7 +29,7 @@ export default function NetworkTopologyPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <NetworkTopologyClient
           uid={uid}
           kind={root?.kind ?? ""}
@@ -36,7 +37,7 @@ export default function NetworkTopologyPage() {
           namespace={root?.namespace ?? ""}
           name={root?.name ?? ""}
         />
-      </main>
+      </Page>
     </div>
   )
 }

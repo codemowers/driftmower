@@ -56,7 +56,6 @@ func KubernetesIdentity(c *Caller, m Mapping) (authz.Identity, error) {
 		return authz.Identity{}, ErrEmailUnverified
 	}
 
-	// The API server adds system:authenticated to every principal.
 	groups := []string{"system:authenticated"}
 	for _, g := range c.IdentityClaims.Groups {
 		if g = m.GroupsPrefix + g; !slices.Contains(groups, g) {

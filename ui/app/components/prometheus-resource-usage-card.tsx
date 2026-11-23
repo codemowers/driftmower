@@ -21,6 +21,7 @@ type CardMetrics = {
 }
 
 type Props = {
+  vertical?: boolean
   metrics: CardMetrics | null
   graphQueries: { memUsage: string; cpuUsage: string; volUsed?: string }
   emptyHint?: string
@@ -36,7 +37,7 @@ function nameSeries(expr: string, name: string): string {
   return `label_replace(${expr}, "__name__", "${name}", "", "")`
 }
 
-export default function PrometheusResourceUsageCard({ metrics, graphQueries, emptyHint, podCount, qosBreakdown }: Props) {
+export default function PrometheusResourceUsageCard({ metrics, graphQueries, emptyHint, podCount, qosBreakdown, vertical = false }: Props) {
   const prometheusUrl = useClusterState(s => s.prometheusUrl)
 
   if (!metrics) return null
@@ -89,9 +90,9 @@ export default function PrometheusResourceUsageCard({ metrics, graphQueries, emp
           <>
             {hasComputeUsage && (
               noBars ? (
-                <ComputeStats memory={metrics.memory} cpu={metrics.cpu} qosClass={qosInStrip ? metrics.qosClass : null} qosBreakdown={qosBreakdown} />
+                <ComputeStats vertical={vertical} memory={metrics.memory} cpu={metrics.cpu} qosClass={qosInStrip ? metrics.qosClass : null} qosBreakdown={qosBreakdown} />
               ) : (
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
+                <div className={cn("flex flex-col gap-4", !vertical && "md:flex-row md:items-start md:gap-8")}>
                   <ComputeBar kind="memory" data={metrics.memory} className="md:flex-1 md:min-w-0" />
                   <ComputeBar kind="cpu" data={metrics.cpu} className="md:flex-1 md:min-w-0" />
                 </div>
@@ -101,7 +102,7 @@ export default function PrometheusResourceUsageCard({ metrics, graphQueries, emp
             {metrics.volumes.length > 0 && (
               <div className={cn(hasComputeUsage && "mt-4")}>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Volumes</p>
-                <VolumeList volumes={metrics.volumes} />
+                <VolumeList volumes={metrics.volumes} vertical={vertical} />
               </div>
             )}
 
@@ -145,7 +146,7 @@ function statCellValue(metric: ResourceTriplet, fmt: (n: number) => string): str
     : fmt(metric.usage)
 }
 
-function ComputeStats({ memory, cpu, qosClass, qosBreakdown }: { memory: ResourceTriplet; cpu: ResourceTriplet; qosClass: string | null; qosBreakdown?: QosBreakdown }) {
+function ComputeStats({ memory, cpu, qosClass, qosBreakdown, vertical }: { vertical?: boolean; memory: ResourceTriplet; cpu: ResourceTriplet; qosClass: string | null; qosBreakdown?: QosBreakdown }) {
   const cells: { label: string; value: ReactNode }[] = [
     { label: "Memory", value: statCellValue(memory, formatBytes) },
     { label: "CPU", value: statCellValue(cpu, formatCores) },
@@ -153,11 +154,11 @@ function ComputeStats({ memory, cpu, qosClass, qosBreakdown }: { memory: Resourc
   if (qosClass) cells.push({ label: "QoS", value: withQosTooltip(<span>{qosClass}</span>, qosBreakdown) })
 
   return (
-    <div className="flex divide-x divide-gray-200">
+    <div className={cn("flex divide-gray-200", vertical ? "flex-col gap-3 divide-y" : "divide-x")}>
       {cells.map((cell, i) => (
         <div
           key={cell.label}
-          className={cn("flex flex-1 flex-col gap-1", i === 0 ? "pr-6" : i === cells.length - 1 ? "pl-6" : "px-6")}
+          className={cn("flex flex-1 flex-col gap-1", vertical ? (i > 0 && "pt-3") : i === 0 ? "pr-6" : i === cells.length - 1 ? "pl-6" : "px-6")}
         >
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{cell.label}</p>
           <p className="font-mono text-sm text-foreground">{cell.value}</p>
@@ -248,14 +249,14 @@ export function UsageBar({ usage, limit, request, fmt, height, markers = [] }: {
   )
 }
 
-function VolumeList({ volumes }: { volumes: PodVolume[] }) {
+function VolumeList({ volumes, vertical }: { volumes: PodVolume[]; vertical?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? volumes : volumes.slice(0, MAX_VISIBLE)
   const hidden = volumes.length - MAX_VISIBLE
 
   return (
     <div className="flex flex-col gap-2.5">
-      {visible.map(volume => <VolumeRow key={volume.name} volume={volume} />)}
+      {visible.map(volume => <VolumeRow key={volume.name} volume={volume} vertical={vertical} />)}
       {hidden > 0 && (
         <button
           onClick={() => setExpanded(v => !v)}
@@ -268,14 +269,14 @@ function VolumeList({ volumes }: { volumes: PodVolume[] }) {
   )
 }
 
-function VolumeRow({ volume }: { volume: PodVolume }) {
+function VolumeRow({ volume, vertical }: { volume: PodVolume; vertical?: boolean }) {
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-56 shrink-0 break-words font-mono text-xs text-foreground" title={volume.name}>
+    <div className={cn("flex gap-3", vertical ? "flex-col" : "items-center")}>
+      <span className={cn(!vertical && "w-56", "shrink-0 break-words font-mono text-xs text-foreground")} title={volume.name}>
         {softWrapText(volume.name)}
       </span>
-      <MetricBar value={volume.used} total={volume.capacity} className="flex-1" />
+      <MetricBar value={volume.used} total={volume.capacity} className={vertical ? undefined : "flex-1"} />
       <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
         {formatBytes(volume.used)} / {formatBytes(volume.capacity)}
       </span>

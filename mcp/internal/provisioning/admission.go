@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // ValidatingAdmissionPolicies override RBAC: a caller whose role covers
@@ -18,7 +20,6 @@ import (
 // or Warn does not block. Scope and exemptions are read from the shape of the
 // expressions, never by evaluating them.
 
-// ResourceRule is one matchConstraints.resourceRules entry.
 type ResourceRule struct {
 	APIGroups   []string `json:"apiGroups,omitempty"`
 	APIVersions []string `json:"apiVersions,omitempty"`
@@ -33,7 +34,6 @@ type Expression struct {
 	MessageExpression string `json:"messageExpression,omitempty"`
 }
 
-// AdmissionPolicy is the part of a ValidatingAdmissionPolicy read here.
 type AdmissionPolicy struct {
 	Name            string
 	Annotations     map[string]string
@@ -59,7 +59,6 @@ func (s *LabelSelector) selectsSomething() bool {
 	return s != nil && (len(s.MatchLabels) > 0 || len(s.MatchExpressions) > 0)
 }
 
-// AdmissionBinding is the part of a ValidatingAdmissionPolicyBinding read here.
 type AdmissionBinding struct {
 	PolicyName string
 	// Nil means validationActions was omitted, which defaults to Deny.
@@ -393,7 +392,7 @@ func ToAdmissionFacts(policies []AdmissionPolicy, bindings []AdmissionBinding) [
 			ref = &bound[0]
 		}
 		if ref != nil {
-			paramRef = &ParamRef{Name: ref.ParamRefName, Namespace: strOrNil(ref.ParamRefNamespace)}
+			paramRef = &ParamRef{Name: ref.ParamRefName, Namespace: nonnil.String(ref.ParamRefNamespace)}
 		}
 
 		facts = append(facts, AdmissionPolicyFact{
@@ -402,7 +401,7 @@ func ToAdmissionFacts(policies []AdmissionPolicy, bindings []AdmissionBinding) [
 			Enforcement:                enforcement,
 			Guards:                     guardsOf(p.ResourceRules, p.MatchPolicy),
 			Messages:                   messagesOf(p),
-			Description:                strOrNil(foldSpace(p.Annotations["kubernetes.io/description"])),
+			Description:                nonnil.String(foldSpace(p.Annotations["kubernetes.io/description"])),
 			ScopedToNamespaceLabels:    scoping,
 			BindingLabelKeys:           labelKeys,
 			BindingSelectors:           selectors,
@@ -460,7 +459,6 @@ func SelectorMatches(s LabelSelector, labels map[string]string) bool {
 }
 
 func scopeApplies(f AdmissionPolicyFact, labels map[string]string) bool {
-	// The API server labels every namespace with its own name.
 	if name := labels["kubernetes.io/metadata.name"]; name != "" {
 		if f.NamespaceNames.Only != nil && !slices.Contains(f.NamespaceNames.Only, name) {
 			return false
@@ -489,7 +487,6 @@ func scopeApplies(f AdmissionPolicyFact, labels map[string]string) bool {
 	return true
 }
 
-// Operation is one request an admission policy might govern.
 type Operation struct {
 	Group     string
 	Resource  string
@@ -598,7 +595,7 @@ func (f AdmissionPolicyFact) Projection() AdmissionFact {
 		Enforced:                f.Enforced,
 		Enforcement:             f.Enforcement,
 		Guards:                  f.Guards,
-		Messages:                orEmpty(f.Messages),
+		Messages:                nonnil.Slice(f.Messages),
 		Description:             f.Description,
 		ScopedToNamespaceLabels: f.ScopedToNamespaceLabels,
 	}

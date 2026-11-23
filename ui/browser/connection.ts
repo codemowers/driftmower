@@ -1,24 +1,26 @@
+import { inspect, inspecting } from "@/lib/features/inspector/store"
 import { chooseChromeProfile } from "./chrome-profile-prompt"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 // The default validator compiles schemas with new Function, which the
 // dashboard's Content-Security-Policy (no unsafe-eval) forbids.
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker"
-import { ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
+import { type Tool, ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
 import { InMemoryWebStorage,UserManager,WebStorageStateStore,type User } from "oidc-client-ts"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
 import { connectionForEndpoint, type KubeconfigConnection } from "@/lib/kubernetes/contexts"
 import { navigate } from "./navigation"
+import { loginDestination, loginCallbackDestination } from "@/lib/connection/login-return"
 import { connectionTitle } from "@/lib/kubernetes/labels"
 import { fetchWithContext, mcpOperation, requestError } from "@/lib/http/request"
 export { contextTitle } from "@/lib/kubernetes/labels"
-import { connectionProgress, useConnectionProgress } from "@/lib/connection/progress"
+import { connectionProgress, connectionStage, useConnectionProgress } from "@/lib/connection/progress"
 export { connectionProgress, restoreConnectionProgress, useConnectionProgress } from "@/lib/connection/progress"
 
 export type ClusterEndpoint = { name: string; url: string; contextKey?: string; authMethod?: string; portForward?:boolean }
 export type ClientConfig = { authMode?: "oidc"; clientId: string; issuer: string; resource: string; scopes: string[] } | { authMode:"anonymous" }
 export type ChromeProfile = {directory:string;name:string}
-export type DashboardConfig = { chromeProfilesEnabled?:boolean;chromeProfiles?:ChromeProfile[];chromeProfilesError?:string;kubeContext?: string;  mcpUrl?: string; clusters?: ClusterEndpoint[]; discoveryEnabled?: boolean; contexts?: KubeconfigConnection[] }
+export type DashboardConfig = { configUpdates?:boolean;discoveryError?:string; chromeProfilesEnabled?:boolean;chromeProfiles?:ChromeProfile[];chromeProfilesError?:string;kubeContext?: string;  mcpUrl?: string; clusters?: ClusterEndpoint[]; discoveryEnabled?: boolean; contexts?: KubeconfigConnection[] }
 let dashboardConfig: Promise<DashboardConfig> | null = null
 let configLoading = false
 export function deploymentConfig(refresh = false): Promise<DashboardConfig> {
@@ -38,6 +40,60 @@ export function deploymentConfig(refresh = false): Promise<DashboardConfig> {
   }).catch(error => { dashboardConfig = null; throw error }).finally(() => { configLoading = false })
   return dashboardConfig
 }
+type ConfigListener = { update: (config: DashboardConfig) => void; error?: (error: Error) => void }
+const configListeners = new Set<ConfigListener>()
+let configEvents: EventSource | null = null
+let nativeConfigEvents = false
+let configRefreshTimer: ReturnType<typeof setTimeout> | undefined
+let configRefreshing = false, configChanged = false
+async function refreshDesktopConfig() {
+  if (configRefreshing) { configChanged = true; return }
+  configRefreshing = true
+  try {
+    do {
+      configChanged = false
+      const config = await deploymentConfig(true)
+      for (const listener of configListeners) listener.update(config)
+    } while (configChanged && configListeners.size)
+  } catch (error) { for (const listener of configListeners) listener.error?.(error instanceof Error ? error : new Error(String(error))) }
+  finally { configRefreshing = false }
+}
+
+function closeConfigEvents() { configEvents?.close(); configEvents = null; clearTimeout(configRefreshTimer) }
+function openConfigEvents() {
+  if (!nativeConfigEvents || !configListeners.size || configEvents) return
+  configEvents = new EventSource("/api/desktop/events")
+  configEvents.onmessage = () => {
+    clearTimeout(configRefreshTimer)
+    configRefreshTimer = setTimeout(() => { void refreshDesktopConfig() }, 25)
+  }
+}
+
+// One native event stream per browser window, shared by Settings and navigation.
+// Messages invalidate the config snapshot; no interval polls the local server.
+export function subscribeDesktopConfig(update: ConfigListener["update"], error?: ConfigListener["error"]) {
+  const listener = { update, error }; configListeners.add(listener)
+  if (configListeners.size === 1) {
+    window.addEventListener("pagehide", closeConfigEvents)
+    window.addEventListener("pageshow", openConfigEvents)
+  }
+  void deploymentConfig().then(config => {
+    if (!configListeners.has(listener)) return
+    update(config)
+    nativeConfigEvents = config.configUpdates === true
+    if (nativeConfigEvents) openConfigEvents()
+    else closeConfigEvents()
+  }).catch(reason => { if (configListeners.has(listener)) error?.(reason instanceof Error ? reason : new Error(String(reason))) })
+  return () => {
+    configListeners.delete(listener)
+    if (!configListeners.size) {
+      closeConfigEvents()
+      window.removeEventListener("pagehide", closeConfigEvents)
+      window.removeEventListener("pageshow", openConfigEvents)
+    }
+  }
+}
+
 let client: Client | null = null
 let manager: UserManager | null = null
 let anonymousEndpoint: string | null = null
@@ -76,32 +132,40 @@ export async function loginToEndpoint(url: string, contextKey?: string) {
   if(useConnectionProgress.getState().target)return
   const known = connectionForEndpoint(useKubeconfigState.getState().connections, url, contextKey)
   connectionProgress(url || contextKey || "cluster", true, connectionTitle(known, url))
-  navigate("/executive-summary")
+  const operation=useConnectionProgress.getState().operation
+  connectionStage("reading desktop connection configuration", "/dashboard-config.json", operation)
+  const destination=loginDestination(location.pathname+location.search+location.hash,location.origin)
+  if(destination!==location.pathname+location.search+location.hash)navigate(destination)
   try {
     const config=await deploymentConfig()
     let selected=connectionForEndpoint(config.contexts??[],url,contextKey)
     if(config.chromeProfilesEnabled&&selected){
+      connectionStage("checking the Chrome profile",undefined,operation)
       selected=await ensureChromeProfile(selected.key)
       if(!selected){connectionProgress(null);return}
     }
     if (config.chromeProfilesEnabled && selected?.chromeProfile && selected.chromeProfile.directory!==currentChromeProfile()) {
-      const response=await fetchWithContext("Open Chrome profile", "/api/desktop/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:selected.key})})
+      connectionStage("opening the selected Chrome profile","/api/desktop/connect",operation)
+      const response=await fetchWithContext("Open Chrome profile", "/api/desktop/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:selected.key,returnTo:destination})})
       if (!response.ok) throw new Error((await response.text()).trim() || "Could not open Chrome profile")
       connectionProgress(null)
       return selected.chromeProfile.name
     }
     if(selected&&selected.status!=="available"){
       sessionStorage.setItem("driftmower.pending-connect",selected.key)
+      connectionStage("retrying Kubernetes discovery",selected.apiServer ?? "/api/desktop/retry",operation)
       const retry=await fetchWithContext("Retry desktop connection", "/api/desktop/retry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:selected.key})})
       if(!retry.ok)throw new Error((await retry.text()).trim() || "Could not retry the connection")
+      connectionStage("waiting for Kubernetes to discover the MCP endpoint",selected.apiServer,operation)
       return
     }
+    connectionStage("closing the previous MCP connection",undefined,operation)
     await client?.close()
     client = null; connection = null; manager = null; anonymousEndpoint = null
     localStorage.setItem("driftmower.selected", url)
     sessionStorage.setItem("driftmower.selected", url)
     selectKubeconfigContext(url, contextKey)
-    await login()
+    await login(destination)
   } catch(error) {
     connectionProgress(null)
     useConnectionProgress.setState({error:error instanceof Error ? error.message : String(error)})
@@ -139,9 +203,11 @@ export async function saveChromeProfile(key:string,directory:string) {
   return deploymentConfig(true)
 }
 export async function configure(): Promise<UserManager | null> {
+  const operation=useConnectionProgress.getState().operation
   if (manager) return manager
   const endpoint = await selectedEndpoint()
   if (anonymousEndpoint === endpoint) return null
+  connectionStage("loading MCP authentication configuration",new URL("/api/client-config",endpoint).href,operation)
   const response = await fetchWithContext("Load MCP authentication configuration", new URL("/api/client-config", endpoint))
   if (!response.ok) throw requestError(new Error(`HTTP ${response.status}`), "Load MCP authentication configuration", new URL("/api/client-config", endpoint), "GET")
   const config: ClientConfig = await response.json()
@@ -169,17 +235,18 @@ export async function kubernetesSignIn(context: string): Promise<void> {
   const response = await fetchWithContext("Kubernetes sign-in", "/api/kubernetes-sign-in", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) })
   if (!response.ok) throw new Error((await response.text()).trim() || `Kubernetes sign-in failed (${response.status})`)
 }
-export async function login() {
+export async function login(returnTo=location.pathname+location.search+location.hash) {
+  const destination=loginDestination(returnTo,location.origin)
   const auth = await configure()
-  if (auth) { try { await auth.signinRedirect() } catch (error) { throw requestError(error, "OIDC sign-in", auth.settings.authority) } }
-  else location.assign("/executive-summary")
+  if (auth) { connectionStage("waiting for OIDC sign-in",auth.settings.authority); try { await auth.signinRedirect({state:{returnTo:destination}}) } catch (error) { throw requestError(error, "OIDC sign-in", auth.settings.authority) } }
+  else location.assign(destination)
 }
 export async function logout() {
   connectionProgress(null)
   await client?.close(); client = null; connection = null
   await manager?.removeUser()
   anonymousEndpoint = null
-  location.assign("/")
+  location.assign("/settings")
 }
 export async function user(): Promise<User | {profile:{sub:string;name:string;email?:string;groups:string[]};expired:false} | null> {
   const auth = await configure()
@@ -187,11 +254,17 @@ export async function user(): Promise<User | {profile:{sub:string;name:string;em
 }
 export async function finishLogin() {
   const auth = await configure()
-  if (auth) { try { await auth.signinRedirectCallback() } catch (error) { throw requestError(error, "OIDC callback/token exchange", auth.settings.authority) } }
-  history.replaceState(null, "", "/executive-summary")
+  let state:unknown
+  if (auth) {
+    connectionStage("completing OIDC sign-in",auth.settings.authority)
+    try { state=(await auth.signinRedirectCallback()).state }
+    catch (error) { throw requestError(error, "OIDC callback/token exchange", auth.settings.authority) }
+  }
+  navigate(loginCallbackDestination(state,location.origin),true)
 }
 export async function connect(): Promise<Client> {
   if (connection) return connection
+  const operation=useConnectionProgress.getState().operation
   connection = (async () => {
     const auth = await configure()
     const token = await auth?.getUser()
@@ -221,28 +294,61 @@ export async function connect(): Promise<Client> {
       },
     })
     const next = new Client({ name: "driftmower-dashboard", version: "1" }, { jsonSchemaValidator: new CfWorkerJsonSchemaValidator() })
+    connectionStage("initializing the MCP session",endpoint,operation)
     try { await next.connect(transport) } catch (error) { throw requestError(error, "Connect to MCP", endpoint) }
     client = next
     return next
   })().catch(error => { connection = null; throw error })
   return connection
 }
-// Names of the tools the connected MCP server offers; optional features are
-// registered only when enabled on the server.
+// Discover the live catalog through the selected connection; no response cache.
+// The tool list is fixed for a server session, so one listing serves every
+// caller until the connection is replaced.
+let toolCache: { connection: Promise<Client>; tools: Promise<Tool[]> } | undefined
+export async function listMcpTools(): Promise<Tool[]> {
+  const session = await connect()
+  if (toolCache?.connection !== connection) {
+    const tools = (async () => {
+      const out: Tool[] = []
+      let cursor: string | undefined
+      do {
+        const page = await session.listTools(cursor ? { cursor } : {})
+        out.push(...page.tools)
+        cursor = page.nextCursor
+      } while (cursor)
+      return out
+    })()
+    const entry = { connection: connection!, tools }
+    toolCache = entry
+    tools.catch(() => { if (toolCache === entry) toolCache = undefined })
+  }
+  return toolCache.tools
+}
+
+// Optional features are registered only when enabled on the server.
 export async function toolNames(): Promise<Set<string>> {
-  const names = new Set<string>()
-  let cursor: string | undefined
-  do {
-    const page = await (await connect()).listTools(cursor ? { cursor } : {})
-    page.tools.forEach(tool => names.add(tool.name))
-    cursor = page.nextCursor
-  } while (cursor)
-  return names
+  return new Set((await listMcpTools()).map(tool => tool.name))
 }
 export async function callTool<T>(name: string, args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  const done = inspect({ kind: "tool", name, args })
+  try {
+    const result = await callToolUninspected<T>(name, args, signal)
+    if (inspecting()) done({ status: "ok", response: result, bytes: JSON.stringify(result).length })
+    return result
+  } catch (error) {
+    done({ status: "error", error: (error as Error).message })
+    throw error
+  }
+}
+async function callToolUninspected<T>(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+  const operation=useConnectionProgress.getState().operation
   const endpoint = await selectedEndpoint()
   let result
-  try { result = await (await connect()).callTool({ name, arguments: args }, undefined, { signal }) } catch (error) { throw requestError(error, `MCP tool ${name}`, endpoint, "POST") }
+  try {
+    const session = await connect()
+    if(name==="get_inventory_status")connectionStage("waiting for MCP inventory status",endpoint,operation)
+    result = await session.callTool({ name, arguments: args }, undefined, { signal })
+  } catch (error) { throw requestError(error, `MCP tool ${name}`, endpoint, "POST") }
   if (result.isError) throw new Error(`${name}: ${(result.content as { text?: string }[]).map(part => part.text || "").join("\n")}`)
   if (result.structuredContent) return result.structuredContent as T
   throw new Error(`${name} returned no structured data`)
@@ -251,6 +357,22 @@ export async function callTool<T>(name: string, args: Record<string, unknown> = 
 // Fetch a non-MCP browser resource from the selected MCP server using the same
 // audience-bound bearer as MCP calls (for example provisioning capabilities).
 export async function fetchMcp(path: string, init: RequestInit = {}): Promise<Response> {
+  const done = inspect({ kind: "http", name: path, method: init.method ?? "GET", body: typeof init.body === "string" ? init.body : undefined })
+  try {
+    const response = await fetchMcpUninspected(path, init)
+    if (inspecting()) {
+      const text = await response.clone().text()
+      let body: unknown = text.length > 2_000_000 ? `${text.length} bytes, body not kept` : text
+      if (text.length <= 2_000_000) try { body = JSON.parse(text) } catch { /* Not JSON; keep the text. */ }
+      done({ status: String(response.status), bytes: text.length, response: body })
+    }
+    return response
+  } catch (error) {
+    done({ status: "error", error: (error as Error).message })
+    throw error
+  }
+}
+async function fetchMcpUninspected(path: string, init: RequestInit): Promise<Response> {
   const auth = await configure()
   if (!auth) {
     const headers = new Headers(init.headers)

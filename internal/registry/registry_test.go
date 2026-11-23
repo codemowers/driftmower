@@ -78,8 +78,8 @@ func TestHierarchyPreservesEveryBoundaryAlternativesAndPlatforms(t *testing.T) {
 	if got := restored.Hierarchy(target); len(got.Stages) != 2 {
 		t.Fatalf("hierarchy did not survive restart: %+v", got)
 	}
-	page, ok := restored.Page("docker.io/library/python", 0, 50, sha256Digest([]byte("python")))
-	if !ok || page.Total != 1 {
+	page, ok := restored.Repository("docker.io/library/python", sha256Digest([]byte("python")))
+	if !ok || len(page.Images) != 1 {
 		t.Fatal("manifest lookup failed")
 	}
 }
@@ -285,7 +285,7 @@ func TestAPIAuthenticationConfigDownloadAndValidation(t *testing.T) {
 	for _, tc := range []struct {
 		path, token string
 		want        int
-	}{{"/v1/repositories", "", 401}, {"/v1/repository?name=missing&offset=-1", "mcp-token", 400}, {"/v1/configs/invalid", "mcp-token", 400}, {"/v1/configs/" + digest + "?encoding=base64", "mcp-token", 200}} {
+	}{{"/v1/repositories", "", 401}, {"/v1/repository?name=missing&digest=bad", "mcp-token", 400}, {"/v1/configs/invalid", "mcp-token", 400}, {"/v1/configs/" + digest + "?encoding=base64", "mcp-token", 200}} {
 		r := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		if tc.token != "" {
 			r.Header.Set("Authorization", "Bearer "+tc.token)

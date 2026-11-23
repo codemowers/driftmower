@@ -1,14 +1,14 @@
 import PrefetchLink from "@/app/components/prefetch-link"
-import { Map, ArrowRight } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 import { chartDrift } from "@/lib/features/helm-releases/chart-versions"
 import { SEVERITY_STYLE, isNoData } from "@/lib/cluster/styles/status-style"
 
 const CARD_BASE =
-  "flex items-center gap-5 rounded-xl border border-gray-200 bg-white px-5 py-4"
+  "flex items-center gap-5 px-5 py-4"
 const CARD_INTERACTIVE =
-  "group transition-colors hover:border-brand/40 hover:bg-brand-bg/30"
+  "group transition-colors hover:bg-brand-bg/30"
 
 function DriftIndicator({ releaseInfo }: { releaseInfo: ReleaseInfo }) {
   const deployed = releaseInfo.chartSourceVersion ?? releaseInfo.chartVersion
@@ -39,14 +39,9 @@ export default function ChartCard({ releaseInfo, href }: { releaseInfo: ReleaseI
   const chartName = releaseInfo.chartName ?? releaseInfo.name
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Helm Chart
-      </p>
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Helm Chart</h2>
       <PrefetchLink href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
-          <Map className="size-6" strokeWidth={2} />
-        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-foreground">{chartName}</p>
@@ -63,6 +58,6 @@ export default function ChartCard({ releaseInfo, href }: { releaseInfo: ReleaseI
           <ArrowRight className="size-4 text-muted-foreground transition-colors group-hover:text-brand-text" />
         </div>
       </PrefetchLink>
-    </div>
+    </section>
   )
 }

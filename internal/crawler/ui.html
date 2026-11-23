@@ -142,6 +142,7 @@ function badges(source) {
   const counts = severityCounts(source)
   const out = [...severities, 'possible'].filter(key => counts[key]).map(key => el('span', { class: `badge ${key}` }, `${counts[key]} ${key}`))
   if (!source.checkedAt) out.push(el('span', { class: 'badge pending' }, 'pending'))
+  else if (source.unauthorized) out.push(el('span', { class: 'badge error', title: (source.errors ?? []).join('\n') }, 'Unauthorized'))
   else if (source.errors?.length) out.push(el('span', { class: 'badge error' }, `${source.errors.length} error${source.errors.length > 1 ? 's' : ''}`))
   return el('span', { class: 'badges' }, out)
 }

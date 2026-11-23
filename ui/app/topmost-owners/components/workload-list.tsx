@@ -9,6 +9,8 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { useContextHref, type LinkTo } from "@/lib/hooks/use-context-href"
 import WorkloadFilters from "./workload-filters"
+import { compareIssues, issueLabel, type WorkloadIssue } from "@/lib/cluster/issues"
+import IssueIndicator from "@/app/components/issue-indicator"
 import { isFinished, isDownscaled } from "../workload-lifecycle"
 import type { FocusDefinition, WorkloadEntry } from "../focus/types"
 
@@ -79,6 +81,7 @@ function WorkloadRow({
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-semibold text-foreground truncate">{name}</span>
+          <IssueIndicator issues={entry.issues} />
         </div>
         <span className="font-mono text-xs text-muted-foreground">{namespace}</span>
         {repoHint.length > 0 && (
@@ -117,7 +120,7 @@ function WorkloadRow({
       </div>
 
       {entry.orphan === "bucket"
-        ? <span className="col-span-3 text-sm text-muted-foreground">{entry.orphanSummary}</span>
+        ? <span className="col-span-2 text-sm text-muted-foreground">{entry.orphanSummary}</span>
         : focus.renderCells(entry)}
     </>
   )
@@ -147,7 +150,7 @@ export default function WorkloadList({
   const { linkTo } = useContextHref()
   const initialTokens = parseFilterTokens(searchParams.get("filters"))
   const [activeTokens, setActiveTokens] = useState<Set<string>>(
-    () => new Set([...initialTokens].filter(t => focus.scale.some(l => l.token === t))),
+    () => new Set([...initialTokens].filter(t => focus.scale.some(l => l.token === t) || t.startsWith("issue:"))),
   )
   const [showDownscaled, setShowDownscaled] = useState(() => initialTokens.has("showdownscaled"))
   const [showFinished, setShowFinished] = useState(() => initialTokens.has("showfinished"))
@@ -159,7 +162,7 @@ export default function WorkloadList({
   useEffect(() => {
     if (!syncUrl) return
     const filters = [
-      ...focus.scale.filter(l => activeTokens.has(l.token)).map(l => l.token),
+      ...activeTokens,
       ...(showFinished ? ["showfinished"] : []),
       ...(showDownscaled ? ["showdownscaled"] : []),
       ...(hideHelmManaged ? ["hidehelm"] : []),
@@ -210,9 +213,9 @@ export default function WorkloadList({
   const sortedEntries = useMemo(() => [...entries].sort(focus.compare), [entries, focus])
 
   const activeScale = focus.scale.filter(l => activeTokens.has(l.token))
+  const issueTokens = [...activeTokens].filter(t => t.startsWith("issue:")).map(t => t.slice(6))
   const q = searchQuery.toLowerCase()
   const filteredEntries = sortedEntries
-    .filter(e => activeScale.length === 0 || activeScale.some(l => l.match(e)))
     .filter(e => showFinished || !isFinished(e))
     .filter(e => showDownscaled || !isDownscaled(e))
     .filter(e => !hideHelmManaged || e.manager.kind !== "helm")
@@ -220,19 +223,37 @@ export default function WorkloadList({
     .filter(e => !hideOrphaned || !e.orphan)
     .filter(e => q === "" || matchesIdentity(e, q) || matchingRepos(e, q).length > 0)
 
-  if (q !== "") {
-    filteredEntries.sort((a, b) => Number(matchesIdentity(b, q)) - Number(matchesIdentity(a, q)))
+  const issueKinds = new Map<string, { issue: WorkloadIssue; count: number }>()
+  for (const entry of filteredEntries) {
+    const seen = new Set<string>()
+    for (const issue of entry.issues ?? []) {
+      if (seen.has(issue.code)) continue
+      seen.add(issue.code)
+      const previous = issueKinds.get(issue.code)
+      issueKinds.set(issue.code, { issue: previous && compareIssues(previous.issue, issue) < 0 ? previous.issue : issue, count: (previous?.count ?? 0) + 1 })
+    }
   }
+  // Keep selected badges visible when another filter removes their matches.
+  for (const code of issueTokens) {
+    if (!issueKinds.has(code)) issueKinds.set(code, { issue: { code, severity: "info", message: issueLabel(code) }, count: 0 })
+  }
+  const issueChips = [...issueKinds.values()].sort((a, b) => compareIssues(a.issue, b.issue)).map(({ issue, count }) => ({
+    token: `issue:${issue.code}`, label: issueLabel(issue.code), severity: issue.severity, count,
+  }))
+  const displayedEntries = filteredEntries.filter(e =>
+    (activeScale.length === 0 || activeScale.some(l => l.match(e))) &&
+    (issueTokens.length === 0 || e.issues?.some(i => issueTokens.includes(i.code))))
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white">
       <WorkloadFilters
         total={entries.length}
-        filtered={filteredEntries.length}
+        filtered={displayedEntries.length}
         isModified={isModified}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         chips={focus.scale}
+        issueChips={issueChips}
         activeTokens={activeTokens}
         onTokenToggle={handleTokenToggle}
         showDownscaled={showDownscaled}
@@ -257,8 +278,8 @@ export default function WorkloadList({
         ))}
       </header>
       <div className="divide-y divide-gray-100">
-        {filteredEntries.length > 0 ? (
-          filteredEntries.map(entry => (
+        {displayedEntries.length > 0 ? (
+          displayedEntries.map(entry => (
             <WorkloadRow
               key={entry.groupKey}
               entry={entry}

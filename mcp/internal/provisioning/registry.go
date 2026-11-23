@@ -65,7 +65,6 @@ func FindRegistries(deployments []RegistryDeployment, services []RegistryService
 			continue
 		}
 		for _, s := range services {
-			// A Service without a selector routes to nothing on its own.
 			if s.Name == "" || len(s.Selector) == 0 {
 				continue
 			}
@@ -88,9 +87,9 @@ func FindRegistries(deployments []RegistryDeployment, services []RegistryService
 						Kind:       "zot",
 						Host:       rule.Host,
 						TLS:        slices.Contains(ing.TLSHosts, rule.Host),
-						Deployment: orUnnamed(d.Name),
+						Deployment: OrUnnamed(d.Name),
 						Service:    s.Name,
-						Ingress:    orUnnamed(ing.Name),
+						Ingress:    OrUnnamed(ing.Name),
 					})
 				}
 			}
@@ -101,7 +100,7 @@ func FindRegistries(deployments []RegistryDeployment, services []RegistryService
 	return found
 }
 
-func orUnnamed(name string) string {
+func OrUnnamed(name string) string {
 	if name == "" {
 		return "(unnamed)"
 	}

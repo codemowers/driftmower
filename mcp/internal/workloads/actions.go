@@ -227,9 +227,6 @@ func (a *Actions) Terminate(ctx context.Context, t Target, id authz.Identity) (*
 	if err != nil {
 		return nil, err
 	}
-	if len(obj.GetOwnerReferences()) > 0 {
-		return nil, errors.New("only standalone pods may be terminated; this pod has an owner")
-	}
 	if _, mirror := obj.GetAnnotations()["kubernetes.io/config.mirror"]; mirror {
 		return nil, errors.New("static mirror pods cannot be terminated through this endpoint")
 	}
@@ -238,8 +235,11 @@ func (a *Actions) Terminate(ctx context.Context, t Target, id authz.Identity) (*
 		return nil, err
 	}
 
-	return &ActionResult{Target: t, Action: "terminate", Status: "requested",
-		Message: "Pod termination requested with its normal grace period. A standalone pod has no controller to recreate it."}, nil
+	message := "Pod deletion requested with its normal grace period. A standalone Pod has no controller to recreate it."
+	if len(obj.GetOwnerReferences()) > 0 {
+		message = "Pod deletion requested with its normal grace period. If applicable, its controller will attempt to create a replacement Pod."
+	}
+	return &ActionResult{Target: t, Action: "terminate", Status: "requested", Message: message}, nil
 }
 
 // OwnerRecord is what the dashboard shows of a custom-resource owner that

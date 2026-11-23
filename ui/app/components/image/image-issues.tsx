@@ -16,8 +16,8 @@ export default function ImageIssues({ issues }: { issues: Issue[] }) {
   const sorted = [...issues].sort((a, b) => a.type.localeCompare(b.type))
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="-mx-6 mb-4 border-b border-gray-200 px-6 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+      <p className="-mx-5 mb-4 border-b border-gray-200 px-5 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Issues
       </p>
 

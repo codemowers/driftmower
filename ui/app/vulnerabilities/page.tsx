@@ -1,16 +1,15 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
-import MarkdownText from "@/app/components/markdown-text"
 
 import { useMemo, useState } from "react"
 import PageHeader from "@/app/components/page-header"
 import PageLoading from "@/app/components/page-loading"
-import PrefetchLink from "@/app/components/prefetch-link"
+import VulnerabilityTable from "@/app/components/findings/vulnerability-table"
 import SeverityBadge from "@/app/components/image/severity-badge"
 import { FilterSearchInput } from "@/app/components/filter-bar"
 import { useClusterState } from "@/lib/cluster/cluster-state"
-import { useContextHref } from "@/lib/hooks/use-context-href"
-import { imagePath } from "@/lib/utils/image-artifacts"
 import { type VulnerabilitySeverity } from "@/lib/features/vulnerability"
 import { vulnerabilityRows } from "@/lib/features/vulnerability/rows"
 import { scanCoverage, emptyScanMessage } from "@/lib/features/vulnerability/coverage"
@@ -23,7 +22,6 @@ export default function VulnerabilitiesPage() {
   const reports = useClusterState(s => s.vulnerabilityReports)
   const statuses = useClusterState(s => s.imageScanStatuses)
   const scanError = useClusterState(s => s.vulnerabilityReportsError)
-  const { linkTo } = useContextHref()
   const [severities, setSeverities] = useState<Set<VulnerabilitySeverity>>(new Set(SEVERITIES))
   const [search, setSearch] = useState("")
 
@@ -38,9 +36,9 @@ export default function VulnerabilitiesPage() {
   for (const r of rows) counts.set(r.severity, (counts.get(r.severity) ?? 0) + 1)
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Vulnerabilities" subtitle="CVEs found by scanning the images that are running" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.vulnerabilities} title="Vulnerabilities" subtitle="CVEs found by scanning the images that are running" />
         {scanError && <p role="alert" className="text-sm text-status-major-label">Vulnerability scans could not be loaded: {scanError}</p>}
         {reports && <p className="text-sm text-muted-foreground">{coverage.complete} of {coverage.total} running images fully scanned{coverage.partial ? ` · ${coverage.partial} partial` : ""}{coverage.pending ? ` · ${coverage.pending} pending` : ""}{coverage.expired ? ` · ${coverage.expired} expired` : ""}{coverage.unavailable ? ` · ${coverage.unavailable} unavailable` : ""}</p>}
         {!reports ? <PageLoading loading="image scans" /> : (
@@ -57,21 +55,10 @@ export default function VulnerabilitiesPage() {
             </div>
             {visible.length === 0
               ? <p className="px-5 py-8 text-center text-sm text-muted-foreground">{rows.length ? "No vulnerabilities match the filters." : emptyScanMessage(coverage)}</p>
-              : (
-                <div className="overflow-x-auto"><table className="w-full min-w-[48rem] table-fixed text-left text-sm"><colgroup><col className="w-28"/><col/><col className="w-[max(20rem,33.333%)]"/></colgroup>
-                  <thead className="border-b bg-muted text-xs text-muted-foreground"><tr><th className="px-5 py-3">Severity</th><th className="px-3 py-3">Vulnerability</th><th className="px-5 py-3">Affected images</th></tr></thead>
-                  <tbody>{visible.map(row => <tr key={row.id} className="border-b align-top last:border-0">
-                    <td className="px-5 py-4"><SeverityBadge severity={row.severity} score={row.score}/></td>
-                    <td className="px-3 py-4"><PrefetchLink href={linkTo(`/vulnerabilities/${encodeURIComponent(row.id)}`)} className="font-mono text-sm text-brand-text hover:underline">{row.id}</PrefetchLink>
-                      {row.title && <MarkdownText text={row.title} className="mt-1 line-clamp-2 text-sm"/>}
-                    </td>
-                    <td className="px-5 py-4"><div className="flex flex-col gap-1">{[...row.images].slice(0,3).map(image => <PrefetchLink key={image} href={linkTo(`/container-images/${imagePath(image)}`)} className="break-all font-mono text-xs text-brand-text hover:underline">{image}</PrefetchLink>)}{row.images.size>3&&<PrefetchLink href={linkTo(`/vulnerabilities/${encodeURIComponent(row.id)}`)} className="text-xs text-brand-text hover:underline">+{row.images.size-3} more</PrefetchLink>}</div></td>
-                  </tr>)}</tbody>
-                </table></div>
-              )}
+              : <VulnerabilityTable rows={visible} />}
           </section>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

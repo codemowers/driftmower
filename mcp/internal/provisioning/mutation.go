@@ -2,6 +2,8 @@ package provisioning
 
 import (
 	"slices"
+
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // MutatingAdmissionPolicies rewrite an object on its way in, so what the
@@ -61,7 +63,7 @@ func ToMutationFacts(policies []MutatingPolicy, bindings []MutatingBinding) []Mu
 		allScoped := !slices.ContainsFunc(bound, func(b MutatingBinding) bool { return !b.NamespaceSelector.selectsSomething() })
 		facts = append(facts, MutationFact{
 			Name:            p.Name,
-			Description:     strOrNil(foldSpace(p.Description)),
+			Description:     nonnil.String(foldSpace(p.Description)),
 			Guards:          guardsOf(p.ResourceRules, p.MatchPolicy),
 			NamespaceScoped: p.NamespaceSelector.selectsSomething() || allScoped,
 		})

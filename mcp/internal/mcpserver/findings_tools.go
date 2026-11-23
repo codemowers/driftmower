@@ -64,15 +64,16 @@ type versionFindings struct {
 }
 
 type sourceFindings struct {
-	License   *crawler.RepositoryLicense `json:"license,omitempty"`
-	NextCrawl time.Time                  `json:"nextCrawl,omitzero"`
-	Scraping  bool                       `json:"scraping,omitempty"`
-	Releases  []crawler.Release          `json:"releases,omitempty"`
-	URL       string                     `json:"url"`
-	CheckedAt time.Time                  `json:"checkedAt,omitzero"`
-	Latest    string                     `json:"latest,omitempty"`
-	Errors    []string                   `json:"errors,omitempty"`
-	Deployed  []versionFindings          `json:"deployed"`
+	Unauthorized bool                       `json:"unauthorized,omitempty"`
+	License      *crawler.RepositoryLicense `json:"license,omitempty"`
+	NextCrawl    time.Time                  `json:"nextCrawl,omitzero"`
+	Scraping     bool                       `json:"scraping,omitempty"`
+	Releases     []crawler.Release          `json:"releases,omitempty"`
+	URL          string                     `json:"url"`
+	CheckedAt    time.Time                  `json:"checkedAt,omitzero"`
+	Latest       string                     `json:"latest,omitempty"`
+	Errors       []string                   `json:"errors,omitempty"`
+	Deployed     []versionFindings          `json:"deployed"`
 }
 
 type sourceFindingsOutput struct {
@@ -140,17 +141,9 @@ func latestTag(report *crawler.SourceReport) string {
 
 func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_source_findings",
-		Title: "Get version drift and security advisories by source",
-		Description: "With a specific source URL, also includes stable release notes and links. Lists the source repositories of images in use with, per deployed version, how many stable releases it is behind, " +
-			"the newest release on its own major.minor line, the security advisories that apply (severity, confidence, the version " +
-			"that fixes it, summary and link) and the root workloads running it. Confidence affected means a well-formed range or OSV " +
-			"matched the version; possible means a free-text range admits a reading that includes it. Behind -1 means the version " +
-			"cannot be compared: it does not parse, or no release on its line is known yet. A source without checkedAt, or with errors, " +
-			"was not fully crawled, and the absence of findings for it means nothing. Advisories come from GitHub repository advisories, GitHub's reviewed advisory database and OSV; " +
-			"sources off GitHub get no repository advisories, and OSV by version covers Go modules only, so absence of findings is " +
-			"not proof of absence. Callers who may list ContainerImages see every source and image; others see only the versions, " +
-			"workloads and image references of workloads they may list. Data is crawled every few hours; check checkedAt and errors.",
+		Name:         "get_source_findings",
+		Title:        "Get version drift and security advisories by source",
+		Description:  "Source repositories of images in use: per deployed version, stable releases behind (-1 = not comparable), newest patch on its line, applicable advisories (severity, confidence, fixed version) and the workloads running it. With url, also release notes. Sources without checkedAt or with errors were not fully crawled.",
 		InputSchema:  inputSchema[sourceFindingsInput](nil),
 		OutputSchema: schemaFor[*sourceFindingsOutput](),
 		Annotations:  readOnly("Get version drift and security advisories by source"),
@@ -206,7 +199,7 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 			if in.URL != "" && report.URL != in.URL {
 				continue
 			}
-			src := sourceFindings{License: report.License, NextCrawl: report.NextCrawl, Scraping: report.Scraping, URL: report.URL, CheckedAt: report.CheckedAt, Latest: latestTag(report), Errors: report.Errors}
+			src := sourceFindings{Unauthorized: report.Unauthorized, License: report.License, NextCrawl: report.NextCrawl, Scraping: report.Scraping, URL: report.URL, CheckedAt: report.CheckedAt, Latest: latestTag(report), Errors: report.Errors}
 			if in.URL != "" {
 				src.Releases = report.Releases
 			}
@@ -259,14 +252,9 @@ func addFindingsTools(s *mcp.Server, source FindingsSource, w *Workloads, m auth
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_workload_findings",
-		Title: "Get version drift and security advisories by workload",
-		Description: "For root workloads the caller may list, the images they run resolved to source, deployed version, drift and " +
-			"applicable advisories, as in get_source_findings, with each source's checkedAt and errors: an image without checkedAt, or " +
-			"with errors, was not fully checked, so no findings does not mean none apply. Images whose source or version is unknown " +
-			"are listed as untracked. " +
-			"Use it to judge what a workload is exposed to and which version to move to; find where the version is declared, such " +
-			"as a GitOps repository, before proposing a change.",
+		Name:        "get_workload_findings",
+		Title:       "Get version drift and security advisories by workload",
+		Description: "Images of the caller's root workloads with source, deployed version, drift and advisories as in get_source_findings. Unresolved images are listed as untracked.",
 		InputSchema: inputSchema[workloadFindingsInput](func(props map[string]*jsonschema.Schema) {
 			namespaceProperty(props["namespace"])
 		}),

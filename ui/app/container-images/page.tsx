@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { Suspense } from "react"
 import PageHeader from "../components/page-header"
@@ -29,9 +31,9 @@ export default function ContainerImagesPage() {
   const noDataCount = entries.filter(e => isNoData(e.worstStatus)).length
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Container Images" subtitle="Every unique image running in the cluster" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.containerImages} title="Container Images" subtitle="Every unique image running in the cluster" />
         <StatusSummaryBar
           totalLabel="images"
           totalCount={entries.length}
@@ -45,7 +47,7 @@ export default function ContainerImagesPage() {
             <ImageList entries={entries} />
           </Suspense>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

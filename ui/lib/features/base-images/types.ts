@@ -2,7 +2,9 @@
 export type Platform = { os: string; architecture: string; variant?: string }
 export type Layer = { digest: string; diffID?: string; mediaType?: string; size: number }
 export type Target = { digest: string; platform: Platform; layers: Layer[] }
-export type BaseImage = Target & {
+export type BaseImage = Omit<Target, "layers"> & {
+  layers?: Target["layers"]
+  layerCount?: number
   repository: string
   configDigest: string
   tags: string[]
@@ -38,7 +40,7 @@ export type RegistryStatus = {
   lastError?: string
   lastHTTPStatus?: number
 }
-export type RepositoryPage = RepositorySummary & { images: BaseImage[]; offset: number; limit: number; total: number }
+export type RepositoryDetail = RepositorySummary & { images: BaseImage[] }
 export type Candidate = Pick<BaseImage, "repository" | "digest" | "tags" | "platform" | "created"> & { evidence: string }
 export type Hierarchy = {
   digest: string
@@ -56,8 +58,4 @@ export function preferredTag(tags: string[]): string {
 
 export function platformName(platform: Platform): string {
   return [platform.os, platform.architecture, platform.variant].filter(Boolean).join("/")
-}
-
-export function repositoryPath(repository: string): string {
-  return `/base-images/${repository.split("/").map(encodeURIComponent).join("/")}`
 }

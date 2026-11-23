@@ -110,7 +110,6 @@ func New() *Metrics {
 	return m
 }
 
-// Handler serves the registry in the Prometheus exposition format.
 func (m *Metrics) Handler() http.Handler {
 	return promhttp.HandlerFor(m.Registry, promhttp.HandlerOpts{})
 }

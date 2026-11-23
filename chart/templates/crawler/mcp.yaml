@@ -1,0 +1,39 @@
+{{- if and .Values.crawler.enabled .Values.crawler.mcp.enabled }}
+{{- if .Capabilities.APIVersions.Has "codemowers.ai/v1alpha1/ClusterMCPServer" }}
+apiVersion: codemowers.ai/v1alpha1
+kind: ClusterMCPServer
+metadata:
+  name: driftmower-crawler
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  annotations:
+    kubernetes.io/description: >-
+      Read upstream releases, licenses and security advisories already fetched
+      by this cluster's source crawler. Contains no deployed image or workload
+      associations and performs no live upstream requests during tool calls.
+spec:
+  url: {{ printf "http://%s-crawler.%s.svc.cluster.local.:8080/mcp" .Release.Name .Release.Namespace | quote }}
+  audience: {{ printf "%s-crawler.%s" .Release.Name .Release.Namespace | quote }}
+---
+{{- end }}
+{{- if .Values.crawler.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: driftmower-crawler
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  rules:
+    - host: {{ .Values.crawler.ingress.host | quote }}
+      http:
+        paths:
+          - path: /mcp
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Release.Name }}-crawler
+                port:
+                  name: api
+{{- end }}
+{{- end }}

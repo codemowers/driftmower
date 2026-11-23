@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -116,6 +117,22 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 	api := &crawler.API{Crawler: c, Authenticate: authenticate, Allowed: allowed}
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", api)
+	if os.Getenv("MCP_ENABLED") == "true" {
+		mux.Handle("/mcp", c.MCP(version, func(r *http.Request) error {
+			token, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if !found {
+				return errors.New("missing bearer token")
+			}
+			id, err := authorizer.Authenticate(r.Context(), token)
+			if err != nil {
+				return err
+			}
+			if slices.Contains(allowed, id.User) {
+				return nil
+			}
+			return authorizer.MayUseMCP(r.Context(), id, "driftmower-crawler")
+		}))
+	}
 
 	if authorizeURL := os.Getenv("BROWSER_AUTHORIZE_URL"); authorizeURL != "" {
 		origins := split(os.Getenv("BROWSER_ALLOWED_ORIGINS"))

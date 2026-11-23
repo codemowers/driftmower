@@ -1,4 +1,5 @@
 "use client"
+import Page from "@/app/components/layout/page"
 
 import { useEffect } from "react"
 import PrefetchLink from "@/app/components/prefetch-link"
@@ -6,6 +7,8 @@ import { useParams } from "next/navigation"
 import { Check, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Breadcrumbs from "../../components/breadcrumbs"
+import ResourceHeader from "@/app/components/resource-header"
+import { ICONS } from "@/app/components/layout/icons"
 import { ValuePill } from "../components/overflow-pills"
 import KubeconfigPanel from "../kubeconfig-panel"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -35,9 +38,9 @@ export default function SandboxDetailPage() {
   if (!hydrated) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <LoadingLine loading="sandbox" />
-        </main>
+        </Page>
       </div>
     )
   }
@@ -45,10 +48,10 @@ export default function SandboxDetailPage() {
   if (!sandbox) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <Breadcrumbs items={breadcrumbs} />
           <p className="text-sm text-muted-foreground">Sandbox not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -57,28 +60,11 @@ export default function SandboxDetailPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <header className="flex flex-col gap-4">
-          <Breadcrumbs items={breadcrumbs} />
-
-          <div className="flex items-start justify-between gap-8">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-3">
-                <Package className="size-6 shrink-0 text-brand-icon" aria-hidden />
-                <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-                  {sandbox.sandbox}
-                </h1>
-                <span className="rounded-full bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
-                  {sandbox.stackChannel}
-                </span>
-              </div>
-              {sandbox.creator && (
-                <p className="text-sm text-muted-foreground">Created by {sandbox.creator}</p>
-              )}
-            </div>
-            <div className="shrink-0 p-1">
-            </div>
-          </div>
+          <ResourceHeader icon={ICONS.sandboxes} iconAriaLabel="Sandbox" title={sandbox.sandbox} breadcrumbs={breadcrumbs}
+            chips={[{ label: sandbox.stackChannel, tone: "muted" }]}
+            subtitle={sandbox.creator ? `Created by ${sandbox.creator}` : "Sandbox"} />
 
           <div className="flex items-start justify-between gap-8 border-b border-gray-200 pb-5">
             <div className="flex flex-wrap gap-x-10 gap-y-4">
@@ -145,7 +131,7 @@ export default function SandboxDetailPage() {
             <code className="font-mono text-xs">skaffold.env</code> and a pull example.
           </p>
         )}
-      </main>
+      </Page>
     </div>
   )
 }

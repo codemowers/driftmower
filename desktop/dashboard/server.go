@@ -34,6 +34,9 @@ func (d *Dashboard) Handler() http.Handler {
 		_, _ = w.Write(data)
 	})
 	if d.cfg.KubeLogin {
+		mux.HandleFunc("GET /api/desktop/events", d.configEvents)
+	}
+	if d.cfg.KubeLogin {
 		mux.HandleFunc("POST /api/kubernetes-sign-in", d.signIn)
 		mux.HandleFunc("POST /api/desktop/retry", d.retryConnection)
 	}
@@ -66,8 +69,11 @@ func (d *Dashboard) Handler() http.Handler {
 	return mux
 }
 
-// LastSeen is when the page last polled its configuration; zero before.
+// LastSeen tracks active config streams and the most recent config request.
 func (d *Dashboard) LastSeen() time.Time {
+	if d.discovery.hasConfigClients() {
+		return time.Now()
+	}
 	if s := d.lastSeen.Load(); s != 0 {
 		return time.Unix(s, 0)
 	}

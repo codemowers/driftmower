@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestScanUsesTrivyAndTwoReadOnlyImageVolumes(t *testing.T) {
@@ -32,10 +33,10 @@ func TestScanUsesTrivyAndTwoReadOnlyImageVolumes(t *testing.T) {
 	if v := volumes["database"].Image; v == nil || v.Reference != c.DatabaseImage {
 		t.Fatal("database must be mounted as an image volume")
 	}
-	if len(p.InitContainers) != 1 || p.InitContainers[0].Image != c.TrivyImage {
+	if len(p.InitContainers) != 2 || p.InitContainers[0].Name != "analyze-image" || p.InitContainers[1].Image != c.TrivyImage {
 		t.Fatal("scanner must run the Trivy image itself")
 	}
-	scan := p.InitContainers[0]
+	scan := p.InitContainers[1]
 	if len(scan.Command) != 4 || scan.Command[2] != scanCommand || scan.Command[3] != "trivy" {
 		t.Fatal("check Java DB availability before executing Trivy")
 	}
@@ -78,5 +79,32 @@ func TestScanPodsFollowReleaseIdentity(t *testing.T) {
 	}
 	if job.Spec.RestartPolicy != corev1.RestartPolicyNever || job.OwnerReferences[0].Kind != "ContainerImage" {
 		t.Fatal("operator must own attempts directly without container or Job retries")
+	}
+}
+
+func TestReadCoverageChangesArtifactIdentity(t *testing.T) {
+	cfg := Config{Image: "operator", TrivyImage: "trivy", DatabaseImage: "db"}
+	old := cfg.artifactKey("digest")
+	if old != Key("digest", cfg.Image, cfg.TrivyImage, cfg.DatabaseImage) {
+		t.Fatal("default cache identity changed")
+	}
+	cfg.ReadAllFiles = true
+	if cfg.artifactKey("digest") == old {
+		t.Fatal("read coverage reused previous artifacts and attempts")
+	}
+}
+
+func TestScanCPUReservationIsConfigurableWithoutAThrottle(t *testing.T) {
+	for _, tc := range []struct{ configured, want string }{{"", "100m"}, {"50m", "50m"}} {
+		p := ScanPod(Config{CPURequest: tc.configured}, Key("digest", "image"), "image", "uid", "ref", "node", "amd64", "scan")
+		for _, c := range p.Spec.InitContainers {
+			got := c.Resources.Requests[corev1.ResourceCPU]
+			if got.Cmp(resource.MustParse(tc.want)) != 0 {
+				t.Fatalf("%s request %s, want %s", c.Name, got.String(), tc.want)
+			}
+			if _, limited := c.Resources.Limits[corev1.ResourceCPU]; limited {
+				t.Fatal("background CPU request must not impose a CPU limit")
+			}
+		}
 	}
 }

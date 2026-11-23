@@ -11,8 +11,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func ptr(s string) *string { return &s }
-
 func kubelogin(hosts ...string) *networkingv1.Ingress {
 	ing := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "kubelogin"}}
 	for _, h := range hosts {
@@ -23,7 +21,7 @@ func kubelogin(hosts ...string) *networkingv1.Ingress {
 }
 
 func TestDiscover(t *testing.T) {
-	fallback := NewIdentity(ptr("configured"), nil, "http://127.0.0.1:3000")
+	fallback := NewIdentity(new("configured"), nil, "http://127.0.0.1:3000")
 	logger := slog.New(slog.DiscardHandler)
 	discover := func(objects ...*networkingv1.Ingress) Identity {
 		client := fake.NewClientset()
@@ -62,7 +60,7 @@ func TestInstructions(t *testing.T) {
 		t.Errorf("unset instructions = %q", unset)
 	}
 
-	id := NewIdentity(ptr("bravo.example.com"), ptr("https://kube.bravo.example.com"), "")
+	id := NewIdentity(new("bravo.example.com"), new("https://kube.bravo.example.com"), "")
 	id.Authentication = AuthenticationPassmowerOIDC
 	got := Instructions(id)
 	for _, want := range []string{

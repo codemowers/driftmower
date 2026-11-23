@@ -18,7 +18,7 @@ export default function HelmInspection({ release }: { release: ReleaseInfo }) {
   commands.push({ label: "Release revisions and statuses", command: `${kubectl("get", release.namespace)} secrets -l ${q(`owner=helm,name=${release.name}`)} -o custom-columns=NAME:.metadata.name,REVISION:.metadata.labels.version,STATUS:.metadata.labels.status` })
   return <>
     <InspectionCommands commands={commands}/>
-    <section className="space-y-3 rounded-xl border bg-white p-5"><h2 className="text-sm font-semibold">Uninstall release</h2>
+    <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-5"><h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uninstall release</h2>
       <p className="text-sm text-muted-foreground">{release.helmChartRef ? "Managed by the Rancher Helm controller. Delete the HelmChart resource to uninstall the release." : "No Rancher HelmChart was found for this release. Uninstall it with Helm."}</p>
       {remove && <CommandSnippet title={`Delete ${remove.target}`} command={remove.command} open/>}
     </section>

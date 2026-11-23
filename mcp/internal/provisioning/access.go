@@ -93,9 +93,9 @@ func SummariseMatrix(matrix map[string]map[Verb]Verdict, targets []ProvisionTarg
 			row := ProvisionRow{Resource: qualified(r.Resource, r.Group), Verdict: verdict}
 			switch verdict {
 			case authz.No:
-				row.Reason = ptr("Kubernetes RBAC denies create " + qualified(r.Resource, r.Group))
+				row.Reason = new("Kubernetes RBAC denies create " + qualified(r.Resource, r.Group))
 			case authz.Unknown:
-				row.Reason = ptr("The access review for this resource could not be evaluated")
+				row.Reason = new("The access review for this resource could not be evaluated")
 			}
 			rows = append(rows, row)
 		}

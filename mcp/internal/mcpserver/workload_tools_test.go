@@ -57,11 +57,15 @@ func TestWorkloadTools(t *testing.T) {
 		t.Fatal("connection status triggered cluster inventory reads")
 	}
 	text, out := call(t, s, "get_workloads", map[string]any{"namespace": "team-a"})
-	if !strings.HasPrefix(text, "0 workloads; 1 namespace orphan buckets.") {
-		t.Errorf("summary = %q", text)
+	if !strings.HasPrefix(text, "1 owners.") || out["orphans"] != nil {
+		t.Errorf("summary = %q, orphans without asking: %v", text, out["orphans"])
 	}
-	bucket := out["workloads"].([]any)[0].(map[string]any)
-	if bucket["standalonePods"].([]any)[0].(map[string]any)["name"] != "debug" ||
+	if owner := out["owners"].([]any)[0].(map[string]any); owner["kind"] != "Pod" || owner["name"] != "debug" || owner["pods"] != nil {
+		t.Errorf("a standalone Pod must be its own owner: %v", owner)
+	}
+	_, out = call(t, s, "get_workloads", map[string]any{"namespace": "team-a", "includeOrphans": true})
+	bucket := out["orphans"].([]any)[0].(map[string]any)
+	if bucket["standalonePods"] != nil ||
 		bucket["orphaned"].(map[string]any)["Widget.example.com"].(map[string]any)["w"].(map[string]any)["secrets"].([]any)[0] != "token" {
 		t.Errorf("bucket = %v", bucket)
 	}
@@ -80,10 +84,6 @@ func TestWorkloadTools(t *testing.T) {
 	_, status := call(t, s, "get_inventory_status", map[string]any{})
 	if status["clusterContext"] != "bravo.example.com" || status["imageUsages"] != nil {
 		t.Fatalf("expected cheap status: %v", status)
-	}
-	_, page := call(t, s, "list_pod_inventory", map[string]any{"namespace": "team-a"})
-	if len(page["items"].([]any)) != 1 {
-		t.Fatalf("expected runtime pod page: %v", page)
 	}
 	for _, tool := range tools.Tools {
 		if tool.Name == "get_dashboard_snapshot" {
@@ -111,9 +111,9 @@ func TestWorkloadTools(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	_, allPods := call(t, s, "list_pod_inventory", map[string]any{"namespace": "team-a"})
-	if len(allPods["items"].([]any)) != 106 || allPods["nextOffset"] != nil {
-		t.Fatal("inventory was paginated", allPods["total"], allPods["nextOffset"])
+	_, all := call(t, s, "get_workloads", map[string]any{"namespace": "team-a"})
+	if len(all["owners"].([]any)) != 106 {
+		t.Fatal("inventory was truncated", len(all["owners"].([]any)))
 	}
 	_, apps := call(t, s, "list_applications", map[string]any{"namespace": "team-a"})
 	entries := apps["applications"].([]any)

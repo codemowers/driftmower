@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils/cn"
-import type { StatusType } from "@/lib/cluster/reports"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
 import { classifyPod, podStateLabel, POD_SEVERITY_STYLE } from "@/lib/cluster/styles/pod-status-style"
 import {
@@ -7,7 +6,6 @@ import {
   StatCell,
   StatValue,
   StatCaption,
-  DriftScoreCell,
 } from "@/app/components/stats-card"
 import RuntimeCell from "@/app/components/runtime-cell"
 
@@ -16,8 +14,6 @@ type Props = {
   nodeName: string
   totalContainers: number
   staleContainerCount: number
-  worstStatus: StatusType
-  normalizedScore: number
 }
 
 export default function PodStats({
@@ -25,8 +21,6 @@ export default function PodStats({
   nodeName,
   totalContainers,
   staleContainerCount,
-  worstStatus,
-  normalizedScore,
 }: Props) {
   const staleLabel =
     totalContainers === 0
@@ -43,8 +37,7 @@ export default function PodStats({
     : nodeName
 
   return (
-    <StatGrid>
-      <DriftScoreCell worstStatus={worstStatus} normalizedScore={normalizedScore} />
+    <StatGrid vertical>
 
       <StatCell label="State">
         <div className="flex items-center gap-2 mt-0.5">

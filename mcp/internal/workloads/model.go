@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Category names a dependency list on a workload.
 type Category string
 
 const (
@@ -95,8 +94,9 @@ func (d *Dependencies) sort() {
 }
 
 type StandalonePod struct {
-	Name string `json:"name"`
-	UID  string `json:"uid"`
+	Issues []WorkloadIssue `json:"issues,omitempty"`
+	Name   string          `json:"name"`
+	UID    string          `json:"uid"`
 }
 
 // OrphanOwner is an auxiliary generating owner of orphaned objects.
@@ -116,6 +116,7 @@ type SourceRepository struct {
 // Workload is a root owner, or the namespace's orphan bucket (kind
 // Namespace, name orphaned-workloads).
 type Workload struct {
+	Issues               []WorkloadIssue    `json:"issues,omitempty"`
 	SourceRepositories   []SourceRepository `json:"sourceRepositories,omitempty"`
 	DesiredReplicas      *int32             `json:"desiredReplicas,omitempty"`
 	Completed            bool               `json:"completed,omitempty"`
@@ -141,7 +142,6 @@ type Workload struct {
 	Orphaned map[string]map[string]*OrphanOwner `json:"orphaned,omitempty"`
 }
 
-// Inventory is the caller's view of one or more namespaces.
 type Inventory struct {
 	Workloads []*Workload `json:"workloads"`
 	Total     int         `json:"total"`
@@ -150,7 +150,6 @@ type Inventory struct {
 	Revision string `json:"revision,omitempty"`
 }
 
-// Source is one collection the cache watches.
 type Source struct {
 	GVR  schema.GroupVersionResource
 	Kind string
@@ -238,15 +237,22 @@ type Node struct {
 // PodSnapshot is a small runtime inventory, without Pod specs, environment
 // values, annotations or image filesystem metadata.
 type PodSnapshot struct {
-	Name                string         `json:"name"`
-	Namespace           string         `json:"namespace"`
-	UID                 string         `json:"uid"`
-	CreatedAt           time.Time      `json:"createdAt"`
-	NodeName            string         `json:"nodeName,omitempty"`
-	Phase               string         `json:"phase"`
-	IPs                 []string       `json:"ips,omitempty"`
-	HasImagePullSecrets bool           `json:"hasImagePullSecrets"`
-	Containers          []PodContainer `json:"containers"`
+	ScanPod             bool            `json:"scanPod,omitempty"`
+	JobOwned            bool            `json:"jobOwned,omitempty"`
+	Issues              []WorkloadIssue `json:"issues,omitempty"`
+	Terminating         bool            `json:"terminating,omitempty"`
+	Security            *PodSecurity    `json:"security,omitempty"`
+	PriorityClassName   string          `json:"priorityClassName,omitempty"`
+	Priority            *int32          `json:"priority,omitempty"`
+	Name                string          `json:"name"`
+	Namespace           string          `json:"namespace"`
+	UID                 string          `json:"uid"`
+	CreatedAt           time.Time       `json:"createdAt"`
+	NodeName            string          `json:"nodeName,omitempty"`
+	Phase               string          `json:"phase"`
+	IPs                 []string        `json:"ips,omitempty"`
+	HasImagePullSecrets bool            `json:"hasImagePullSecrets"`
+	Containers          []PodContainer  `json:"containers"`
 }
 type PodContainer struct {
 	Name    string `json:"name"`

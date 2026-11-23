@@ -71,16 +71,16 @@ func (s *Service) LogRate(ctx context.Context, id authz.Identity, namespace, pod
 			return err
 		}
 		if response.Status != "success" || response.Data.ResultType != "vector" || len(response.Data.Result) > 1 {
-			return errors.New("Loki returned an unexpected aggregate log-rate response")
+			return errors.New("loki returned an unexpected aggregate log-rate response")
 		}
 		out.Warnings = append(out.Warnings, response.Warnings...)
 		for _, sample := range response.Data.Result {
 			if len(sample.Metric) != 0 || sample.Value == nil {
-				return errors.New("Loki returned an unexpected aggregate log-rate sample")
+				return errors.New("loki returned an unexpected aggregate log-rate sample")
 			}
 			value, err := strconv.ParseFloat(sample.Value.Value, 64)
 			if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
-				return errors.New("Loki returned an invalid log rate")
+				return errors.New("loki returned an invalid log rate")
 			}
 			out.LinesPerSecond = &value
 		}
@@ -94,16 +94,6 @@ func (s *Service) LogRate(ctx context.Context, id authz.Identity, namespace, pod
 type NamespaceSummary struct {
 	CPURequests    *float64 `json:"cpuRequests"`
 	MemoryRequests *float64 `json:"memoryRequests"`
-	// Running and pending containers that set no request or limit, by
-	// resource.
-	Unset UnsetResources `json:"unset"`
-}
-
-type UnsetResources struct {
-	CPURequests    int `json:"cpuRequests"`
-	CPULimits      int `json:"cpuLimits"`
-	MemoryRequests int `json:"memoryRequests"`
-	MemoryLimits   int `json:"memoryLimits"`
 }
 
 type NamespaceSummaries struct {
@@ -141,14 +131,7 @@ func (s *Service) NamespaceSummaries(ctx context.Context, id authz.Identity, nam
 	requests := func(resource string) string {
 		return fmt.Sprintf(`sum by (namespace) (max by (namespace,pod,container) (kube_pod_container_resource_requests{%s,resource=%s}) %s)`, sel, promString(resource), live)
 	}
-	// Containers of live Pods with no request or limit series for a resource.
-	containers := fmt.Sprintf(`(kube_pod_container_info{%s} %s)`, sel, live)
-	unset := func(metric, resource string) string {
-		return fmt.Sprintf(`count by (namespace) (%s unless on (namespace,pod,container) %s{%s,resource=%s})`, containers, metric, sel, promString(resource))
-	}
-	queries := map[string]string{"cpu": requests("cpu"), "memory": requests("memory"),
-		"unsetCPURequests": unset("kube_pod_container_resource_requests", "cpu"), "unsetCPULimits": unset("kube_pod_container_resource_limits", "cpu"),
-		"unsetMemoryRequests": unset("kube_pod_container_resource_requests", "memory"), "unsetMemoryLimits": unset("kube_pod_container_resource_limits", "memory")}
+	queries := map[string]string{"cpu": requests("cpu"), "memory": requests("memory")}
 
 	err := func(backend Requester) error {
 		at := s.alignedNow().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -171,14 +154,7 @@ func (s *Service) NamespaceSummaries(ctx context.Context, id authz.Identity, nam
 					summary.CPURequests = &v
 				case "memory":
 					summary.MemoryRequests = &v
-				case "unsetCPURequests":
-					summary.Unset.CPURequests = int(v)
-				case "unsetCPULimits":
-					summary.Unset.CPULimits = int(v)
-				case "unsetMemoryRequests":
-					summary.Unset.MemoryRequests = int(v)
-				case "unsetMemoryLimits":
-					summary.Unset.MemoryLimits = int(v)
+
 				}
 			}
 		}

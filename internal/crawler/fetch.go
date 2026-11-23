@@ -24,6 +24,7 @@ const (
 )
 
 var errNotFound = errors.New("not found")
+var errUnauthorized = errors.New("unauthorized")
 var errResponseTooLarge = errors.New("response too large")
 
 // fetcher makes conditional GET requests, reusing a cached body on 304, and
@@ -123,6 +124,20 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 		body = cached.body
 	case resp.StatusCode == http.StatusNotFound:
 		return nil, errNotFound
+	case resp.StatusCode == http.StatusUnauthorized:
+		return nil, fmt.Errorf("%s: HTTP %d: %w", url, resp.StatusCode, errUnauthorized)
+	case resp.StatusCode == http.StatusForbidden:
+		// GitHub also uses 403 for rate limits; those are retryable failures,
+		// not evidence that this token lacks repository access.
+		var response struct {
+			Message string `json:"message"`
+		}
+		_ = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&response)
+		limited := resp.Header.Get("X-RateLimit-Remaining") == "0" || resp.Header.Get("Retry-After") != "" || strings.Contains(strings.ToLower(response.Message), "rate limit")
+		if limited {
+			return nil, fmt.Errorf("%s: HTTP %d (rate limited)", url, resp.StatusCode)
+		}
+		return nil, fmt.Errorf("%s: HTTP %d: %w", url, resp.StatusCode, errUnauthorized)
 	case resp.StatusCode == http.StatusOK:
 		if body, err = io.ReadAll(io.LimitReader(resp.Body, maxBody+1)); err != nil {
 			return nil, err
@@ -141,7 +156,6 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 	return body, nil
 }
 
-// postJSON sends in as JSON and decodes the response into out.
 func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) (err error) {
 	observe := f.observeFetch(url)
 	defer func() { observe(err) }()
@@ -167,7 +181,6 @@ func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) (err er
 	return json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(out)
 }
 
-// waitGitHub blocks until the rate limit allows another request.
 func (f *fetcher) waitGitHub(ctx context.Context) error {
 	f.mu.Lock()
 	remaining, reset := f.remaining, f.reset

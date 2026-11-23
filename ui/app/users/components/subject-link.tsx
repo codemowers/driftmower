@@ -1,5 +1,6 @@
 "use client"
 
+import { useFeatureFlags } from "@/app/components/feature-flags-init"
 import { useEffect, useState } from "react"
 import { Bot, User } from "lucide-react"
 import PrefetchLink from "@/app/components/prefetch-link"
@@ -35,10 +36,11 @@ function useDisplayName(name?: string) {
 // behind its icon and linked to its page; any other username as it is.
 export default function SubjectLink({ subject, className = "" }: { subject: Subject; className?: string }) {
   const { linkTo } = useContextHref()
-  const person = useDisplayName(subject.oidcUser)
+  const enabled = useFeatureFlags(s => s.oidcUsers)
+  const person = useDisplayName(enabled ? subject.oidcUser : undefined)
   const sa = subject.serviceAccount
   const link = subject.oidcUser
-    ? { href: linkTo(`/users/${encodeURIComponent(subject.oidcUser)}`), Icon: User, label: person }
+    ? { href: linkTo(`/users/${encodeURIComponent(subject.oidcUser)}`), Icon: User, label: person ?? subject.oidcUser }
     : sa ? { href: linkTo(`/service-accounts/${encodeURIComponent(sa.namespace)}/${encodeURIComponent(sa.name)}`), Icon: Bot, label: `${sa.namespace}/${sa.name}` } : undefined
   if (!link) return <span className={`break-all font-mono ${className}`}>{subject.username}</span>
   return (

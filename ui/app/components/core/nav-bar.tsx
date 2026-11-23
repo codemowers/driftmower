@@ -8,45 +8,19 @@ import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
-import {
-  Boxes,
-  BarChart3,
-  Cpu,
-  Layers,
-  GitBranch,
-  PanelLeft,
-  Server,
-  ServerOff,
-  LayoutGrid,
-  Package,
-  ShipWheel,
-  ChevronsUpDown,
-  Pin,
-  Settings,
-  LoaderCircle,
-  ShieldCheck,
-  Users,
-  UsersRound,
-  HardDrive,
-  FolderTree,
-  Gauge,
-  ShieldAlert,
-  Bug,
-  Bot,
-  Container,
-  Database,
-  Archive,
-  ShieldQuestion,
-} from "lucide-react"
+import { PanelLeft, Server, ServerOff, ChevronsUpDown, Pin, LoaderCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/types"
 import { useSandboxContext } from "@/lib/tenancy/sandbox-context"
+import { useResourceNavigationStore } from "@/lib/hooks/use-resource-navigation"
 import { setActivePageSection, usePageSectionsStore } from "@/lib/hooks/use-page-sections"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
+import DownloadProgress from "@/app/components/download-progress"
+import { ICONS } from "@/app/components/layout/icons"
 import { callTool, contextTitle, toolNames, useConnectionProgress, type ClusterEndpoint } from "@/browser/connection"
 
 // Checks each gated item once per connected endpoint: the MCP server must
@@ -90,30 +64,30 @@ type NavItem = {
 
 // Grouped under headings; the first and last groups have none.
 const navItems: NavItem[] = [
-  { name: "Executive Summary", href: "/executive-summary", icon: BarChart3 },
-  { group: "Workloads", name: "Top-level", href: "/topmost-owners", icon: Boxes },
-  { group: "Workloads", name: "Namespaces", href: "/namespaces", icon: FolderTree },
-  { group: "Workloads", name: "Applications", href: "/applications", icon: LayoutGrid },
-  { group: "Workloads", name: "Helm Releases", href: "/helm-releases", icon: ShipWheel },
-  { group: "Workloads", name: "Container Images", href: "/container-images", icon: Layers },
-  { group: "Workloads", name: "Base Images", href: "/base-images", icon: Layers, tool: "list_base_image_repositories" },
-  { group: "Workloads", name: "Source Repositories", href: "/source-repositories", icon: GitBranch, tool: "get_source_findings" },
-  { group: "Workloads", name: "Operators", href: "/operators", icon: Database },
-  { group: "Workloads", name: "Sandboxes", href: "/sandboxes", icon: Package },
-  { group: "Cluster", name: "Nodes", href: "/cluster", icon: Cpu, requires: { verb: "list", resource: "nodes" } },
-  { group: "Cluster", name: "Volumes", href: "/volumes", icon: HardDrive, requires: { verb: "list", resource: "persistentvolumes" } },
-  { group: "Cluster", name: "Storage classes", href: "/storage-classes", icon: Archive },
-  { group: "Cluster", name: "Priority classes", href: "/priority-classes", icon: Gauge, tool: "list_priority_classes" },
-  { group: "Security", name: "Advisories", href: "/advisories", icon: ShieldAlert, tool: "get_workload_findings" },
-  { group: "Security", name: "Vulnerabilities", href: "/vulnerabilities", icon: Bug },
-  { group: "Security", name: "Admission policies", href: "/admission-policies", icon: ShieldQuestion },
-  { group: "Security", name: "Trust", href: "/trust", icon: ShieldCheck },
-  { group: "Security", name: "Users", href: "/users", icon: Users, tool: "list_oidc_users" },
-  { group: "Security", name: "Groups", href: "/groups", icon: UsersRound, tool: "list_oidc_users" },
-  { group: "Security", name: "Service accounts", href: "/service-accounts", icon: Bot, tool: "list_service_accounts" },
-  { group: "Settings", name: "General", href: "/settings", icon: Settings },
-  { group: "Settings", name: "Coding agent", href: "/coding-agent", icon: Bot },
-  { group: "Settings", name: "Container registry", href: "/registry", icon: Container },
+  { name: "Executive Summary", href: "/executive-summary", icon: ICONS.summary },
+  { group: "Workloads", name: "Top-level", href: "/topmost-owners", icon: ICONS.workloads },
+  { group: "Workloads", name: "Namespaces", href: "/namespaces", icon: ICONS.namespaces },
+  { group: "Workloads", name: "Applications", href: "/applications", icon: ICONS.applications },
+  { group: "Workloads", name: "Helm Releases", href: "/helm-releases", icon: ICONS.helmReleases },
+  { group: "Workloads", name: "Container Images", href: "/container-images", icon: ICONS.containerImages },
+  { group: "Workloads", name: "Source Repositories", href: "/source-repositories", icon: ICONS.sources, tool: "get_source_findings" },
+  { group: "Workloads", name: "Operators", href: "/operators", icon: ICONS.operators },
+  { group: "Workloads", name: "Sandboxes", href: "/sandboxes", icon: ICONS.sandboxes },
+  { group: "Cluster", name: "Nodes", href: "/cluster", icon: ICONS.nodes, requires: { verb: "list", resource: "nodes" } },
+  { group: "Cluster", name: "Alerts", href: "/alerts", icon: ICONS.alerts, tool: "list_alerts" },
+  { group: "Cluster", name: "Volumes", href: "/volumes", icon: ICONS.volumes, requires: { verb: "list", resource: "persistentvolumes" } },
+  { group: "Cluster", name: "Storage classes", href: "/storage-classes", icon: ICONS.storageClasses },
+  { group: "Cluster", name: "Priority classes", href: "/priority-classes", icon: ICONS.priorityClasses, tool: "list_priority_classes" },
+  { group: "Security", name: "Advisories", href: "/advisories", icon: ICONS.advisories, tool: "get_workload_findings" },
+  { group: "Security", name: "Vulnerabilities", href: "/vulnerabilities", icon: ICONS.vulnerabilities, tool: "get_image_scans" },
+  { group: "Security", name: "Admission policies", href: "/admission-policies", icon: ICONS.admissionPolicies },
+  { group: "Security", name: "Trust", href: "/trust", icon: ICONS.trust },
+  { group: "Security", name: "Users", href: "/users", icon: ICONS.users, tool: "list_oidc_users" },
+  { group: "Security", name: "Groups", href: "/groups", icon: ICONS.groups, tool: "list_oidc_users" },
+  { group: "Security", name: "Service accounts", href: "/service-accounts", icon: ICONS.serviceAccounts, tool: "list_service_accounts" },
+  { group: "Settings", name: "General", href: "/settings", icon: ICONS.settings },
+  { group: "Settings", name: "Coding agent", href: "/coding-agent", icon: ICONS.codingAgent },
+  { group: "Settings", name: "Container registry", href: "/registry", icon: ICONS.registry },
 ]
 
 function isNavActive(pathname: string, href: string): boolean {
@@ -154,6 +128,7 @@ export default function NavBar({
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
   const pageSections = usePageSectionsStore()
+  const resourceNavigation = useResourceNavigationStore(s => s.navigation)
   const [newEndpoint, setNewEndpoint] = useState("")
   const [endpointError, setEndpointError] = useState("")
 
@@ -275,6 +250,23 @@ export default function NavBar({
                   {isExpanded ? (
                     <>
                       {link}
+                      {active && resourceNavigation?.parent === item.href && (
+                        // The selected resource's subpages as plain sub-items of the
+                        // still-highlighted section entry: no resource level, no tree.
+                        <ul aria-label="Subpages" className="mb-1 mt-0.5 flex flex-col">
+                          {resourceNavigation.items.map(entry => {
+                            const current = pathname === entry.href.split("?")[0]
+                            return <li key={entry.href}>
+                              {entry.disabled
+                                ? <span className="block py-1.5 pl-12 pr-3 text-sm text-muted-foreground/50">{entry.label}</span>
+                                : <Link href={entry.href} aria-current={current ? "page" : undefined}
+                                    className={cn("block py-1.5 pl-12 pr-3 text-sm transition-colors", current ? "font-semibold text-brand" : "text-muted-foreground hover:text-foreground")}>
+                                    {entry.label}
+                                  </Link>}
+                            </li>
+                          })}
+                        </ul>
+                      )}
                       {sections.length > 0 && (
                         <ul
                           aria-label={`${item.name} sections`}
@@ -340,7 +332,7 @@ export default function NavBar({
                 aria-hidden
               />}
               <span className="min-w-0 flex-1">
-                <span className="block font-mono text-xs text-muted-foreground">{connectingTo ? "Connecting…" : isConnected ? "Connected context" : "Disconnected"}</span>
+                <span className="block font-mono text-xs text-muted-foreground">{connectingTo ? "Connecting…" : isConnected ? "Connected context" : "Disconnected"}{connectingTo && <> <DownloadProgress /></>}</span>
                 <span className="block truncate text-sm font-medium text-gray-800">{displayContext}</span>
               </span>
               {onSelectEndpoint && !fixedEndpoint && <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />}

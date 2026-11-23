@@ -9,5 +9,3 @@ export type PodVolume = {
   used: number
   capacity: number
 }
-
-export type VectorRow = { metric: Record<string, string>; value: [number, string] }

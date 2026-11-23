@@ -194,7 +194,13 @@ func Project(src Source, obj any) (*Node, error) {
 	case *corev1.Pod:
 		n.Completed = o.Status.Phase == corev1.PodSucceeded
 		n.ObjectMeta, n.Spec = reduceMeta(o.ObjectMeta), Spec{Pod: podRefs(&o.Spec)}
-		p := &PodSnapshot{Name: o.Name, Namespace: o.Namespace, UID: string(o.UID), CreatedAt: o.CreationTimestamp.Time, NodeName: o.Spec.NodeName, Phase: string(o.Status.Phase), HasImagePullSecrets: len(o.Spec.ImagePullSecrets) > 0, Containers: []PodContainer{}}
+		security, issues := EvaluatePod(o)
+		ref := owner(n)
+		jobOwned := ref != nil && ref.Kind == "Job" && groupOf(ref.APIVersion) == "batch"
+		if (o.Status.Phase == corev1.PodSucceeded || o.Status.Phase == corev1.PodFailed || o.DeletionTimestamp != nil) && !jobOwned {
+			issues = nil
+		}
+		p := &PodSnapshot{ScanPod: o.Labels["driftmower-scan"] == "driftmower-scan", JobOwned: jobOwned, Issues: issues, Terminating: o.DeletionTimestamp != nil, Security: &security, PriorityClassName: o.Spec.PriorityClassName, Priority: o.Spec.Priority, Name: o.Name, Namespace: o.Namespace, UID: string(o.UID), CreatedAt: o.CreationTimestamp.Time, NodeName: o.Spec.NodeName, Phase: string(o.Status.Phase), HasImagePullSecrets: len(o.Spec.ImagePullSecrets) > 0, Containers: []PodContainer{}}
 		for _, ip := range o.Status.PodIPs {
 			p.IPs = append(p.IPs, ip.IP)
 		}

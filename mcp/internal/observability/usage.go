@@ -116,7 +116,6 @@ type definition struct {
 	unit, query string
 }
 
-// HistoryInput asks for statistics over a past range.
 type HistoryInput struct {
 	HistorySeconds int
 	StepSeconds    int
@@ -533,6 +532,7 @@ func (s *Service) ClusterUsage(ctx context.Context, id authz.Identity, in Cluste
 			"cpuUsed":         {"cores", host(fmt.Sprintf(`sum by (instance) (1 - max by (instance,cpu) (rate(node_cpu_seconds_total{mode="idle"}[%ss])))`, window), "")},
 			"cpuCapacity":     {"cores", `max by (node) (kube_node_status_capacity{resource="cpu",unit="core"})`},
 			"memoryCapacity":  {"bytes", `max by (node) (kube_node_status_capacity{resource="memory",unit="byte"})`},
+			"bootTime":        {"seconds", node("node_boot_time_seconds")},
 			"memoryAvailable": {"bytes", node("node_memory_MemAvailable_bytes")},
 			"memoryUsed":      {"bytes", node("node_memory_MemTotal_bytes") + " - " + node("node_memory_MemAvailable_bytes")},
 			"memoryCached":    {"bytes", node("node_memory_Cached_bytes")},

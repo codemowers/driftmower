@@ -299,6 +299,7 @@ func (p *ChromeProfiles) Set(discovery *ContextDiscovery, key, directory string)
 		}
 	}
 	discovery.mu.Unlock()
+	discovery.notify()
 	if discovery.forwards != nil {
 		discovery.forwards.drop(forwardIdentityKey(key, group.ChromeProfile))
 	}

@@ -21,7 +21,6 @@ type Response struct {
 	Body   []byte
 }
 
-// Requester performs a GET.
 type Requester interface {
 	Get(ctx context.Context, u *url.URL) (Response, error)
 }
@@ -31,6 +30,8 @@ type RequesterFunc func(ctx context.Context, u *url.URL) (Response, error)
 func (f RequesterFunc) Get(ctx context.Context, u *url.URL) (Response, error) { return f(ctx, u) }
 
 const maxBody = 4 << 20
+
+var ErrResponseTooLarge = errors.New("observability response exceeds 4 MiB; narrow the query")
 
 // HTTPRequester follows no redirects, bounds the body at 4 MiB and the whole
 // exchange by the timeout.
@@ -55,14 +56,13 @@ func HTTPRequester(timeout time.Duration) Requester {
 			return Response{}, err
 		}
 		if len(body) > maxBody {
-			return Response{}, errors.New("observability response exceeds 4 MiB; narrow the query")
+			return Response{}, ErrResponseTooLarge
 		}
 
 		return Response{Status: resp.StatusCode, Body: body}, nil
 	})
 }
 
-// GatewayOptions configure query sharing and backend timeouts.
 type GatewayOptions struct {
 	Next Requester
 	// Requests under this base URL are Prometheus queries: they get its

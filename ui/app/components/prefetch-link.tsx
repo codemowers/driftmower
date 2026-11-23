@@ -1,5 +1,6 @@
 "use client"
 
+import { useFeatureFlags } from "./feature-flags-init"
 import type { ComponentProps } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -13,8 +14,13 @@ export function usePagePrefetch(): (href: string) => void {
 type Props = Omit<ComponentProps<typeof Link>, "href" | "prefetch"> & { href: string }
 
 export default function PrefetchLink({ href, onMouseEnter, onFocus, onTouchStart, ...props }: Props) {
+  const features = useFeatureFlags()
+  const path = href.split("?")[0]
+  const disabled = (/^\/(users|groups)(?:\/|$)/.test(path) && !features.oidcUsers) || (/^\/vulnerabilities(?:\/|$)/.test(path) && !features.imageScans) || (path === "/advisories" && !features.advisories)
   const prefetchPage = usePagePrefetch()
   const prefetch = () => prefetchPage(href)
+
+  if (disabled) return <span className={props.className} title={props.title}>{props.children}</span>
 
   return (
     <Link

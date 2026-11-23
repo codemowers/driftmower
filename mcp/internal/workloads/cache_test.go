@@ -166,7 +166,7 @@ func TestCacheInventory(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if bucket.StandalonePods[0] != (StandalonePod{Name: "debug", UID: "p2"}) || inv.Revision == before {
+	if bucket.StandalonePods[0].Name != "debug" || bucket.StandalonePods[0].UID != "p2" || inv.Revision == before {
 		t.Errorf("standalone = %+v, revision %s -> %s", bucket.StandalonePods, before, inv.Revision)
 	}
 }

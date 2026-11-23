@@ -49,7 +49,7 @@ export default function StatCard({
 
     return (
         <div className={cn(
-            "flex min-w-0 flex-col justify-center gap-1 rounded-3xl border-t-4 px-6 py-6.5",
+            "flex min-w-0 flex-col justify-center gap-1 rounded-xl border-t-4 px-6 py-6.5",
             bg[accent],
         )}>
             {label && (

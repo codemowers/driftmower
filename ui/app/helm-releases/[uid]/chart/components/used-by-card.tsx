@@ -16,11 +16,9 @@ export default function UsedByCard({ releases, linkTo }: Props) {
   if (releases.length < 2) return null
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Used By
-      </p>
-      <div className="rounded-xl border border-gray-200 bg-white">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Used By</h2>
+      <div className="">
         {releases.map((score, i) => (
           <PrefetchLink
             key={score.groupKey}
@@ -44,6 +42,6 @@ export default function UsedByCard({ releases, linkTo }: Props) {
           </PrefetchLink>
         ))}
       </div>
-    </div>
+    </section>
   )
 }

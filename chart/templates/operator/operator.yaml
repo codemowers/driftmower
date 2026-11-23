@@ -1,4 +1,7 @@
 {{- if .Values.operator.enabled }}
+{{- if not (has .Values.operator.trivy.strategy (list "operatorNamespace" "workloadNamespace")) }}
+{{- fail "operator.trivy.strategy must be operatorNamespace or workloadNamespace" }}
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -27,6 +30,40 @@ rules:
   - apiGroups: ['']
     resources: [nodes]
     verbs: [get, list]
+  {{- if eq .Values.operator.trivy.strategy "workloadNamespace" }}
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: ['']
+    resources: [events]
+    verbs: [list]
+  - apiGroups: ['']
+    resources: [serviceaccounts]
+    resourceNames: [{{ printf "%s-scan" .Release.Name | quote }}]
+    verbs: [get]
+  - apiGroups: ['']
+    resources: [serviceaccounts]
+    verbs: [create]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    resourceNames: [{{ printf "%s-scan" .Release.Name | quote }}]
+    verbs: [get]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [create]
+  {{- if compact .Values.imagePullSecrets }}
+  - apiGroups: ['']
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: ['']
+    resources: [secrets]
+    resourceNames:
+      {{- range compact .Values.imagePullSecrets }}
+      - {{ printf "scan-pull-%s" (trunc 40 (sha256sum (printf "%s/%s/%s" $.Release.Namespace $.Release.Name .))) | quote }}
+      {{- end }}
+    verbs: [get, update]
+  {{- end }}
+  {{- end }}
   - apiGroups: [authentication.k8s.io]
     resources: [tokenreviews]
     verbs: [create]
@@ -56,6 +93,15 @@ rules:
   - apiGroups: ['']
     resources: [pods]
     verbs: [get, list, watch, create, delete]
+  - apiGroups: ['']
+    resources: [events]
+    verbs: [list]
+  {{- if and (eq .Values.operator.trivy.strategy "workloadNamespace") (compact .Values.imagePullSecrets) }}
+  - apiGroups: ['']
+    resources: [secrets]
+    resourceNames: {{ compact .Values.imagePullSecrets | toJson }}
+    verbs: [get]
+  {{- end }}
   - apiGroups: [coordination.k8s.io]
     resources: [leases]
     verbs: [get, create, update]
@@ -98,6 +144,9 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         app: {{ .Release.Name }}-operator
     spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       serviceAccountName: {{ .Release.Name }}-operator
       securityContext:
         runAsNonRoot: true
@@ -119,7 +168,7 @@ spec:
             - name: SCANNER_INSTANCE
               value: {{ .Release.Name | quote }}
             - name: SCANNER_URL
-              value: {{ printf "http://%s-operator:8080" .Release.Name | quote }}
+              value: {{ printf "http://%s-operator.%s.svc:8080" .Release.Name .Release.Namespace | quote }}
             - name: SCANNER_SERVICE_ACCOUNT
               value: {{ .Release.Name }}-scan
             - name: SCANNER_IMAGE
@@ -131,11 +180,19 @@ spec:
             - name: IMAGE_PULL_SECRETS
               value: {{ join "," (compact .Values.imagePullSecrets) | quote }}
             - name: SCAN_PRIORITY_CLASS
-              value: {{ .Values.operator.priorityClassName | default (printf "%s-%s-scan" .Release.Namespace .Release.Name) | quote }}
+              value: {{ .Values.operator.priorityClassName | default "vulnerability-scan" | quote }}
             - name: SBOM_CACHE_MIB
               value: {{ .Values.operator.sbomCacheMiB | quote }}
+            - name: SCAN_CPU_REQUEST
+              value: {{ .Values.operator.trivy.cpuRequest | quote }}
+            - name: SCAN_STRATEGY
+              value: {{ .Values.operator.trivy.strategy | quote }}
             - name: SCAN_PARALLELISM
               value: {{ .Values.operator.trivy.parallelism | quote }}
+            - name: SCAN_MAX_FAILED_PODS
+              value: {{ .Values.operator.trivy.maxFailedPods | quote }}
+            - name: SCAN_DAC_READ_SEARCH
+              value: {{ .Values.operator.trivy.dacReadSearch | quote }}
           ports:
             - name: http
               containerPort: 8080

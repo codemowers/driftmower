@@ -1,4 +1,6 @@
 "use client"
+import Card from "@/app/components/layout/card"
+import Page from "@/app/components/layout/page"
 
 import Breadcrumbs from "@/app/components/breadcrumbs"
 import PrefetchLink from "@/app/components/prefetch-link"
@@ -17,8 +19,8 @@ export default function OrphanBucket({ uid }: { uid: string }) {
   const owners = Object.entries(bucket?.orphaned ?? {}).sort(([a], [b]) => a.localeCompare(b))
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
+    <>
+      <Page>
         <Breadcrumbs items={[{ label: "Workloads", href: linkTo("/topmost-owners") }, ...(bucket ? [{ label: `Namespace ${bucket.namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(bucket.namespace)}`) }] : []), { label: "Orphaned resources" }]} />
         {!bucket ? (
           <p className="text-sm text-muted-foreground">Nothing is orphaned in this namespace now.</p>
@@ -30,7 +32,7 @@ export default function OrphanBucket({ uid }: { uid: string }) {
               <p className="text-sm text-muted-foreground">Not used by any workload in the namespace. Orphaned does not mean safe to delete.</p>
             </header>
 
-            <section className="flex flex-col gap-3 rounded-xl border border-status-minor-bg bg-status-minor-bg/20 p-5">
+            <section className="flex flex-col gap-3 rounded-xl border border-gray-200 border-status-minor-bg bg-status-minor-bg/20 p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Unused resources</h2>
               <RelatedResources deps={bucket} empty="None." />
             </section>
@@ -57,18 +59,17 @@ export default function OrphanBucket({ uid }: { uid: string }) {
             )}
 
             {(bucket.standalonePods ?? []).length > 0 && (
-              <section className="flex flex-col gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pods without an owner</h2>
+              <Card title="Pods without an owner" meta={bucket.standalonePods!.length}>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {bucket.standalonePods!.map(p => (
                     <PrefetchLink key={p.uid} href={linkTo(`/topmost-owners/${p.uid}`)} className="font-mono text-sm text-brand hover:underline">{p.name}</PrefetchLink>
                   ))}
                 </div>
-              </section>
+              </Card>
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

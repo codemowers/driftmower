@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/codemowers/driftmower/internal/platformapis"
 	"github.com/codemowers/driftmower/internal/registry"
 	"github.com/codemowers/driftmower/mcp/internal/auth"
 	"github.com/codemowers/driftmower/mcp/internal/authz"
@@ -72,7 +73,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid configuration: %v\n", err)
 		os.Exit(1)
 	}
-	logger := logging.New(os.Stderr, cfg.LogLevel)
+	logOutput := os.Stdout
+	if cfg.Transport == config.TransportStdio {
+		logOutput = os.Stderr
+	}
+	logger := logging.New(logOutput, cfg.LogLevel)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -83,7 +88,6 @@ func main() {
 	}
 }
 
-// services are the long-lived components shared by every session.
 type services struct {
 	clients    *kube.Clients
 	reviews    *authz.CachedReviewer
@@ -179,6 +183,21 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		driftHandler.Handle("GET /security-metrics", &securitymetrics.Exporter{Kubernetes: svc.clients.Kubernetes, Logger: logger, ServiceAccountsEnabled: cfg.UserAccess.Enabled})
 	}
 
+	oidcUsers, err := platformapis.HasResources(svc.clients.Kubernetes.Discovery(), "codemowers.cloud/v1", "oidcusers")
+	if err != nil {
+		return err
+	}
+	if !oidcUsers {
+		logger.Info("OIDCUser CRD is not installed; Users, Groups and user/group links are disabled")
+	}
+	nodestatd, err := platformapis.HasResources(svc.clients.Kubernetes.Discovery(), "codemowers.io/v1alpha1", "containerimages", "sourcerepositories")
+	if err != nil {
+		return err
+	}
+	if !nodestatd {
+		logger.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; GHSA advisories, vulnerabilities and Trivy scanning are disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock; restart Driftmower after installing")
+		cfg.ScannerURL = ""
+	}
 	issuer := ""
 	if cfg.OIDC != nil {
 		issuer = cfg.OIDC.Issuer
@@ -192,8 +211,14 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	svc.clusterID = identity.ID
 
 	live := newWorkloads(gctx, cfg, svc, logger)
+	if !nodestatd {
+		live.MissingComponents = []string{"nodestatd"}
+	}
 	obs := newObservability(cfg, svc, m)
-	source := newFindings(cfg)
+	var source mcpserver.FindingsSource
+	if nodestatd {
+		source = newFindings(cfg)
+	}
 	if source != nil && live != nil {
 		namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err == nil {
@@ -207,11 +232,15 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 	}
 	var history *observability.Service
 	if cfg.DriftPrometheusURL != "" {
-		history = &observability.Service{PrometheusURL: cfg.DriftPrometheusURL, MaxHistoryRange: 90 * 24 * time.Hour, Alignment: 5 * time.Minute, Kubernetes: svc.clients.Kubernetes, Judge: svc.judge,
+		history = &observability.Service{ScannerNamespace: cfg.ScannerNamespace, ScannerInstance: cfg.ScannerInstance, PrometheusURL: cfg.DriftPrometheusURL, MaxHistoryRange: 90 * 24 * time.Hour, Alignment: 5 * time.Minute, Kubernetes: svc.clients.Kubernetes, Judge: svc.judge,
 			CVEHistoryEnabled: cfg.CVEHistoryEnabled, SAHistoryEnabled: cfg.SAHistoryEnabled,
+			HoursPerUpgrade: cfg.HoursPerUpgrade, BuildAgeDaysPerUpgrade: cfg.BuildAgeDaysPerUpgrade,
 			Backend: observability.NewGateway(observability.GatewayOptions{Next: observability.HTTPRequester(20 * time.Second), PrometheusURL: cfg.DriftPrometheusURL, PrometheusTimeout: 19 * time.Second})}
 	}
 	users := newUserAccess(cfg, svc)
+	if users != nil {
+		users.OIDCUsersDisabled = !oidcUsers
+	}
 	m.ObserveCaches(func() map[string]ttlcache.Stats {
 		stats := svc.facts.CacheStats()
 		stats["rbac_reviews"] = svc.reviews.Stats()
@@ -225,19 +254,20 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		m.ObserveWorkloadObjects(live.Cache.ObjectCounts)
 	}
 	server := mcpserver.New(mcpserver.Deps{
-		Cluster:       identity,
-		Version:       version,
-		Logger:        logger,
-		Metrics:       m,
-		Mapping:       svc.mapping,
-		Scope:         svc.scope,
-		Catalog:       svc.catalog,
-		Provisioning:  svc.service,
-		Workloads:     live,
-		Observability: obs,
-		Findings:      source,
-		DriftHistory:  history,
-		UserAccess:    users,
+		Cluster:                identity,
+		Version:                version,
+		Logger:                 logger,
+		Metrics:                m,
+		Mapping:                svc.mapping,
+		Scope:                  svc.scope,
+		Catalog:                svc.catalog,
+		Provisioning:           svc.service,
+		Workloads:              live,
+		Observability:          obs,
+		Findings:               source,
+		DriftHistory:           history,
+		UserAccess:             users,
+		ImageInventoryDisabled: !nodestatd,
 	})
 
 	if cfg.Transport == config.TransportStdio {
@@ -370,6 +400,7 @@ func newObservability(cfg *config.Config, svc *services, m *metrics.Metrics) *ob
 	o.PrometheusURL, o.LokiURL, o.LogsEnabled = c.PrometheusURL, c.LokiURL, true
 	o.ScannerNamespace, o.ScannerInstance = cfg.ScannerNamespace, cfg.ScannerInstance
 	o.CVEHistoryEnabled, o.SAHistoryEnabled = cfg.CVEHistoryEnabled, cfg.SAHistoryEnabled
+	o.HoursPerUpgrade, o.BuildAgeDaysPerUpgrade = cfg.HoursPerUpgrade, cfg.BuildAgeDaysPerUpgrade
 	o.PrometheusExternalURL = c.PrometheusExternalURL
 	o.AlertmanagerURL, o.AlertmanagerTimeout = c.AlertmanagerURL, c.RequestTimeout
 	o.Backend = observability.NewGateway(observability.GatewayOptions{
@@ -439,6 +470,7 @@ func newAuthenticator(cfg *config.Config, svc *services) *auth.Authenticator {
 	}
 	if cfg.ServiceAccountAuthEnabled {
 		a.ServiceAccounts = auth.NewTokenReviewer(svc.clients.Kubernetes.AuthenticationV1())
+		a.ServiceAccountAudience = cfg.ServiceAccountAudience
 	}
 
 	return a

@@ -86,11 +86,6 @@ func TestNamespaceSummariesSkipUnauthorizedNamespaces(t *testing.T) {
 		q := u.Query().Get("query")
 		value := "2.5"
 		switch {
-		case strings.HasPrefix(q, "count by"):
-			if !strings.Contains(q, "resource_limits") || !strings.Contains(q, `"memory"`) {
-				return vectorOf(), nil
-			}
-			value = "3"
 		case strings.Contains(q, `resource="memory"`):
 			value = "1024"
 		}
@@ -113,7 +108,7 @@ func TestNamespaceSummariesSkipUnauthorizedNamespaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	team := r.Namespaces["team"]
-	if len(r.Namespaces) != 1 || team == nil || *team.CPURequests != 2.5 || *team.MemoryRequests != 1024 || team.Unset.MemoryLimits != 3 || team.Unset.CPURequests != 0 || len(r.Warnings) != 1 {
+	if len(r.Namespaces) != 1 || team == nil || *team.CPURequests != 2.5 || *team.MemoryRequests != 1024 || len(r.Warnings) != 1 {
 		t.Fatalf("%+v %+v", r, team)
 	}
 	for _, u := range b.urls {

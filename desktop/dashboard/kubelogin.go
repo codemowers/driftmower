@@ -34,7 +34,6 @@ func pluginPath() string {
 	return strings.Join(dirs, string(filepath.ListSeparator))
 }
 
-// lookPath finds command in path, as exec.LookPath would with that PATH.
 func lookPath(command, path string) (string, error) {
 	for _, dir := range filepath.SplitList(path) {
 		candidate := filepath.Join(dir, command)

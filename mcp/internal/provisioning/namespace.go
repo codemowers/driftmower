@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // Namespace budget and network posture: the two things that decide whether a
@@ -175,7 +177,7 @@ func ComputeHeadroom(q *ResourceQuotaInput) *Headroom {
 		}
 		consumed, _ := parse(used[key])
 
-		return ptr(max(0, limit-consumed))
+		return new(max(0, limit-consumed))
 	}
 	remainingFloat := func(key string) *float64 {
 		limit, ok := ParseQuantity(hard[key])
@@ -184,7 +186,7 @@ func ComputeHeadroom(q *ResourceQuotaInput) *Headroom {
 		}
 		consumed, _ := ParseQuantity(used[key])
 
-		return ptr(max(0, limit-consumed))
+		return new(max(0, limit-consumed))
 	}
 
 	return &Headroom{
@@ -212,17 +214,9 @@ func ContainerDefaults(ranges [][]LimitRangeItem) *LimitRangeDefaults {
 				continue
 			}
 
-			return &LimitRangeDefaults{DefaultRequest: orEmptyMap(l.DefaultRequest), Default: orEmptyMap(l.Default)}
+			return &LimitRangeDefaults{DefaultRequest: nonnil.Map(l.DefaultRequest), Default: nonnil.Map(l.Default)}
 		}
 	}
 
 	return nil
-}
-
-func orEmptyMap(m QuotaAmounts) QuotaAmounts {
-	if m == nil {
-		return QuotaAmounts{}
-	}
-
-	return m
 }

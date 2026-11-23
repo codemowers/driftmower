@@ -5,9 +5,11 @@ import { AlertTriangle, RefreshCw, X } from "lucide-react"
 import MissingComponents from "@/app/components/missing-components"
 
 // Keep notices out of document flow so refreshes never move the dashboard.
-export default function DashboardNotices({ messages, missingComponents }: {
+export default function DashboardNotices({ messages, missingComponents, desktop, onRefresh }: {
   messages: (string | null | undefined)[]
   missingComponents: string[]
+  desktop: boolean
+  onRefresh: () => void
 }) {
   const [dismissed, setDismissed] = useState("")
   const notices = [...new Set([
@@ -17,15 +19,15 @@ export default function DashboardNotices({ messages, missingComponents }: {
   const signature = JSON.stringify(notices)
 
   return <>
-    <button
+    {desktop && <button
       type="button"
-      aria-label="Refresh all data"
-      title="Refresh all data and reconnect"
-      onClick={() => location.reload()}
+      aria-label="Refresh current view"
+      title="Refresh the current view"
+      onClick={onRefresh}
       className="fixed right-4 top-4 z-40 rounded-lg border bg-white p-2 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
     >
       <RefreshCw className="size-5" aria-hidden />
-    </button>
+    </button>}
     {notices.length > 0 && dismissed !== signature && (
       <aside role="status" aria-live="polite" className="fixed left-4 right-16 top-4 z-40 mx-auto max-h-[50vh] max-w-3xl overflow-auto rounded-lg border border-amber-400 bg-amber-100 text-sm text-amber-950 shadow-lg">
         <button

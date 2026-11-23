@@ -1,4 +1,5 @@
 # All components build and deploy together. Select a cluster through local env settings.
+# Dev trigger and RPC settings live in skaffold.env; see skaffold.env.example.
 apiVersion: skaffold/v4beta13
 kind: Config
 metadata:
@@ -125,7 +126,6 @@ manifests:
     flags:
       template:
         - --api-versions=monitoring.coreos.com/v1/PodMonitor
-        - --api-versions=monitoring.coreos.com/v1/ServiceMonitor
         - --api-versions=monitoring.coreos.com/v1/PrometheusRule
         - --api-versions=monitoring.coreos.com/v1/Prometheus
         - --api-versions=codemowers.ai/v1alpha1/ClusterMCPServer
@@ -144,12 +144,16 @@ manifests:
           operator.sbomStorageClassName: scratch
           registryScraper.storageClassName: scratch
         setValueTemplates:
+          priorityClassName: '{{ default "observability-critical" .DRIFTMOWER_PRIORITY_CLASS }}'
           crawler.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_crawler}}"
           mcp.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_mcp}}"
           mcp.auth.mode: '{{ default "rbac" .MCP_AUTH_MODE }}'
           mcp.ingress.enabled: '{{ default "true" .MCP_INGRESS_ENABLED }}'
           mcp.publicUrl: '{{ default "" .MCP_PUBLIC_URL }}'
           ui.enabled: '{{ default "true" .UI_ENABLED }}'
+          operator.trivy.cpuRequest: '{{ default "100m" .SCAN_CPU_REQUEST }}'
+          operator.trivy.strategy: '{{ default "operatorNamespace" .SCAN_STRATEGY }}'
+          operator.trivy.dacReadSearch: '{{ default "false" .TRIVY_DAC_READ_SEARCH }}'
           operator.enabled: '{{ default "true" .OPERATOR_ENABLED }}'
           mcp.metrics.prometheusNamespace: '{{ default "monitoring" .PROMETHEUS_NAMESPACE }}'
           ui.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_ui}}"

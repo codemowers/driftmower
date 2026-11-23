@@ -43,10 +43,9 @@ func addOwnerRecordTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 	var mu sync.Mutex
 	cache := map[string]ownerRecordEntry{}
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "get_owner_record",
-		Title: "Read a custom-resource owner's record",
-		Description: "Read when a workload's top-level owner that get_workloads reports as ownerReferenceOnly was created and last written, by which field manager, and its provenance annotations and labels. " +
-			"Read as the caller, so it requires get on that object.",
+		Name:        "get_owner_record",
+		Title:       "Read a custom-resource owner's record",
+		Description: "Creation time, last write, field managers and provenance metadata of a workload root marked ownerReferenceOnly.",
 		InputSchema: inputSchema[ownerRecordInput](func(p map[string]*jsonschema.Schema) {
 			for _, k := range []string{"apiVersion", "kind", "namespace", "name", "uid"} {
 				p[k].MinLength, p[k].MaxLength = jsonschema.Ptr(1), jsonschema.Ptr(253)

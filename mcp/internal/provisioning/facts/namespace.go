@@ -14,6 +14,7 @@ import (
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 	"github.com/codemowers/driftmower/mcp/internal/provisioning"
 )
 
@@ -75,7 +76,6 @@ func (f *Facts) Matrix(ctx context.Context, id authz.Identity, namespace string)
 	return matrix, nil
 }
 
-// NamespaceInput asks for one namespace's facts.
 type NamespaceInput struct {
 	Namespace string
 	// Nil when the call was unauthenticated; no access matrix is built then.
@@ -185,8 +185,8 @@ func (f *Facts) Namespace(ctx context.Context, in NamespaceInput) (NamespaceResu
 
 	labels, annotations := map[string]string{}, map[string]string{}
 	if nsU == nil {
-		labels = orEmptyMap(namespace.Labels)
-		annotations = orEmptyMap(namespace.Annotations)
+		labels = nonnil.Map(namespace.Labels)
+		annotations = nonnil.Map(namespace.Annotations)
 	}
 
 	var nativeInputs []provisioning.NetworkPolicyInput
@@ -225,9 +225,9 @@ func (f *Facts) Namespace(ctx context.Context, in NamespaceInput) (NamespaceResu
 		quota = &provisioning.ResourceQuotaInput{Name: q.Name, StatusHard: amounts(q.Status.Hard), StatusUsed: amounts(q.Status.Used), SpecHard: amounts(q.Spec.Hard)}
 		hard := quota.StatusHard
 		if hard == nil {
-			hard = orEmptyMap(quota.SpecHard)
+			hard = nonnil.Map(quota.SpecHard)
 		}
-		quotaFact = &provisioning.Quota{Name: orUnnamed(q.Name), Used: orEmptyMap(quota.StatusUsed), Hard: hard}
+		quotaFact = &provisioning.Quota{Name: provisioning.OrUnnamed(q.Name), Used: nonnil.Map(quota.StatusUsed), Hard: hard}
 	}
 	var limitItems [][]provisioning.LimitRangeItem
 	if limitsU == nil {
@@ -294,7 +294,7 @@ func (f *Facts) Namespace(ctx context.Context, in NamespaceInput) (NamespaceResu
 
 	fact := provisioning.NamespaceFact{
 		Namespace:  ns,
-		Sandbox:    strOrNil(tenantID),
+		Sandbox:    nonnil.String(tenantID),
 		Quota:      quotaFact,
 		Headroom:   provisioning.ComputeHeadroom(quota),
 		LimitRange: provisioning.ContainerDefaults(limitItems),
@@ -312,7 +312,7 @@ func (f *Facts) Namespace(ctx context.Context, in NamespaceInput) (NamespaceResu
 		fact.Tenant = &provisioning.Tenant{LabelKey: cluster.TenantLabelKey, ID: tenantID}
 	}
 
-	return NamespaceResult{Fact: fact, Labels: labels, Annotations: annotations, Degraded: orEmpty([]provisioning.DegradedRead(degraded))}, nil
+	return NamespaceResult{Fact: fact, Labels: labels, Annotations: annotations, Degraded: nonnil.Slice([]provisioning.DegradedRead(degraded))}, nil
 }
 
 // loadRegistries reads Services and Ingresses only once a Deployment here
@@ -413,28 +413,4 @@ func amounts(list corev1.ResourceList) provisioning.QuotaAmounts {
 	}
 
 	return out
-}
-
-func orEmptyMap[M ~map[string]string](m M) M {
-	if m == nil {
-		return M{}
-	}
-
-	return m
-}
-
-func orUnnamed(name string) string {
-	if name == "" {
-		return "(unnamed)"
-	}
-
-	return name
-}
-
-func strOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-
-	return &s
 }

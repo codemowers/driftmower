@@ -28,7 +28,7 @@ type oidcClientsOutput struct {
 }
 
 func addOIDCClientsTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
-	mcp.AddTool(s, &mcp.Tool{Name: "list_oidc_clients", Title: "List registered applications", Description: "List public application metadata from enabled OIDCClient registrations the caller may list. Checks caller Kubernetes RBAC for OIDCClients in each namespace. Returns names, launch URLs, descriptions and configured access groups, never credentials or redirect settings. Registration visibility does not guarantee application sign-in or health.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List registered applications")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, oidcClientsOutput, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "list_oidc_clients", Title: "List registered applications", Description: "Enabled OIDCClient applications with launch URL, description and access groups.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List registered applications")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, oidcClientsOutput, error) {
 		id, err := callerIdentity(req, mapping)
 		if err != nil {
 			return nil, oidcClientsOutput{}, err

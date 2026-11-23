@@ -20,7 +20,6 @@ type ListOptions struct {
 	What string
 }
 
-// PageFunc reads one page and returns its items and continue token.
 type PageFunc[T any] func(ctx context.Context, opts metav1.ListOptions) (items []T, continueToken string, err error)
 
 // Collect reads every page of a collection. It refuses to return a partial

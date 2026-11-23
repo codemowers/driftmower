@@ -18,7 +18,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// ClusterEndpoint is a public service/ingress metadata returned to the browser.
 type ClusterEndpoint struct {
 	PortForward bool   `json:"portForward,omitempty"`
 	Name        string `json:"name"`
@@ -27,7 +26,6 @@ type ClusterEndpoint struct {
 	AuthMethod  string `json:"authMethod,omitempty"`
 }
 
-// DiscoveredContext represents a Kubernetes context and its current status.
 type DiscoveredContext struct {
 	ChromeProfile *ChromeProfile `json:"chromeProfile,omitempty"`
 	PortForward   bool           `json:"portForward,omitempty"`
@@ -50,7 +48,6 @@ type DiscoveredContext struct {
 	SignInCommand string `json:"signInCommand,omitempty"`
 }
 
-// ContextDiscovery manages the background refreshing of Kubernetes contexts.
 type ContextDiscovery struct {
 	mu       sync.RWMutex
 	contexts []DiscoveredContext
@@ -67,6 +64,8 @@ type ContextDiscovery struct {
 	jumps      *sshJumps
 	forwards   *desktopForwards
 	chrome     *ChromeProfiles
+	watchDone  chan struct{}
+	updates    configUpdates
 	generation atomic.Uint64
 }
 
@@ -86,12 +85,7 @@ func (d *ContextDiscovery) Snapshot() ([]DiscoveredContext, []ClusterEndpoint) {
 }
 
 func (d *ContextDiscovery) load() (*clientcmdapi.Config, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	if d.path != "" {
-		rules.ExplicitPath = d.path
-	}
-
-	return rules.Load()
+	return d.loadingRules().Load()
 }
 
 func (d *ContextDiscovery) signedIn(key string) string {
@@ -178,26 +172,17 @@ func (d *ContextDiscovery) refresh() {
 			d.jumps.prune(nil)
 		}
 		d.mu.Lock()
-		d.contexts = []DiscoveredContext{{Name: "kubeconfig", Status: "Cannot read kubeconfig"}}
-		d.mu.Unlock()
-		return
-	}
-	results := contextGroups(raw)
-	d.mu.Lock()
-	if generation != d.generation.Load() {
-		d.mu.Unlock()
-		return
-	}
-	for i, group := range results {
-		for _, previous := range d.contexts {
-			if previous.Key == group.Key {
-				results[i].Status, results[i].State, results[i].URL, results[i].PortForward = previous.Status, previous.State, previous.URL, previous.PortForward
-				break
-			}
+		if generation == d.generation.Load() {
+			d.contexts = []DiscoveredContext{{Name: "kubeconfig", Status: "Cannot read kubeconfig"}}
 		}
+		d.mu.Unlock()
+		d.notify()
+		return
 	}
-	d.contexts = results
-	d.mu.Unlock()
+	results, published := d.publishGroups(raw, generation)
+	if !published {
+		return
+	}
 	// Contexts often share an API server; each is dialled once.
 	var reach sync.Map // server URL -> func() error
 	reachable := func(server string) error {
@@ -227,6 +212,7 @@ func (d *ContextDiscovery) refresh() {
 				d.contexts[i] = result
 			}
 			d.mu.Unlock()
+			d.notify()
 		}(i, group)
 	}
 	wg.Wait()
@@ -466,12 +452,11 @@ func anyReady(slices []discoveryv1.EndpointSlice) bool {
 	return false
 }
 
-// StartDiscovery starts a background refresh loop.
-// StartDiscovery starts a background refresh loop; a sign-in triggers an
-// immediate refresh. kubeLogin lets people sign in with kubelogin.
+// StartDiscovery reacts to kubeconfig writes, sign-in, retries and tunnel
+// lifecycle events. It never polls files or probes clusters on a timer.
 func StartDiscovery(enabled bool, path string, kubeLogin bool, chrome ...*ChromeProfiles) *ContextDiscovery {
 	ctx, cancel := context.WithCancel(context.Background())
-	d := &ContextDiscovery{path: path, kubeLogin: kubeLogin, wake: make(chan struct{}, 1), ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	d := &ContextDiscovery{path: path, kubeLogin: kubeLogin, wake: make(chan struct{}, 1), ctx: ctx, cancel: cancel, done: make(chan struct{}), watchDone: make(chan struct{})}
 	if len(chrome) > 0 {
 		d.chrome = chrome[0]
 	}
@@ -480,6 +465,7 @@ func StartDiscovery(enabled bool, path string, kubeLogin bool, chrome ...*Chrome
 		d.jumps = newSSHJumps(ctx)
 	}
 	if enabled {
+		d.startKubeconfigWatcher()
 		go func() {
 			defer close(d.done)
 			for {
@@ -490,13 +476,13 @@ func StartDiscovery(enabled bool, path string, kubeLogin bool, chrome ...*Chrome
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(time.Minute):
 				case <-d.wake:
 				}
 			}
 		}()
 	} else {
 		close(d.done)
+		close(d.watchDone)
 	}
 	return d
 }
@@ -510,4 +496,5 @@ func (d *ContextDiscovery) Close() {
 		d.forwards.Close()
 	}
 	<-d.done
+	<-d.watchDone
 }

@@ -85,7 +85,7 @@ function OfferingRow({
   return (
     <div className="rounded-lg border border-border bg-card px-5 py-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="font-heading text-sm font-semibold text-foreground">{card.name}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{card.name}</h3>
         <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium", badge.className)}>{badge.label}</span>
         {card.operator && (
           <a

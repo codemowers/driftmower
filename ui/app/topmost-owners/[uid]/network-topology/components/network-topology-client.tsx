@@ -20,6 +20,7 @@ import UnknownPeersList from "./unknown-peers-list"
 import PortMatrix from "./port-matrix"
 import StickyHeader from "./sticky-header"
 import NetworkTopologyHeader from "./network-topology-header"
+import { WorkloadNav } from "@/app/components/layout/resource-navs"
 import { NetstatdMissingNotice } from "@/app/components/netstatd-missing"
 
 type Props = {
@@ -84,11 +85,13 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
       portTotal={portTotal}
     />
   )
+  const nav = <WorkloadNav uid={uid} namespace={namespace} />
 
   if (missing) {
     return (
       <div className="flex flex-col gap-6">
         {header}
+        {nav}
         <NetstatdMissingNotice />
       </div>
     )
@@ -106,6 +109,7 @@ export default function NetworkTopologyClient({ uid, kind, kindLabel, namespace,
 
       <div className="flex flex-col gap-6">
         {header}
+        {nav}
 
         <SummaryStrip
           podCount={scope.podUids.size}

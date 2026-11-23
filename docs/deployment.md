@@ -104,3 +104,57 @@ Crawler and registry scraper instances are private to each cluster. Their HTTP
 APIs use projected ServiceAccount credentials; browsers and agents reach them
 through that cluster’s MCP. Image promotion also copies the crawler GitHub
 Secret to each destination. There are no shared public catalog endpoints.
+
+## Scan placement
+
+`operator.trivy.strategy` defaults to `operatorNamespace`, scanning cached images
+from the release namespace. Configure `operator.trivy.strategy=workloadNamespace`
+when scans require a consuming Pod's namespace-local pull references
+(`SCAN_STRATEGY=workloadNamespace` with Skaffold). Set
+`operator.trivy.cpuRequest` (`SCAN_CPU_REQUEST` with Skaffold) for the target
+cluster; the default is `100m`, with no CPU limit. Keep cluster-specific
+overrides in ignored local files under `chart/cluster-values/`.
+
+`workloadNamespace` selects a running Pod by its observed immutable image ID and
+runs the scan in that Pod's namespace on the same Node, with its pull Secret
+references. Images with no running consumer remain pending. Workload credentials
+stay in their original Secrets; no workload ServiceAccount is reused. The
+operator creates a scan ServiceAccount without workload permissions and mirrors
+only the release's configured scanner image pull Secrets into that namespace.
+Mirrors follow credential rotation when dispatching a scan and are owned by the
+scan ServiceAccount. A scan-owned egress policy permits DNS and uploads to the
+operator, including in namespaces with default-deny rules. Namespace removal
+removes these resources; disabling the strategy does
+not delete ServiceAccounts or credential mirrors from existing namespaces.
+
+This opt-in strategy grants the operator cluster-wide Pod lifecycle access,
+event reads, scan ServiceAccount and NetworkPolicy creation, and infrastructure pull
+Secret mirrors. Reads of infrastructure source Secrets stay restricted to the
+configured names in the release namespace; mirror reads/updates are restricted
+to their deterministic names. Scan Pods retain user namespaces, dropped
+capabilities, offline scanning and bounded centralized artifact retention.
+
+## Merged CycloneDX evidence
+
+The scanner publishes a filesystem-only CycloneDX document before starting
+Trivy, then replaces that same artifact with the merged vulnerability report.
+A failed Trivy step preserves filesystem evidence and marks vulnerability status
+as failed. Pending and failed reports never satisfy vulnerability coverage or
+suppress scan retries. MCP can project static analysis and download either phase
+through the same authenticated artifact store; no analysis sidecar is retained.
+
+File evidence uses bounded `type: file` components: the 1,000 newest regular
+files plus bounded ELF and shell observations, deduplicated by path. Standard
+`mime-type` carries the base media type. Custom observations use namespaced
+properties, including `driftmower:file:modified-at`, `driftmower:elf:linking` and
+`driftmower:shell:resolved-path`. BOM-level properties carry filesystem counts,
+MIME/linking histograms, coverage limits and
+`driftmower:filesystem:latest-modified-at`. The latest path is not duplicated at
+the top level. `driftmower:scan:vulnerabilities-status` distinguishes pending,
+complete and failed vulnerability steps; existing scan coverage/database
+properties retain their meanings.
+
+ContainerImage labels and config JSON creation time stay in their independent
+metadata lifecycle. The UI combines them with filesystem timestamps: created
+label first, config time second, latest file modification as an explicit estimate.
+A warning triangle exposes secondary facts when timestamps differ by an hour.

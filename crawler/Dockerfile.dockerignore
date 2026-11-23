@@ -13,3 +13,5 @@
 !internal/**/*.go
 !internal/**/*.html
 **/*_test.go
+/chart/cluster-values/
+/scripts/promote-images.sh

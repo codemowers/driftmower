@@ -190,14 +190,20 @@ type scalarTable struct {
 
 // smallScalar reports k when the public key is ±k·G for 1 ≤ k ≤ smallScalarLimit.
 func smallScalar(key *ecdsa.PublicKey) (int, bool) {
-	if key.Curve == nil || key.X == nil {
+	if key == nil || key.Curve == nil {
+		return 0, false
+	}
+	point, err := key.Bytes()
+	if err != nil {
 		return 0, false
 	}
 	name := key.Curve.Params().Name
 	v, _ := smallScalarTables.LoadOrStore(name, &scalarTable{})
 	t := v.(*scalarTable)
 	t.once.Do(func() { t.byX = buildScalarTable(key.Curve) })
-	k, ok := t.byX[string(key.X.Bytes())]
+	// SEC 1 uncompressed points contain a prefix followed by fixed-width X and Y.
+	x := bytes.TrimLeft(point[1:1+(len(point)-1)/2], "\x00")
+	k, ok := t.byX[string(x)]
 	return k, ok
 }
 

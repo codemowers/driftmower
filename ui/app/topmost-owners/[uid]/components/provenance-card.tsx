@@ -43,7 +43,7 @@ function useOwnerRecord(root: ClusterResource) {
 // Who and what created a top-level owner and when: the creator admission
 // recorded, its age and latest write, and deploy markers the Helm and Argo CD
 // cards do not already show.
-export default function ProvenanceCard({ root }: { root: ClusterResource }) {
+export default function ProvenanceCard({ root, embedded = false }: { root: ClusterResource; embedded?: boolean }) {
   const record = useOwnerRecord(root)
   const p = (root.ownerReferenceOnly ? record?.provenance : root.provenance) ?? {}
   const flux = p["helm.toolkit.fluxcd.io/name"]
@@ -61,10 +61,13 @@ export default function ProvenanceCard({ root }: { root: ClusterResource }) {
   if (p["skaffold.dev/run-id"]) rows.push(<Row key="skaffold" label="Skaffold run"><span className="font-mono">{p["skaffold.dev/run-id"]}</span></Row>)
   if (!rows.length) return null
 
+  const content = <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2">{rows}</dl>
+  if (embedded) return content
+
   return (
-    <section className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-      <p className="-mx-6 mb-4 border-b border-gray-200 px-6 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Provenance</p>
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2">{rows}</dl>
+    <section className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+      <p className="-mx-5 mb-4 border-b border-gray-200 px-5 pb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Provenance</p>
+      {content}
     </section>
   )
 }

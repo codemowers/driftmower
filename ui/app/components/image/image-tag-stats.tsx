@@ -1,8 +1,12 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { ICONS } from "@/app/components/layout/icons"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import type { useImageAnalysis } from "@/lib/features/image-analysis"
+import { imageBuildTime, IMAGE_TIME_SOURCES } from "@/lib/features/image-build-time"
 import { cn } from "@/lib/utils/cn"
-import { relativeTimeFromNow, compactRelativeTimeFromNow, durationFromNow } from "@/lib/utils/format-time"
+import { relativeTimeFromNow, compactRelativeTimeFromNow, durationFromNow, isoDate } from "@/lib/utils/format-time"
 import { OCI_CREATED } from "@/lib/utils/oci-labels"
 import { integrityInfo } from "@/lib/utils/image-artifacts"
 import VulnerabilityBar from "./vulnerability-bar"
@@ -10,16 +14,14 @@ import { useClusterState } from "@/lib/cluster/cluster-state"
 import { SEVERITY_STYLE, type StatusStyle } from "@/lib/cluster/styles/status-style"
 import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
 
+const TimestampConflict = ICONS.timestampConflict
+
 function severityStyle(statusType: string): StatusStyle {
   return SEVERITY_STYLE[statusType as StatusType] ?? {
     bg: "bg-status-neutral-bg",
     text: "text-status-neutral-label",
     label: statusType.replace(/_/g, " "),
   }
-}
-
-function isoDate(iso: string): string {
-  return iso.slice(0, 10)
 }
 
 function Column({ label, children, sub }: { label: string; children: ReactNode; sub: ReactNode }) {
@@ -32,7 +34,7 @@ function Column({ label, children, sub }: { label: string; children: ReactNode; 
   )
 }
 
-export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
+export default function ImageTagStats({ usage, analysis }: { usage: ImageUsage; analysis: ReturnType<typeof useImageAnalysis> }) {
   const vulnReports = useClusterState(s => s.vulnerabilityReports)
   const vulnError = useClusterState(s => s.vulnerabilityReportsError)
   const vuln = vulnReports?.[usage.imageInfo.digest] ?? null
@@ -49,7 +51,13 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
     ...(isBehind && vs.latestBuiltAt ? [`available for ${durationFromNow(vs.latestBuiltAt)}`] : []),
   ]
 
-  const builtAt = vs.deployedBuiltAt ?? usage.imageInfo.labels?.[OCI_CREATED]
+  const buildTime = imageBuildTime(usage.imageInfo.labels?.[OCI_CREATED], analysis.data?.images[usage.imageInfo.digest])
+  const primaryTime = buildTime.primary
+  const buildCaption = primaryTime
+    ? primaryTime.source === "file"
+      ? `file modified ${isoDate(primaryTime.timestamp)} · estimate`
+      : `built ${isoDate(primaryTime.timestamp)} · ${primaryTime.source === "label" ? "created label" : "config JSON"}`
+    : analysis.loading ? "Loading image timestamps…" : analysis.error ? "Image timestamps unavailable" : "build time unknown"
   const integrity = integrityInfo(usage)
 
   const summary = vuln?.report.summary ?? null
@@ -75,10 +83,27 @@ export default function ImageTagStats({ usage }: { usage: ImageUsage }) {
           <p className="text-xl font-semibold tabular-nums text-foreground">{driftValue}</p>
         </Column>
 
-        <Column label="Build Age" sub={builtAt ? `built ${isoDate(builtAt)}` : "build time unknown"}>
-          {builtAt
-            ? <p className="text-xl font-semibold text-foreground">{relativeTimeFromNow(builtAt)}</p>
-            : <p className="text-xl font-semibold text-muted-foreground">no data</p>}
+        <Column label="Build Age" sub={buildCaption}>
+          <div className="flex items-center gap-2">
+            {primaryTime
+              ? <p className="text-xl font-semibold text-foreground">{primaryTime.source === "file" && "≈ "}{relativeTimeFromNow(primaryTime.timestamp)}</p>
+              : <p className="text-xl font-semibold text-muted-foreground">{analysis.loading ? "loading" : "no data"}</p>}
+            {buildTime.conflict && <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label="Image timestamps differ by at least one hour" className="rounded text-status-major-label focus-visible:outline-2 focus-visible:outline-offset-2">
+                  <TimestampConflict className="size-4" aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm flex-col items-start gap-2">
+                <p>Image timestamps differ by at least one hour.</p>
+                <ul className="space-y-1">{buildTime.facts.map((fact, i) => <li key={`${fact.source}-${fact.digest ?? i}`}>
+                  {IMAGE_TIME_SOURCES[fact.source]}{i === 0 ? " (primary)" : ""}: {new Date(fact.timestamp).toLocaleString()}
+                  {fact.digest && <span className="block break-all font-mono text-xs">{fact.digest}</span>}
+                </li>)}</ul>
+                <p>File modification times may be preserved or normalized during a build.</p>
+              </TooltipContent>
+            </Tooltip>}
+          </div>
         </Column>
 
         <Column label="Integrity" sub={integrity.caption}>

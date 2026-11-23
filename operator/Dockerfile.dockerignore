@@ -10,3 +10,5 @@
 !operator/
 !operator/**/*.go
 **/*_test.go
+/chart/cluster-values/
+/scripts/promote-images.sh

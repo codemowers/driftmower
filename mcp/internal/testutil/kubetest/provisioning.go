@@ -17,7 +17,6 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-// Cluster is a fake cluster's typed and dynamic clients.
 type Cluster struct {
 	Kubernetes *fake.Clientset
 	Dynamic    *dynamicfake.FakeDynamicClient
@@ -42,8 +41,6 @@ func meta(name string, extra map[string]any) map[string]any {
 	return m
 }
 
-func ptr[T any](v T) *T { return &v }
-
 // ProvisioningCluster is a small platform: CloudNativePG installed and
 // healthy, one zone, a default storage class, an enforced tenant ingress guard
 // with a parameter ConfigMap, an HTTP-01 cluster issuer, and two tenant
@@ -59,7 +56,7 @@ func ProvisioningCluster() *Cluster {
 		},
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-cloudnative-pg", Namespace: "ops", Labels: map[string]string{"app.kubernetes.io/version": "1.24"}},
-			Spec:       appsv1.DeploymentSpec{Replicas: ptr(int32(1))},
+			Spec:       appsv1.DeploymentSpec{Replicas: new(int32(1))},
 			Status:     appsv1.DeploymentStatus{ReadyReplicas: 1},
 		},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "ingress-params", Namespace: "platform"}, Data: map[string]string{"ingressDomainSuffix": ".apps.example.com"}},

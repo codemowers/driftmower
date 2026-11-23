@@ -1,10 +1,14 @@
 export type VolumeUsage = { usedBytes: number | null; capacityBytes: number | null; inodes: number | null; inodesUsed: number | null }
 export type Claim = {
+  resizeStatus?: string
+  conditions?: { type: string; status: string; message?: string; lastTransitionTime?: string }[]
+  createdAt?: string | null
   namespace: string; name: string; uid: string; phase: string | null; storageClass: string | null
   requestedStorage: string | null; provisionedStorage: string | null; volumeMode: string; accessModes: string[]
   boundVolume: string | null; usage: VolumeUsage; canExpand: boolean; usedBy: { name: string; uid: string }[]
 }
 export type PersistentVolume = {
+  createdAt?: string | null
   name: string; uid: string; phase: string | null; capacityStorage: string | null; storageClass: string | null
   volumeMode: string; accessModes: string[]; reclaimPolicy: string | null; csiDriver: string | null
   claim: { namespace: string; name: string; uid?: string } | null

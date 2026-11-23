@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 	"github.com/codemowers/driftmower/mcp/internal/kube"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 type VolumeUsage struct {
@@ -27,18 +29,28 @@ type VolumeUsage struct {
 	InodesUsed    *float64 `json:"inodesUsed"`
 }
 
+type ClaimCondition struct {
+	Type               string    `json:"type"`
+	Status             string    `json:"status"`
+	Message            string    `json:"message,omitempty"`
+	LastTransitionTime time.Time `json:"lastTransitionTime,omitzero"`
+}
+
 type Claim struct {
-	Namespace          string      `json:"namespace"`
-	Name               string      `json:"name"`
-	UID                string      `json:"uid"`
-	Phase              *string     `json:"phase"`
-	StorageClass       *string     `json:"storageClass"`
-	RequestedStorage   *string     `json:"requestedStorage"`
-	ProvisionedStorage *string     `json:"provisionedStorage"`
-	VolumeMode         string      `json:"volumeMode"`
-	AccessModes        []string    `json:"accessModes"`
-	BoundVolume        *string     `json:"boundVolume"`
-	Usage              VolumeUsage `json:"usage"`
+	ResizeStatus       corev1.ClaimResourceStatus `json:"resizeStatus,omitempty"`
+	Conditions         []ClaimCondition           `json:"conditions,omitempty"`
+	CreatedAt          time.Time                  `json:"createdAt,omitzero"`
+	Namespace          string                     `json:"namespace"`
+	Name               string                     `json:"name"`
+	UID                string                     `json:"uid"`
+	Phase              *string                    `json:"phase"`
+	StorageClass       *string                    `json:"storageClass"`
+	RequestedStorage   *string                    `json:"requestedStorage"`
+	ProvisionedStorage *string                    `json:"provisionedStorage"`
+	VolumeMode         string                     `json:"volumeMode"`
+	AccessModes        []string                   `json:"accessModes"`
+	BoundVolume        *string                    `json:"boundVolume"`
+	Usage              VolumeUsage                `json:"usage"`
 	// The caller may patch this claim and its StorageClass allows expansion;
 	// always false when volume expansion is disabled on this server.
 	CanExpand bool `json:"canExpand"`
@@ -71,6 +83,7 @@ type ClaimRef struct {
 }
 
 type PersistentVolume struct {
+	CreatedAt       time.Time `json:"createdAt,omitzero"`
 	UID             string    `json:"uid"`
 	Name            string    `json:"name"`
 	Phase           *string   `json:"phase"`
@@ -158,8 +171,9 @@ func quantity(list corev1.ResourceList, name corev1.ResourceName) *string {
 // describePV never exports CSI volume attributes or secret references.
 func describePV(pv *corev1.PersistentVolume) PersistentVolume {
 	out := PersistentVolume{
-		UID:  string(pv.UID),
-		Name: pv.Name, Phase: optional(string(pv.Status.Phase)), CapacityStorage: quantity(pv.Spec.Capacity, corev1.ResourceStorage),
+		CreatedAt: pv.CreationTimestamp.Time,
+		UID:       string(pv.UID),
+		Name:      pv.Name, Phase: optional(string(pv.Status.Phase)), CapacityStorage: quantity(pv.Spec.Capacity, corev1.ResourceStorage),
 		StorageClass: optional(pv.Spec.StorageClassName), VolumeMode: volumeMode(pv.Spec.VolumeMode), AccessModes: modes(pv.Spec.AccessModes),
 		ReclaimPolicy: optional(string(pv.Spec.PersistentVolumeReclaimPolicy)),
 	}
@@ -272,11 +286,7 @@ func (s *Service) ListVolumes(ctx context.Context, id authz.Identity, namespace 
 			if c.Spec.VolumeName != "" {
 				bound[c.Spec.VolumeName] = true
 			}
-			claims = append(claims, Claim{
-				Namespace: c.Namespace, Name: c.Name, UID: string(c.UID), Phase: optional(string(c.Status.Phase)), StorageClass: c.Spec.StorageClassName,
-				RequestedStorage: quantity(c.Spec.Resources.Requests, corev1.ResourceStorage), ProvisionedStorage: quantity(c.Status.Capacity, corev1.ResourceStorage),
-				VolumeMode: volumeMode(c.Spec.VolumeMode), AccessModes: modes(c.Spec.AccessModes), BoundVolume: optional(c.Spec.VolumeName),
-			})
+			claims = append(claims, describeClaim(&c))
 		}
 
 		if includeUnbound {
@@ -420,7 +430,7 @@ func (s *Service) ListVolumes(ctx context.Context, id authz.Identity, namespace 
 		}
 		slices.SortStableFunc(degraded, func(a, b VolumeDegraded) int { return strings.Compare(a.Source, b.Source) })
 		result = &Volumes{
-			ObservedAt: observedAt, Namespace: optional(namespace), Claims: claims, PersistentVolumes: orEmpty(list), StorageClasses: storageClasses,
+			ObservedAt: observedAt, Namespace: optional(namespace), Claims: claims, PersistentVolumes: nonnil.Slice(list), StorageClasses: storageClasses,
 			MetricSources: sources, PrometheusURL: prometheusURL, Degraded: degraded,
 			Notes: []string{
 				"PVC and PV inventory comes from the Kubernetes API. Bound PV details require get permission for that PV; includeUnboundPVs requires cluster-wide list PV permission.",
@@ -533,7 +543,7 @@ func describeStorageClass(c *storagev1.StorageClass) StorageClassInfo {
 		}
 	}
 	out := StorageClassInfo{Name: c.Name, Provisioner: c.Provisioner, Parameters: params, ReclaimPolicy: "Delete", VolumeBindingMode: "Immediate",
-		AllowVolumeExpansion: c.AllowVolumeExpansion != nil && *c.AllowVolumeExpansion, MountOptions: orEmpty(c.MountOptions)}
+		AllowVolumeExpansion: c.AllowVolumeExpansion != nil && *c.AllowVolumeExpansion, MountOptions: nonnil.Slice(c.MountOptions)}
 	if c.ReclaimPolicy != nil {
 		out.ReclaimPolicy = string(*c.ReclaimPolicy)
 	}
@@ -544,7 +554,6 @@ func describeStorageClass(c *storagev1.StorageClass) StorageClassInfo {
 	return out
 }
 
-// vector evaluates an instant query and returns finite samples.
 func (s *Service) vector(ctx context.Context, backend Requester, query, at string) ([]Sample, []string, error) {
 	u := endpoint(s.PrometheusURL, "/api/v1/query")
 	v := u.Query()

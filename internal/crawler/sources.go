@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// Forge kinds the crawler reads releases from.
 const (
 	GitHub = "github"
 	GitLab = "gitlab"
@@ -33,7 +32,6 @@ type Range struct {
 	Patched []string `json:"patched,omitempty"`
 }
 
-// Advisory is a security advisory affecting a source.
 type Advisory struct {
 	ID        string    `json:"id"`
 	Aliases   []string  `json:"aliases,omitempty"`

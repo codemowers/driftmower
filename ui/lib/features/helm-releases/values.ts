@@ -1,4 +1,4 @@
-import { emitYamlLines, type YamlAnnotation, type YamlLine } from "@/lib/features/yaml/yaml-lines"
+import { emitYamlLines, isPlainObject, type YamlAnnotation, type YamlLine } from "@/lib/features/yaml/yaml-lines"
 
 export type ReleaseIdentity = {
   name: string
@@ -18,10 +18,6 @@ export type ReleaseValues = ReleaseIdentity & {
 export type ValuesView = "overrides" | "merged"
 
 type Lookup = { found: boolean; value: unknown }
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
 
 function isEmptyContainer(value: unknown): boolean {
   if (Array.isArray(value)) return value.length === 0

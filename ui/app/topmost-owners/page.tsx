@@ -1,24 +1,23 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { LoaderCircle } from "lucide-react"
-import { Suspense, startTransition, useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { Suspense, useMemo } from "react"
 import PageHeader from "../components/page-header"
 import StatusSummaryBar from "../components/status-summary-bar"
 import WorkloadList from "./components/workload-list"
-import FocusSelect from "./components/focus-select"
-import { DEFAULT_FOCUS, FOCUSES, FOCUS_STORAGE_KEY, resolveFocusKey } from "./focus"
-import type { FocusKey, WorkloadEntry } from "./focus/types"
+import { DRIFT_FOCUS } from "./focus/drift-focus"
+import type { WorkloadEntry } from "./focus/types"
 import { EMPTY_POD_SUMMARY, summarizePodsByRoot } from "@/lib/utils/pods-by-root"
-import { useWorkloadHistory } from "@/lib/features/drift-history/use-bulk-drift-history"
 import { orphanBuckets, reportWorkloadRoots } from "@/lib/utils/report-roots"
 import { resourceSummary } from "./components/related-resources"
 import SandboxEmptyState from "../components/sandbox-empty-state"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useSandboxScope } from "@/lib/tenancy/sandbox-context"
 import { findWorkloadRoot } from "@/lib/cluster/workload-root"
-import { parseFilterTokens } from "@/lib/utils/filter-params"
 import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
+import { compareIssues, driftIssues } from "@/lib/cluster/issues"
 import type { StatusType } from "@/lib/cluster/reports"
 
 export default function TopmostOwnersPage() {
@@ -34,47 +33,8 @@ function TopmostOwnersContent() {
   const error = useClusterState(s => s.error)
   const data = useClusterState(s => s.data)
   const clusterResources = useClusterState(s => s.clusterResources)
-  const searchParams = useSearchParams()
   const { sandboxes: scopedSandboxes, namespaces } = useSandboxScope()
-
-  const [storedFocus, setStoredFocus] = useState<string | null>(null)
-  const [focusResolved, setFocusResolved] = useState(false)
-  useEffect(() => {
-    const stored = localStorage.getItem(FOCUS_STORAGE_KEY)
-    startTransition(() => {
-      if (stored) setStoredFocus(stored)
-      setFocusResolved(true)
-    })
-  }, [])
-
-  const focusKey = resolveFocusKey(searchParams.get("focus"), storedFocus)
-  const focus = FOCUSES[focusKey]
-  const history = useWorkloadHistory(focusKey === "history")
-
-  useEffect(() => {
-    if (!focusResolved || focusKey === DEFAULT_FOCUS || searchParams.get("focus")) return
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("focus", focusKey)
-    window.history.replaceState(null, "", `?${params.toString()}`)
-  }, [focusResolved, focusKey, searchParams])
-
-  function handleFocusChange(key: FocusKey) {
-    if (key === focusKey) return
-    localStorage.setItem(FOCUS_STORAGE_KEY, key)
-    setStoredFocus(key)
-
-    const params = new URLSearchParams(searchParams.toString())
-    if (key === DEFAULT_FOCUS) params.delete("focus")
-    else params.set("focus", key)
-
-    const previousTokens = new Set(focus.scale.map(l => l.token))
-    const keptFilters = [...parseFilterTokens(params.get("filters"))].filter(t => !previousTokens.has(t))
-    if (keptFilters.length) params.set("filters", keptFilters.join(","))
-    else params.delete("filters")
-
-    const next = params.toString()
-    window.history.replaceState(null, "", next ? `?${next}` : window.location.pathname)
-  }
+  const focus = DRIFT_FOCUS
 
   const podSummaries = useMemo(() => summarizePodsByRoot(clusterResources), [clusterResources])
 
@@ -118,6 +78,7 @@ function TopmostOwnersContent() {
 
       return {
         orphan: root.orphan ? "pod" : undefined,
+        issues: [...(root.issues ?? []), ...driftIssues(usages)].sort(compareIssues),
         sourceState: usages.some(u => u.imageInfo.sourceStatus === "linked") ? "linked" : usages.length > 0 && usages.every(u => u.imageInfo.sourceStatus === "unlinked") ? "unlinked" : "unknown",
         desiredReplicas: root.desiredReplicas,
         completed: root.completed,
@@ -160,15 +121,13 @@ function TopmostOwnersContent() {
 
   const scopeSet = namespaces ? new Set(namespaces) : null
   const scoped = [...reportEntries, ...bucketEntries].filter(w => !scopeSet || scopeSet.has(w.namespace))
-  const workloads = focus.key === "history"
-    ? scoped.map(w => ({ ...w, history: history[w.groupKey] }))
-    : scoped
+  const workloads = scoped
   const rooted = workloads.filter(w => w.orphan !== "bucket")
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader title="Workloads" subtitle="Controllers at the root of each workload subtree" />
+    <>
+      <Page>
+        <PageHeader icon={ICONS.workloads} title="Workloads" subtitle="Controllers at the root of each workload subtree" />
         {(fetching || (!data && !error)) && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />{data ? "Updating workloads…" : "Loading workloads…"}</p>}
         {!data && error && <p role="alert">Could not load workloads: {error}</p>}
         {data && <><StatusSummaryBar
@@ -176,15 +135,14 @@ function TopmostOwnersContent() {
           totalCount={rooted.length}
           secondary={focus.secondary(rooted)}
           pills={focus.pills(rooted)}
-          leading={<FocusSelect focus={focus} onChange={handleFocusChange} />}
         />
         {scopedSandboxes.length > 0 && workloads.length === 0 ? (
           <SandboxEmptyState sandboxes={scopedSandboxes} entity="workloads" />
         ) : (
-          <WorkloadList key={focus.key} entries={workloads} focus={focus} syncUrl={focusResolved} />
+          <WorkloadList entries={workloads} focus={focus} syncUrl />
         )}
         </>}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

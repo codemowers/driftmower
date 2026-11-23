@@ -66,7 +66,6 @@ func (c *Crawler) changelog(ctx context.Context, loc location) (*Changelog, erro
 	return nil, nil
 }
 
-// Change categories, most urgent first.
 const (
 	CategorySecurity = "security"
 	CategoryBreaking = "breaking"
@@ -81,7 +80,6 @@ type ChangeItem struct {
 	Text     string `json:"text"`
 }
 
-// VersionChanges is what one release changed.
 type VersionChanges struct {
 	Tag       string    `json:"tag"`
 	Published time.Time `json:"published,omitzero"`

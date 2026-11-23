@@ -17,7 +17,7 @@ type NodePressure struct {
 	PID    bool `json:"pid"`
 }
 
-// Used and total bytes of one kind of node storage.
+// Used and total bytes of one node capacity, with its source and graph.
 type NodeStorage struct {
 	Used   float64 `json:"used"`
 	Total  float64 `json:"total"`
@@ -30,6 +30,7 @@ type ClusterNode struct {
 	Name              string       `json:"name"`
 	Roles             []string     `json:"roles"`
 	Readiness         string       `json:"readiness"`
+	Conditions        []string     `json:"conditions"`
 	Schedulable       bool         `json:"schedulable"`
 	Pressure          NodePressure `json:"pressure"`
 	KubeletVersion    string       `json:"kubeletVersion"`
@@ -38,9 +39,11 @@ type ClusterNode struct {
 	ContainerRuntime  string       `json:"containerRuntime"`
 	Architecture      string       `json:"architecture"`
 	CreationTimestamp string       `json:"creationTimestamp"`
+	BootTimeSeconds   *float64     `json:"bootTimeSeconds"`
 	// From Prometheus; nil when unavailable. LVM is the TopoLVM volume
 	// group's allocation, for PersistentVolumes; Ephemeral is the root
 	// filesystem, holding images, logs and emptyDirs.
+	Memory    *NodeStorage `json:"memory"`
 	LVM       *NodeStorage `json:"lvm"`
 	Ephemeral *NodeStorage `json:"ephemeral"`
 }
@@ -139,7 +142,17 @@ func (s *Service) ClusterHealth(ctx context.Context, id authz.Identity) (*Cluste
 		}
 		lvm := nodeStorage(usage, "lvmVolumeGroupAllocated", "lvmVolumeGroupSize", "topolvm")
 		ephemeral := nodeStorage(usage, "rootFilesystemUsed", "rootFilesystemCapacity", "rootFilesystem")
+		memory := nodeStorage(usage, "memoryUsed", "memoryCapacity", "nodeMemory")
 		for i := range out.Nodes {
+			if metric := usage.Metrics["bootTime"]; metric != nil {
+				for _, sample := range metric.Breakdown {
+					if sample.Labels["node"] == out.Nodes[i].Name && sample.Value > 0 && sample.Value <= float64(s.now().Unix()) {
+						value := sample.Value
+						out.Nodes[i].BootTimeSeconds = &value
+					}
+				}
+			}
+			out.Nodes[i].Memory = memory[out.Nodes[i].Name]
 			out.Nodes[i].LVM, out.Nodes[i].Ephemeral = lvm[out.Nodes[i].Name], ephemeral[out.Nodes[i].Name]
 		}
 	}
@@ -174,8 +187,15 @@ func describeNodes(items []corev1.Node) []ClusterNode {
 		}
 		slices.Sort(roles)
 		info := n.Status.NodeInfo
+		conditions := []string{}
+		for _, c := range n.Status.Conditions {
+			if c.Type != corev1.NodeReady && c.Status == corev1.ConditionTrue {
+				conditions = append(conditions, string(c.Type))
+			}
+		}
+		slices.Sort(conditions)
 		out = append(out, ClusterNode{
-			Name: n.Name, Roles: roles, Readiness: readiness, Schedulable: !n.Spec.Unschedulable,
+			Name: n.Name, Roles: roles, Readiness: readiness, Conditions: conditions, Schedulable: !n.Spec.Unschedulable,
 			Pressure: NodePressure{
 				Memory: condition(corev1.NodeMemoryPressure) == corev1.ConditionTrue,
 				Disk:   condition(corev1.NodeDiskPressure) == corev1.ConditionTrue,

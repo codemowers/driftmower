@@ -21,7 +21,6 @@ var (
 	mcpServersGVR        = schema.GroupVersionResource{Group: mcpServersGroup, Version: "v1alpha1", Resource: "mcpservers"}
 )
 
-// mcpServer is one MCP server registered for codemowers agents.
 type mcpServer struct {
 	Name string `json:"name"`
 	// Empty for a ClusterMCPServer.
@@ -40,10 +39,9 @@ type mcpServersOutput struct {
 // MCPServer resources, as far as the caller may list them.
 func addMCPServersTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_mcp_servers",
-		Title: "List MCP servers",
-		Description: "List the MCP servers registered for agents: every ClusterMCPServer when the caller may list them, and MCPServers in namespaces where the caller may list them. " +
-			"Each has its URL and, when agents present ServiceAccount tokens, the token audience.",
+		Name:        "list_mcp_servers",
+		Title:       "List MCP servers",
+		Description: "Registered ClusterMCPServers and MCPServers with description, URL and token audience.",
 		InputSchema: noArguments(),
 		Annotations: readOnly("List MCP servers"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, *mcpServersOutput, error) {

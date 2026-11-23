@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -387,5 +388,43 @@ func TestChromeProfileIsSingleAssociationPerAuthEntry(t *testing.T) {
 		if group.ChromeProfile == nil || group.ChromeProfile.Directory != "Profile 1" {
 			t.Fatal("API server changed auth profile", group)
 		}
+	}
+}
+
+func TestChromeConnectPassesOnlyLocalReturnPathToNewProfile(t *testing.T) {
+	p := chromeFixture(t)
+	d := New(&Config{KubeLogin: true, ChromeProfiles: p})
+	defer d.Close()
+	d.discovery.contexts = []DiscoveredContext{{Key: "identity", Status: "available", URL: "https://mcp.example/mcp", ChromeProfile: &ChromeProfile{Directory: "Profile 1", Name: "Work"}}}
+	launches := 0
+	linked := "/topmost-owners/workload/pod?tab=metadata#details"
+	p.launch = func(profile, target string, app bool) error {
+		launches++
+		u, err := url.Parse(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if profile != "Profile 1" || !app || u.Scheme+"://"+u.Host != DesktopOrigin || u.Path != "/settings" || u.Query().Get("return-to") != linked || u.Query().Get("connect") != "identity" || u.Query().Get("chrome-profile") != "Profile 1" {
+			t.Fatalf("wrong launch %s", target)
+		}
+		return nil
+	}
+	for _, destination := range []string{linked, "https://evil.example", "//evil.example", "/\\evil.example", "/\n/evil.example"} {
+		body, _ := json.Marshal(map[string]string{"key": "identity", "returnTo": destination})
+		r := httptest.NewRequest(http.MethodPost, DesktopOrigin+"/api/desktop/connect", strings.NewReader(string(body)))
+		r.Header.Set("Origin", DesktopOrigin)
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		d.Handler().ServeHTTP(w, r)
+		want := http.StatusBadRequest
+		if destination == linked {
+			want = http.StatusNoContent
+		}
+		if w.Code != want {
+			t.Fatalf("destination %q: %d %s", destination, w.Code, w.Body)
+		}
+	}
+	if launches != 1 {
+		t.Fatalf("launched %d times", launches)
 	}
 }

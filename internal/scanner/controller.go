@@ -1,25 +1,31 @@
 package scanner
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/codemowers/driftmower/internal/imageanalysis"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/codemowers/driftmower/internal/platformapis"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,21 +50,55 @@ type Controller struct {
 	// This release's scan Pods; their count is the concurrency in use.
 	podStore cache.Store
 	// Wakes the dispatcher when a slot may have freed or work arrived.
-	wakeup    chan struct{}
-	mu        sync.Mutex
-	ready     atomic.Bool
-	artifacts sync.Mutex
+	wakeup         chan struct{}
+	mu             sync.Mutex
+	ready          atomic.Bool
+	disabled       atomic.Bool
+	dispatchHalted atomic.Bool
+	artifacts      sync.Mutex
 	// Only bounded severity counts, never full SBOMs, survive parsing.
 	summaries sync.Map // artifact key -> vulnerabilitySummary
 }
 
 func (c *Controller) Run(ctx context.Context) error {
+	installed, err := platformapis.HasResources(c.Kube.Discovery(), "codemowers.io/v1alpha1", "containerimages", "sourcerepositories")
+	if err != nil {
+		return err
+	}
+	if !installed {
+		c.Log.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; Trivy scanner dispatching is disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock; restart Driftmower after installing")
+		c.disabled.Store(true)
+		c.ready.Store(true)
+		defer c.ready.Store(false)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
+	if c.Config.Strategy != "" && c.Config.Strategy != StrategyOperatorNamespace && c.Config.Strategy != StrategyWorkloadNamespace {
+		return fmt.Errorf("unknown scan strategy %q", c.Config.Strategy)
+	}
+	if c.Config.CPURequest != "" {
+		cpu, err := resource.ParseQuantity(c.Config.CPURequest)
+		if err != nil || cpu.Sign() <= 0 {
+			return errors.New("scan CPU request must be a positive quantity")
+		}
+	}
 	if c.Config.MaxBytes < 32<<20 || c.Config.PriorityClass == "" {
 		return errors.New("invalid scan priority class or cache size")
 	}
 	if err := os.MkdirAll(c.Config.CacheDir, 0700); err != nil {
 		return err
 	}
+	c.artifacts.Lock()
+	if err := c.cleanupLegacy(); err != nil {
+		c.artifacts.Unlock()
+		return err
+	}
+	if err := c.makeRoom(0); err != nil {
+		c.artifacts.Unlock()
+		return err
+	}
+	c.artifacts.Unlock()
 	defer c.ready.Store(false)
 	c.queue = workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 	defer c.queue.ShutDown()
@@ -69,11 +109,11 @@ func (c *Controller) Run(ctx context.Context) error {
 			c.queue.Add(u.GetName())
 		}
 	}
-	_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{AddFunc: func(obj any) { enqueue(obj); c.wake() }, UpdateFunc: func(_, obj any) { enqueue(obj) }})
+	_, err = c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{AddFunc: func(obj any) { enqueue(obj); c.wake() }, UpdateFunc: func(_, obj any) { enqueue(obj) }})
 	if err != nil {
 		return err
 	}
-	factory := informers.NewSharedInformerFactoryWithOptions(c.Kube, 0, informers.WithNamespace(c.Config.Namespace), informers.WithTweakListOptions(func(options *metav1.ListOptions) { options.LabelSelector = "app=" + c.Config.scanServiceAccount() }))
+	factory := informers.NewSharedInformerFactoryWithOptions(c.Kube, 0, informers.WithNamespace(c.scanNamespace()), informers.WithTweakListOptions(func(options *metav1.ListOptions) { options.LabelSelector = "app=" + c.Config.scanServiceAccount() }))
 	podEvents := factory.Core().V1().Pods().Informer()
 	c.podStore = podEvents.GetStore()
 	enqueuePod := func(obj any) {
@@ -146,12 +186,11 @@ func (c *Controller) reconcile(ctx context.Context, name string) error {
 		if digest == "" || architecture == "" {
 			continue
 		}
-		key := Key(digest, c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)
-		if _, err := os.Stat(filepath.Join(c.Config.CacheDir, key+".json")); err == nil {
-			if err := c.summarizeArtifact(key); err != nil {
-				failed = errors.Join(failed, err)
-				continue
-			}
+		key := c.Config.artifactKey(digest)
+		if available, err := c.artifactExists(key); err != nil {
+			failed = errors.Join(failed, err)
+			continue
+		} else if available {
 			// One manifest's failure must not hold back the others.
 			if err := c.attach(ctx, name, digest, key); err != nil {
 				failed = errors.Join(failed, err)
@@ -180,6 +219,7 @@ func (c *Controller) attach(ctx context.Context, name, digest, key string) error
 			return err
 		}
 		if state.Key == key && len(state.Attempts) > 0 {
+			state.Digest = digest
 			state.Attempts[len(state.Attempts)-1].Outcome = "succeeded"
 			state.Attempts[len(state.Attempts)-1].Reason = ""
 			encoded, err := json.Marshal(state)
@@ -206,7 +246,7 @@ func (c *Controller) attach(ctx context.Context, name, digest, key string) error
 	return err
 }
 
-func (c *Controller) authenticated(r *http.Request, account string) (*authv1.TokenReview, error) {
+func (c *Controller) reviewToken(r *http.Request) (*authv1.TokenReview, error) {
 	raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {
 		return nil, errors.New("bearer token required")
@@ -215,16 +255,28 @@ func (c *Controller) authenticated(r *http.Request, account string) (*authv1.Tok
 	if err != nil {
 		return nil, err
 	}
-	if !review.Status.Authenticated || review.Status.User.Username != "system:serviceaccount:"+c.Config.Namespace+":"+account || !slices.Contains(review.Status.Audiences, c.Config.Audience) {
+	if !review.Status.Authenticated || !slices.Contains(review.Status.Audiences, c.Config.Audience) {
 		return nil, errors.New("token rejected")
 	}
 	return review, nil
 }
+func (c *Controller) authenticated(r *http.Request, account string) (*authv1.TokenReview, error) {
+	review, err := c.reviewToken(r)
+	if err != nil {
+		return nil, err
+	}
+	if review.Status.User.Username != "system:serviceaccount:"+c.Config.Namespace+":"+account {
+		return nil, errors.New("token rejected")
+	}
+	return review, nil
+}
+
 func (c *Controller) Handler() http.Handler {
 	mux := http.NewServeMux()
 	metrics := newScanMetrics()
 	metrics.registry.MustRegister(&securityCollector{controller: c})
 	metrics.registry.MustRegister(&scannerFootprintCollector{controller: c})
+	metrics.registry.MustRegister(&scanDispatchCollector{controller: c})
 	mux.Handle("GET /metrics", promhttp.HandlerFor(metrics.registry, promhttp.HandlerOpts{}))
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
 		if !c.ready.Load() {
@@ -235,8 +287,13 @@ func (c *Controller) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
 	mux.HandleFunc("PUT /internal/scans/{pod}", func(w http.ResponseWriter, r *http.Request) {
-		review, err := c.authenticated(r, c.Config.scanServiceAccount())
+		review, err := c.reviewToken(r)
 		if err != nil {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+		identity := strings.Split(review.Status.User.Username, ":")
+		if len(identity) != 4 || identity[0] != "system" || identity[1] != "serviceaccount" || identity[3] != c.Config.scanServiceAccount() || (c.Config.Strategy != StrategyWorkloadNamespace && identity[2] != c.Config.Namespace) {
 			http.Error(w, "unauthorized", 401)
 			return
 		}
@@ -245,7 +302,7 @@ func (c *Controller) Handler() http.Handler {
 			http.Error(w, "pod-bound token required", 403)
 			return
 		}
-		pod, err := c.Kube.CoreV1().Pods(c.Config.Namespace).Get(r.Context(), podNames[0], metav1.GetOptions{})
+		pod, err := c.Kube.CoreV1().Pods(identity[2]).Get(r.Context(), podNames[0], metav1.GetOptions{})
 		if err != nil {
 			http.Error(w, "pod unavailable", 403)
 			return
@@ -266,6 +323,28 @@ func (c *Controller) Handler() http.Handler {
 		}
 		image := pod.Annotations["driftmower.io/container-image"]
 		digest := pod.Annotations["driftmower.io/platform-digest"]
+		if c.Config.Strategy == StrategyWorkloadNamespace {
+			imageObj, err := c.Dynamic.Resource(images).Get(r.Context(), image, metav1.GetOptions{})
+			if err != nil {
+				http.Error(w, "image unavailable", 503)
+				return
+			}
+			if !ownsScanPod(pod, imageObj, key, c.Config.scanServiceAccount()) {
+				http.Error(w, "image ownership mismatch", 403)
+				return
+			}
+			state, err := c.loadState(imageObj, digest, key)
+			if err != nil {
+				http.Error(w, "scan state unavailable", 503)
+				return
+			}
+			if !slices.ContainsFunc(state.Attempts, func(a scanAttempt) bool {
+				return a.Pod == pod.Name && c.attemptNamespace(a) == pod.Namespace && a.UID == pod.UID && a.UID != ""
+			}) {
+				http.Error(w, "scan attempt not recorded", 503)
+				return
+			}
+		}
 		if r.Header.Get("Content-Type") == OversizedSBOMMediaType {
 			var report SBOMSizeReport
 			decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
@@ -278,29 +357,92 @@ func (c *Controller) Handler() http.Handler {
 			http.Error(w, "artifact too large", 413)
 			return
 		}
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxSBOMBytes))
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			http.Error(w, "gzip SBOM upload required", http.StatusUnsupportedMediaType)
+			return
+		}
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxCompressedSBOMBytes))
 		if err != nil {
-			var tooLarge *http.MaxBytesError
-			if errors.As(err, &tooLarge) {
-				// Without a size report the stream's exact total is unknown.
-				// Record the observed lower bound, never a fabricated infinity.
-				metrics.size.Observe(float64(MaxSBOMBytes + 1))
-				metrics.oversized.WithLabelValues(image, digest).Set(float64(MaxSBOMBytes + 1))
+			http.Error(w, "compressed artifact too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		size, err := validateCompressedSBOM(bytes.NewReader(body))
+		if size > MaxSBOMBytes {
+			metrics.size.Observe(float64(size))
+			metrics.oversized.WithLabelValues(image, digest).Set(float64(size))
+			http.Error(w, "artifact too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		if err != nil {
+			http.Error(w, "invalid gzip SBOM", http.StatusBadRequest)
+			return
+		}
+		reader, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			http.Error(w, "invalid gzip SBOM", 400)
+			return
+		}
+		summary, err := summarizeVulnerabilities(io.LimitReader(reader, MaxSBOMBytes+1))
+		reader.Close()
+		if err != nil {
+			http.Error(w, "invalid SBOM summary", 400)
+			return
+		}
+		if summary.Status != "" && summary.Status != "pending" && summary.Status != "complete" && summary.Status != "failed" {
+			http.Error(w, "invalid vulnerability phase", 400)
+			return
+		}
+		pending := summary.Status == "pending" || summary.Status == "failed"
+		if pending && !summary.Filesystem {
+			http.Error(w, "filesystem evidence required", 400)
+			return
+		}
+		if summary.Filesystem {
+			reader, err := gzip.NewReader(bytes.NewReader(body))
+			if err != nil {
+				http.Error(w, "invalid gzip SBOM", 400)
+				return
 			}
-			http.Error(w, "artifact too large", 413)
+			_, err = imageanalysis.ReadCycloneDX(io.LimitReader(reader, MaxSBOMBytes+1))
+			reader.Close()
+			if err != nil {
+				http.Error(w, "invalid bounded filesystem evidence", 400)
+				return
+			}
+		}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		imageObj, err := c.Dynamic.Resource(images).Get(r.Context(), image, metav1.GetOptions{})
+		if err != nil {
+			http.Error(w, "image unavailable", 503)
 			return
 		}
-		var bom struct {
-			BOMFormat string `json:"bomFormat"`
-		}
-		if json.Unmarshal(body, &bom) != nil || bom.BOMFormat != "CycloneDX" {
-			http.Error(w, "invalid SBOM", 400)
+		if !ownsScanPod(pod, imageObj, key, c.Config.scanServiceAccount()) {
+			http.Error(w, "image ownership mismatch", 403)
 			return
 		}
-		metrics.size.Observe(float64(len(body)))
+		metrics.size.Observe(float64(size))
 		c.artifacts.Lock()
 		defer c.artifacts.Unlock()
-		if err := c.makeRoom(int64(len(body))); err != nil {
+		if pending {
+			previous, err := readArtifactSummary(filepath.Join(c.Config.CacheDir, key+artifactSuffix))
+			if err == nil && previous.Status != "pending" && previous.Status != "failed" {
+				w.WriteHeader(201)
+				return
+			}
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				http.Error(w, "previous artifact unavailable", 503)
+				return
+			}
+		}
+		incoming := int64(len(body))
+		if previous, err := os.Stat(filepath.Join(c.Config.CacheDir, key+artifactSuffix)); err == nil {
+			incoming -= previous.Size()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "previous artifact unavailable", 503)
+			return
+		}
+		if err := c.makeRoomFor(incoming, key); err != nil {
 			http.Error(w, "cache full", 507)
 			return
 		}
@@ -309,24 +451,65 @@ func (c *Controller) Handler() http.Handler {
 			http.Error(w, "cache unavailable", 503)
 			return
 		}
-		if err := os.Rename(tmp, filepath.Join(c.Config.CacheDir, key+".json")); err != nil {
+		if err := os.Rename(tmp, filepath.Join(c.Config.CacheDir, key+artifactSuffix)); err != nil {
 			http.Error(w, "cache unavailable", 503)
 			return
 		}
-		metrics.oversized.DeleteLabelValues(image, digest)
-		// Rebuild lazily from the persisted artifact, also after a restart.
-		c.summaries.Delete(key)
+		if !pending {
+			metrics.oversized.DeleteLabelValues(image, digest)
+		}
+		info, err := os.Stat(filepath.Join(c.Config.CacheDir, key+artifactSuffix))
+		if err != nil {
+			http.Error(w, "artifact unavailable", 503)
+			return
+		}
+		summary.AcceptedAt = float64(info.ModTime().Unix())
+		c.summaries.Store(key, summary)
+		if summary.Filesystem {
+			annotation := "driftmower.io/analysis-" + Key(digest, "manifest")[:40]
+			if imageObj.GetAnnotations()[annotation] != key {
+				patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"resourceVersion": imageObj.GetResourceVersion(), "annotations": map[string]string{annotation: key}}})
+				if _, err := c.Dynamic.Resource(images).Patch(r.Context(), image, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+					http.Error(w, "filesystem artifact not recorded", 503)
+					return
+				}
+			}
+		}
+		_ = os.Remove(filepath.Join(c.Config.CacheDir, key+findingsSuffix))
 		if c.queue != nil {
 			c.queue.Add(image)
 		}
 		w.WriteHeader(201)
 	})
-	mux.HandleFunc("GET /v1/sboms/{key}", func(w http.ResponseWriter, r *http.Request) {
-		reader := c.Config.ReaderServiceAccount
-		if reader == "" {
-			reader = "driftmower-mcp"
+	mux.HandleFunc("POST /v1/findings", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := c.authenticated(r, c.Config.readerServiceAccount()); err != nil {
+			http.Error(w, "unauthorized", 401)
+			return
 		}
-		if _, err := c.authenticated(r, reader); err != nil {
+		var in struct {
+			Keys []string `json:"keys"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in); err != nil || len(in.Keys) == 0 {
+			http.Error(w, "expected artifact keys", 400)
+			return
+		}
+		out := map[string]*ArtifactFindings{}
+		for _, key := range in.Keys {
+			if len(key) != 64 || strings.Trim(key, "0123456789abcdef") != "" {
+				http.Error(w, "invalid artifact key", 400)
+				return
+			}
+			// Missing artifacts are absent from the answer: expired, not clean.
+			if findings, err := c.findings(key); err == nil {
+				out[key] = findings
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": out})
+	})
+	mux.HandleFunc("GET /v1/sboms/{key}", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := c.authenticated(r, c.Config.readerServiceAccount()); err != nil {
 			http.Error(w, "unauthorized", 401)
 			return
 		}
@@ -335,48 +518,35 @@ func (c *Controller) Handler() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
+			http.Error(w, "gzip encoding required", http.StatusNotAcceptable)
+			return
+		}
+		file, err := os.Open(filepath.Join(c.Config.CacheDir, key+artifactSuffix))
+		if errors.Is(err, os.ErrNotExist) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, "artifact unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		defer func() { _ = file.Close() }()
+		info, err := file.Stat()
+		if err != nil {
+			http.Error(w, "artifact unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		w.Header().Set("Content-Type", "application/vnd.cyclonedx+json")
-		http.ServeFile(w, r, filepath.Join(c.Config.CacheDir, key+".json"))
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+		w.Header().Set("ETag", fmt.Sprintf(`W/"%x-%x-gzip"`, info.ModTime().UnixNano(), info.Size()))
+		w.Header().Add("Vary", "Accept-Encoding")
+		w.Header().Set("Cache-Control", "private, no-cache")
+		http.ServeContent(w, r, key+artifactSuffix, info.ModTime(), file)
 	})
+	mux.HandleFunc("GET /v1/analyses/{key}", c.serveAnalysis)
 	return mux
-}
-func (c *Controller) makeRoom(incoming int64) error {
-	entries, err := os.ReadDir(c.Config.CacheDir)
-	if err != nil {
-		return err
-	}
-	type artifact struct {
-		name     string
-		size     int64
-		modified time.Time
-	}
-	var files []artifact
-	total := incoming
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".json") {
-			info, err := e.Info()
-			if err != nil {
-				return err
-			}
-			files = append(files, artifact{e.Name(), info.Size(), info.ModTime()})
-			total += info.Size()
-		}
-	}
-	slices.SortFunc(files, func(a, b artifact) int { return a.modified.Compare(b.modified) })
-	for _, file := range files {
-		if total <= c.Config.MaxBytes {
-			break
-		}
-		if err := os.Remove(filepath.Join(c.Config.CacheDir, file.name)); err != nil {
-			return err
-		}
-		c.summaries.Delete(strings.TrimSuffix(file.name, ".json"))
-		total -= file.size
-	}
-	if total > c.Config.MaxBytes {
-		return fmt.Errorf("artifact exceeds cache limit")
-	}
-	return nil
 }
 
 // Preserve containerd's recorded immutable reference: pulling an index does

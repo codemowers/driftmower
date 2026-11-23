@@ -107,7 +107,6 @@ func (v Version) Line(o Version) bool {
 	return v.component(0) == o.component(0) && v.component(1) == o.component(1)
 }
 
-// Confidence says how sure a match is.
 type Confidence string
 
 const (

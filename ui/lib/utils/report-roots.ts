@@ -1,6 +1,7 @@
 import type { ImageUsage, Report, ReportWorkload, WorkloadDependencies } from "@/lib/cluster/reports"
 
 export type ReportWorkloadRoot = {
+  issues?: import("@/lib/cluster/issues").WorkloadIssue[]
   // A standalone Pod, held in its namespace's orphan bucket.
   orphan?: boolean
   desiredReplicas?: number
@@ -19,6 +20,7 @@ export function reportWorkloadRoots(data: Report | null): ReportWorkloadRoot[] {
   const roots: ReportWorkloadRoot[] = []
   if (data.workloads) {
     for (const workload of data.workloads) {
+      if (workload.kind === "ContainerImage") continue
       const owners = workload.kind === "Namespace"
         ? (workload.standalonePods ?? []).map(pod => ({ ...pod, kind: "Pod", namespace: workload.namespace, orphan: true }))
         : [workload]
@@ -32,7 +34,7 @@ export function reportWorkloadRoots(data: Report | null): ReportWorkloadRoot[] {
   for (const [groupKey, usages] of Object.entries(data.report.workloadGroupMap)) {
     if (groupKey === "unknown") continue
     const root = usages[0]?.workloadRootInfo
-    if (!root?.uid) continue
+    if (!root?.uid || root.kind === "ContainerImage") continue
     roots.push({
       groupKey,
       kind: root.kind,

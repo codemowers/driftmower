@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import MarkdownText from "@/app/components/markdown-text"
 
@@ -330,9 +332,9 @@ export default function TrustPage() {
   const retry = () => { setState({ status: "loading" }); setAttempt(a => a + 1) }
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader
+    <>
+      <Page>
+        <PageHeader icon={ICONS.trust}
           title="Trust"
           subtitle="CA bundles distributed by trust-manager, the admission policies that mount them into workloads, and problems in each CA certificate"
         />
@@ -359,7 +361,7 @@ export default function TrustPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

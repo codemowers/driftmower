@@ -1,11 +1,12 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import PageHeader from "../components/page-header"
 import ClusterScopePill from "../components/cluster-scope-pill"
 import ClusterHeader from "./components/cluster-header"
 import NodesCard from "./components/nodes-card"
-import PrometheusAlerts from "./components/prometheus-alerts"
 import ClusterMetrics from "./components/cluster-metrics"
 import ClusterIOCards from "./components/cluster-io"
 import { useClusterState } from "@/lib/cluster/cluster-state"
@@ -34,8 +35,6 @@ export default function ClusterPage() {
   const nodeDrift = useClusterState(s => s.nodeDrift)
   const isConnected = useClusterState(s => s.isConnected)
   const nodeDriftError = useClusterState(s => s.nodeDriftError)
-  const alerts = useClusterState(s => s.prometheusAlerts)
-  const [alertsHeight, setAlertsHeight] = useState<number | null>(null)
 
   useEffect(() => {
     if (!isConnected) return
@@ -53,9 +52,9 @@ export default function ClusterPage() {
   const nodes = nodeDrift?.nodes ?? []
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader
+    <>
+      <Page>
+        <PageHeader icon={ICONS.nodes}
           title="Cluster"
           subtitle="Nodes, their state and versions, and cluster resource usage"
           accessory={<ClusterScopePill />}
@@ -71,14 +70,7 @@ export default function ClusterPage() {
           <>
             <ClusterHeader nodes={nodes} />
 
-            {alerts && alerts.length > 0 ? (
-              <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
-                <PrometheusAlerts onCollapsedHeight={setAlertsHeight} />
-                <ClusterMetrics matchHeight={alertsHeight} />
-              </div>
-            ) : (
-              <ClusterMetrics matchHeight={null} />
-            )}
+            <ClusterMetrics matchHeight={null} />
             <ClusterIOCards />
             {nodes.length === 0 ? (
               <Notice>{NO_NODES}</Notice>
@@ -87,8 +79,8 @@ export default function ClusterPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }
 

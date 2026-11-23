@@ -43,7 +43,6 @@ func (l *NamespaceLister) List(ctx context.Context) ([]string, error) {
 	return l.memo.Get(ctx)
 }
 
-// Invalidate makes the next List read the cluster again.
 func (l *NamespaceLister) Invalidate() {
 	l.memo.Invalidate()
 }

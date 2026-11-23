@@ -26,7 +26,7 @@ type applicationsOutput struct {
 }
 
 func addApplicationsTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
-	mcp.AddTool(s, &mcp.Tool{Name: "list_applications", Title: "List application endpoints", Description: "Discover application URLs from Ingress rules in namespaces visible to the caller. Checks caller list permission for Ingresses separately. TLS hosts use HTTPS; wildcard hosts are omitted. This lists configured routes, not a guarantee of application access or health. Warnings identify incomplete discovery.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List application endpoints")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, applicationsOutput, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "list_applications", Title: "List application endpoints", Description: "Application URLs from Ingress rules.", InputSchema: inputSchema[namespaceInput](nil), Annotations: readOnly("List application endpoints")}, func(ctx context.Context, req *mcp.CallToolRequest, in namespaceInput) (*mcp.CallToolResult, applicationsOutput, error) {
 		out := applicationsOutput{Applications: []application{}, Warnings: []string{}}
 		id, err := callerIdentity(req, mapping)
 		if err != nil {

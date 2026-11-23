@@ -2,19 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { ExternalLink } from "lucide-react"
-import CopyButton from "@/app/components/copy-button"
-import { callTool, toolNames } from "@/browser/connection"
+import { CopySnippet } from "@/app/components/copy-button"
+import { shellQuote } from "@/lib/utils/shell"
+import { callTool, toolNames, user } from "@/browser/connection"
 
-type Registry = { present: boolean; service?: string; host?: string }
+type Registry = { present: boolean; service?: string; host?: string; username?: string }
 
-function Snippet({ text }: { text: string }) {
-  return (
-    <div className="relative">
-      <span className="absolute right-3 top-2 z-10"><CopyButton value={text} /></span>
-      <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">{text}</pre>
-    </div>
-  )
-}
 
 // The cluster-wide Zot registry, when the platform runs one: where to make
 // an API key, how to log in with it, and the skaffold.env lines that push
@@ -27,7 +20,9 @@ export default function ClusterRegistry() {
     void (async () => {
       try {
         if (!(await toolNames()).has("get_cluster_registry")) return
-        const r = await callTool<Registry>("get_cluster_registry")
+        const [r, signedIn] = await Promise.all([callTool<Registry>("get_cluster_registry"), user()])
+        const username = signedIn && "username" in signedIn.profile ? signedIn.profile.username : undefined
+        if (typeof username === "string" && username) r.username = username
         if (!cancelled) setRegistry(r)
       } catch { /* Nothing to show. */ }
     })()
@@ -36,6 +31,7 @@ export default function ClusterRegistry() {
   if (!registry?.present) return null
 
   const host = registry.host
+  const username = registry.username ?? "<username>"
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cluster registry</h2>
@@ -52,9 +48,9 @@ export default function ClusterRegistry() {
             </a>{" "}
             and create an API key under your user menu, then log in with your Zot username and that key as the password:
           </p>
-          <Snippet text={`docker login ${host} -u <username>`} />
+          <CopySnippet text={`docker login ${shellQuote(host)} -u ${shellQuote(username)}`} />
           <p className="text-sm">In <code className="font-mono text-xs">skaffold.env</code>, push images under your user:</p>
-          <Snippet text={`SKAFFOLD_DEFAULT_REPO=${host}/<username>`} />
+          <CopySnippet text={`SKAFFOLD_DEFAULT_REPO=${shellQuote(`${host}/${username}`)}`} />
         </>
       )}
     </section>

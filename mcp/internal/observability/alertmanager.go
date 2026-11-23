@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/codemowers/driftmower/mcp/internal/authz"
+	"github.com/codemowers/driftmower/mcp/internal/nonnil"
 )
 
 // Alert access maps to Kubernetes permissions of the caller: reading a
@@ -210,7 +211,7 @@ func (s *Service) ListAlerts(ctx context.Context, id authz.Identity, in AlertsIn
 			out.Alerts = append(out.Alerts, Alert{
 				Alertname: al.Labels["alertname"], Severity: severity, Namespace: ns, State: al.Status.State, StartsAt: al.StartsAt,
 				Summary: al.Annotations["summary"], Description: al.Annotations["description"], Labels: al.Labels,
-				SilencedBy: orEmpty(al.Status.SilencedBy), InhibitedBy: orEmpty(al.Status.InhibitedBy), Fingerprint: al.Fingerprint,
+				SilencedBy: nonnil.Slice(al.Status.SilencedBy), InhibitedBy: nonnil.Slice(al.Status.InhibitedBy), Fingerprint: al.Fingerprint,
 				CanSilence: a.maySilence(ns),
 			})
 		}

@@ -65,11 +65,9 @@ export default function VersionHistoryCard({
   const repoFlag = chartSource && repoUrl && !isAbsoluteChartRef(chartSource) ? ` --repo ${repoUrl}` : ""
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Version History
-      </p>
-      <div className="rounded-xl border border-gray-200 bg-white">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Version History</h2>
+      <div className="">
         <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-3">
           <p className="text-xs text-muted-foreground">Published chart versions</p>
           <div className="flex shrink-0 items-center gap-4">
@@ -156,6 +154,6 @@ export default function VersionHistoryCard({
           </button>
         )}
       </div>
-    </div>
+    </section>
   )
 }

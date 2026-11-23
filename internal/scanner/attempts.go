@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"os"
-	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,18 +28,23 @@ const (
 )
 
 type scanAttempt struct {
-	Pod       string `json:"pod"`
-	Node      string `json:"node"`
-	Hostname  string `json:"hostname"`
-	Reference string `json:"reference"`
-	Outcome   string `json:"outcome,omitempty"`
-	Reason    string `json:"reason,omitempty"`
+	Pod       string    `json:"pod"`
+	Namespace string    `json:"namespace,omitempty"`
+	UID       types.UID `json:"uid,omitempty"`
+	SourcePod string    `json:"sourcePod,omitempty"`
+	SourceUID types.UID `json:"sourceUID,omitempty"`
+	Node      string    `json:"node"`
+	Hostname  string    `json:"hostname"`
+	Reference string    `json:"reference"`
+	Outcome   string    `json:"outcome,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
 }
 
 // Bounded per-platform history survives operator restarts and diagnostic Pod
 // cleanup. A new scanner/database version gets a fresh artifact and budget.
 type scanState struct {
 	Key        string        `json:"key"`
+	Digest     string        `json:"digest,omitempty"`
 	Generation int           `json:"generation,omitempty"`
 	Attempts   []scanAttempt `json:"attempts"`
 }
@@ -53,7 +58,7 @@ func (c *Controller) stateAnnotation(digest string) string {
 }
 
 func (c *Controller) loadState(image *unstructured.Unstructured, digest, key string) (scanState, error) {
-	state := scanState{Key: key}
+	state := scanState{Key: key, Digest: digest}
 	if raw := image.GetAnnotations()[c.stateAnnotation(digest)]; raw != "" {
 		if err := json.Unmarshal([]byte(raw), &state); err != nil {
 			return scanState{}, fmt.Errorf("invalid persisted scan attempts: %w", err)
@@ -61,6 +66,7 @@ func (c *Controller) loadState(image *unstructured.Unstructured, digest, key str
 		if state.Key != key {
 			state = scanState{Key: key}
 		}
+		state.Digest = digest
 	}
 	return state, nil
 }
@@ -84,15 +90,18 @@ func (c *Controller) saveScanState(ctx context.Context, image *unstructured.Unst
 	return err
 }
 
+// A filesystem-only CycloneDX document is useful evidence, but cannot satisfy
+// the vulnerability scan or stop retries. Summaries remain bounded and rebuild
+// from the single artifact after restart.
 func (c *Controller) artifactExists(key string) (bool, error) {
-	_, err := os.Stat(filepath.Join(c.Config.CacheDir, key+".json"))
-	if err == nil {
-		return true, nil
-	}
+	summary, err := c.summarizeArtifact(key)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
+	} else if err != nil {
+		return false, err
 	}
-	return false, err
+	status := summary.Status
+	return status != "pending" && status != "failed", nil
 }
 
 // restartIfEvicted starts a fresh scan cycle for a successful artifact the
@@ -130,10 +139,23 @@ func (c *Controller) observe(ctx context.Context, recorded *unstructured.Unstruc
 		return c.saveScanState(ctx, image, digest, state)
 	}
 	if !state.inFlight() {
+		// loadState resets a superseded scanner configuration in memory.
+		// Persist that reset before dispatch so readers cannot report the old
+		// failure while the new configuration is still waiting for a slot.
+		if len(state.Attempts) == 0 {
+			raw := image.GetAnnotations()[c.stateAnnotation(digest)]
+			encoded, err := json.Marshal(state)
+			if err != nil {
+				return err
+			}
+			if raw != "" && raw != string(encoded) {
+				return c.saveScanState(ctx, image, digest, state)
+			}
+		}
 		return nil
 	}
 	last := &state.Attempts[len(state.Attempts)-1]
-	pods := c.Kube.CoreV1().Pods(c.Config.Namespace)
+	pods := c.Kube.CoreV1().Pods(c.attemptNamespace(*last))
 	// client-go returns an empty, non-nil Pod alongside NotFound.
 	pod, err := pods.Get(ctx, last.Pod, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -141,14 +163,14 @@ func (c *Controller) observe(ctx context.Context, recorded *unstructured.Unstruc
 	} else if err != nil {
 		return err
 	}
-	if pod != nil && !ownsScanPod(pod, image, key, c.Config.scanServiceAccount()) {
+	if pod != nil && (!ownsScanPod(pod, image, key, c.Config.scanServiceAccount()) || (last.UID != "" && pod.UID != last.UID)) {
 		return errors.New("scan Pod identity mismatch")
 	}
 	switch {
 	case pod == nil:
 		last.Outcome, last.Reason = "failed", "scan Pod disappeared"
 	case pod.Status.Phase == corev1.PodFailed:
-		last.Outcome, last.Reason = "failed", pod.Status.Reason
+		last.Outcome, last.Reason = "failed", scanPodExit(pod)
 	case pod.Status.Phase == corev1.PodSucceeded:
 		if exists, err := c.artifactExists(key); err != nil {
 			return err
@@ -158,10 +180,19 @@ func (c *Controller) observe(ctx context.Context, recorded *unstructured.Unstruc
 			last.Outcome, last.Reason = "failed", "scan completed without an artifact"
 		}
 	default:
-		if last.Reason = scanPodFailure(pod); last.Reason == "" {
+		reason, err := c.scanPodFailure(ctx, pod)
+		if err != nil {
+			return err
+		}
+		if reason == "" {
 			return nil
 		}
-		last.Outcome = "failed"
+		last.Outcome, last.Reason = "failed", reason
+	}
+	if last.Outcome == "failed" {
+		if err := c.markArtifactFailed(key, last.Reason); err != nil {
+			return err
+		}
 	}
 	if err := c.saveScanState(ctx, image, digest, state); err != nil {
 		return err
@@ -205,7 +236,7 @@ func (c *Controller) pendingScans() []pendingScan {
 			if digest == "" || arch == "" {
 				continue
 			}
-			key := Key(digest, c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)
+			key := c.Config.artifactKey(digest)
 			if exists, err := c.artifactExists(key); err != nil || exists {
 				continue
 			}
@@ -286,6 +317,9 @@ func (c *Controller) dispatchLoop(ctx context.Context) {
 
 // fill starts scans for random pending manifests until every slot is used.
 func (c *Controller) fill(ctx context.Context) {
+	if !c.dispatchAllowed() {
+		return
+	}
 	free := c.parallelism() - c.activeScans()
 	if free <= 0 {
 		return
@@ -300,11 +334,20 @@ func (c *Controller) fill(ctx context.Context) {
 		c.Log.Warn("scan dispatch: list nodes", "error", err)
 		return
 	}
-	for _, p := range pending {
-		if free == 0 || ctx.Err() != nil {
+	var consumers []corev1.Pod
+	if c.Config.Strategy == StrategyWorkloadNamespace {
+		pods, err := c.Kube.CoreV1().Pods("").List(ctx, metav1.ListOptions{FieldSelector: "status.phase=Running"})
+		if err != nil {
+			c.Log.Warn("scan dispatch: list consuming Pods", "error", err)
 			return
 		}
-		started, err := c.start(ctx, p, nodes.Items)
+		consumers = pods.Items
+	}
+	for _, p := range pending {
+		if free == 0 || ctx.Err() != nil || !c.dispatchAllowed() {
+			return
+		}
+		started, err := c.start(ctx, p, nodes.Items, consumers)
 		if err != nil {
 			c.Log.Warn("scan not started", "image", p.image.GetName(), "digest", p.digest, "error", err)
 		}
@@ -316,7 +359,7 @@ func (c *Controller) fill(ctx context.Context) {
 
 // start creates the next attempt's Pod and then records it. Pod names are
 // deterministic, so a Pod whose record was lost is adopted, not duplicated.
-func (c *Controller) start(ctx context.Context, p pendingScan, nodes []corev1.Node) (bool, error) {
+func (c *Controller) start(ctx context.Context, p pendingScan, nodes []corev1.Node, consumers []corev1.Pod) (bool, error) {
 	// Choose from the cached snapshot first: most pending manifests have no
 	// eligible Node, and that must not cost an API read per round.
 	state, err := c.loadState(p.image, p.digest, p.key)
@@ -326,7 +369,7 @@ func (c *Controller) start(ctx context.Context, p pendingScan, nodes []corev1.No
 	if _, err := c.restartIfEvicted(&state); err != nil {
 		return false, err
 	}
-	if _, ok := c.nextNode(p.image, state, nodes, p.arch, p.digest, p.key); !ok {
+	if _, ok := c.nextAttempt(p.image, state, nodes, p.arch, p.digest, p.key, consumers); !ok {
 		return false, nil
 	}
 
@@ -345,15 +388,26 @@ func (c *Controller) start(ctx context.Context, p pendingScan, nodes []corev1.No
 	if exists, err := c.artifactExists(p.key); err != nil || exists || state.inFlight() || len(state.Attempts) >= maxScanAttempts {
 		return false, err
 	}
-	attempt, ok := c.nextNode(image, state, nodes, p.arch, p.digest, p.key)
+	attempt, ok := c.nextAttempt(image, state, nodes, p.arch, p.digest, p.key, consumers)
 	if !ok {
 		return false, nil
 	}
 	attempt.Pod = fmt.Sprintf("scan-%s-%d-%d", Key(p.key, image.GetName(), c.Config.Instance)[:40], state.Generation, len(state.Attempts)+1)
-	pods := c.Kube.CoreV1().Pods(c.Config.Namespace)
-	pod := ScanPod(c.Config, p.key, image.GetName(), string(image.GetUID()), attempt.Reference, attempt.Hostname, p.arch, attempt.Pod)
+	cfg := c.Config
+	if cfg.Strategy == StrategyWorkloadNamespace {
+		pullSecrets, err := c.prepareWorkloadScan(ctx, image, p.digest, attempt)
+		if err != nil {
+			return false, err
+		}
+		cfg.Namespace = attempt.Namespace
+		cfg.PullSecrets = pullSecrets
+	}
+	pods := c.Kube.CoreV1().Pods(cfg.Namespace)
+	pod := ScanPod(cfg, p.key, image.GetName(), string(image.GetUID()), attempt.Reference, attempt.Hostname, p.arch, attempt.Pod)
 	pod.Annotations["driftmower.io/platform-digest"] = p.digest
-	if _, err := pods.Create(ctx, pod, metav1.CreateOptions{}); apierrors.IsAlreadyExists(err) {
+	pod.Labels[scannerOwnerLabel] = c.scannerOwner()
+	created, err := pods.Create(ctx, pod, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
 		existing, err := pods.Get(ctx, attempt.Pod, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -364,6 +418,8 @@ func (c *Controller) start(ctx context.Context, p pendingScan, nodes []corev1.No
 		attempt = adoptedAttempt(existing, nodes)
 	} else if err != nil {
 		return false, err
+	} else {
+		attempt.UID = created.UID
 	}
 	state.Attempts = append(state.Attempts, attempt)
 	// If this fails, the Pod runs unrecorded until the next round adopts it.
@@ -435,7 +491,7 @@ func (c *Controller) nextNode(image *unstructured.Unstructured, state scanState,
 
 // adoptedAttempt reconstructs the record of an existing attempt Pod.
 func adoptedAttempt(pod *corev1.Pod, nodes []corev1.Node) scanAttempt {
-	attempt := scanAttempt{Pod: pod.Name, Hostname: pod.Spec.NodeSelector["kubernetes.io/hostname"], Node: pod.Spec.NodeName}
+	attempt := scanAttempt{Pod: pod.Name, Namespace: pod.Namespace, UID: pod.UID, Hostname: pod.Spec.NodeSelector["kubernetes.io/hostname"], Node: pod.Spec.NodeName}
 	for _, node := range nodes {
 		if attempt.Node == "" && node.Labels["kubernetes.io/hostname"] == attempt.Hostname {
 			attempt.Node = node.Name
@@ -475,14 +531,77 @@ func ownsScanPod(pod *corev1.Pod, image *unstructured.Unstructured, key, account
 		})
 }
 
-func scanPodFailure(pod *corev1.Pod) string {
+// maxReason bounds a recorded failure; five attempts share one annotation.
+const maxReason = 1024
+
+// scanPodExit explains a failed scan Pod by its failed container's
+// termination message, which keeps the end of the log.
+func scanPodExit(pod *corev1.Pod) string {
 	for _, status := range append(slices.Clone(pod.Status.InitContainerStatuses), pod.Status.ContainerStatuses...) {
-		if status.State.Waiting != nil && status.State.Waiting.Reason == "ErrImageNeverPull" {
-			return status.State.Waiting.Reason
+		t := status.State.Terminated
+		if t == nil || t.ExitCode == 0 {
+			continue
+		}
+		reason := fmt.Sprintf("%s exited with code %d", status.Name, t.ExitCode)
+		if msg := strings.TrimSpace(t.Message); msg != "" {
+			if len(msg) > maxReason {
+				msg = "…" + msg[len(msg)-maxReason:]
+			}
+			reason += ": " + msg
+		} else if t.Reason != "" && t.Reason != "Error" {
+			reason += ": " + t.Reason
+		}
+		return reason
+	}
+	if pod.Status.Reason != "" {
+		return pod.Status.Reason
+	}
+	return "scan Pod failed"
+}
+
+// Image volume failures can leave every container in PodInitializing. Their
+// only useful evidence is then a kubelet Event, rather than a container status.
+// Read only this Pod's events; never keep another inventory cache.
+func (c *Controller) scanPodFailure(ctx context.Context, pod *corev1.Pod) (string, error) {
+	for _, status := range append(slices.Clone(pod.Status.InitContainerStatuses), pod.Status.ContainerStatuses...) {
+		if waiting := status.State.Waiting; waiting != nil {
+			if reason := imageCacheFailure(waiting.Reason, waiting.Message); reason != "" {
+				return reason, nil
+			}
+		}
+	}
+	started := slices.ContainsFunc(pod.Status.InitContainerStatuses, func(status corev1.ContainerStatus) bool {
+		return status.State.Running != nil || status.State.Terminated != nil
+	})
+	if pod.Status.Phase == corev1.PodPending && !started && pod.UID != "" {
+		events, err := c.Kube.CoreV1().Events(pod.Namespace).List(ctx, metav1.ListOptions{FieldSelector: "involvedObject.uid=" + string(pod.UID) + ",type=Warning"})
+		if err != nil {
+			return "", fmt.Errorf("read scan Pod events: %w", err)
+		}
+		for _, event := range events.Items {
+			if event.InvolvedObject.UID != pod.UID || event.Type != corev1.EventTypeWarning {
+				continue
+			}
+			if reason := imageCacheFailure(event.Reason, event.Message); reason != "" {
+				return reason, nil
+			}
 		}
 	}
 	if !pod.CreationTimestamp.IsZero() && time.Since(pod.CreationTimestamp.Time) > 15*time.Minute {
-		return "scan attempt exceeded 15 minutes"
+		return "scan attempt exceeded 15 minutes", nil
+	}
+	return "", nil
+}
+
+func imageCacheFailure(reason, message string) string {
+	if reason == "ErrImageNeverPull" || (strings.Contains(message, "ImageVolumeMountFailed") && strings.Contains(message, ": not found")) {
+		if message != "" {
+			reason += ": " + message
+		}
+		if len(reason) > maxReason {
+			return strings.ToValidUTF8(reason[:maxReason], "")
+		}
+		return reason
 	}
 	return ""
 }

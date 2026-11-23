@@ -1,5 +1,6 @@
 "use client"
 
+import SourceCard from "@/app/components/image/source-card"
 import { cn } from "@/lib/utils/cn"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
@@ -54,41 +55,19 @@ function DriftCell({ detail }: { detail: ImageDetail }) {
 
 function IntegrityCell({ detail }: { detail: ImageDetail }) {
   const { versions, containerCount } = detail
-
-  if (versions.length > 1) {
-    const verified = versions
-      .filter(v => v.tagStatus === "match")
-      .reduce((sum, v) => sum + v.containerCount, 0)
-    const unverified = containerCount - verified
-    return (
-      <StatCell label="Integrity">
-        <StatValue>
-          {verified} <span className="text-sm font-medium text-muted-foreground">of {containerCount} verified</span>
-        </StatValue>
-        <StatCaption>
-          {unverified} {unverified === 1 ? "container runs" : "containers run"} a digest the registry cannot confirm
-        </StatCaption>
-      </StatCell>
-    )
-  }
-
   const version = versions[0]
-  if (!version) {
-    return (
-      <StatCell label="Integrity">
-        <p className="mt-0.5 text-xl font-medium text-muted-foreground">no data</p>
-        <StatCaption>nothing to verify</StatCaption>
-      </StatCell>
-    )
-  }
-
-  const integrity = integrityInfo(version.usage)
-  return (
-    <StatCell label="Integrity">
+  const integrity = version ? integrityInfo(version.usage) : undefined
+  const verified = versions.filter(v => v.tagStatus === "match").reduce((sum, v) => sum + v.containerCount, 0)
+  return <StatCell label="Integrity">
+    {versions.length > 1 ? <>
+      <StatValue>{verified} <span className="text-sm font-medium text-muted-foreground">of {containerCount} verified</span></StatValue>
+      <StatCaption>{containerCount - verified} containers run a digest the registry cannot confirm</StatCaption>
+    </> : integrity ? <>
       <p className={cn("mt-0.5 text-xl font-semibold", integrity.textClass)}>{integrity.value}</p>
       <StatCaption>{integrity.caption}</StatCaption>
-    </StatCell>
-  )
+    </> : <StatCaption>Nothing to verify</StatCaption>}
+    {version && <SourceCard usage={version.usage} showRevision={false} embedded />}
+  </StatCell>
 }
 
 export default function ImageStats({ detail }: { detail: ImageDetail }) {
@@ -97,7 +76,7 @@ export default function ImageStats({ detail }: { detail: ImageDetail }) {
   const reportsError = useClusterState(s => s.vulnerabilityReportsError)
 
   const states=detail.digests.map(d=>scanStatuses[d]??"loading")
-  const scanCaption=states.includes("partial")?"Partial scan coverage":states.includes("expired")?"Stored scan expired from the operator cache":states.includes("unavailable")?"Scan results unavailable":states.includes("loading")?"Loading scan results":"Waiting for a scan"
+  const scanCaption=states.includes("failed")?"Scan failed":states.includes("partial")?"Partial scan coverage":states.includes("expired")?"Stored scan expired from the operator cache":states.includes("unavailable")?"Scan results unavailable":states.includes("loading")?"Loading scan results":"Waiting for a scan"
   const { containerCount, versions } = detail
   const scanned = reports === null ? [] : detail.digests.map(d => reports[d]).filter(Boolean)
   const { summary, total, fixable } = aggregateVulnerabilities(scanned)

@@ -84,18 +84,10 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	if c.ID != nil {
 		id = *c.ID
 	}
-	createScope := "Installed APIs do not establish caller authorization. "
-	if svc != nil {
-		createScope = "Supply the intended namespace to return only APIs the verified caller can create there; cluster-scoped APIs are checked without a namespace. " +
-			"Omit namespace only for installed-API discovery, which does not establish authorization. "
-	}
-
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "list_custom_resource_definitions",
-		Title: "List custom resource definitions (" + id + ")",
-		Description: "Use to discover which custom-resource APIs are installed before planning resources. Returns an array of API identities and operator-authored descriptions, without permission fields. " +
-			"Defaults to Namespaced APIs; choose Cluster or All explicitly to include cluster-scoped APIs. " + createScope +
-			"API existence does not establish operator health. Use describe_custom_resource_definition for a selected CRD schema; use get_workloads when available for existing workload roots.",
+		Name:        "list_custom_resource_definitions",
+		Title:       "List custom resource definitions (" + id + ")",
+		Description: "Installed custom-resource APIs with operator descriptions. Scope defaults to Namespaced. With namespace, only APIs the caller can create there. Follow with describe_custom_resource_definition.",
 		InputSchema: inputSchema[crdListInput](func(props map[string]*jsonschema.Schema) {
 			props["scope"].Enum = []any{"Namespaced", "Cluster", "All"}
 			props["scope"].Default = defaultValue("Namespaced")
@@ -179,7 +171,7 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 		Name:         "list_ingress_classes",
 		Title:        "List ingress classes",
 		InputSchema:  noArguments(),
-		Description:  "Use to choose an installed ingressClassName. Returns ingress classes and their controllers; class existence does not verify controller health, routing, DNS or TLS.",
+		Description:  "Ingress classes and their controllers.",
 		OutputSchema: schemaFor[ingressClassesOutput](),
 		Annotations:  readOnly("List ingress classes"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, ingressClassesOutput, error) {
@@ -199,11 +191,10 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_cluster_issuers",
-		Title:       "List cluster issuers",
-		InputSchema: noArguments(),
-		Description: "Use to discover available cluster-scoped cert-manager issuers before selecting one for a Certificate. Returns their own descriptions, reported readiness and ACME solver types when the API is installed. " +
-			"Null means the catalog is unavailable; an empty list means none were found. Do not infer namespace-scoped Issuer availability from this catalog.",
+		Name:         "list_cluster_issuers",
+		Title:        "List cluster issuers",
+		InputSchema:  noArguments(),
+		Description:  "cert-manager ClusterIssuers with descriptions, readiness and ACME solver types. Null means the API is unavailable.",
 		OutputSchema: schemaFor[clusterIssuersOutput](),
 		Annotations:  readOnly("List cluster issuers"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, clusterIssuersOutput, error) {
@@ -220,11 +211,10 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_priority_classes",
-		Title:       "List priority classes",
-		InputSchema: noArguments(),
-		Description: "Use to choose an installed priorityClassName. Returns classes sorted by ascending numeric priority, with values and descriptions. " +
-			"Larger values have higher scheduling priority; class existence does not authorize its use or guarantee capacity.",
+		Name:         "list_priority_classes",
+		Title:        "List priority classes",
+		InputSchema:  noArguments(),
+		Description:  "PriorityClasses sorted by value, with descriptions.",
 		OutputSchema: schemaFor[priorityClassesOutput](),
 		Annotations:  readOnly("List priority classes"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, priorityClassesOutput, error) {
@@ -244,12 +234,9 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:  "describe_custom_resource_definition",
-		Title: "Describe a custom resource definition",
-		Description: "Use after selecting a CRD from list_custom_resource_definitions to inspect its writable fields before drafting a custom resource. " +
-			"Supply the full CRD name (plural.group), not Kind.group or an object name. Returns every served API version and the writable resource schema of one: the storage version unless version names another served one. " +
-			"The schema starts at path (the whole object when omitted) and keeps depth levels of fields; deeper objects list their fields under elidedFields, so pass that object's path to read them. " +
-			"Excludes status, controller metadata and CEL code.",
+		Name:        "describe_custom_resource_definition",
+		Title:       "Describe a custom resource definition",
+		Description: "Writable schema of one CRD (plural.group), without status. Defaults to the storage version. Fields deeper than depth are listed under elidedFields; pass their path to expand.",
 		InputSchema: inputSchema[crdDescribeInput](func(props map[string]*jsonschema.Schema) {
 			props["name"].Pattern = `^[a-z0-9][a-z0-9.-]*$`
 			props["version"].Description = "Served version whose schema to return, e.g. v1beta1. Defaults to the storage version."
@@ -283,12 +270,10 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_storage_classes",
-		Title:       "List storage classes",
-		InputSchema: noArguments(),
-		Description: "Use to choose storageClassName and understand volume binding, expansion and reclaim behavior. Lists live Kubernetes StorageClasses with provisioning guidance from kubernetes.io/description and structured settings: " +
-			"provisioner, filesystemType, driver parameters, reclaimPolicy, volumeBindingMode, allowVolumeExpansion, mountOptions, and allowedTopologies. " +
-			"Missing descriptions and unspecified filesystem types are null. Cluster-wide capability metadata for authenticated callers.",
+		Name:         "list_storage_classes",
+		Title:        "List storage classes",
+		InputSchema:  noArguments(),
+		Description:  "StorageClasses with descriptions, provisioner, parameters, reclaim policy, binding mode, expansion, mount options and topologies.",
 		OutputSchema: schemaFor[storageClassesOutput](),
 		Annotations:  readOnly("List storage classes"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, storageClassesOutput, error) {
@@ -310,11 +295,7 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 				"Keeps policies whose own resource rules could match it; unqualified, any group matches. Omit for the whole catalog."
 			props["resource"].Pattern = `^[a-z0-9][a-z0-9.-]*$`
 		}),
-		Description: "Use before planning resource changes to discover admission requirements and applicable bindings. Returns a CSV catalog of admission policy names, descriptions and target resource rules/selectors, plus binding names and scope restrictions. " +
-			"Pass resource to keep only policies that could target it; a large catalog may otherwise be too long to read inline. " +
-			"No policy code is returned. conditional indicates additional conditions or parameters that this summary does not evaluate. " +
-			"bindings=null means discovery is unavailable; [] means no bindings. Match resource rules and binding scope to the intended resource; targets are candidates, not a prediction of effective admission behavior. " +
-			"This catalog does not evaluate policy conditions or replace an authorization check.",
+		Description: "Admission policies as CSV: name, description, target rules and bindings. Pass resource to filter. conditional means unevaluated match conditions or params; bindings=null means discovery failed.",
 		Annotations: readOnly("List admission policies"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in admissionPoliciesInput) (*mcp.CallToolResult, any, error) {
 		if err := requireCaller(req); err != nil {
@@ -340,8 +321,6 @@ func addCatalogTools(s *mcp.Server, cat *catalog.Catalog, c cluster.Identity, sv
 	})
 }
 
-// The dashboard's view of the same catalog: structured, with the creator
-// admission recorded on each policy.
 // The catalog for the dashboard, structured. Admission never runs on
 // admission policies, so no creator is recorded on them.
 type dashboardPolicy struct {
@@ -358,8 +337,7 @@ func addAdmissionPoliciesTool(s *mcp.Server, cat *catalog.Catalog) {
 		Name:        "get_admission_policies",
 		Title:       "Get admission policies",
 		InputSchema: noArguments(),
-		Description: "The admission policy catalog as structured data, validating and mutating, sorted by name: each policy's description, target resource rules and bindings. " +
-			"For planning prefer list_admission_policies, whose CSV stays small on large catalogs.",
+		Description: "Validating and mutating admission policies as structured data. Prefer list_admission_policies on large catalogs.",
 		Annotations: readOnly("Get admission policies"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, *dashboardPoliciesOutput, error) {
 		if err := requireCaller(req); err != nil {

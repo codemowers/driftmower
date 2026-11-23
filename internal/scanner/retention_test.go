@@ -91,3 +91,45 @@ func TestExpiredSupersededScanDoesNotBlockNewConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestSupersededTerminalPodsExpireWithoutOldAttemptAnnotation(t *testing.T) {
+	for _, tc := range []struct {
+		phase   corev1.PodPhase
+		age     time.Duration
+		deleted bool
+	}{
+		{corev1.PodSucceeded, 3 * time.Minute, true},
+		{corev1.PodSucceeded, time.Minute, false},
+		{corev1.PodFailed, 49 * time.Hour, true},
+		{corev1.PodFailed, time.Hour, false},
+	} {
+		t.Run(string(tc.phase)+tc.age.String(), func(t *testing.T) {
+			c, image, key := testController(t, 1)
+			if err := dispatchTest(t, c, image, key); err != nil {
+				t.Fatal(err)
+			}
+			pod := currentPod(t, c)
+			pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-tc.age))
+			pod.Status.Phase = tc.phase
+			if _, err := c.Kube.CoreV1().Pods("test").Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			c.Config.TrivyImage = "new-trivy"
+			// The current configuration has replaced the old version's annotation.
+			live, err := c.Dynamic.Resource(images).Get(context.Background(), image.GetName(), metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := c.saveScanState(context.Background(), live, "sha256:target", scanState{Key: Key("sha256:target", c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)}); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.updateRetention(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			_, err = c.Kube.CoreV1().Pods("test").Get(context.Background(), pod.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) != tc.deleted {
+				t.Fatalf("deleted=%v error=%v", tc.deleted, err)
+			}
+		})
+	}
+}

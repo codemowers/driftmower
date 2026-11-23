@@ -31,7 +31,6 @@ const (
 	Union Source = "union"
 )
 
-// Policy selects which sources confine results.
 type Policy string
 
 const (

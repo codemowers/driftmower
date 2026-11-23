@@ -4,9 +4,9 @@ kind: PriorityClass
 metadata:
   labels:
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
-  name: {{ .Values.operator.priorityClassName | default (printf "%s-%s-scan" .Release.Namespace .Release.Name) | quote }}
+  name: {{ .Values.operator.priorityClassName | default "vulnerability-scan" | quote }}
 value: {{ .Values.operator.priorityValue }}
 globalDefault: false
 preemptionPolicy: Never
-description: "Image scans queue above end-user workloads and below infrastructure, without preempting running Pods."
+description: "Driftmower scheduled Trivy scans"
 {{- end }}

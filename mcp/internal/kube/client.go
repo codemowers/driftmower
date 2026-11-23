@@ -15,7 +15,6 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/config"
 )
 
-// Clients holds the server's Kubernetes clients.
 type Clients struct {
 	// Kubernetes bounds every request by the configured timeout.
 	Kubernetes kubernetes.Interface

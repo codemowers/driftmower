@@ -23,8 +23,7 @@ type RBACScope struct {
 	// The caller may list pods in every namespace, so the per-namespace sweep
 	// was skipped.
 	ClusterWide bool `json:"clusterWide"`
-	// Namespaces the cluster reported.
-	Total int `json:"total"`
+	Total       int  `json:"total"`
 	// The cluster has more namespaces than the sweep bound; only the first
 	// MaxNamespaces (preferred ones first, then alphabetical) were checked.
 	Truncated bool `json:"truncated"`

@@ -1,40 +1,36 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useParams } from "next/navigation"
-import { Boxes } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { collectOwnedPods, findWorkloadRoot } from "@/lib/cluster/workload-root"
 import { classifyPod } from "@/lib/cluster/styles/pod-status-style"
-import type { ImageUsage, StatusType } from "@/lib/cluster/reports"
-import { SEVERITY_ORDER, STALE_STATUSES } from "@/lib/cluster/styles/status-style"
+import { driftStats } from "@/lib/cluster/drift-stats"
 import { useContextHref } from "@/lib/hooks/use-context-href"
-import { cn } from "@/lib/utils/cn"
 import { workloadMetricQueries } from "@/lib/features/prometheus/workload-metrics"
 import ResourceHeader, { type Chip } from "@/app/components/resource-header"
 import PrometheusResourceUsageCard from "@/app/components/prometheus-resource-usage-card"
 import WorkloadStats from "./components/workload-stats"
+import DetailLayout from "@/app/components/layout/detail-layout"
+import ScopeFindings from "@/app/components/findings/scope-findings"
+import AlertsCard from "@/app/components/findings/alerts-card"
+import VolumesCard from "@/app/components/scope/volumes-card"
+import { aggregateIssues } from "@/lib/cluster/scope"
 import ManagerCard from "./components/manager-card"
 import ProvenanceCard from "./components/provenance-card"
-import NetworkCard from "@/app/components/network-card"
-import LogsCard from "@/app/components/logs-card"
-import AiInsightsCard from "./components/ai-insights-card"
+import { WorkloadNav } from "@/app/components/layout/resource-navs"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
-import ActionsCard from "@/app/components/actions-card"
-import LivenessProbeCard from "@/app/components/liveness-probe-card"
+import ImagesCard from "@/app/components/scope/images-card"
+import PodsCard from "@/app/components/scope/pods-card"
 import RestartTile, { type RestartTarget } from "@/app/components/restart-tile"
 import { useFeatureFlags } from "@/app/components/feature-flags-init"
 import { useWorkloadMetrics } from "./hooks/use-workload-metrics"
-import { useActionAssessments } from "@/lib/features/actions/use-action-assessments"
-import { currentChartScopes, deriveActions } from "@/lib/features/actions/derive"
 import PageLoading from "@/app/components/page-loading"
 import OrphanBucket from "./components/orphan-bucket"
 
-const NO_USAGES: ImageUsage[] = []
 const RESTARTABLE_KINDS = new Set(["Deployment", "StatefulSet"])
-// One Pod per node, run to completion, or a lone Pod: replica count says
-// nothing about availability.
-const NOT_REPLICATED = new Set(["DaemonSet", "Job", "CronJob", "Pod"])
 
 // Orphan buckets have UIDs "namespace:<name>"; every other UID is a workload root.
 export default function WorkloadPage() {
@@ -48,7 +44,6 @@ function WorkloadDetailPage() {
   const reportId = useClusterState(s => s.reportId)
   const clusterResources = useClusterState(s => s.clusterResources)
   const restartEnabled = useFeatureFlags(s => s.workloadRestart)
-  const vulnerabilityReports = useClusterState(s => s.vulnerabilityReports)
   const { linkTo } = useContextHref()
 
   const match = data
@@ -70,43 +65,24 @@ function WorkloadDetailPage() {
   const reportPodNames = match ? [...new Set(match[1].map(u => u.podName))] : []
   const podNames = livePodNames.length > 0 ? livePodNames : reportPodNames
   const workloadMetrics = useWorkloadMetrics(namespace, root?.uid ?? uid, podNames)
-  const actionUsages = match?.[1] ?? NO_USAGES
-  const actionRows = deriveActions(actionUsages, root, vulnerabilityReports)
-  const currentCharts = currentChartScopes(actionUsages)
-  const assessments = useActionAssessments(actionRows, currentCharts)
 
   if (!data) return <PageLoading loading="workload" />
 
   if (!data || !match) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Workload not found</p>
-        </main>
+        </Page>
       </div>
     )
   }
 
-  const [groupKey, usages] = match
+  const [, usages] = match
 
-  const repoStatus = new Map<string, StatusType>()
-  for (const u of usages) {
-    const repo = `${u.imageInfo.registry}/${u.imageInfo.repository}`
-    const prev = repoStatus.get(repo)
-    const cur = u.versionStatus.statusType
-    if (prev === undefined || SEVERITY_ORDER[cur] > SEVERITY_ORDER[prev]) {
-      repoStatus.set(repo, cur)
-    }
-  }
-  const distinctRepoCount = repoStatus.size
-  const staleRepoCount = Array.from(repoStatus.values()).filter(s => STALE_STATUSES.includes(s)).length
-  const normalizedScore = distinctRepoCount > 0 ? staleRepoCount / distinctRepoCount : 0
+  const { staleRepoCount, distinctRepoCount } = driftStats(usages)
 
-  const worstStatus = usages.reduce<StatusType>((worst, u) => {
-    const s = u.versionStatus.statusType
-    return SEVERITY_ORDER[s] > SEVERITY_ORDER[worst] ? s : worst
-  }, "no_data")
-
+  const resourceIssues = root?.issues ?? aggregateIssues(livePods)
   const issueCount = data.issues.filter(i =>
     usages.some(u => u.image.includes(i.image))
   ).length
@@ -137,9 +113,9 @@ function WorkloadDetailPage() {
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={Boxes}
+          icon={ICONS.workloads}
           iconAriaLabel="Workload"
           title={name}
           copyValue={name}
@@ -149,53 +125,45 @@ function WorkloadDetailPage() {
             { label: `${kindLabel} ${name}` },
           ]}
           chips={headerChips}
-          scoreChip={{ status: worstStatus, score: normalizedScore }}
-          issueCount={issueCount}
+          issueCount={issueCount + resourceIssues.length}
           subtitle={`${namespace} · ${containerLabel} · ${podLabel}`}
         />
+        <WorkloadNav uid={uid} namespace={namespace} podNames={podNames} />
 
-        <WorkloadStats
-          normalizedScore={normalizedScore}
-          staleRepoCount={staleRepoCount}
-          distinctRepoCount={distinctRepoCount}
-          totalContainers={totalContainers}
-          totalPods={totalPods}
-          worstStatus={worstStatus}
-          pods={livePods}
-          replicated={!NOT_REPLICATED.has(kind)}
+        <DetailLayout
+          main={<>
+            <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={root?.apiVersion ?? rootInfo?.apiGroup} />
+            <AlertsCard scope={{ namespace, pods: podNames }} hideWhenEmpty />
+            <ScopeFindings scope={{ kind: "workload", uid }} resourceIssues={resourceIssues} />
+            {isHelm && ri && releaseUid ? (
+              <ManagerCard kind="helm" releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
+            ) : isArgo && argoApp ? (
+              <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
+            ) : null}
+            <ImagesCard usages={running} livenessProbes={[...new Map(livePods.flatMap(p => p.livenessProbes ?? []).map(p => [`${p.container}::${p.check}`, p])).values()]} />
+            <PodsCard pods={clusterResources ? ownedPods : null} workloadUid={uid} />
+            <VolumesCard namespace={namespace} pods={podNames} operator={{ kind, apiVersion: root?.apiVersion ?? rootInfo?.apiGroup, name }} />
+            <WorkloadTabs usages={usages} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} />
+          </>}
+          aside={<>
+            <WorkloadStats
+              staleRepoCount={staleRepoCount}
+              distinctRepoCount={distinctRepoCount}
+              totalContainers={totalContainers}
+              totalPods={totalPods}
+              provenance={root ? <ProvenanceCard root={root} embedded /> : undefined}
+            />
+            <PrometheusResourceUsageCard
+              metrics={workloadMetrics}
+              graphQueries={workloadMetricQueries(namespace, podNames)}
+              podCount={podNames.length}
+              qosBreakdown={workloadMetrics?.qosBreakdown}
+              vertical
+            />
+            {restartTarget && <RestartTile target={restartTarget} restartedAt={root?.restartedAt ?? null} pods={livePods} />}
+          </>}
         />
-
-        {isHelm && ri && releaseUid ? (
-          <ManagerCard kind="helm" releaseInfo={ri} releaseUid={releaseUid} reportId={reportId} />
-        ) : isArgo && argoApp ? (
-          <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
-        ) : null}
-
-        {root && <ProvenanceCard root={root} />}
-
-        <LivenessProbeCard probes={livePods.flatMap(p => p.livenessProbes ?? [])} />
-
-        <ActionsCard {...assessments} />
-
-        <AiInsightsCard key={`${groupKey}:${reportId}`} workloadKey={groupKey} reportId={reportId} />
-
-        <PrometheusResourceUsageCard
-          metrics={workloadMetrics}
-          graphQueries={workloadMetricQueries(namespace, podNames)}
-          podCount={podNames.length}
-          qosBreakdown={workloadMetrics?.qosBreakdown}
-        />
-
-        <div className={cn("grid grid-cols-1 items-start gap-6", restartTarget ? "md:grid-cols-[2.5fr_2fr_2fr_auto]" : "md:grid-cols-[3fr_2fr_2fr]")}>
-          <CommandsCard kind={kind} namespace={namespace} name={name} apiGroup={rootInfo?.apiGroup} />
-          <NetworkCard href={linkTo(`/topmost-owners/${uid}/network-topology`)} />
-          <LogsCard namespace={namespace} podNames={podNames} href={linkTo(`/topmost-owners/${uid}/logs`)} scope="every Pod of this workload" />
-          {restartTarget && <RestartTile target={restartTarget} restartedAt={root?.restartedAt ?? null} pods={livePods} />}
-        </div>
-
-
-        <WorkloadTabs usages={usages} issues={data.issues} clusterResources={clusterResources} reportWorkloadUid={uid} liveWorkloadUid={liveWorkloadUid} />
-      </main>
+      </Page>
     </div>
   )
 }

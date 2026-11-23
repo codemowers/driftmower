@@ -74,12 +74,6 @@ export const STACK_STATUSES = [
 
 export type StackStatus = (typeof STACK_STATUSES)[number]
 
-export type RottennessPoint = {
-  t: number
-  score: number
-  containers: number
-}
-
 export type ClusterStats = {
   greenRatio: number | null
   measuredDays: number

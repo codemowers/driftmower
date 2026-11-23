@@ -1,4 +1,5 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
 
 import { useMemo, useState } from "react"
 import PageHeader from "../components/page-header"
@@ -42,7 +43,7 @@ export default function ExportPage() {
 
   return (
     <div className="flex h-screen flex-col gap-6 overflow-hidden px-7 py-8">
-      <PageHeader
+      <PageHeader icon={ICONS.export}
         title="Export shipping artifacts"
         subtitle="Package every image, chart, and manifest into one signed, portable bundle for air-gapped delivery."
       />

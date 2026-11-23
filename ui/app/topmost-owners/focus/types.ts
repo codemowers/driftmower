@@ -5,6 +5,7 @@ import type { PodSummary } from "@/lib/utils/pods-by-root"
 import type { SeriesStats, Span } from "@/lib/features/drift-history/types"
 
 export type WorkloadEntry = {
+  issues?: import("@/lib/cluster/issues").WorkloadIssue[]
   // Held in the namespace's orphan bucket: the bucket itself, or a Pod
   // without an owner.
   orphan?: "bucket" | "pod"
@@ -33,7 +34,7 @@ export type WorkloadEntry = {
   history?: { spans: Span[]; stats: SeriesStats }
 }
 
-export type FocusKey = "drift" | "pods" | "history"
+export type FocusKey = "drift"
 
 export type ScaleLevel = {
   token: string
@@ -47,7 +48,7 @@ export type FocusDefinition = {
   scale: ScaleLevel[]
   secondary: (entries: WorkloadEntry[]) => { label: string; count: number }
   pills: (entries: WorkloadEntry[]) => SummaryPill[]
-  headers: [string, string, string]
+  headers: string[]
   gridCols: string
   renderCells: (entry: WorkloadEntry) => ReactNode
   compare: (a: WorkloadEntry, b: WorkloadEntry) => number

@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"github.com/codemowers/driftmower/internal/imagesource"
 	"slices"
 	"strings"
 
@@ -25,46 +26,60 @@ func workloadSources(ctx context.Context, w *Workloads, id authz.Identity, roots
 	if w.Judge.MayPerform(ctx, id, listContainerImages).Verdict != authz.Yes {
 		return roots, []string{"Source links unavailable: listing ContainerImages is not authorized."}, nil
 	}
-	images, err := kube.Collect(ctx, func(ctx context.Context, opts metav1.ListOptions) ([]sourceImage, string, error) {
+	objects, err := kube.Collect(ctx, func(ctx context.Context, opts metav1.ListOptions) ([]map[string]any, string, error) {
 		page, err := w.Cache.Dynamic.Resource(containerImagesGVR).List(ctx, opts)
 		if err != nil {
 			return nil, "", err
 		}
-		rows := []sourceImage{}
+		rows := make([]map[string]any, 0, len(page.Items))
 		for _, image := range page.Items {
-			row := sourceImage{digests: []string{strings.Replace(image.GetName(), "sha256-", "sha256:", 1)}}
-			row.tags, _, _ = unstructured.NestedStringSlice(image.Object, "repoTags")
-			refs, _, _ := unstructured.NestedStringSlice(image.Object, "repoDigests")
-			for _, ref := range refs {
-				if _, d, ok := strings.Cut(ref, "@"); ok {
-					row.digests = append(row.digests, d)
-				}
-			}
-			if d, _, _ := unstructured.NestedString(image.Object, "index", "digest"); d != "" {
-				row.digests = append(row.digests, d)
-			}
-			raw, _, _ := unstructured.NestedFieldNoCopy(image.Object, "manifests")
-			manifests, _ := raw.([]any)
-			for _, raw := range manifests {
-				if m, ok := raw.(map[string]any); ok {
-					if d, ok := m["digest"].(string); ok {
-						row.digests = append(row.digests, d)
+			reduced := imagesource.Reduce(image.Object)
+			reduced["index"] = image.Object["index"]
+			reduced["name"] = image.GetName()
+			if raw, ok := image.Object["manifests"].([]any); ok {
+				digests := []any{}
+				for _, m := range raw {
+					if m, ok := m.(map[string]any); ok && m["digest"] != nil {
+						digests = append(digests, m["digest"])
 					}
 				}
+				reduced["manifestDigests"] = digests
 			}
-			for _, path := range [][]string{{"status", "source"}, {"labels", "org.opencontainers.image.source"}, {"annotations", "org.opencontainers.image.source"}} {
-				if u, _, _ := unstructured.NestedString(image.Object, path...); httpURL(u) && !slices.Contains(row.urls, u) {
-					row.urls = append(row.urls, u)
-				}
-			}
-			if len(row.urls) > 0 {
-				rows = append(rows, row)
-			}
+			rows = append(rows, reduced)
 		}
 		return rows, page.GetContinue(), nil
 	}, kube.ListOptions{Limit: 100, MaxPages: 100, What: "image source links"})
 	if err != nil {
 		return nil, nil, err
+	}
+	// Only the image's own source claim links it; metadata inherited from a
+	// base image (copied labels or annotations) is unknown provenance.
+	index := imagesource.NewIndex(objects)
+	images := []sourceImage{}
+	for _, obj := range objects {
+		claim := imagesource.Of(obj, index)
+		if !httpURL(claim.Source) {
+			continue
+		}
+		name, _ := obj["name"].(string)
+		row := sourceImage{digests: []string{strings.Replace(name, "sha256-", "sha256:", 1)}, urls: []string{claim.Source}}
+		row.tags, _, _ = unstructured.NestedStringSlice(obj, "repoTags")
+		refs, _, _ := unstructured.NestedStringSlice(obj, "repoDigests")
+		for _, ref := range refs {
+			if _, d, ok := strings.Cut(ref, "@"); ok {
+				row.digests = append(row.digests, d)
+			}
+		}
+		if d, _, _ := unstructured.NestedString(obj, "index", "digest"); d != "" {
+			row.digests = append(row.digests, d)
+		}
+		manifestDigests, _ := obj["manifestDigests"].([]any)
+		for _, d := range manifestDigests {
+			if d, ok := d.(string); ok {
+				row.digests = append(row.digests, d)
+			}
+		}
+		images = append(images, row)
 	}
 	names := map[string]string{}
 	warnings := []string{}
@@ -177,7 +192,7 @@ func addWorkloadSourcesTool(s *mcp.Server, w *Workloads, mapping auth.Mapping) {
 		Sources  []workloads.SourceRepository `json:"sources"`
 		Warnings []string                     `json:"warnings,omitempty"`
 	}
-	mcp.AddTool(s, &mcp.Tool{Name: "get_workload_sources", Description: "Resolve one authorized workload's images to SourceRepository names and URLs. Running immutable digests take priority over moving tags. No image layers or crawler payloads; read scrape status from the source crawler's get_source_findings tool using each URL.", InputSchema: inputSchema[input](nil), Annotations: readOnly("Workload source repositories")}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, output, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "get_workload_sources", Description: "Source repository names and URLs for one workload's images.", InputSchema: inputSchema[input](nil), Annotations: readOnly("Workload source repositories")}, func(ctx context.Context, req *mcp.CallToolRequest, in input) (*mcp.CallToolResult, output, error) {
 		out := output{Sources: []workloads.SourceRepository{}}
 		if in.Namespace == "" || in.UID == "" {
 			return nil, out, fmt.Errorf("namespace and workload UID are required")

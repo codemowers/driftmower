@@ -43,12 +43,13 @@ metadata:
   name: {{ .Release.Name }}
 spec:
   replicas: 1
+  {{- with .Values.priorityClassName }}
+  priorityClassName: {{ . | quote }}
+  {{- end }}
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
   serviceAccountName: {{ .Release.Name }}-prometheus
-  # Without fsGroup a fresh volume stays root-owned and Prometheus cannot
-  # write its data; clusters without admission defaults need these set here.
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000

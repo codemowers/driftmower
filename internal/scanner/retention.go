@@ -14,7 +14,7 @@ const succeededPodRetention = 2 * time.Minute
 const failedPodRetention = 48 * time.Hour
 
 func (c *Controller) updateRetention(ctx context.Context) error {
-	pods, err := c.Kube.CoreV1().Pods(c.Config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app=" + c.Config.scanServiceAccount()})
+	pods, err := c.Kube.CoreV1().Pods(c.scanNamespace()).List(ctx, metav1.ListOptions{LabelSelector: "app=" + c.Config.scanServiceAccount()})
 	if err != nil {
 		return err
 	}
@@ -24,9 +24,16 @@ func (c *Controller) updateRetention(ctx context.Context) error {
 		}
 		retention := failedPodRetention
 		digest := pod.Annotations["driftmower.io/platform-digest"]
-		obsoleteExpired := pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed &&
-			scanPodFailure(&pod) != "" &&
-			digest != "" && pod.Annotations["driftmower.io/artifact-key"] != Key(digest, c.Config.Image, c.Config.TrivyImage, c.Config.DatabaseImage)
+		superseded := digest != "" && pod.Annotations["driftmower.io/artifact-key"] != c.Config.artifactKey(digest)
+		obsoleteExpired := false
+		if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed &&
+			superseded {
+			reason, err := c.scanPodFailure(ctx, &pod)
+			if err != nil {
+				return err
+			}
+			obsoleteExpired = reason != ""
+		}
 		if pod.Status.Phase == corev1.PodSucceeded {
 			retention = succeededPodRetention
 		} else if obsoleteExpired {
@@ -60,14 +67,16 @@ func (c *Controller) updateRetention(ctx context.Context) error {
 		// Obsolete timed-out attempts cannot satisfy the current configuration;
 		// release their slots even if their state has already been superseded.
 		// Current attempts retain their evidence until the outcome is durable.
-		recorded := obsoleteExpired
+		// A newer configuration has replaced the old attempt annotation, so
+		// its terminal Pods cannot retain a matching durable record forever.
+		recorded := obsoleteExpired || superseded
 		for _, raw := range image.GetAnnotations() {
 			var state scanState
 			if json.Unmarshal([]byte(raw), &state) != nil {
 				continue
 			}
 			for _, attempt := range state.Attempts {
-				if attempt.Pod == pod.Name && attempt.Outcome != "" {
+				if attempt.Pod == pod.Name && c.attemptNamespace(attempt) == pod.Namespace && attempt.Outcome != "" {
 					recorded = true
 				}
 			}
@@ -75,7 +84,7 @@ func (c *Controller) updateRetention(ctx context.Context) error {
 		if !recorded {
 			continue
 		}
-		if err := c.Kube.CoreV1().Pods(c.Config.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &pod.UID}}); err != nil && !apierrors.IsNotFound(err) {
+		if err := c.Kube.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &pod.UID}}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

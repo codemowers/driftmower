@@ -14,7 +14,6 @@ import (
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-// Identity is the Kubernetes subject a caller maps to.
 type Identity struct {
 	User   string   `json:"user"`
 	Groups []string `json:"groups"`

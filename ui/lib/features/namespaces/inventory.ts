@@ -5,7 +5,7 @@ import { reportWorkloadRoots } from "../../utils/report-roots.ts"
 // A crashing but still-running Pod remains visible. Only terminal phases are
 // excluded; missing phase information is not evidence of completion.
 export function isTerminalPod(resource:ClusterResource):boolean{
- return resource.kind==="Pod"&&(resource.phase==="Succeeded"||resource.phase==="Failed")
+ return resource.kind==="Pod"&&(resource.terminating||resource.phase==="Succeeded"||resource.phase==="Failed")
 }
 export function namespaceWorkloadRoots(data:Report|null,resources:ClusterResource[]|null){
  const pods=(resources??[]).filter(resource=>resource.kind==="Pod")
@@ -17,4 +17,9 @@ export function namespaceWorkloadRoots(data:Report|null,resources:ClusterResourc
   }
   return true
  })
+}
+
+// Retain Job evidence after completion, including Jobs grouped under CronJobs.
+export function namespacePods(resources: ClusterResource[], namespace: string): ClusterResource[] {
+ return resources.filter(resource=>resource.kind==="Pod"&&resource.namespace===namespace&&(!isTerminalPod(resource)||resource.jobOwned||resource.scanPod))
 }

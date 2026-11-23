@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useState } from "react"
 import PageHeader from "@/app/components/page-header"
@@ -29,9 +31,9 @@ export default function ServiceAccountsPage() {
   const hidden = showDefault ? 0 : matching.filter(plainDefault).length
   const accounts = showDefault ? matching : matching.filter(sa => !plainDefault(sa))
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
-    <PageHeader title="Service accounts" subtitle="Kubernetes ServiceAccounts; open one to see its effective Kubernetes rights" />
+    <>
+      <Page>
+    <PageHeader icon={ICONS.serviceAccounts} title="Service accounts" subtitle="Kubernetes ServiceAccounts; open one to see its effective Kubernetes rights" />
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="w-80"><FilterSearchInput value={query} onChange={setQuery} placeholder="Search name, namespace or creator..." /></div>
@@ -75,7 +77,7 @@ export default function ServiceAccountsPage() {
           </div>
         ))}
     </section>
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

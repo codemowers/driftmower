@@ -19,11 +19,13 @@ import (
 // permission is asked of the cluster authorizer before a backend is queried.
 type Service struct {
 	// Empty disables the metrics and resource-usage tools.
-	PrometheusURL     string
-	ScannerNamespace  string
-	ScannerInstance   string
-	CVEHistoryEnabled bool
-	SAHistoryEnabled  bool
+	PrometheusURL          string
+	ScannerNamespace       string
+	ScannerInstance        string
+	HoursPerUpgrade        float64
+	BuildAgeDaysPerUpgrade float64
+	CVEHistoryEnabled      bool
+	SAHistoryEnabled       bool
 	// Prometheus's public address for links; empty reads its
 	// web.external-url flag.
 	PrometheusExternalURL string
@@ -121,7 +123,6 @@ func (s *Service) externalURL(ctx context.Context, backend Requester) *string {
 	return s.external.url
 }
 
-// get queries a backend and decodes a 200 answer.
 func get(ctx context.Context, backend Requester, u *url.URL, name string, into any) error {
 	resp, err := backend.Get(ctx, u)
 	if err != nil {
@@ -152,7 +153,6 @@ func validateRange(start, end time.Time) error {
 	return nil
 }
 
-// PromSample is a Prometheus [timestamp, "value"] pair.
 type PromSample struct {
 	Time  float64
 	Value string

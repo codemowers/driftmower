@@ -89,6 +89,7 @@ func render(inv *workloads.Inventory, reports []crawler.SourceReport, counts map
 	out.WriteString("# HELP driftmower_version_checked_timestamp_seconds Last source crawl Unix timestamp; absent when never crawled.\n# TYPE driftmower_version_checked_timestamp_seconds gauge\n")
 	out.WriteString("# HELP driftmower_version_container_count Observed containers running this workload image.\n# TYPE driftmower_version_container_count gauge\n")
 	out.WriteString("# HELP driftmower_version_status Comparison state with bounded reason labels.\n# TYPE driftmower_version_status gauge\n")
+	out.WriteString("# HELP driftmower_version_drift Semantic distance to the newest release: current, patch, minor, major or behind when the newest release does not parse.\n# TYPE driftmower_version_drift gauge\n")
 	out.WriteString("# HELP driftmower_image_created_timestamp_seconds Unix timestamp from org.opencontainers.image.created only.\n# TYPE driftmower_image_created_timestamp_seconds gauge\n")
 	for _, wl := range inv.Workloads {
 		if wl.Kind == "Namespace" {
@@ -126,6 +127,7 @@ func render(inv *workloads.Inventory, reports []crawler.SourceReport, counts map
 			if reason == "known" {
 				state = "known"
 				fmt.Fprintf(&out, "driftmower_version_releases_behind{%s} %d\n", labels, behind)
+				fmt.Fprintf(&out, "driftmower_version_drift{%s,class=%s} 1\n", labels, quote(driftClass(version, latest, behind)))
 			}
 			fmt.Fprintf(&out, "driftmower_version_status{%s,status=%s,reason=%s} 1\n", labels, quote(state), quote(reason))
 			if checked > 0 {
@@ -259,4 +261,30 @@ func imageCreatedIndex(images []unstructured.Unstructured) map[string]int64 {
 		}
 	}
 	return out
+}
+
+// driftClass compares the deployed and newest versions by semantic component.
+func driftClass(version, latest string, behind int) string {
+	if behind == 0 {
+		return "current"
+	}
+	v, ok := crawler.ParseVersion(version)
+	l, ok2 := crawler.ParseVersion(latest)
+	if !ok || !ok2 {
+		return "behind"
+	}
+	at := func(c []int, i int) int {
+		if i < len(c) {
+			return c[i]
+		}
+		return 0
+	}
+	switch {
+	case at(l.Core, 0) != at(v.Core, 0):
+		return "major"
+	case at(l.Core, 1) != at(v.Core, 1):
+		return "minor"
+	default:
+		return "patch"
+	}
 }

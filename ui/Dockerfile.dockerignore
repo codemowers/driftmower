@@ -35,3 +35,5 @@ ui/**/*.tsbuildinfo
 ui/vendor/spdx-license-list-data/**
 !ui/vendor/spdx-license-list-data/json
 !ui/vendor/spdx-license-list-data/json/licenses.json
+/chart/cluster-values/
+/scripts/promote-images.sh

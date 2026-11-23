@@ -1,0 +1,226 @@
+evaluation_interval: 1m
+rule_files:
+- rules.yaml
+tests:
+- interval: 1m
+  input_series:
+  - series: driftmower_scanner_inventory_ready{namespace="driftmower",job="driftmower-operator"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:a"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:b"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:c"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:d"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:partial-index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:uncatalogued"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="other",digest="sha256:a"}
+    values: 100+0x10
+  - series: driftmower_image_scan_available{namespace="rogue",job="other-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  promql_expr_test:
+  - expr: count by (stage) (max by (digest,stage) (driftmower:running_image_scan_stage:info{driftmower_namespace="driftmower",driftmower_instance="driftmower"}))
+    eval_time: 10m
+    exp_samples:
+    - labels: '{stage="trivy_files"}'
+      value: 2
+    - labels: '{stage="files_only"}'
+      value: 1
+    - labels: '{stage="trivy_only"}'
+      value: 1
+    - labels: '{stage="no_scan"}'
+      value: 3
+- interval: 1m
+  input_series:
+  - series: driftmower_scanner_inventory_ready{namespace="driftmower",job="driftmower-operator"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:a"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:b"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:c"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:d"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:partial-index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:uncatalogued"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="other",digest="sha256:a"}
+    values: 100+0x10
+  - series: driftmower_image_scan_available{namespace="rogue",job="other-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  promql_expr_test:
+  - expr: count by (stage) (max by (digest,stage) (driftmower:running_image_scan_stage:info{driftmower_namespace="driftmower",driftmower_instance="driftmower"}))
+    eval_time: 10m
+    exp_samples: []
+- interval: 1m
+  input_series:
+  - series: driftmower_scanner_inventory_ready{namespace="driftmower",job="driftmower-operator"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-a",digest="sha256:a"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-b",digest="sha256:b"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-c",digest="sha256:c"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-d",digest="sha256:d"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-e",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-f",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_image_filesystem_available{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 0+0x10
+  - series: driftmower_image_scan_available{namespace="driftmower",job="driftmower-operator",image="sha256-g",digest="sha256:g"}
+    values: 0+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-index",digest="sha256:f"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:e"}
+    values: 1+0x10
+  - series: driftmower_image_manifest_info{namespace="driftmower",job="driftmower-operator",image="sha256-partial-index",digest="sha256:g"}
+    values: 1+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:a"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:b"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:c"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:d"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:partial-index"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="team",digest="sha256:uncatalogued"}
+    values: 9+0x10
+  - series: driftmower_running_image_containers{job="driftmower-mcp",driftmower_namespace="driftmower",driftmower_instance="driftmower",namespace="other",digest="sha256:a"}
+    values: 100+0x10
+  - series: driftmower_image_scan_available{namespace="rogue",job="other-operator",image="sha256-b",digest="sha256:b"}
+    values: 1+0x10
+  promql_expr_test:
+  - expr: count by (stage) (max by (digest,stage) (driftmower:running_image_scan_stage:info{driftmower_namespace="driftmower",driftmower_instance="driftmower"}))
+    eval_time: 10m
+    exp_samples: []

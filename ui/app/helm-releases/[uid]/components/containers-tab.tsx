@@ -1,29 +1,11 @@
+import { TagCell } from "@/app/components/image/image-cells"
 import PrefetchLink from "@/app/components/prefetch-link"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils/cn"
-import { relativeTimeFromNow } from "@/lib/utils/format-time"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ImageUsage, Issue } from "@/lib/cluster/reports"
 import { SEVERITY_STYLE } from "@/lib/cluster/styles/status-style"
 import { digestCrumb, resolvedVersion } from "@/lib/utils/image-artifacts"
 
-function TagCell({ tag, builtAt }: { tag: string | null; builtAt?: string }) {
-  return (
-    <div className="flex flex-col">
-      <span className="font-mono text-sm text-foreground">{tag ?? "—"}</span>
-      {builtAt && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <time dateTime={builtAt} className="font-mono text-xs text-muted-foreground">
-              {relativeTimeFromNow(builtAt)}
-            </time>
-          </TooltipTrigger>
-          <TooltipContent>{builtAt}</TooltipContent>
-        </Tooltip>
-      )}
-    </div>
-  )
-}
 
 type Props = {
   usages: ImageUsage[]

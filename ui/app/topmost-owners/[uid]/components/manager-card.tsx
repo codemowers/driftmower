@@ -1,5 +1,6 @@
 import PrefetchLink from "@/app/components/prefetch-link"
-import { ShipWheel, Anchor, ArrowRight, ExternalLink } from "lucide-react"
+import type React from "react"
+import { ArrowRight, ExternalLink } from "lucide-react"
 import CopyButton from "@/app/components/copy-button"
 import type { ReleaseInfo } from "@/lib/cluster/reports"
 
@@ -8,15 +9,17 @@ type Props =
   | { kind: "argo"; appName: string; url?: string; resourceKind?: string; resourceRef?: string }
 
 const CARD_BASE =
-  "flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4"
+  "flex items-center gap-4 px-5 py-4"
 const CARD_INTERACTIVE =
-  "group transition-colors hover:border-brand/40 hover:bg-brand-bg/30"
+  "group transition-colors hover:bg-brand-bg/30"
 
-function SectionLabel({ children }: { children: string }) {
+// A card whose title sits in its own header row.
+function Framed({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <h2 className="border-b border-gray-200 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
       {children}
-    </p>
+    </section>
   )
 }
 
@@ -29,12 +32,8 @@ function HelmCard({ releaseInfo, releaseUid, reportId }: Extract<Props, { kind: 
     : `/helm-releases/${releaseUid}`
 
   return (
-    <div>
-      <SectionLabel>Managed by Helm</SectionLabel>
+    <Framed title="Managed by Helm">
       <PrefetchLink href={href} className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
-          <ShipWheel className="size-6" strokeWidth={2} />
-        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-foreground">{releaseInfo.name}</p>
@@ -47,7 +46,7 @@ function HelmCard({ releaseInfo, releaseUid, reportId }: Extract<Props, { kind: 
         </div>
         <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-text" />
       </PrefetchLink>
-    </div>
+    </Framed>
   )
 }
 
@@ -59,9 +58,6 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
   const subtext = resourceKind && resourceRef ? `${resourceKind} · ${resourceRef}` : "application"
   const inner = (
     <>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg text-brand-icon">
-        <Anchor className="size-6" strokeWidth={2} />
-      </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="font-semibold text-foreground">{appName}</p>
@@ -74,8 +70,7 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
   )
 
   return (
-    <div>
-      <SectionLabel>Managed by Argo CD</SectionLabel>
+    <Framed title="Managed by Argo CD">
       {url ? (
         <a href={url} target="_blank" rel="noreferrer" className={`${CARD_BASE} ${CARD_INTERACTIVE}`}>
           {inner}
@@ -83,7 +78,7 @@ function ArgoCard({ appName, url, resourceKind, resourceRef }: Extract<Props, { 
       ) : (
         <div className={CARD_BASE} title={ARGO_LINK_HINT}>{inner}</div>
       )}
-    </div>
+    </Framed>
   )
 }
 

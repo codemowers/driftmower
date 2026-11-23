@@ -10,3 +10,5 @@
 !internal/**
 **/*_test.go
 mcp/internal/testutil/
+/chart/cluster-values/
+/scripts/promote-images.sh

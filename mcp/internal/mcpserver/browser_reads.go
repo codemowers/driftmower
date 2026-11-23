@@ -20,24 +20,29 @@ func BrowserReads(o *observability.Service, w *Workloads, mapping auth.Mapping, 
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Cache-Control", "no-store")
 		rw.Header().Set("Vary", "Authorization, Origin")
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		allowHead := r.Method == http.MethodHead && r.URL.Path == "/api/image-scans/sbom"
+		if r.Method != http.MethodGet && r.Method != http.MethodPost && !allowHead {
 			rw.Header().Set("Allow", "GET, POST")
-			http.Error(rw, "method not allowed", 405)
+			http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		ti := sdkauth.TokenInfoFromContext(r.Context())
 		id, err := auth.KubernetesIdentity(auth.CallerFrom(ti), mapping)
 		if err != nil {
-			http.Error(rw, "authenticated Kubernetes identity required", 403)
+			http.Error(rw, "authenticated Kubernetes identity required", http.StatusForbidden)
+			return
+		}
+		if r.URL.Path == "/api/image-scans/sbom" {
+			serveImageScan(rw, r, w, id)
 			return
 		}
 		if r.URL.Path == "/api/crawler/authorize" {
 			if r.Method != http.MethodGet {
-				http.Error(rw, "method not allowed", 405)
+				http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 			if w == nil || w.Judge.MayPerform(r.Context(), id, authz.Attributes{Group: "codemowers.io", Resource: "containerimages", Verb: "list"}).Verdict != authz.Yes {
-				http.Error(rw, "direct crawler reads require list ContainerImages", 403)
+				http.Error(rw, "direct crawler reads require list ContainerImages", http.StatusForbidden)
 				return
 			}
 			rw.WriteHeader(http.StatusNoContent)
@@ -66,20 +71,22 @@ func BrowserReads(o *observability.Service, w *Workloads, mapping auth.Mapping, 
 				Pod                    string   `json:"pod"`
 				Pods                   []string `json:"pods"`
 				Digests                []string `json:"digests"`
+				Current                bool     `json:"current"`
 				Signal                 string   `json:"signal"`
 				Namespaces             []string `json:"namespaces"`
 				Days                   int      `json:"days"`
+				Hours                  int      `json:"hours"`
 				HoursPerUpgrade        float64  `json:"hoursPerUpgrade"`
 				BuildAgeDaysPerUpgrade float64  `json:"buildAgeDaysPerUpgrade"`
 			}
-			decoder := json.NewDecoder(http.MaxBytesReader(rw, r.Body, 8192))
+			decoder := json.NewDecoder(http.MaxBytesReader(rw, r.Body, 1<<20))
 			decoder.DisallowUnknownFields()
 			if err := decoder.Decode(&args); err != nil {
-				http.Error(rw, "invalid JSON arguments", 400)
+				http.Error(rw, "invalid JSON arguments", http.StatusBadRequest)
 				return
 			}
 			if err := decoder.Decode(new(any)); err != io.EOF {
-				http.Error(rw, "one JSON object is required", 400)
+				http.Error(rw, "one JSON object is required", http.StatusBadRequest)
 				return
 			}
 			q.Set("namespace", args.Namespace)
@@ -87,9 +94,11 @@ func BrowserReads(o *observability.Service, w *Workloads, mapping auth.Mapping, 
 			q.Set("pod", args.Pod)
 			q["pods"] = args.Pods
 			q["digests"] = args.Digests
+			q.Set("current", strconv.FormatBool(args.Current))
 			q.Set("signal", args.Signal)
 			q["namespaces"] = args.Namespaces
 			q.Set("days", strconv.Itoa(args.Days))
+			q.Set("hours", strconv.Itoa(args.Hours))
 			q.Set("hoursPerUpgrade", strconv.FormatFloat(args.HoursPerUpgrade, 'g', -1, 64))
 			q.Set("buildAgeDaysPerUpgrade", strconv.FormatFloat(args.BuildAgeDaysPerUpgrade, 'g', -1, 64))
 		}
@@ -103,8 +112,14 @@ func BrowserReads(o *observability.Service, w *Workloads, mapping auth.Mapping, 
 			var in observability.SignalHistoryInput
 			in.Signal = q.Get("signal")
 			in.Namespaces = q["namespaces"]
-			if q.Get("days") != "" {
+			if q.Get("current") != "" {
+				in.Current, err = strconv.ParseBool(q.Get("current"))
+			}
+			if err == nil && q.Get("days") != "" {
 				in.Days, err = strconv.Atoi(q.Get("days"))
+			}
+			if err == nil && q.Get("hours") != "" {
+				in.Hours, err = strconv.Atoi(q.Get("hours"))
 			}
 			if err == nil && q.Get("hoursPerUpgrade") != "" {
 				in.HoursPerUpgrade, err = strconv.ParseFloat(q.Get("hoursPerUpgrade"), 64)
@@ -121,13 +136,13 @@ func BrowserReads(o *observability.Service, w *Workloads, mapping auth.Mapping, 
 			body, err = o.ListAlerts(r.Context(), id, observability.AlertsInput{Namespace: q.Get("namespace")})
 		case "/api/observability/log-rate":
 			if q.Get("namespace") == "" {
-				http.Error(rw, "namespace is required", 400)
+				http.Error(rw, "namespace is required", http.StatusBadRequest)
 				return
 			}
 			body, err = o.LogRate(r.Context(), id, q.Get("namespace"), q.Get("pod"), q["pods"]...)
 		case "/api/observability/namespace-resources":
 			if q.Get("namespace") == "" {
-				http.Error(rw, "namespace is required", 400)
+				http.Error(rw, "namespace is required", http.StatusBadRequest)
 				return
 			}
 			body, err = o.NamespaceResources(r.Context(), id, q.Get("namespace"))

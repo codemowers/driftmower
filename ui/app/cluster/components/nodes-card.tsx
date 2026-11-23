@@ -2,39 +2,31 @@
 
 import { cn } from "@/lib/utils/cn"
 import { softWrapText } from "@/lib/utils/soft-wrap-text"
-import { kubectlAge } from "@/lib/utils/format-time"
 import { formatBytes } from "@/lib/utils/format-bytes"
-import { usageBarColor } from "@/lib/utils/usage-color"
-import type { NodeDrift, Readiness } from "@/lib/cluster-resources/types"
+import MetricBar from "@/app/components/metric-bar"
+import type { NodeDrift } from "@/lib/cluster-resources/types"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import type { StorageUsage } from "@/lib/features/prometheus/node-storage"
 import GraphLink from "@/app/components/graph-link"
+import Card from "@/app/components/layout/card"
+import PrefetchLink from "@/app/components/prefetch-link"
+import { useContextHref } from "@/lib/hooks/use-context-href"
+import { nodeState } from "@/lib/cluster-resources/node-state"
 
-const GRID = "grid-cols-[2fr_1.4fr_1.6fr_1.6fr_1.4fr_0.4fr]"
-const HEADERS = ["Name", "State", "LVM pool", "Ephemeral", "Version", "Age"]
-
-const SPINE: Record<Readiness, string> = {
-  Ready:    "border-l-status-ok",
-  NotReady: "border-l-status-major",
-  Unknown:  "border-l-gray-300",
-}
+const GRID = "grid-cols-[2fr_1.4fr_1.4fr_1.4fr_1.2fr]"
+const HEADERS = ["Name", "Memory", "LVM pool", "Ephemeral", "Version"]
 
 const isControlPlane = (role: string) => role === "control-plane" || role === "master"
 
 // Every Node in one card, control plane first, with its roles as badges.
 export default function NodesCard({ nodes }: { nodes: NodeDrift[] }) {
   return (
-    <div className="rounded-xl border border-gray-200">
-      <header className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3.5">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nodes</span>
-        <span className="text-xs text-muted-foreground">{nodes.length}</span>
-      </header>
-
+    <Card title="Nodes" meta={nodes.length} flush>
       <div className={cn("grid gap-4 border-b border-gray-100 py-3 pl-8 pr-7", GRID)}>
-        {HEADERS.map((h, i) => (
+        {HEADERS.map(h => (
           <p
             key={h}
-            className={cn("text-xs font-medium text-muted-foreground", i === HEADERS.length - 1 && "text-right")}
+            className="text-xs font-medium text-muted-foreground"
           >{h}</p>
         ))}
       </div>
@@ -42,16 +34,17 @@ export default function NodesCard({ nodes }: { nodes: NodeDrift[] }) {
       <div className="flex flex-col gap-2 p-3">
         {nodes.map(node => <Node key={node.name} node={node} />)}
       </div>
-    </div>
+    </Card>
   )
 }
 
 function Node({ node }: { node: NodeDrift }) {
   const storage = useClusterState(s => s.nodeStorage?.[node.name] ?? null)
   const roles = node.role.split(",").filter(Boolean)
+  const state = nodeState(node)
 
   return (
-    <div className={cn("rounded-l-md border border-gray-200 border-l-4", SPINE[node.readiness])}>
+    <div role="group" className={cn("rounded-l-md border border-gray-200 border-l-4", state.border)} title={state.label} aria-label={`${node.name}: ${state.label}`}>
       <div className={cn("grid items-center gap-4 px-4 py-2.5", GRID)}>
         <div className="flex min-w-0 flex-col gap-1">
           <NodeName name={node.name} />
@@ -62,60 +55,34 @@ function Node({ node }: { node: NodeDrift }) {
           </div>
         </div>
 
-        <State readiness={node.readiness} schedulable={node.schedulable} pressure={node.pressure} />
-
+        <StorageBar usage={node.memory??undefined} />
         <StorageBar usage={storage?.lvm} />
         <StorageBar usage={storage?.ephemeral} />
 
         <Version version={node.version} />
-
-        <span className="font-mono text-sm text-muted-foreground tabular-nums text-right">
-          {node.creationTimestamp ? kubectlAge(node.creationTimestamp) : "—"}
-        </span>
       </div>
     </div>
   )
 }
 
 function NodeName({ name }: { name: string }) {
+  const { linkTo } = useContextHref()
   return (
-    <span className="break-words font-mono text-sm font-semibold text-foreground">
+    <PrefetchLink href={linkTo(`/cluster/nodes/${encodeURIComponent(name)}`)} className="break-words font-mono text-sm font-semibold text-foreground hover:text-brand hover:underline">
       {softWrapText(name)}
-    </span>
-  )
-}
-
-function State({ readiness, schedulable, pressure }: { readiness: Readiness; schedulable: boolean; pressure: NodeDrift["pressure"] }) {
-  const pressures = [pressure.memory && "MemoryPressure", pressure.disk && "DiskPressure", pressure.pid && "PIDPressure"].filter(Boolean)
-  const dot =
-    readiness === "Ready" ? "bg-status-ok" : readiness === "NotReady" ? "bg-status-major" : "bg-gray-400"
-  return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <span className={cn("size-2 shrink-0 rounded-full", dot)} aria-hidden />
-      <span className="truncate text-sm text-foreground">
-        {readiness}
-        {!schedulable && <span className="text-muted-foreground">,SchedulingDisabled</span>}
-        {pressures.length > 0 && <span className="text-status-major-label">,{pressures.join(",")}</span>}
-      </span>
-    </div>
+    </PrefetchLink>
   )
 }
 
 function StorageBar({ usage }: { usage?: StorageUsage }) {
   if (!usage) return <span className="font-mono text-xs text-muted-foreground">—</span>
   const { used, total, graph } = usage
-  const pct = total > 0 ? used / total : 0
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className={cn("h-full rounded-full", usageBarColor(pct))}
-          style={{ width: `${Math.min(pct * 100, 100)}%` }}
-        />
-      </div>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <MetricBar value={used} total={total} className="h-1.5 w-full" label={`${formatBytes(used)} of ${formatBytes(total)}`} />
       <GraphLink exprs={graph} range="1w">
         <span className="font-mono text-xs text-muted-foreground">
-          {formatBytes(used)} / {formatBytes(total)}
+          {formatBytes(used).replace(/ ?B$/, "").replace(/ /g, "")} / {formatBytes(total).replace(/ ?B$/, "").replace(/ /g, "")}
         </span>
       </GraphLink>
     </div>

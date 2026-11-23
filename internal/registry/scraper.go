@@ -133,7 +133,11 @@ func (s *Scraper) Run(ctx context.Context) error {
 					s.Log.Error("registry snapshot not saved", "repository", r.Repository, "error", err)
 					return
 				}
-				s.Log.Info("registry scraped", "repository", r.Repository, "images", len(repo.Images), "tags", repo.MatchedTags, "errors", len(repo.Errors))
+				if len(repo.Errors) > 0 {
+					s.Log.Warn("registry scraped with errors", "repository", r.Repository, "images", len(repo.Images), "tags", repo.MatchedTags, "errors", len(repo.Errors), "errorDetails", repo.Errors)
+				} else {
+					s.Log.Info("registry scraped", "repository", r.Repository, "images", len(repo.Images), "tags", repo.MatchedTags)
+				}
 			}(r)
 		}
 		select {
@@ -337,7 +341,9 @@ func (s *Scraper) resolve(ctx context.Context, repository, digest string, body [
 	if m.SchemaVersion != 2 {
 		return nil, errors.New("unsupported registry manifest schema")
 	}
-	if len(m.Manifests) > 0 {
+	// An empty index is valid and has no config or filesystem to index.
+	// Distinguish it from an image manifest whose config is missing.
+	if m.Manifests != nil {
 		var images []Image
 		for _, desc := range m.Manifests {
 			p := desc.Platform

@@ -273,3 +273,21 @@ func TestCrawler(t *testing.T) {
 		t.Errorf("error = %q", msg)
 	}
 }
+
+func TestTechnicalDebtEnvironment(t *testing.T) {
+	defaults := load(t, noBackend)
+	if defaults.HoursPerUpgrade != 1 || defaults.BuildAgeDaysPerUpgrade != 365 {
+		t.Fatalf("defaults %+v", defaults)
+	}
+	configured := load(t, map[string]string{"TECHNICAL_DEBT_HOURS_PER_UPGRADE": "2.5", "TECHNICAL_DEBT_BUILD_AGE_DAYS_PER_UPGRADE": "180"})
+	if configured.HoursPerUpgrade != 2.5 || configured.BuildAgeDaysPerUpgrade != 180 {
+		t.Fatalf("configured %+v", configured)
+	}
+	for _, name := range []string{"TECHNICAL_DEBT_HOURS_PER_UPGRADE", "TECHNICAL_DEBT_BUILD_AGE_DAYS_PER_UPGRADE"} {
+		for _, value := range []string{"0", "-1", "NaN", "Inf", "oops", "100000"} {
+			if !strings.Contains(loadError(t, map[string]string{name: value}), name) {
+				t.Fatalf("missing error for %s=%s", name, value)
+			}
+		}
+	}
+}

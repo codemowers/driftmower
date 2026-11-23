@@ -1,5 +1,6 @@
 export type SignalHistory = {
  signal:string;query:string;start:number;end:number;stepSeconds:number
+ hoursPerUpgrade?:number;buildAgeDaysPerUpgrade?:number
  series:{name:string;values:[number,number][]}[];warnings:string[]
 }
 

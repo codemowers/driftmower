@@ -16,6 +16,9 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         app: {{ .Release.Name }}-ui
     spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true

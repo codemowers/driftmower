@@ -19,7 +19,6 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/authz"
 )
 
-// TokenReviewer resolves a Kubernetes token through TokenReview.
 type TokenReviewer struct {
 	client authenticationclient.TokenReviewsGetter
 }
@@ -52,10 +51,18 @@ var errServiceAccountDenied = fmt.Errorf("%w: a valid ServiceAccount token bound
 // the audience keeps ordinary Kubernetes API tokens from opening this server.
 // It reports ok=false for tokens that are not ServiceAccount tokens, which
 // belong to OIDC.
-func (r *TokenReviewer) VerifyServiceAccount(ctx context.Context, raw, resource string) (*Caller, *auth.TokenInfo, bool, error) {
+func (r *TokenReviewer) VerifyServiceAccount(ctx context.Context, raw, resource string, additional ...string) (*Caller, *auth.TokenInfo, bool, error) {
 	claims, ok := unverifiedClaims(raw)
 	if !ok || !strings.HasPrefix(claims.Sub, "system:serviceaccount:") {
 		return nil, nil, false, nil
+	}
+	if !slices.Contains(claims.Aud, resource) {
+		for _, candidate := range additional {
+			if candidate != "" && slices.Contains(claims.Aud, candidate) {
+				resource = candidate
+				break
+			}
+		}
 	}
 	if !slices.Contains(claims.Aud, resource) {
 		return nil, nil, true, errServiceAccountDenied

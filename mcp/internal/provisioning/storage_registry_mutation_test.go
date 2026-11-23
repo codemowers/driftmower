@@ -163,7 +163,7 @@ var postgresTarget = ProvisionTarget{ID: Postgres, Resources: []TargetResource{
 func TestMutationDefaults(t *testing.T) {
 	facts := ToMutationFacts([]MutatingPolicy{cnpgTLS}, []MutatingBinding{{PolicyName: "cnpg-tls"}})
 	want := []AdmissionDefault{{Policy: "cnpg-tls", Resource: "clusters.postgresql.cnpg.io",
-		Description: ptr("Defaults serverTLSSecret. Provision the Secret before starting the Cluster."), NamespaceScoped: false}}
+		Description: new("Defaults serverTLSSecret. Provision the Secret before starting the Cluster."), NamespaceScoped: false}}
 	if got := DefaultsFor(facts, postgresTarget); !reflect.DeepEqual(got, want) {
 		t.Errorf("DefaultsFor = %+v", got)
 	}

@@ -77,3 +77,9 @@ export function staleText(staleRepoCount: number, distinctRepoCount: number): st
   if (staleRepoCount === distinctRepoCount) return "text-status-major-label"
   return "text-status-minor-label"
 }
+
+export function staleColor(staleRepoCount: number, distinctRepoCount: number): string {
+  if (staleRepoCount === 0) return "text-muted-foreground"
+  if (staleRepoCount === distinctRepoCount) return "text-status-major-label"
+  return "text-status-minor-label"
+}

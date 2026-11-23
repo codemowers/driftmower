@@ -24,12 +24,13 @@ import (
 	"github.com/codemowers/driftmower/mcp/internal/ttlcache"
 )
 
-// RulesReviewer answers a SelfSubjectRulesReview in namespace as id.
 type RulesReviewer func(ctx context.Context, id authz.Identity, namespace string) (authorizationv1.SubjectRulesReviewStatus, error)
 
 // Service lists OIDCUsers and evaluates their effective rights for callers
 // who may impersonate them.
 type Service struct {
+	// OIDCUsersDisabled leaves core ServiceAccount and caller access available.
+	OIDCUsersDisabled bool
 	// The server's own clients. OIDCUsers are read with them only after the
 	// caller's own RBAC allows it.
 	Dynamic   dynamic.Interface
@@ -83,7 +84,6 @@ func NewImpersonatingReviewer(base *rest.Config) RulesReviewer {
 	}
 }
 
-// ErrForbidden reports a caller who may not use this view.
 var ErrForbidden = errors.New("not authorized")
 
 func (s *Service) require(ctx context.Context, caller authz.Identity, attrs ...authz.Attributes) error {
@@ -113,7 +113,6 @@ func (s *Service) inspectGate(name string) []authz.Attributes {
 	}
 }
 
-// Access is one user's effective rights.
 type Access struct {
 	User     User           `json:"user"`
 	Identity authz.Identity `json:"identity"`

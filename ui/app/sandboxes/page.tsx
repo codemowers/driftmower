@@ -1,4 +1,6 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { useEffect, useMemo, useState } from "react"
 import PrefetchLink from "@/app/components/prefetch-link"
@@ -79,9 +81,9 @@ export default function SandboxesPage() {
   ) : null
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader
+    <>
+      <Page>
+        <PageHeader icon={ICONS.sandboxes}
           title="Sandboxes"
           subtitle="Your sandboxes and their kubeconfig snippets"
           accessory={adminPill}
@@ -207,7 +209,7 @@ export default function SandboxesPage() {
             )}
           </div>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

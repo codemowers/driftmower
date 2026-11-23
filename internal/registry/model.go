@@ -58,7 +58,8 @@ type Image struct {
 	Tags         []string          `json:"tags"`
 	CurrentTags  []string          `json:"currentTags"`
 	Platform     Platform          `json:"platform"`
-	Layers       []Layer           `json:"layers"`
+	Layers       []Layer           `json:"layers,omitempty"`
+	LayerCount   int               `json:"layerCount,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty"`
 	Annotations  map[string]string `json:"annotations,omitempty"`
 	Created      string            `json:"created,omitempty"`
@@ -94,12 +95,9 @@ type RepositorySummary struct {
 	Errors      []string  `json:"errors,omitempty"`
 }
 
-type RepositoryPage struct {
+type RepositoryDetail struct {
 	RepositorySummary
 	Images []Image `json:"images"`
-	Offset int     `json:"offset"`
-	Limit  int     `json:"limit"`
-	Total  int     `json:"total"`
 }
 
 // Target has the same platform and ordered-layer fields as a scraped Image.

@@ -27,7 +27,11 @@ type VolumeDetail struct {
 }
 
 func describeClaim(c *corev1.PersistentVolumeClaim) Claim {
-	return Claim{Namespace: c.Namespace, Name: c.Name, UID: string(c.UID), Phase: optional(string(c.Status.Phase)), StorageClass: c.Spec.StorageClassName, RequestedStorage: quantity(c.Spec.Resources.Requests, corev1.ResourceStorage), ProvisionedStorage: quantity(c.Status.Capacity, corev1.ResourceStorage), VolumeMode: volumeMode(c.Spec.VolumeMode), AccessModes: modes(c.Spec.AccessModes), BoundVolume: optional(c.Spec.VolumeName), UsedBy: []PodRef{}}
+	claim := Claim{ResizeStatus: c.Status.AllocatedResourceStatuses[corev1.ResourceStorage], CreatedAt: c.CreationTimestamp.Time, Namespace: c.Namespace, Name: c.Name, UID: string(c.UID), Phase: optional(string(c.Status.Phase)), StorageClass: c.Spec.StorageClassName, RequestedStorage: quantity(c.Spec.Resources.Requests, corev1.ResourceStorage), ProvisionedStorage: quantity(c.Status.Capacity, corev1.ResourceStorage), VolumeMode: volumeMode(c.Spec.VolumeMode), AccessModes: modes(c.Spec.AccessModes), BoundVolume: optional(c.Spec.VolumeName), UsedBy: []PodRef{}}
+	for _, condition := range c.Status.Conditions {
+		claim.Conditions = append(claim.Conditions, ClaimCondition{Type: string(condition.Type), Status: string(condition.Status), Message: condition.Message, LastTransitionTime: condition.LastTransitionTime.Time})
+	}
+	return claim
 }
 
 // GetVolume reads one binding, checking the caller's get permission for each
@@ -41,7 +45,7 @@ func (s *Service) GetVolume(ctx context.Context, id authz.Identity, in VolumeDet
 	volumeName := in.Volume
 	if in.Claim != "" {
 		if s.Judge.MayPerform(ctx, id, authz.Attributes{Namespace: in.Namespace, Resource: "persistentvolumeclaims", Verb: "get", Name: in.Claim}).Verdict != authz.Yes {
-			return nil, errors.New("Kubernetes RBAC denied get persistentvolumeclaim")
+			return nil, errors.New("kubernetes RBAC denied get persistentvolumeclaim")
 		}
 		claim, err := s.Kubernetes.CoreV1().PersistentVolumeClaims(in.Namespace).Get(ctx, in.Claim, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -58,7 +62,7 @@ func (s *Service) GetVolume(ctx context.Context, id authz.Identity, in VolumeDet
 	if volumeName != "" {
 		if s.Judge.MayPerform(ctx, id, authz.Attributes{Resource: "persistentvolumes", Verb: "get", Name: volumeName}).Verdict != authz.Yes {
 			if out.Claim == nil {
-				return nil, errors.New("Kubernetes RBAC denied get persistentvolume")
+				return nil, errors.New("kubernetes RBAC denied get persistentvolume")
 			}
 			out.Warnings = append(out.Warnings, "PV details unavailable: caller lacks get permission")
 		} else {

@@ -1,4 +1,7 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
+import Card from "@/app/components/layout/card"
 
 import { useState } from "react"
 import PageHeader from "../components/page-header"
@@ -43,7 +46,7 @@ export default function ApplicationsPage() {
 
   function renderTiles(entries: ApplicationEntry[]) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="divide-y divide-gray-100">
         {entries.map(entry => (
           <ApplicationTile key={entry.key} entry={entry} manager={resolveManagerLink(entry, releaseScores)} />
         ))}
@@ -52,9 +55,9 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-8 px-7 py-12">
-        <PageHeader
+    <>
+      <Page>
+        <PageHeader icon={ICONS.applications}
           title="Applications"
           subtitle="Registered applications from OIDCClients you can access"
         />
@@ -85,21 +88,15 @@ export default function ApplicationsPage() {
               )}
             </div>
 
-            <section className="flex flex-col gap-3">
-              <div className="flex items-baseline gap-2.5">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Registered applications
-                </h2>
-                <span className="text-xs tabular-nums text-muted-foreground">{available.length}</span>
-              </div>
+            <Card flush title="Registered applications" meta={available.length}>
               {available.length > 0 ? (
                 renderTiles(available)
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="px-5 py-4 text-sm text-muted-foreground">
                   {search ? "No applications match that search." : "No registered applications were found in your accessible namespaces."}
                 </p>
               )}
-            </section>
+            </Card>
 
             {warnings.map(warning => <p key={warning} className="text-sm text-muted-foreground">{warning}</p>)}
 
@@ -108,25 +105,19 @@ export default function ApplicationsPage() {
             )}
 
             {showAll && (
-              <section className="flex flex-col gap-3">
-                <div className="flex items-baseline gap-2.5">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {namespaces ? "Other hosts in your namespaces" : "Other hosts discovered"}
-                  </h2>
-                  <span className="text-xs tabular-nums text-muted-foreground">{others.length}</span>
-                </div>
+              <Card flush title={namespaces ? "Other hosts in your namespaces" : "Other hosts discovered"} meta={others.length}>
                 {others.length > 0 ? (
                   renderTiles(others)
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="px-5 py-4 text-sm text-muted-foreground">
                     {search ? "No hosts match that search." : "No other hosts in this scope."}
                   </p>
                 )}
-              </section>
+              </Card>
             )}
           </>
         )}
-      </main>
-    </div>
+      </Page>
+    </>
   )
 }

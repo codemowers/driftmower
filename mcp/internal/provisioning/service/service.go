@@ -45,7 +45,6 @@ func New(f *facts.Facts, judge authz.Judge, maxNamespaces int) *Service {
 	return &Service{facts: f, judge: judge, MaxNamespaces: maxNamespaces}
 }
 
-// Invalidate drops cached cluster facts.
 func (s *Service) Invalidate() {
 	s.facts.Invalidate()
 }
@@ -398,7 +397,7 @@ func (s *Service) CheckAccess(ctx context.Context, id *authz.Identity, in Access
 	if id == nil {
 		result.Verdict = authz.Unknown
 		result.Reason = "The call carried no verified caller, so permission was not checked. Run `kubectl auth can-i " + in.Verb + " " + what + "`."
-		result.RBAC = RBACVerdict{Verdict: authz.Unknown, Reason: ptr("no verified caller")}
+		result.RBAC = RBACVerdict{Verdict: authz.Unknown, Reason: new("no verified caller")}
 
 		return result, nil
 	}
@@ -434,8 +433,6 @@ func (s *Service) CheckAccess(ctx context.Context, id *authz.Identity, in Access
 
 	return result, nil
 }
-
-func ptr[T any](v T) *T { return &v }
 
 var hostMention = regexp.MustCompile(`(?i)host`)
 

@@ -1,0 +1,43 @@
+import {
+  Archive, BarChart3, BellRing, Download, Bot, Box, Boxes, Bug, Container, Cpu, Database, FileCode, FolderTree, Gauge, GitBranch, HardDrive,
+  Layers, Layers2, LayoutGrid, ListTree, Network, Package, ScrollText, Server, Settings, ShieldAlert, ShieldCheck,
+  ShieldQuestion, TriangleAlert, ShipWheel, SquareTerminal, Users, UsersRound, type LucideIcon,
+} from "lucide-react"
+
+// One icon per concept. The nav bar, list headers and resource headers all
+// take theirs from here, so a section and its resources always match.
+export const ICONS = {
+  summary: BarChart3,
+  timestampConflict: TriangleAlert,
+  workloads: Boxes,
+  pod: Box,
+  namespaces: FolderTree,
+  applications: LayoutGrid,
+  helmReleases: ShipWheel,
+  containerImages: Layers,
+  baseImages: Layers2,
+  sources: GitBranch,
+  operators: Database,
+  sandboxes: Package,
+  nodes: Cpu,
+  alerts: BellRing,
+  volumes: HardDrive,
+  storageClasses: Archive,
+  priorityClasses: Gauge,
+  advisories: ShieldAlert,
+  vulnerabilities: Bug,
+  admissionPolicies: ShieldQuestion,
+  trust: ShieldCheck,
+  users: Users,
+  groups: UsersRound,
+  serviceAccounts: Bot,
+  codingAgent: SquareTerminal,
+  mcpServer: Server,
+  registry: Container,
+  settings: Settings,
+  logs: ScrollText,
+  network: Network,
+  sbom: ListTree,
+  yaml: FileCode,
+  export: Download,
+} satisfies Record<string, LucideIcon>

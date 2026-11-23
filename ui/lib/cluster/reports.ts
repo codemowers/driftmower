@@ -86,10 +86,13 @@ export type ImageUsage = {
     digest: string
     repositoryUrl?: string
     tagUrl?: string
+    configCreated?: string
     labels?: Record<string, string>
     crawlerSource?: { url: string; version: string }
     sourceStatus?: "linked" | "unlinked" | "unknown"
     sourceRepositories?: { name?: string; url: string }[]
+    // Why the image's source metadata was discarded as inherited from a base image.
+    inheritedSource?: string
     containerImage?: string
     sbomArtifacts?: string[]
     scannerNamespace?: string
@@ -142,6 +145,7 @@ export type WorkloadDependencies = {
 export type OrphanOwner = WorkloadDependencies & { apiVersion: string; uid: string; ownerReferenceOnly: boolean }
 
 export type ReportWorkload = WorkloadDependencies & {
+  issues?: import("@/lib/cluster/issues").WorkloadIssue[]
   sourceRepositories?: import("../features/crawler/sources").SourceRepository[]
   apiVersion?: string
   createdAt?: string
@@ -160,7 +164,7 @@ export type ReportWorkload = WorkloadDependencies & {
   name: string
   // On a namespace's orphan bucket (kind Namespace): ownerless Pods, and
   // generating owners by "Kind.group" and name.
-  standalonePods?: { name: string; uid: string }[]
+  standalonePods?: { name: string; uid: string; issues?: import("./issues").WorkloadIssue[] }[]
   orphaned?: Record<string, Record<string, OrphanOwner>>
 }
 

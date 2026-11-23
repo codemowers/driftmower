@@ -8,6 +8,8 @@ skaffold.env
 # Local cluster settings
 skaffold.env.*
 !skaffold.env.example
+/chart/cluster-values/
+/scripts/promote-images.sh
 
 # Derived from the pinned SPDX submodule by the UI prebuild script.
 /ui/lib/features/crawler/license-data.ts

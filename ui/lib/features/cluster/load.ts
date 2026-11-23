@@ -7,10 +7,11 @@ import type { ClusterMetrics } from "@/lib/features/prometheus/metrics"
 import type { NodeStorageMap } from "@/lib/features/prometheus/node-storage"
 import type { AlertGroup, AlertSeverity } from "@/lib/features/prometheus/types"
 
-type HealthNode = {
+export type HealthNode = {
   name: string
   roles: string[]
   readiness: Readiness
+  conditions?: string[]
   schedulable: boolean
   pressure: NodeDrift["pressure"]
   kubeletVersion: string
@@ -19,6 +20,8 @@ type HealthNode = {
   containerRuntime: string
   architecture: string
   creationTimestamp: string
+  bootTimeSeconds: number | null
+  memory: {used:number;total:number;graph:string[]|null}|null
   lvm: { used: number; total: number; graph: string[] | null } | null
   ephemeral: { used: number; total: number; graph: string[] | null } | null
 }
@@ -32,10 +35,13 @@ type Alerts = { alerts: { alertname: string; severity: string }[] }
 
 function toNode(n: HealthNode): NodeDrift {
   return {
+    memory:n.memory?{used:n.memory.used,total:n.memory.total,graph:n.memory.graph??undefined}:null,
     name: n.name, role: n.roles.length ? n.roles.join(",") : "worker", readiness: n.readiness, schedulable: n.schedulable,
-    pressure: n.pressure, version: n.kubeletVersion, osImage: n.osImage, kernelVersion: n.kernelVersion,
+    pressure: n.pressure, conditions: n.conditions ?? [], version: n.kubeletVersion, osImage: n.osImage, kernelVersion: n.kernelVersion,
     containerRuntime: n.containerRuntime, architecture: n.architecture,
     creationTimestamp: n.creationTimestamp || null,
+    bootTime: n.bootTimeSeconds != null && Number.isFinite(n.bootTimeSeconds) && n.bootTimeSeconds > 0
+      ? new Date(n.bootTimeSeconds * 1000).toISOString() : null,
   }
 }
 
@@ -54,7 +60,7 @@ export function alertGroups(alerts: Alerts["alerts"]): AlertGroup[] {
 }
 
 // Loads the Cluster page through the selected MCP server: nodes enriched with
-// usage from get_cluster_health, and the firing alerts the caller may read.
+// usage from get_cluster_health. Firing alerts have their own Alerts page.
 export async function loadCluster(): Promise<void> {
   const health = fetchMcpJSON<ClusterHealth>("/api/observability/cluster-health")
     .then(h => {
@@ -64,8 +70,5 @@ export async function loadCluster(): Promise<void> {
       useClusterState.setState({ nodeDrift: { nodes: h.nodes.map(toNode) }, nodeDriftError: null, clusterMetrics: h.resources, nodeStorage: storage })
     })
     .catch((e: unknown) => useClusterState.setState({ nodeDriftError: e instanceof Error ? e.message : String(e) }))
-  const alerts = fetchMcpJSON<Alerts>("/api/observability/alerts")
-    .then(r => useClusterState.setState({ prometheusAlerts: alertGroups(r.alerts) }))
-    .catch(() => undefined)
-  await Promise.all([health, alerts])
+  await health
 }

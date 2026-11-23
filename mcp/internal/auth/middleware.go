@@ -14,6 +14,8 @@ type Authenticator struct {
 	OIDC *OIDCVerifier
 	// Nil disables ServiceAccount authentication.
 	ServiceAccounts *TokenReviewer
+	// Stable in-cluster audience advertised independently of the public origin.
+	ServiceAccountAudience string
 	// The protected resource, `<public URL>/mcp`.
 	Resource string
 	Issuer   string
@@ -26,7 +28,7 @@ const MetadataPath = "/.well-known/oauth-protected-resource/mcp"
 // Verify implements the SDK's TokenVerifier.
 func (a *Authenticator) Verify(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
 	if a.ServiceAccounts != nil {
-		_, info, handled, err := a.ServiceAccounts.VerifyServiceAccount(ctx, token, a.Resource)
+		_, info, handled, err := a.ServiceAccounts.VerifyServiceAccount(ctx, token, a.Resource, a.ServiceAccountAudience)
 		if handled {
 			return info, err
 		}

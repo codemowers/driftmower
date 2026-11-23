@@ -5,7 +5,7 @@ import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ClusterResource } from "@/lib/cluster/cluster-state"
-import { cn } from "@/lib/utils/cn"
+import Card from "@/app/components/layout/card"
 import { callTool } from "@/browser/connection"
 
 export type RestartTarget = { namespace: string; kind: string; apiVersion: string; name: string; uid: string; managerKind: "argo" | "standalone" }
@@ -100,10 +100,7 @@ export default function RestartTile({ target, restartedAt, pods }: Props) {
       disabled={restarting}
       aria-expanded={confirming}
       onClick={() => setConfirming(open => !open)}
-      className={cn(
-        "flex size-20 flex-col items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white transition-colors hover:border-brand/40 hover:bg-brand-bg/30 disabled:pointer-events-none",
-        confirming && "border-brand/40 bg-brand-bg/30",
-      )}
+      className="inline-flex w-fit items-center gap-2 rounded-md bg-brand-bg px-3 py-2 text-sm font-medium text-brand-label hover:bg-brand-bg/70 disabled:opacity-50"
     >
       {restarting ? <LoaderCircle className="size-5.5 animate-spin text-brand-icon motion-reduce:animate-none" aria-hidden />
         : error ? <AlertTriangle className="size-5.5 text-status-major-label" aria-hidden />
@@ -116,8 +113,7 @@ export default function RestartTile({ target, restartedAt, pods }: Props) {
   )
 
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rollout</p>
+    <Card title="Actions">
       {error ? (
         <Tooltip>
           <TooltipTrigger asChild>{tile}</TooltipTrigger>
@@ -125,6 +121,6 @@ export default function RestartTile({ target, restartedAt, pods }: Props) {
         </Tooltip>
       ) : tile}
       {confirming && <ConfirmDialog target={target} onCancel={() => setConfirming(false)} onConfirm={() => void restart()} />}
-    </div>
+    </Card>
   )
 }

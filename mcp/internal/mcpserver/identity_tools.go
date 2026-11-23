@@ -25,8 +25,7 @@ func addClusterIdentityTool(s *mcp.Server, c cluster.Identity, usage string) {
 		Name:        "get_cluster_identity",
 		Title:       "Identify this cluster",
 		InputSchema: noArguments(),
-		Description: "Use to identify the cluster and external Kubernetes API URL for this connection, especially before selecting a kubectl context or interpreting drift history. " +
-			"Match that URL against local kubeconfig before selecting an explicit kubectl context. Null values mean unconfigured identity; ask rather than guessing.",
+		Description: "Cluster ID and external Kubernetes API URL. Match the URL against local kubeconfig before choosing a kubectl context.",
 		Annotations: readOnly("Identify this cluster"),
 	}, func(context.Context, *mcp.CallToolRequest, noInput) (*mcp.CallToolResult, clusterIdentityOutput, error) {
 		return nil, clusterIdentityOutput{
@@ -51,10 +50,7 @@ func addAccessibleNamespacesTool(s *mcp.Server, resolver *authz.ScopeResolver, m
 		Name:        "list_accessible_namespaces",
 		Title:       "List accessible namespaces",
 		InputSchema: noArguments(),
-		Description: "Use to choose a namespace when the user has not specified one, or discover the scope visible to this caller. " +
-			"Returns namespaces where Kubernetes authorizes list pods for the verified caller. This establishes visibility only, not create/edit permission; check the intended operation separately. " +
-			"Unknown entries could not be evaluated and are excluded, not denied. Inspect unknown and truncated before treating the listing as complete. " +
-			"If a namespace is already known, query the relevant tool directly; no preliminary namespace listing is required.",
+		Description: "Namespaces where the caller may list pods. Check unknown and truncated before treating it as complete.",
 		Annotations: readOnly("List accessible namespaces"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, accessibleNamespacesOutput, error) {
 		id, err := callerIdentity(req, m)

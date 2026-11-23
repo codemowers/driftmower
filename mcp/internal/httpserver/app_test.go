@@ -70,10 +70,14 @@ func start(t *testing.T, authenticated bool, mode ...string) *fixture {
 		BrowserClientID: "dashboard",
 		AllowedOrigins:  []string{"http://localhost:8080", "https://dashboard.example.com"},
 		SessionIdle:     time.Minute,
-		BrowserReads:    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("read")) }),
-		Metrics:         m,
-		AnonymousRead:   readAll && !authenticated,
-		Logger:          logger,
+		BrowserReads: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, err := w.Write([]byte("read")); err != nil {
+				t.Error(err)
+			}
+		}),
+		Metrics:       m,
+		AnonymousRead: readAll && !authenticated,
+		Logger:        logger,
 		MCP: mcpserver.New(mcpserver.Deps{
 			Cluster: c, Version: "test", Logger: logger, Metrics: m, Mapping: mapping,
 			Scope: &authz.ScopeResolver{
@@ -354,7 +358,9 @@ func TestDashboardClientForOrigin(t *testing.T) {
 		if res.StatusCode == 200 {
 			err = json.NewDecoder(res.Body).Decode(&body)
 		}
-		res.Body.Close()
+		if err := res.Body.Close(); err != nil {
+			t.Error(err)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -386,7 +392,9 @@ func TestBrowserReadsAreProtectedBeforeServingOrCaching(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				t.Error(err)
+			}
 			if resp.Header.Get("Cache-Control") != "no-store" {
 				t.Fatal(resp.Header)
 			}

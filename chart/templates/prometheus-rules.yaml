@@ -25,6 +25,11 @@ spec:
           labels:
             driftmower_namespace: {{ .Release.Namespace | quote }}
             driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:image_filesystem_available:max
+          expr: max by (digest) (driftmower_image_filesystem_available{{ $scanner }}) and on () (max(driftmower_scanner_inventory_ready{{ $scanner }}) == 1)
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
         - record: driftmower:image_scan_available:max
           expr: max by (digest, trivy_version, db_version, coverage, reason) (driftmower_image_scan_available{{ $scanner }})
           labels:
@@ -52,6 +57,21 @@ spec:
               Impact: This artifact was rejected; vulnerability coverage may be incomplete.
               Next steps: Inspect the scan status, scanner logs and image contents; arrange a valid scan before relying on vulnerability conclusions.
               Limitations: The gauge clears after a valid upload or operator restart. Resolution alone does not prove restored coverage.
+        - alert: DriftmowerScannerDispatchStopped
+          expr: |-
+            driftmower_scanner_failed_pods{{ $scanner }} >= driftmower_scanner_failed_pod_limit{{ $scanner }}
+          for: 5m
+          labels:
+            severity: warning
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_release: {{ .Release.Name | quote }}
+          annotations:
+            summary: "Scanner stopped starting new scans"
+            description: |-
+              {{ "Signal: {{ $value }} retained failed scan Pods have met or exceeded the configured failure limit for 5 minutes." }}
+              Impact: New image scans are stopped; existing scans and cached artifact reads continue. Images without readable findings have unknown coverage.
+              Next steps: Inspect failed scan Pod termination messages and events, admission mutations, runtime isolation and image-volume support. Fix the cause, then delete reviewed failed scan Pods to bring their count below the limit and resume dispatch.
+              Limitations: This count includes retained failures from older scanner versions. It identifies a blocked dispatcher, not a common root cause or a clean security result.
         - alert: DriftmowerScannerInventoryUnavailable
           expr: |-
             driftmower_scanner_inventory_ready{{ $scanner }} == 0
@@ -81,7 +101,7 @@ spec:
             description: |-
               Signal: the security metrics target is failing or undiscovered for 15 minutes.
               Impact: running image and service-account exposure coverage is unknown; resolved finding alerts do not establish a clean security state.
-              Next steps: inspect the security ServiceMonitor selection, dedicated metrics port access, MCP health, Pod/RBAC list permissions, and unresolved Role references. Restore a complete inventory scrape.
+              Next steps: inspect the security PodMonitor selection, dedicated metrics port access, MCP health, Pod/RBAC list permissions, and unresolved Role references. Restore a complete inventory scrape.
               Limitations: this exporter intentionally fails incomplete reads rather than publishing an empty successful inventory.
         - record: driftmower:running_image_containers:max
           expr: max by (namespace, digest) (driftmower_running_image_containers{{ $mcp }})
@@ -133,6 +153,44 @@ spec:
 {{- end }}
 {{- end }}
 {{- if and .Values.mcp.enabled .Values.operator.enabled }}
+{{- $manifests := printf "max by (image,digest) (driftmower_image_manifest_info%s)" $scanner }}
+{{- $catalog := printf "max by (digest) (max by (digest) (%s) or label_replace(max by (image) (%s),\"digest\",\"sha256:$1\",\"image\",\"sha256-(.*)\"))" $manifests $manifests }}
+{{- $filesDirect := printf "max by (digest) (driftmower_image_filesystem_available%s)" $scanner }}
+{{- $trivyDirect := printf "max by (digest) (driftmower_image_scan_available%s)" $scanner }}
+{{- $files := printf "max by (digest) (%s or label_replace(min by (image) (%s * on (digest) group_left () (%s or on (digest) (max by (digest) (%s) * 0))),\"digest\",\"sha256:$1\",\"image\",\"sha256-(.*)\"))" $filesDirect $manifests $filesDirect $manifests }}
+{{- $trivy := printf "max by (digest) (%s or label_replace(min by (image) (%s * on (digest) group_left () (%s or on (digest) (max by (digest) (%s) * 0))),\"digest\",\"sha256:$1\",\"image\",\"sha256-(.*)\"))" $trivyDirect $manifests $trivyDirect $manifests }}
+{{- $stages := printf "driftmower:image_scan_stage:info{%s}" $owned }}
+{{- $running := printf "(max by (namespace,digest) (driftmower_running_image_containers%s > 0) > bool 0)" $mcp }}
+    - name: driftmower.security.scan_coverage
+      interval: 1m
+      rules:
+        # Resolve image/index aliases once per evaluation, rather than repeating
+        # platform joins at every point of every browser history query.
+        - record: driftmower:image_scan_stage:info
+          expr: |-
+            (
+              label_replace(({{ $files }} == 1) and on (digest) ({{ $trivy }} == 1),"stage","trivy_files","","")
+              or label_replace(({{ $files }} == 1) unless on (digest) ({{ $trivy }} == 1),"stage","files_only","","")
+              or label_replace(({{ $trivy }} == 1) unless on (digest) ({{ $files }} == 1),"stage","trivy_only","","")
+              or label_replace({{ $catalog }} unless on (digest) (({{ $files }} == 1) or ({{ $trivy }} == 1)),"stage","no_scan","","")
+            )
+            and on () (max(driftmower_scanner_inventory_ready{{ $scanner }}) == 1)
+            and on () (max(driftmower_image_filesystem_available{{ $scanner }}) >= 0)
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
+        - record: driftmower:running_image_scan_stage:info
+          expr: |-
+            (
+              ({{ $stages }} * on (digest) group_right (stage) {{ $running }})
+              or label_replace({{ $running }} unless on (digest) {{ $stages }},"stage","no_scan","","")
+            )
+            and on () (max({{ $stages }}) > 0)
+            and on () (max(driftmower_scanner_inventory_ready{{ $scanner }}) == 1)
+            and on () (max(driftmower_image_filesystem_available{{ $scanner }}) >= 0)
+          labels:
+            driftmower_namespace: {{ .Release.Namespace | quote }}
+            driftmower_instance: {{ .Release.Name | quote }}
     - name: driftmower.security.deployed_images
       rules:
         - alert: DriftmowerCriticalVulnerabilitiesInUse

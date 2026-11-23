@@ -7,6 +7,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"regexp"
@@ -33,13 +34,15 @@ const (
 )
 
 type Config struct {
-	ScannerURL        string
-	ScannerTokenFile  string
-	ScannerNamespace  string
-	ScannerInstance   string
-	CVEHistoryEnabled bool
-	SAHistoryEnabled  bool
-	Transport         Transport
+	ScannerURL             string
+	ScannerTokenFile       string
+	ScannerNamespace       string
+	ScannerInstance        string
+	HoursPerUpgrade        float64
+	BuildAgeDaysPerUpgrade float64
+	CVEHistoryEnabled      bool
+	SAHistoryEnabled       bool
+	Transport              Transport
 	// Defaults to `::`, which serves IPv6 and IPv4 clients from one socket
 	// wherever the OS leaves bindv6only off. Narrow it to `::1` or
 	// `127.0.0.1` to bind loopback only.
@@ -63,6 +66,7 @@ type Config struct {
 	AuthMode                  string
 	OAuthClientID             string
 	ServiceAccountAuthEnabled bool
+	ServiceAccountAudience    string
 	WorkloadRestartEnabled    bool
 	// OIDCUser listing and effective-rights inspection for callers who may
 	// impersonate users; needs impersonate on users and groups.
@@ -178,7 +182,6 @@ type Observability struct {
 	Alignment time.Duration
 }
 
-// Load reads the configuration from the process environment.
 func Load() (*Config, error) {
 	return LoadFrom(os.LookupEnv)
 }
@@ -195,11 +198,7 @@ func LoadFrom(lookup func(string) (string, bool)) (*Config, error) {
 	return c, nil
 }
 
-// Kubernetes service links inject <SERVICE>_PORT=tcp://<ip>:<port> for every
-// Service in the namespace. A Service named driftmower-mcp shadows
-// DRIFTMOWER_MCP_PORT, and driftmower-mcp-health shadows
-// DRIFTMOWER_MCP_HEALTH_PORT. A service-link URL is never a port number, so it
-// is ignored and the default applies.
+// Ignore Kubernetes service-link values such as tcp://<ip>:<port>.
 var serviceLinkValue = regexp.MustCompile(`^(tcp|udp|sctp)://`)
 
 var shadowedByServiceLinks = map[string]bool{
@@ -269,6 +268,19 @@ func (r *reader) int(name string, fallback, minimum, maximum int) int {
 		return fallback
 	}
 
+	return n
+}
+
+func (r *reader) float(name string, fallback, minimum, maximum float64) float64 {
+	v := r.value(name)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.ParseFloat(v, 64)
+	if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < minimum || n > maximum {
+		r.fail("%s must be a finite number between %g and %g", name, minimum, maximum)
+		return fallback
+	}
 	return n
 }
 
@@ -354,6 +366,7 @@ func (r *reader) load() *Config {
 	authenticated := c.OIDC != nil
 
 	c.ServiceAccountAuthEnabled = r.bool("MCP_SERVICE_ACCOUNT_AUTH_ENABLED", false)
+	c.ServiceAccountAudience = r.value("MCP_SERVICE_ACCOUNT_AUDIENCE")
 	if c.ServiceAccountAuthEnabled && !authenticated {
 		r.fail("MCP_SERVICE_ACCOUNT_AUTH_ENABLED requires authenticated HTTP")
 	}
@@ -379,7 +392,13 @@ func (r *reader) load() *Config {
 			continue
 		}
 		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"))) {
+		if err != nil {
+			r.fail("MCP_ALLOWED_ORIGINS and DASHBOARD_OIDC_CLIENT_ORIGIN must contain exact HTTPS origins or loopback HTTP origins")
+			continue
+		}
+		loopback := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"
+		allowedScheme := u.Scheme == "https" || u.Scheme == "http" && loopback
+		if u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || !allowedScheme {
 			r.fail("MCP_ALLOWED_ORIGINS and DASHBOARD_OIDC_CLIENT_ORIGIN must contain exact HTTPS origins or loopback HTTP origins")
 			continue
 		}
@@ -391,6 +410,8 @@ func (r *reader) load() *Config {
 	c.ScannerInstance = r.value("SCANNER_INSTANCE")
 	c.CVEHistoryEnabled = r.bool("HISTORY_CVE_ENABLED", c.ScannerURL != "")
 	c.SAHistoryEnabled = r.bool("HISTORY_SERVICE_ACCOUNTS_ENABLED", c.UserAccess.Enabled)
+	c.HoursPerUpgrade = r.float("TECHNICAL_DEBT_HOURS_PER_UPGRADE", 1, 0.01, 10000)
+	c.BuildAgeDaysPerUpgrade = r.float("TECHNICAL_DEBT_BUILD_AGE_DAYS_PER_UPGRADE", 365, 1, 36500)
 	c.DriftPrometheusURL = r.url("DRIFT_PROMETHEUS_URL", "", false)
 	c.ArgoCDURL = r.url("ARGO_URL", "", false)
 

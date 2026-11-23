@@ -144,7 +144,7 @@ export default function ApplicationTile({
   manager: ManagerLink | null
 }) {
   return (
-    <div className="group relative flex items-center gap-4 rounded-lg border border-border bg-card px-5 py-6 transition-colors hover:border-brand/40 hover:bg-brand-bg/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-brand">
+    <div className="group relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-brand-bg/30 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset has-[a:focus-visible]:ring-brand">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-bg font-mono text-base font-semibold tracking-tight text-brand-icon">
         {initials(entry.name)}
       </div>

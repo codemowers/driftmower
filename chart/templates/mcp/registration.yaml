@@ -1,0 +1,23 @@
+{{- if and .Values.mcp.enabled (or .Values.mcp.serviceAccountAuth.enabled (eq .Values.mcp.auth.mode "anonymous")) (.Capabilities.APIVersions.Has "codemowers.ai/v1alpha1/ClusterMCPServer") }}
+apiVersion: codemowers.ai/v1alpha1
+kind: ClusterMCPServer
+metadata:
+  name: driftmower
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  annotations:
+    kubernetes.io/description: >-
+      Discover this cluster's identity, capabilities, admission policies, schemas,
+      access, workloads, images, vulnerabilities, logs and metrics. Calls use the
+      caller's configured access mode and Kubernetes permissions. This description
+      advertises capabilities; it does not assign work or authorize changes.
+    {{- if and .Values.mcp.ingress.enabled .Values.mcp.publicUrl }}
+    codemowers.ai/public-url: {{ printf "%s/mcp" (trimSuffix "/" .Values.mcp.publicUrl) | quote }}
+    codemowers.ai/client-config-url: {{ printf "%s/api/client-config" (trimSuffix "/" .Values.mcp.publicUrl) | quote }}
+    {{- end }}
+spec:
+  url: {{ printf "http://mcp.%s.svc.cluster.local.:3000/mcp" .Release.Namespace | quote }}
+  {{- if ne .Values.mcp.auth.mode "anonymous" }}
+  audience: {{ printf "mcp.%s" .Release.Namespace | quote }}
+  {{- end }}
+{{- end }}

@@ -1,8 +1,9 @@
 "use client"
+import { ICONS } from "@/app/components/layout/icons"
+import Page from "@/app/components/layout/page"
 
 import { Suspense } from "react"
 import { useParams } from "next/navigation"
-import { FileCode } from "lucide-react"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { supportsYamlView } from "@/lib/features/yaml/supported-kinds"
 import ResourceHeader from "@/app/components/resource-header"
@@ -18,9 +19,9 @@ export default function YamlPage() {
   if (clusterResources === null) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <ClusterDataPending />
-        </main>
+        </Page>
       </div>
     )
   }
@@ -28,9 +29,9 @@ export default function YamlPage() {
   if (!resource) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">Resource not found in the live cluster.</p>
-        </main>
+        </Page>
       </div>
     )
   }
@@ -38,20 +39,20 @@ export default function YamlPage() {
   if (!supportsYamlView(resource.kind) || !resource.namespace) {
     return (
       <div className="min-h-full flex flex-col items-center">
-        <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+        <Page>
           <p className="text-sm text-muted-foreground">
             YAML view is not available for {resource.kind} resources.
           </p>
-        </main>
+        </Page>
       </div>
     )
   }
 
   return (
     <div className="min-h-full flex flex-col items-center">
-      <main className="flex w-full flex-1 flex-col gap-6 px-7 py-12">
+      <Page>
         <ResourceHeader
-          icon={FileCode}
+          icon={ICONS.yaml}
           iconAriaLabel="Resource YAML"
           title={resource.name}
           copyValue={resource.name}
@@ -71,7 +72,7 @@ export default function YamlPage() {
             name={resource.name}
           />
         </Suspense>
-      </main>
+      </Page>
     </div>
   )
 }
