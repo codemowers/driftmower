@@ -1,5 +1,5 @@
 # Build context: the repository root, where go.mod is.
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27.4-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download

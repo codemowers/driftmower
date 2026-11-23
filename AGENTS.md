@@ -22,8 +22,11 @@ user's requested scope.
 
 ## Local verification
 
-`.github/workflows/ci.yml` defines this repository's CI checks; its Go lint
-scope is `./mcp/...`. For monitoring rules, also run
+`.github/workflows/ci.yml` defines this repository's CI checks. Run Go checks
+with the latest patches of both supported CI branches (1.26 and 1.27);
+serialization can differ between toolchains. Release builds use the latest
+stable Go version; keep Dockerfile pins current. Its Go lint scope is
+`./mcp/...`. For monitoring rules, also run
 `bash scripts/test-security-rules.sh` with `promtool`. For desktop
 build changes, generate the frontend before building with `CGO_ENABLED=0`.
 Look for existing tools under the ignored `.build-tmp/` directory as well as

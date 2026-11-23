@@ -5,7 +5,7 @@ RUN npm ci
 COPY ui ./
 RUN npm run build
 
-FROM golang:1.26.10 AS server
+FROM golang:1.27.4 AS server
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

@@ -60,7 +60,9 @@ func toolResultSize(result *mcp.CallToolResult) (int, error) {
 	}
 	for i, content := range result.Content {
 		text, ok := content.(*mcp.TextContent)
-		if !ok {
+		// Let the SDK marshal malformed text: replacement-rune escaping differs
+		// between Go versions, so the valid UTF-8 fast path cannot size it.
+		if !ok || !utf8.ValidString(text.Text) {
 			body, err := json.Marshal(result)
 			return len(body), err
 		}
@@ -73,8 +75,8 @@ func toolResultSize(result *mcp.CallToolResult) (int, error) {
 	return len(body) + extra, err
 }
 
-// Count bytes within the JSON string quotes. The SDK's content marshaler
-// replaces invalid UTF-8 with a literal replacement rune before JSON encoding.
+// Count bytes within the JSON string quotes for valid UTF-8 text.
+// Malformed text is measured through the SDK marshaler in toolResultSize.
 func escapedTextBytes(text string) int {
 	n := 0
 	for len(text) > 0 {
@@ -98,8 +100,6 @@ func escapedTextBytes(text string) int {
 		r, size := utf8.DecodeRuneInString(text)
 		if r == '\u2028' || r == '\u2029' {
 			n += 6
-		} else if r == utf8.RuneError && size == 1 {
-			n += 3
 		} else {
 			n += size
 		}

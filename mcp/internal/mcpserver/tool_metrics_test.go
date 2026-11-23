@@ -16,6 +16,12 @@ func TestToolResultSizeMatchesWireJSON(t *testing.T) {
 	for _, result := range []*mcp.CallToolResult{
 		{}, {Content: []mcp.Content{}}, {IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "failed"}}},
 		{StructuredContent: json.RawMessage(raw), Content: []mcp.Content{&mcp.TextContent{Text: "\x00\b\f\n\r\t\"\\<>&\u2028\u2029 snow☃ \xff"}}},
+		{Content: []mcp.Content{&mcp.TextContent{Text: "literal replacement rune: \ufffd"}}},
+		{Content: []mcp.Content{&mcp.TextContent{Text: "\xff\xfe\xc0\xaf"}}},
+		{StructuredContent: json.RawMessage(raw), Content: []mcp.Content{
+			&mcp.TextContent{Text: "valid <>&\u2028"},
+			&mcp.TextContent{Text: "invalid \xe2\x82 before ☃"},
+		}},
 		{StructuredContent: map[string]string{"fallback": "<&>"}},
 		{Content: []mcp.Content{&mcp.ImageContent{MIMEType: "image/png", Data: []byte{1, 2, 3}}}},
 	} {

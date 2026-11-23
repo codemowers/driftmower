@@ -26,15 +26,20 @@ jobs:
         run: python3 scripts/release.py metadata
 
   go:
-    name: Go vet, lint & test
+    name: Go ${{ matrix.go }} vet, lint & test
     needs: ui
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.26.x', '1.27.x']
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: ${{ matrix.go }}
+          check-latest: true
 
       - uses: actions/download-artifact@v4
         with:
@@ -55,6 +60,11 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+        run: go build ./...
 
   ui:
     name: UI lint, test & build
@@ -101,7 +111,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # Release executables use only the latest stable Go toolchain.
+          go-version: stable
+          check-latest: true
       - uses: actions/download-artifact@v4
         with:
           name: desktop-frontend
