@@ -2,5 +2,16 @@ node_modules
 .next
 .git
 .env*
+# Keep direct UI contexts consistent with the repository-root context.
+build
+static/.next
+static/out
+**/*.tsbuildinfo
+scripts/*
+!scripts/license-data.mjs
+vendor/spdx-license-list-data/**
+!vendor/spdx-license-list-data/json
+vendor/spdx-license-list-data/json/**
+!vendor/spdx-license-list-data/json/licenses.json
 /chart/cluster-values/
 /scripts/promote-images.sh

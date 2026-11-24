@@ -1,273 +1,188 @@
 # UI conventions
 
-The dashboard serves facts to humans. Agents act through MCP directly, so the
-UI shows state and copyable commands, not workflows. Keep every view to about
-ten MCP tool calls, without pagination.
+The dashboard presents facts and copyable commands to humans; agents act through
+MCP. Keep each view to about ten MCP calls, without pagination.
 
-## Page anatomy
+## Page structure and navigation
 
-Every page has the same vertical order:
+- Use `Page` (`app/components/layout/page.tsx`), never a handwritten `<main>`.
+  Document pages scroll (`gap-6 px-7 py-8`); `fill` pages fill the viewport.
+- Order: header, resource navbar, content. Nothing precedes the header.
+  Lists use `PageHeader`; resources/subpages use `ResourceHeader` with
+  breadcrumbs, icon, title, chips and subtitle.
+- The sidebar contains fixed section links only. Never add expansion, nested
+  resources, subpages or page-section links. Detail pages and descendants belong
+  in breadcrumbs; resource links use `SubpageNav` below the header.
+- Subpages needing separate requests or space use path segments, e.g.
+  `/topmost-owners/<uid>/logs` or `/container-images/<image>/-/<digest>/sbom`.
+  `TabBar`/`?tab` switches already-loaded data without extra calls.
+- No subpage links inside content cards or navigation-only tiles. Live subpage
+  indicators (log rate, connections) belong in the page navbar.
 
-1. **Header.** List pages use `PageHeader` (title, one-line subtitle).
-   Resource pages and their subpages use `ResourceHeader` (breadcrumbs, icon,
-   title, chips, subtitle). Nothing renders above the header.
-2. **Resource navigation.** Workload, Pod and namespace Logs/Network routes
-   appear in the sidebar as flat sub-items (Overview, Logs, Network) under the
-   section the resource belongs to (Top-level, Namespaces). No resource-name
-   level, live meters, tree lines or nested indentation; the section entry
-   stays highlighted. Never repeat an Overview/Logs/Network
-   strip in the page. Other resource families use `SubpageNav` below the
-   header.
-3. **Content**: cards in one column, or a main column with an aside.
+## Shared presentation
 
-The page shell is `Page` (`app/components/layout/page.tsx`): a document page
-scrolls (`gap-6 px-7 py-8`); `fill` pages (logs, topology) fill the viewport.
-Do not write `<main>` by hand.
+- Every bordered content block uses `Card` (`app/components/layout/card.tsx`):
+  `rounded-xl border border-gray-200 bg-white`. Its header contains the title,
+  optional `meta` and right-aligned `actions`; body uses `p-5` or `flush`.
+- No nested bordered boxes. Use flat sections and row separators; lists are rows
+  in one card. Group action buttons in one `Actions` card. Never place a card
+  title outside its header. Outside-card `SectionLabel` is only for stat grids.
+- Section/card titles: `text-xs font-semibold uppercase tracking-wider
+  text-muted-foreground`. Page titles: `text-2xl`; body: `text-sm`; secondary:
+  `text-xs`; identifiers and versions: monospace. Do not repeat resource kinds
+  from breadcrumbs as badges.
+- Tables use `flush` cards, `bg-muted text-xs text-muted-foreground` headers,
+  `px-5 py-3` cells and `border-b` row separators. Link resource names; put
+  digests, UIDs and purls on a second line in `font-mono text-xs
+  text-muted-foreground`. License, severity and status badges go on the right.
+- Use `gap-6` between sections/cards and `gap-4` inside bodies. `DetailLayout`
+  supplies main/aside columns; the default aside is at least 420px and 36% wide.
+- Loading: `PageLoading` for a page, otherwise one muted line in its card.
+  Errors use `role="alert"`, `text-status-major-label` and name the failure.
+  Missing data is unavailable/—, never zero.
+- Use the shared neutral palette in `globals.css`: white canvas/cards, visible
+  gray separators and readable dark secondary text. No pale gray or reduced
+  opacity for meaningful labels, identifiers or metadata.
+- Status colors come from `status-style.ts` (`SEVERITY_STYLE`,
+  `CVE_SEVERITY_STYLE`); capacity colors from `usageBarColor` (cyan/blue/violet).
+  Use `MetricBar` and `TimeSeriesChart`. Vulnerability summaries use thin bars
+  with severity-count legends and yellow/orange/red CVE/GHSA colors. Category
+  series use the shared palette. Stack No data / No scan last, above observations.
+- `ICONS` (`app/components/layout/icons.ts`) defines one icon per concept, shared
+  across sidebar/list/detail. Each page header has exactly one icon tile;
+  subpages may use their resource or subpage concept. No icons in card titles,
+  subpage nav, table headers or badges except the issue-count warning triangle.
+  Buttons use icon plus text; icon-only buttons need `aria-label` and `title`.
 
-## Subpages and tabs
+## Resource details and findings
 
-- **Subpage** (its own path, listed in resource navigation): a view that needs its own
-  requests or a lot of space, such as Logs, Network, SBOM or YAML. Paths are
-  path segments, never query parameters: `/topmost-owners/<uid>/logs`,
-  `/container-images/<image>/-/<digest>/sbom`.
-- **Tab** (`TabBar`, the `?tab` style query parameter): another view of data
-  the page has already loaded. Tabs never trigger extra tool calls on their own.
-- Never link to a subpage from a card in the middle of the page. Live
-  indicators of a subpage (log rate, connection counts) go into its
-  resource navigation item.
-
-## Cards
-
-Use `Card` (`app/components/layout/card.tsx`) for every bordered block:
-
-- Shell: `rounded-xl border border-gray-200 bg-white`. No other radius, border
-  colour or background for content blocks.
-- Header: `title` in the section-label style, optional `meta` (counts, times)
-  and `actions` on the right, separated from the body by a border.
-- Body: `p-5`, or `flush` for tables and lists that run edge to edge.
-- Do not nest bordered cards or boxes. Use flat sections, spacing and row
-  separators within a single card. Actions use one `Actions` card containing
-  normal buttons.
-- Resource kinds already named in breadcrumbs are not repeated as badges.
-- A card's title is always inside it, in the header row. Never put a label
-  above a bordered box; make the label the box's title instead.
-- A list of things (applications, Pods, registries) is rows inside one card,
-  not one card per item.
-- Section labels outside cards are only for grids of stat tiles, using
-  `SectionLabel`. Same style as a card title:
-  `text-xs font-semibold uppercase tracking-wider text-muted-foreground`.
-- Cards do not repeat navigation: no tiles that only link to a nav section.
-
-## Tables and lists
-
-- Tables live in a `flush` card. Header row: `bg-muted text-xs
-  text-muted-foreground`; cells `px-5 py-3`; rows separated by `border-b`.
-- Lists of resources link the resource name; identifiers (digests, UIDs,
-  purls) use `font-mono text-xs text-muted-foreground` on a second line.
-- Labels such as licenses, severities and statuses are badges on the right.
-
-## States
-
-- Loading: `PageLoading` for a whole page, otherwise one muted line
-  (`text-sm text-muted-foreground`) inside the card that is loading.
-- Errors: `role="alert"` with `text-status-major-label`; say what failed.
-- Unknown is not zero: show "unavailable" or "—", never a zero count, when
-  data is missing.
-
-## Icons
-
-- One icon per concept, taken from `ICONS` (`app/components/layout/icons.ts`).
-  The nav bar, a section's list page and its resource pages show the same
-  icon. Add a concept there before using a new icon.
-- Every page header carries exactly one icon tile: `PageHeader` and
-  `ResourceHeader` require it. Subpages use their resource's icon, or the
-  subpage concept's (`logs`, `sbom`, `yaml`).
-- No icons in card titles, subpage navigation or table headers; text labels
-  carry those. Badges and status chips do not get icons either, except the
-  issue-count warning triangle.
-- Buttons: icon plus text. An icon-only button needs `aria-label` and `title`.
-
-## Colour and type
-
-- Use the shared neutral palette in `globals.css`: a white page canvas,
-  white cards, visible gray separators and dark secondary text. Small labels,
-  identifiers and metadata must remain easy to read; do not use pale gray or
-  reduced opacity for meaningful text. Gray utilities share the semantic
-  surface, border and muted-text tokens so pages keep consistent contrast.
-
-- Status colours come from `status-style.ts` (`SEVERITY_STYLE`,
-  `CVE_SEVERITY_STYLE`) and `usageBarColor`; do not invent new ones.
-- Bars use `MetricBar`; time series use `TimeSeriesChart`. Vulnerability
-  summaries use the same thin bar geometry and show severity counts in a legend.
-  CVE/GHSA severities retain yellow/orange/red; capacity thresholds use the
-  separate cyan/blue/violet usage palette from `usageBarColor`.
-- Text sizes: page title `text-2xl`, card title per the section label,
-  body `text-sm`, secondary `text-xs`. Monospace for identifiers and versions.
-
-## Spacing
-
-- `gap-6` between page sections and between cards; `gap-4` inside a card body.
-- Two-column layouts: `DetailLayout` (`app/components/layout/detail-layout.tsx`),
-  a main column plus an aside of at least 420px and 36% of the width.
-
-## Resource detail layouts
-
-- Namespace, workload and Pod details share `DetailLayout`: expanded kubectl
-  commands, then findings, then the resource's own lists in the main column;
-  statistics and resource usage stacked in the aside.
-  Workload provenance has its own flat section.
-- Scope cards in `app/components/scope/` are shared by namespace, workload and
-  Pod pages in this order after the findings: Containers (`ImagesCard`), Pods
-  (`PodsCard`, not on the Pod page), Volumes (`VolumesCard`, omitted on
-  workload/Pod pages without claims). Remaining resource-specific views
-  (workload Resources/Descendants/Metadata/History, Pod Ports/Metadata) stay
-  as tabs below them.
-- Do not display rottenness scores or normalized drift scores anywhere.
-  Show observed version differences and counts instead. Container drift sits
-  immediately above the technical-debt estimate in Executive Summary.
-- Header chips match across scopes: an issue count covering
-  both resource issues and image metadata issues.
+- Namespace/workload/Pod pages use `DetailLayout`: expanded kubectl commands,
+  findings, then resource lists in main; statistics/usage in aside. Workload
+  provenance is a flat section. Issue-count chips include resource and image
+  metadata issues consistently across scopes.
+- Shared `app/components/scope/` cards follow findings: Containers (`ImagesCard`),
+  Pods (`PodsCard`, except on Pod pages), Volumes (`VolumesCard`; omit on
+  workload/Pod pages without claims). Resource-specific Resources, Descendants,
+  Metadata, History and Ports stay in tabs below.
+- Shared `app/components/findings/` blocks use `FindingScope` from
+  `lib/cluster/scope.ts`. Order: firing alerts, issues, advisories, vulnerabilities.
+  Hide empty resource alerts; show top five per resource with Show all. Global
+  Alerts/Advisories/Vulnerabilities show every row; no per-page variants.
+- Never display rottenness or normalized drift scores; show observed version
+  differences/counts. Image repositories place running versions before
+  deployed-by; source links in Integrity open internal source details.
+- Workloads sort by weighted issue rank (critical/warning/notice/info: 27/9/3/1;
+  repeated kinds grow logarithmically). Rank is presentation, not a security
+  assessment. Show issue-kind filters/counts below search; selection uses OR.
+- Keep major/minor/patch/stale drift distinct. Stale issues use the OCI created
+  label, then config creation time, independently of release comparison: none
+  through six months, then linear info, notice (12), warning (18), critical (24).
+  A month is 365.25/12 days. Missing/invalid/future dates stay unknown;
+  uncomparable release drift is Behind, not stale without age evidence.
+- Aggregate Pod configuration conditions across containers/Pods; show counts,
+  not individual names. Keep capability and host-path evidence distinct,
+  deduplicate per container, and never multiply severity/rank by replicas.
+  Kata guest-only root, privileged execution, capabilities and escalation are
+  runtime facts, not host-security warnings; still assess host-facing mounts,
+  namespaces and resources.
 - Operator-managed stateful workloads (CNPG Cluster, Redpanda, Dragonfly,
-  RabbitmqCluster) show +20/50/100% storage commands in their Volumes card
-  that merge-patch the custom resource's declared size, as absolute sizes
-  like the PVC detail.
-- Source repositories split 50:50: license and changelog on the left, images
-  on the right. Changelog releases are flat rows in one card; releases
-  matching a running version are marked "running" and expanded. Image rows
-  show tags and digests inline and link only to images with an image page
-  (the running inventory); unused images are plain text.
+  RabbitmqCluster) offer +20/50/100% storage merge patches on their CR's declared
+  size in Volumes. Use fixed absolute sizes, as on PVC detail.
+- Shell arguments stay unquoted when safe; quote whitespace, syntax and
+  placeholders. Qualify CR resources with their API group; never guess plurals.
 
-## Findings
+## Images, sources and vulnerabilities
 
-Issues, alerts, security advisories and vulnerabilities render with the same
-blocks at every scope: cluster, namespace, workload and Pod
-(`app/components/findings/`, scoped by `FindingScope` in
-`lib/cluster/scope.ts`). Order: firing alerts (hidden when none on resource
-pages), issues, advisories, vulnerabilities. Resource pages show the top five
-of each with a "Show all" footer; the cluster-wide Alerts, Advisories and
-Vulnerabilities pages show every row. Do not build a per-page variant.
-Executive Summary shows the top firing alerts as its top issues; it never
-reads the live inventory.
-- Image repositories show running versions before deployed-by;
-  source links live in their Integrity cell and open the internal source detail.
-- Shell arguments stay unquoted when safe. Quote whitespace, shell syntax and
-  placeholders. Custom-resource commands always qualify the resource with its
-  API group; never guess a plural by appending an s.
+- Source details split 50:50: license/changelog left, images right. Releases are
+  flat rows in one card; running versions are marked running and expanded.
+  Image rows show tags/digests inline; link only running-inventory images with
+  a detail page, leaving unused images as text.
+- Source access failures show Unauthorized on lists/details. Its tooltip notes
+  upstream 404 may mean missing or inaccessible to crawler credentials; missing
+  optional files and rate limits are not unauthorized access.
+- Build Age prefers OCI created label, config creation time, then latest regular
+  file modification time (label this fallback an estimate). Reuse artifact
+  analysis. If two valid timestamps differ by at least one hour, show a focusable
+  warning triangle with sources/full timestamps. For multiple platforms use the
+  oldest config time, or newest file time without declared time, and include
+  platform identity. Missing/invalid facts stay unknown; agreement needs no warning.
+- Filesystem, package and vulnerability evidence share one CycloneDX artifact.
+  File rows expose MIME, modification time and ELF linking. Count the full image,
+  retain only 1,000 newest regular-file records and mark incomplete counts.
+  Config timestamps remain distinct from file timestamps; labels/config retain
+  their own lifecycle and combine only for displayed age. Filesystem-only reports
+  remain downloadable with vulnerability coverage explicitly unknown.
+- Static filesystem/ELF evidence belongs on image artifacts. Probe known shells
+  directly; presence does not prove execution. Process monitoring is deferred;
+  Pod exec snippets use detected shells, actual container names, immutable running
+  digests and the selected kubectl context.
+- Vulnerability lists show one affected image plus a +N more link to CVE detail.
+  Details show severity/CVSS, image digests, packages/installed/fixed versions,
+  workloads and references. Use batched scan findings; fetch full SBOMs only on
+  explicit SBOM views/downloads. Keep incomplete coverage visible.
+- Pod cards hide the observed `driftmower-scan` label by default. A Show scan Pods
+  checkbox reveals all scan attempts, including terminal ones. Never identify by
+  name; this display filter does not restrict agents or direct Pod detail reads.
 
-- Workload lists sort by weighted issue rank (critical/warning/notice/info:
-  27/9/3/1; repeated kinds add logarithmically). Rank is a presentation aid,
-  not a security assessment. Version drift is an issue: major, minor, patch
-  and stale images remain distinct. Show reported issue-kind badges beneath
-  search, with affected workload counts; selected badges filter with OR.
-  Missing version data remains unknown. Stale-image findings use the created label, falling back to the image config
-  creation time (as on image detail), for declared OCI build age independently of release comparison: no finding through six months,
-  then a linear progression through info, notice (12 months), warning (18 months)
-  and critical (24 months). A month is 365.25/12 days; missing, invalid or future
-  build timestamps remain unknown. Uncomparable release drift is labelled Behind,
-  never inferred to be stale without age evidence.
-- Pod configuration issues aggregate matching conditions across containers and
-  Pods. Show affected-container and Pod counts, not individual container names.
-  Keep capability and mounted host-path evidence distinct; repeated mounts or
-  capability declarations in one container count once. Counts do not multiply
-  issue severity or ranking by replica count.
+## Executive Summary and history
 
-- Source access failures show an explicit Unauthorized badge in source lists
-  and details. Explain upstream 404 ambiguity in its tooltip: a repository
-  may be missing or inaccessible to crawler credentials. Missing optional
-  files and rate limits do not count as unauthorized access.
+- Read Prometheus signals and firing alerts, never live inventory. Top firing
+  alerts are the top issues. Container drift and then Technical debt immediately
+  follow the header; current drift counts load independently of history.
+- One accessible Time window dropdown at header right, without a visible label,
+  controls all history (default one week). Do not repeat durations in charts;
+  keep units. Current counts, alerts and top-five workloads remain current.
+- Drift history uses aggregated signals; current top-five workloads use a separate
+  bounded instant query. Show failures/unknown coverage. Effort assumptions are
+  server environment configuration, never editable UI fields. Technical debt has
+  a compact chart and one sentence about version drift, declared-age fallback
+  and highest-image-per-workload aggregation.
+- Scan coverage counts distinct running immutable digests, not replicas: Trivy +
+  files, files only, no scan; legacy Trivy-only stays distinct. Honor the time
+  window, preserve missing-metric gaps and explain partial Trivy coverage.
+  On wide screens coverage sits left of Drift over time at 1:2; stack on narrow
+  screens. Share one capability read. Vulnerability history uses yellow High/red
+  Critical. Detail history scopes to the selected workload/image and backend's
+  bounded sample resolution.
 
-- Kata guest-only root, privileged execution, added capabilities and privilege
-  escalation are runtime facts, not host-security issues or warning badges.
-  Continue evaluating host-facing mounts/namespaces and resource settings.
+## Nodes and access rights
 
-## Image and process evidence
+- Node tables reuse cluster-health memory/LVM/ephemeral-storage data. Capacity
+  uses `MetricBar`, compact used/total labels (e.g. `4G / 16G`) and Prometheus
+  links; missing memory stays unknown. Link names to `/cluster/nodes/<name>`;
+  detail holds membership/boot times, labels, host-affinity PVs and kernel-log
+  placeholder.
+- Node row left borders: Ready green; Ready with disabled scheduling, pressure,
+  network unavailable or legacy out-of-disk yellow; NotReady red; unknown neutral.
+  Positive (e.g. EtcdIsVoter) and unclassified conditions remain visible/neutral.
+  Keep full state accessible; color each detail condition consistently in header
+  and details (Ready green, NotReady red, adverse yellow, informational neutral).
+- Incomplete RBAC enumeration means unknown permissions, not denial. Deduplicate
+  authorizer limitations into one expandable review-scope detail; empty scope is
+  Cluster-wide. Sort rights by fully qualified `group/Kind` (core: `Kind`).
+  Kind/verb labels use monospace: create yellow, reads neutral, mutations,
+  privileged verbs and wildcards red. Shared verb filtering includes wildcards.
+- Merge adjacent equal namespace cells, one namespace per line. Keep labels sticky
+  within their merged cell; no intermediate scroll container trapping stickiness.
+- User details split 50:50: effective-rights cards left, kubectl commands right.
+  Show memberships/removal commands once; group names in command titles use
+  monospace. Commands stay flat/visible, one per existing local group without a
+  selector. Local-email commands use `username@example.com`, with no editing
+  input. Add to an existing local group comes last.
+- Coding agent splits 50:50 on desktop: selectable servers left, selected server's
+  add commands right; stack on small screens. Registration example goes below.
 
-Build Age prefers the OCI created label, then config JSON creation time, then
-latest observed regular-file modification time. Label the file-time fallback as
-an estimate. Reuse the artifact page's analysis request for these facts. If any
-two available timestamps differ by at least one hour, show a focusable warning
-triangle beside the primary age; its tooltip lists the primary and secondary
-facts with their sources and full timestamps. Missing or invalid facts remain
-unknown, and agreement within one hour does not need a warning. For multiple
-platforms, use the oldest config time (or newest file time when no declared time
-exists) and include platform identity in the warning details.
+## Sign-in
 
-Filesystem observations come from the same CycloneDX artifact as packages and
-vulnerabilities. SBOM file rows expose MIME type, modification timestamp and ELF
-linking evidence; filesystem-only documents remain downloadable and explicitly
-state that vulnerability coverage is unknown. ContainerImage labels/config
-metadata keep their own lifecycle and are combined only when rendering age.
-
-Static filesystem enumeration and ELF evidence belong to the image artifact page.
-Count the full image and retain only the 1,000 newest regular file records; show
-when counts are incomplete. Distinguish the config JSON build timestamp from the
-latest observed file modification time. Probe known shell paths directly;
-presence does not prove runtime execution.
-Process monitoring is deferred. Pod pages offer context-scoped kubectl exec
-snippets only for detected shells,
-using the actual container name and immutable running image digest.
-
-Executive Summary places Container drift and Technical debt immediately after
-the header. Container drift counts load independently with a current Prometheus
-instant query, without waiting for history. A single Time window dropdown on the right of the
-page header, with an accessible name and no visible explanatory label, controls all history charts, defaulting to one week; current counts,
-firing alerts and top-five workloads remain current. Effort assumptions are
-server environment configuration, with no editable fields in the dashboard. Its drift chart uses aggregated
-Prometheus signal history; the
-current top-five workloads use a separate bounded instant query, with failures
-and unknown coverage shown explicitly. Vulnerability history uses yellow for
-High findings and red for Critical findings. Detail history requests only the
-selected workload/image and uses the backend's bounded sample resolution.
-
-Pod list cards hide Pods carrying the scanner's `driftmower-scan` label by
-default. A Show scan Pods checkbox in the card header reveals them, including
-retained terminal scan attempts. Identification uses the observed label, never
-Pod names. This is a display filter; agents and direct Pod detail reads retain
-the full inventory.
-
-Sign-in preserves the requested local page, including query parameters and
-fragment, in the existing window-scoped OIDC transaction state. Only restore it
-after callback validation succeeds. Connect from Settings or the root falls back
-to Executive Summary. Opening an assigned Chrome profile passes only the local
-return path; OAuth transactions and tokens stay within their own window.
-
-A hosted dashboard with one configured MCP endpoint automatically starts browser
-OIDC sign-in when no usable session exists, preserving its linked destination.
-Attempt it once per endpoint per browser window; clear the attempt after a
-successful login. Settings and failed callbacks retain manual Connect without
-restarting login. Desktop discovery/profile selection remains manual. Sign out
-opens Settings so automatic sign-in does not immediately undo it.
-
-Stacked charts place the No data / No scan series last so it is above observed
-series. Technical debt uses a compact chart and one sentence describing version
-drift, declared-build-age fallback and highest-image-per-workload aggregation.
-Executive Summary scan coverage counts distinct running immutable image digests,
-not containers or replicas, with Trivy + files, files only and no scan groups;
-legacy Trivy-only evidence stays distinct. It reads Prometheus, honors the page
-time window and preserves gaps when scanner inventory or evidence metrics are
-unavailable. Partial Trivy coverage remains explicitly limited.
-
-Access-rights views show incomplete rule enumeration as unknown permissions,
-not denial. Deduplicate repeated authorizer limitations, and put the affected
-review scopes in one expandable detail, naming the empty scope Cluster-wide.
-
-Executive Summary shows its selected time window only in the page header;
-chart headers retain units but do not repeat the selected duration. Image scan
-coverage sits to the left of Drift over time at a 1:2 width ratio on wide
-screens, stacking on narrow screens. Share one capability read for the page.
-
-The Cluster node table includes per-node used/total memory from the existing
-cluster-health response, alongside LVM and ephemeral storage. Capacity cells
-use MetricBar and Prometheus graph links; missing node memory remains unknown.
-Node capacity cells place compact used/total values below the bar (for example,
-`4G / 16G`). Node rows encode state in their left border: Ready alone is green,
-Ready with scheduling disabled, memory/disk/PID pressure, network unavailable
-or legacy out-of-disk is yellow; NotReady is red; unknown readiness stays
-neutral. Conditions are extensible: positive states such as EtcdIsVoter and
-unclassified conditions stay visible but do not imply faults or change color.
-Keep the full state accessible on the row.
-In node detail State text, color each condition independently: Ready green,
-NotReady red, known adverse conditions yellow, and informational or unclassified
-conditions neutral. Use the same rendering in the header and details card.
-Node names link to `/cluster/nodes/<name>`; membership and boot timestamps,
-labels, host-affinity PVs and the kernel-log placeholder belong to that detail.
+- Preserve the requested local path/query/fragment in window-scoped OIDC state;
+  restore only after validated callback. Connect from Settings/root defaults to
+  Executive Summary. Assigned Chrome profiles receive only the local return path;
+  OAuth state/tokens never cross windows.
+- Hosted single-endpoint dashboards automatically start OIDC once per endpoint
+  per window without a usable session; clear the attempt on success. Settings
+  and failed callbacks keep manual Connect; desktop discovery/profile choice
+  stays manual. Sign out opens Settings to avoid immediate automatic login.
+- Share concurrent callback processing so one-time state is consumed once.
+  Missing state permits one fresh sign-in per endpoint/window with the saved
+  destination; repeated failures and token/issuer verification errors stay
+  visible. Never accept unmatched callbacks or fall back to anonymous.

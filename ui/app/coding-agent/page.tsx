@@ -5,6 +5,10 @@ import Page from "@/app/components/layout/page"
 import { useEffect, useState } from "react"
 import PageHeader from "@/app/components/page-header"
 import CopyButton from "@/app/components/copy-button"
+import Card from "@/app/components/layout/card"
+import CommandSnippet from "@/app/components/command-snippet"
+import { useKubectl } from "@/lib/hooks/use-kubectl"
+import { cn } from "@/lib/utils/cn"
 import MarkdownText from "@/app/components/markdown-text"
 import PrefetchLink from "@/app/components/prefetch-link"
 import { useContextHref } from "@/lib/hooks/use-context-href"
@@ -20,6 +24,19 @@ const AGENTS: { id: McpClientId; label: string }[] = [
   { id: "opencode", label: "opencode" },
 ]
 
+const REGISTRATION_EXAMPLE = `apiVersion: codemowers.ai/v1alpha1
+kind: ClusterMCPServer
+metadata:
+  name: example-mcp
+  annotations:
+    kubernetes.io/description: >-
+      Describe the tools and information this server provides.
+spec:
+  url: https://mcp.example.com/mcp
+`
+
+function serverKey(server: Server) { return `${server.registered ?? ""}/${server.name}` }
+
 // A URL a laptop cannot reach: plain HTTP or a cluster-internal Service.
 function internalOnly(url: string) {
   try {
@@ -33,10 +50,14 @@ function internalOnly(url: string) {
 // sign-in flows are offered: no credential is handed out here.
 export default function CodingAgentPage() {
   const { linkTo } = useContextHref()
+  const kubectl = useKubectl()
   const [agent, setAgent] = useState<McpClientId>("claude-code")
   const [scope, setScope] = useState<McpScope>("user")
   const [servers, setServers] = useState<Server[]>([])
   const [error, setError] = useState("")
+  const [selected, setSelected] = useState("")
+  const selectedServer = servers.find(server => serverKey(server) === selected) ?? servers[0]
+  const recipe = selectedServer ? mcpQuickstart(agent, selectedServer, scope) : null
 
   useEffect(() => {
     let cancelled = false
@@ -84,29 +105,43 @@ export default function CodingAgentPage() {
           </label>
         </div>
         {error && <p className="text-sm text-muted-foreground">{error}</p>}
-        {servers.map(server => {
-          const recipe = mcpQuickstart(agent, server, scope)
-          return (
-            <section key={`${server.registered ?? ""}/${server.name}`} className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-5 py-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                {server.current
-                  ? <PrefetchLink href={linkTo("/coding-agent/mcp-servers/driftmower")} className="font-mono text-sm font-medium text-brand-text hover:underline">{server.name}</PrefetchLink>
-                  : <span className="font-mono text-sm font-medium text-foreground">{server.name}</span>}
-                <span className="font-mono text-xs text-muted-foreground">{server.registered ?? "this dashboard's MCP"}</span>
-              </div>
-              <span className="font-mono text-xs text-muted-foreground">{server.url}</span>
-              {server.description && <MarkdownText text={server.description} className="text-sm text-muted-foreground" />}
-              {internalOnly(server.url) && <p className="text-xs text-status-minor-label">Reachable only from inside the cluster, such as by agents running there.</p>}
+        <div className="grid min-w-0 items-start gap-6 lg:grid-cols-2">
+          <Card title="MCP servers" flush>
+            {servers.length === 0 && <p className="p-5 text-sm text-muted-foreground">Loading MCP servers…</p>}
+            <ul className="divide-y divide-gray-200">
+              {servers.map(server => <li key={serverKey(server)}>
+                <button type="button" onClick={() => setSelected(serverKey(server))}
+                  aria-pressed={server === selectedServer}
+                  className={cn("flex w-full min-w-0 flex-col gap-2 px-5 py-4 text-left transition-colors hover:bg-muted/60", server === selectedServer && "bg-muted")}>
+                  <span className={cn("font-mono text-sm font-medium", server === selectedServer ? "text-brand-text" : "text-foreground")}>{server.name}</span>
+                  <span className="break-all font-mono text-xs text-muted-foreground">{server.url}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{server.registered ?? "this dashboard's MCP"}</span>
+                </button>
+              </li>)}
+            </ul>
+          </Card>
+          <Card title={selectedServer ? `Add ${selectedServer.name}` : "Add to coding agent"}>
+            {selectedServer && recipe ? <>
+              {selectedServer.current && <PrefetchLink href={linkTo("/coding-agent/mcp-servers/driftmower")} className="text-sm text-brand-text hover:underline">View available tools</PrefetchLink>}
+              {selectedServer.description && <MarkdownText text={selectedServer.description} className="text-sm text-muted-foreground" />}
+              {internalOnly(selectedServer.url) && <p className="text-xs text-status-minor-label">Reachable only from inside the cluster, such as by agents running there.</p>}
               {recipe.caption && <p className="text-sm text-muted-foreground">{recipe.caption}</p>}
               {recipe.blocks.map(block => (
-                <div key={block} className="relative">
+                <div key={block} className="relative min-w-0">
                   <span className="absolute right-3 top-2 z-10"><CopyButton value={block} /></span>
-                  <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">{block}</pre>
+                  <pre className="overflow-x-auto bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">{block}</pre>
                 </div>
               ))}
-            </section>
-          )
-        })}
+            </> : <p className="text-sm text-muted-foreground">Commands appear when the MCP servers have loaded.</p>}
+          </Card>
+        </div>
+        <Card title="Register another MCP server">
+          <p className="text-sm text-muted-foreground">Save this as <code>mcp-server.yaml</code>, replace the name, description and URL, then apply it to this cluster. Use an endpoint your coding agent can reach.</p>
+          <CommandSnippet title="ClusterMCPServer example" command={REGISTRATION_EXAMPLE} collapsible={false} fullHeight />
+          <CommandSnippet title="Apply registration" command={`${kubectl("apply")} -f mcp-server.yaml`} collapsible={false} />
+          <p className="text-sm text-muted-foreground">The cluster must have the ClusterMCPServer CRD installed, and you need permission to create the resource. Reload this page after applying; registered servers appear when you have permission to list them. Registration advertises the endpoint; the server still controls sign-in and access.</p>
+          <p className="text-sm text-muted-foreground">For namespace-scoped registration, use <code>kind: MCPServer</code> and add <code>metadata.namespace</code>. Set <code>spec.audience</code> only when the server requires a specific audience for projected ServiceAccount tokens; laptop sign-in uses the server’s own authentication.</p>
+        </Card>
       </Page>
     </>
   )

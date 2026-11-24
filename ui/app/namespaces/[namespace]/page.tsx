@@ -91,7 +91,7 @@ export default function NamespacePage() {
           iconAriaLabel="Namespace"
           title={name}
           copyValue={name}
-          breadcrumbs={[{ label: "Workloads", href: linkTo("/topmost-owners") }, { label: `Namespace ${name}` }]}
+          breadcrumbs={[{ label: "Namespaces", href: linkTo("/namespaces") }, { label: `Namespace ${name}` }]}
           chips={[{ label: "Namespace", tone: "brand" }]}
           issueCount={namespaceIssueCount}
           subtitle={state.status === "ready" && (state.resources.createdBy || state.resources.createdAt) ? (

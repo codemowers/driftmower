@@ -296,6 +296,11 @@ as well as its public protected-resource audience; OIDC verification is unchange
 
 ## UI conventions
 
+Never add sidebar expansion, nested resource entries, subpages or page-section
+links. The sidebar contains only fixed section links. Detail pages and all their
+descendants appear in breadcrumbs; resource subpage links live only in the
+page navbar below the header.
+
 Follow `ui/CONVENTIONS.md` for page anatomy, navigation, cards, tables, states,
 charts, findings and the per-view tool-call budget. Change the conventions there
 first when a new pattern is needed, then apply it everywhere it fits.

@@ -14,8 +14,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils/cn"
 import type { SessionClaims } from "@/lib/auth/types"
 import { useSandboxContext } from "@/lib/tenancy/sandbox-context"
-import { useResourceNavigationStore } from "@/lib/hooks/use-resource-navigation"
-import { setActivePageSection, usePageSectionsStore } from "@/lib/hooks/use-page-sections"
 import DriftmowerLogo from "./driftmower-logo"
 import NavUser from "./nav-user"
 import SandboxPicker from "./sandbox-picker"
@@ -127,8 +125,6 @@ export default function NavBar({
   const { isConnected, connectionError } = useClusterState()
   const selectedSandboxes = useSandboxContext(s => s.selectedSandboxes)
   const pathname = usePathname()
-  const pageSections = usePageSectionsStore()
-  const resourceNavigation = useResourceNavigationStore(s => s.navigation)
   const [newEndpoint, setNewEndpoint] = useState("")
   const [endpointError, setEndpointError] = useState("")
 
@@ -238,64 +234,12 @@ export default function NavBar({
                 </Link>
               )
 
-              // The open page's own sections, nested under its entry.
-              const sections =
-                isExpanded && active && pageSections.href === item.href ? pageSections.sections : []
-
               return (
                 <li key={item.href} className="w-full">
                   {heading && (isExpanded
                     ? <h2 className="mb-1 mt-4 px-3 font-mono text-xs font-medium uppercase tracking-wide text-gray-400">{heading}</h2>
                     : <hr className="mx-2 my-2 border-gray-200" aria-hidden />)}
-                  {isExpanded ? (
-                    <>
-                      {link}
-                      {active && resourceNavigation?.parent === item.href && (
-                        // The selected resource's subpages as plain sub-items of the
-                        // still-highlighted section entry: no resource level, no tree.
-                        <ul aria-label="Subpages" className="mb-1 mt-0.5 flex flex-col">
-                          {resourceNavigation.items.map(entry => {
-                            const current = pathname === entry.href.split("?")[0]
-                            return <li key={entry.href}>
-                              {entry.disabled
-                                ? <span className="block py-1.5 pl-12 pr-3 text-sm text-muted-foreground/50">{entry.label}</span>
-                                : <Link href={entry.href} aria-current={current ? "page" : undefined}
-                                    className={cn("block py-1.5 pl-12 pr-3 text-sm transition-colors", current ? "font-semibold text-brand" : "text-muted-foreground hover:text-foreground")}>
-                                    {entry.label}
-                                  </Link>}
-                            </li>
-                          })}
-                        </ul>
-                      )}
-                      {sections.length > 0 && (
-                        <ul
-                          aria-label={`${item.name} sections`}
-                          className="mb-1 ml-9 mt-1 flex flex-col border-l border-border"
-                        >
-                          {sections.map(section => {
-                            const current = section.id === pageSections.active
-                            return (
-                              <li key={section.id}>
-                                <a
-                                  href={`#${section.id}`}
-                                  aria-current={current ? "location" : undefined}
-                                  onClick={() => setActivePageSection(section.id)}
-                                  className={cn(
-                                    "-ml-px block border-l py-1.5 pl-3 pr-2 text-sm transition-colors",
-                                    current
-                                      ? "border-brand font-medium text-brand"
-                                      : "border-transparent text-muted-foreground hover:text-foreground",
-                                  )}
-                                >
-                                  {section.title}
-                                </a>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-                    </>
-                  ) : (
+                  {isExpanded ? link : (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         {link}

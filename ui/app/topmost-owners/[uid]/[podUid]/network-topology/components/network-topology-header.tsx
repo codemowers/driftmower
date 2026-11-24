@@ -86,7 +86,7 @@ export default function NetworkTopologyHeader({
       <Breadcrumbs
         items={[
           { label: "Workloads", href: ownersHref },
-          { label: `Namespace ${namespace}` },
+          { label: `Namespace ${namespace}`, href: linkTo(`/namespaces/${encodeURIComponent(namespace)}`) },
           { label: `${workloadKind} ${workloadName}`, href: ownerHref },
           { label: `Pod ${podName}`, href: podDetailHref },
           { label: "Network topology" },

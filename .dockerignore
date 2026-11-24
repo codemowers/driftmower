@@ -18,6 +18,18 @@ skaffold.env.*
 **/.env
 **/.env.*
 **/*.log
+**/*.tsbuildinfo
+
+# Generated desktop/UI assets and local cluster reports.
+ui/build
+ui/scripts/*
+!ui/scripts/license-data.mjs
+
+# The UI prebuild needs only this SPDX metadata file.
+ui/vendor/spdx-license-list-data/**
+!ui/vendor/spdx-license-list-data/json
+ui/vendor/spdx-license-list-data/json/**
+!ui/vendor/spdx-license-list-data/json/licenses.json
 
 desktop/frontend
 desktop/build

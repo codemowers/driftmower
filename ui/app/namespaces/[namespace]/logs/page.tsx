@@ -18,7 +18,7 @@ export default function NamespaceLogsPage() {
       <Page fill>
         <ResourceHeader icon={ICONS.logs} iconAriaLabel="Namespace logs" title={name} copyValue={name} subtitle="Logs of every container in this namespace"
           breadcrumbs={[
-            { label: "Workloads", href: linkTo("/topmost-owners") },
+            { label: "Namespaces", href: linkTo("/namespaces") },
             { label: `Namespace ${name}`, href: linkTo(`/namespaces/${encodeURIComponent(name)}`) },
             { label: "Logs" },
           ]} />

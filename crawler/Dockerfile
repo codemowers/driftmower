@@ -11,7 +11,6 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 \
     go build -trimpath \
     -ldflags "-s -w -X main.version=${VERSION}" \
-    -tags 'netgo osusergo' \
     -o . ./crawler/cmd/...
 
 FROM scratch

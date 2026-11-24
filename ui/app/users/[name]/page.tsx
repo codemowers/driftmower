@@ -1,5 +1,6 @@
 "use client"
 import Page from "@/app/components/layout/page"
+import DetailLayout from "@/app/components/layout/detail-layout"
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
@@ -10,7 +11,6 @@ import LoadError from "@/app/components/load-error"
 import { Button } from "@/components/ui/button"
 import { callTool } from "@/browser/connection"
 import { useContextHref } from "@/lib/hooks/use-context-href"
-import GroupChip from "@/app/groups/components/group-chip"
 import { formatSignIn, type UserAccess, userAccessError } from "@/lib/features/users/types"
 import AccessRights from "../components/access-rights"
 import UserCommands from "../components/user-commands"
@@ -56,10 +56,7 @@ export default function UserDetailPage() {
                   <Button type="button" variant="outline" size="sm" onClick={() => reload(true)}>Re-evaluate</Button>
                   <span className="text-xs text-muted-foreground" title={a.evaluatedAt}>Evaluated {new Date(a.evaluatedAt).toLocaleString()}</span>
                 </>} />
-              {a.user.groups.length > 0 && <div className="flex flex-wrap gap-1">{a.user.groups.map(g => <GroupChip key={g} id={g} />)}</div>}
-
-              <AccessRights access={a} />
-              <UserCommands key={a.user.name + a.evaluatedAt} user={a.user} />
+              <DetailLayout equalColumns main={<AccessRights access={a} />} aside={<UserCommands key={a.user.name + a.evaluatedAt} user={a.user} />} />
             </>
           )
         })()}

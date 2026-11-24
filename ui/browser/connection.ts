@@ -11,6 +11,7 @@ import { useKubeconfigState } from "@/lib/kubernetes/context-state"
 import { connectionForEndpoint, type KubeconfigConnection } from "@/lib/kubernetes/contexts"
 import { navigate } from "./navigation"
 import { loginDestination, loginCallbackDestination } from "@/lib/connection/login-return"
+import { claimLoginRecovery, loginRecoveryKey, loginReturnKey } from "@/lib/connection/login-recovery"
 import { connectionTitle } from "@/lib/kubernetes/labels"
 import { fetchWithContext, mcpOperation, requestError } from "@/lib/http/request"
 export { contextTitle } from "@/lib/kubernetes/labels"
@@ -165,6 +166,7 @@ export async function loginToEndpoint(url: string, contextKey?: string) {
     localStorage.setItem("driftmower.selected", url)
     sessionStorage.setItem("driftmower.selected", url)
     selectKubeconfigContext(url, contextKey)
+    sessionStorage.removeItem(loginRecoveryKey(url))
     await login(destination)
   } catch(error) {
     connectionProgress(null)
@@ -238,6 +240,7 @@ export async function kubernetesSignIn(context: string): Promise<void> {
 export async function login(returnTo=location.pathname+location.search+location.hash) {
   const destination=loginDestination(returnTo,location.origin)
   const auth = await configure()
+  if (auth) sessionStorage.setItem(loginReturnKey(await selectedEndpoint()), destination)
   if (auth) { connectionStage("waiting for OIDC sign-in",auth.settings.authority); try { await auth.signinRedirect({state:{returnTo:destination}}) } catch (error) { throw requestError(error, "OIDC sign-in", auth.settings.authority) } }
   else location.assign(destination)
 }
@@ -252,16 +255,35 @@ export async function user(): Promise<User | {profile:{sub:string;name:string;em
   const auth = await configure()
   return auth ? auth.getUser() : {profile:{sub:"system:anonymous",name:"Anonymous",groups:[]},expired:false}
 }
-export async function finishLogin() {
-  const auth = await configure()
-  let state:unknown
-  if (auth) {
-    connectionStage("completing OIDC sign-in",auth.settings.authority)
-    try { state=(await auth.signinRedirectCallback()).state }
-    catch (error) { throw requestError(error, "OIDC callback/token exchange", auth.settings.authority) }
-  }
-  navigate(loginCallbackDestination(state,location.origin),true)
+// React remounts and concurrent bootstrap readers must share the one-time
+// callback exchange: oidc-client-ts removes state before requesting tokens.
+let loginCompletion: Promise<void> | null = null
+export function finishLogin(): Promise<void> {
+  if (loginCompletion) return loginCompletion
+  const callbackURL = location.href
+  loginCompletion = (async () => {
+    const auth = await configure()
+    let state: unknown
+    if (auth) {
+      const endpoint = await selectedEndpoint()
+      connectionStage("completing OIDC sign-in", auth.settings.authority)
+      try { state = (await auth.signinRedirectCallback(callbackURL)).state }
+      catch (error) {
+        if (!claimLoginRecovery(error, endpoint, sessionStorage)) throw requestError(error, "OIDC callback/token exchange", auth.settings.authority)
+        const destination = loginDestination(sessionStorage.getItem(loginReturnKey(endpoint)), location.origin)
+        // Drop the stale authorization response before creating fresh state/PKCE.
+        navigate(destination, true)
+        await login(destination)
+        return
+      }
+      sessionStorage.removeItem(loginRecoveryKey(endpoint))
+      sessionStorage.removeItem(loginReturnKey(endpoint))
+    }
+    navigate(loginCallbackDestination(state, location.origin), true)
+  })()
+  return loginCompletion
 }
+
 export async function connect(): Promise<Client> {
   if (connection) return connection
   const operation=useConnectionProgress.getState().operation
