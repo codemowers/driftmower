@@ -405,3 +405,25 @@ func TestTrustSetupEncodesNoStepsAsEmptyList(t *testing.T) {
 		t.Fatalf("Settings maps over commands; got %s", body)
 	}
 }
+
+func TestLocalChartOverrideUsesPublishedImagesUnpinned(t *testing.T) {
+	d, _ := installFixture(t, "anonymous")
+	record := fakeHelm(t, 0)
+	local := filepath.Dir(chartValuesPath(t))
+	t.Setenv("DRIFTMOWER_INSTALL_CHART", local)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(record)
+	if !strings.Contains(string(args), "\n"+local+"\n") || strings.Contains(string(args), "--version") {
+		t.Fatalf("local chart not used unpinned:\n%s", args)
+	}
+	for _, want := range []string{"--set\nmcp.image=driftmower-mcp\n", "--set\noperator.databaseImage="} {
+		if !strings.Contains(string(args), want) {
+			t.Fatalf("release image %q not set:\n%s", want, args)
+		}
+	}
+	if offer := d.contexts[0].Install; strings.Contains(installCommand("ctx", installSettings{authMode: offer.AuthMode}), local) {
+		t.Fatal("the copyable command must keep the published chart")
+	}
+}

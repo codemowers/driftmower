@@ -106,6 +106,10 @@ provide them; when a dry-run probe shows the cluster does not, an OIDC install
 first sets up the platform's CA trust layer (trust-manager and a
 `trusted-ca-certs` Bundle; cert-manager only if you tick it), listed in the
 confirmation dialog ([CA certificates](../docs/deployment.md#ca-certificates)).
+For development, `DRIFTMOWER_INSTALL_CHART=/path/to/driftmower/chart` makes
+one-click install use that chart directory instead of the published chart.
+It still uses the latest release's image references; the shown command keeps
+the published chart.
 
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
 Kubernetes port-forward on an OS-assigned `127.0.0.1` port. Settings marks it

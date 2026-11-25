@@ -77,6 +77,10 @@ type installSettings struct {
 	storageClass string
 	// Mount the trusted-ca-certs bundle from the CA trust layer.
 	trustBundle bool
+	// Chart reference; empty is the published chart.
+	chart string
+	// Further values, such as release image references for a local chart.
+	extra []string
 }
 
 func installValues(settings installSettings) []string {
@@ -103,11 +107,16 @@ func installValues(settings installSettings) []string {
 			"registryScraper.enabled=false",
 		)
 	}
+	values = append(values, settings.extra...)
 	return values
 }
 
 func installArgs(kubeconfig, context, version string, settings installSettings) []string {
-	args := []string{"upgrade", "--install", installRelease, installChart}
+	chart := settings.chart
+	if chart == "" {
+		chart = installChart
+	}
+	args := []string{"upgrade", "--install", installRelease, chart}
 	if version != "" {
 		args = append(args, "--version", version)
 	}
@@ -413,7 +422,14 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 	// Check the chart before changing anything, including the trust layer:
 	// helm silently ignores values a chart does not define, which would
 	// install a broken Driftmower.
-	version, err := checkChart(ctx, helm, installValues(settings))
+	if local := localInstallChart(); local != "" {
+		images, err := releaseImages(ctx, helm)
+		if err != nil {
+			return err
+		}
+		settings.chart, settings.extra = local, images
+	}
+	version, err := checkChart(ctx, helm, settings.chart, installValues(settings))
 	if err != nil {
 		return err
 	}

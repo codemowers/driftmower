@@ -150,7 +150,10 @@ Before changing the cluster, one-click install reads the published chart with
 `helm show` and refuses when it does not define every value it would `--set`
 (helm silently ignores unknown values), then pins that checked `--version`.
 Without a default StorageClass the person chooses one for the operator and
-registry scraper claims; never pick one silently.
+registry scraper claims; never pick one silently. The developer-only
+`DRIFTMOWER_INSTALL_CHART` points one-click install at a local chart directory,
+checked the same way but unpinned, with the latest published release's
+immutable image references.
 
 Desktop Settings groups kubeconfig entries by API server and authentication
 identity, retaining namespace aliases within each connection. Never merge
