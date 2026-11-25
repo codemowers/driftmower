@@ -10,15 +10,17 @@ import (
 	"testing"
 	"time"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestInstallCommandFollowsClusterAuthCapability(t *testing.T) {
-	anonymous := installCommand("admin@dev cluster", "anonymous")
+	anonymous := installCommand("admin@dev cluster", "anonymous", false)
 	for _, want := range []string{
 		"helm upgrade --install driftmower oci://ghcr.io/codemowers/charts/driftmower",
 		"--kube-context 'admin@dev cluster'",
@@ -31,9 +33,13 @@ func TestInstallCommandFollowsClusterAuthCapability(t *testing.T) {
 			t.Fatalf("anonymous command lacks %q: %s", want, anonymous)
 		}
 	}
-	rbac := installCommand("admin@prod", "rbac")
-	if strings.Contains(rbac, "anonymous") || strings.Contains(rbac, "portForwardOnly") || !strings.Contains(rbac, "localOrigins") {
-		t.Fatalf("Passmower clusters keep chart defaults: %s", rbac)
+	rbac := installCommand("admin@prod", "rbac", true)
+	if strings.Contains(rbac, "anonymous") || strings.Contains(rbac, "portForwardOnly") || strings.Contains(rbac, "ingress") || !strings.Contains(rbac, "localOrigins") {
+		t.Fatalf("Passmower clusters with host expansion keep chart defaults: %s", rbac)
+	}
+	unexpanded := installCommand("admin@katri", "rbac", false)
+	if strings.Contains(unexpanded, "anonymous") || !strings.Contains(unexpanded, "--set mcp.ingress.enabled=false") || !strings.Contains(unexpanded, "--set ui.enabled=false") {
+		t.Fatalf("unexpanded short hosts must not be advertised: %s", unexpanded)
 	}
 	if got := shellQuote("it's"); got != `'it'\''s'` {
 		t.Fatal(got)
@@ -47,8 +53,21 @@ func TestInstallOfferDetectsPassmower(t *testing.T) {
 		t.Fatalf("cluster without Passmower: %+v", offer)
 	}
 	client.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients", Kind: "OIDCClient"}}}}
-	if offer := d.installOffer(context.Background(), client, "ctx", true); offer.AuthMode != "rbac" || !offer.SSHJump || strings.Contains(offer.Command, "anonymous") {
-		t.Fatalf("cluster with Passmower: %+v", offer)
+	offer := d.installOffer(context.Background(), client, "ctx", true)
+	if offer.AuthMode != "rbac" || !offer.SSHJump || strings.Contains(offer.Command, "anonymous") || offer.HostExpansion || !strings.Contains(offer.Command, "mcp.ingress.enabled=false") {
+		t.Fatalf("cluster with Passmower, no host expansion: %+v", offer)
+	}
+	client.PrependReactor("create", "ingresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		create := action.(k8stesting.CreateActionImpl)
+		ingress := create.GetObject().(*networkingv1.Ingress).DeepCopy()
+		if len(create.CreateOptions.DryRun) == 0 {
+			t.Fatal("host expansion check persisted an Ingress")
+		}
+		ingress.Spec.Rules[0].Host += ".example.com"
+		return true, ingress, nil
+	})
+	if offer := d.installOffer(context.Background(), client, "ctx", false); !offer.HostExpansion || strings.Contains(offer.Command, "ingress.enabled") {
+		t.Fatalf("cluster expanding short hosts: %+v", offer)
 	}
 }
 

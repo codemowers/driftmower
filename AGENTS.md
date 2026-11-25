@@ -123,7 +123,11 @@ explicit, confirmed person action: it runs local `helm` against a temporary
 single-context kubeconfig holding the credentials discovery already resolved
 (never a credential plugin; SSH jump forwards keep TLS server-name
 verification), and deletes it afterwards. Clusters with Passmower's OIDCClient
-API get chart defaults; clusters confirmed without it get the anonymous
+API get chart defaults when a server-side dry run shows admission expanding
+the short Ingress host `mcp`; without expansion they get rbac MCP without
+Ingresses or hosted UI, reached by port-forward with its canonical OIDC
+audience. Discovery ignores single-label Ingress hosts for the same reason.
+Clusters confirmed without it get the anonymous
 Service-only MCP with `mcp.portForwardOnly`, whose NetworkPolicy leaves
 port-forwarding (and so `pods/portforward` RBAC) as the only access path. When
 the API cannot be inspected, never guess: offer the command and guide only.

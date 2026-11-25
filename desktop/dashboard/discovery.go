@@ -387,7 +387,10 @@ func (d *ContextDiscovery) inspectContext(raw *clientcmdapi.Config, name, key st
 		if ingresses != nil {
 			for _, ingress := range ingresses.Items {
 				for _, rule := range ingress.Spec.Rules {
-					if rule.HTTP == nil || rule.Host == "" {
+					// A single-label host such as "mcp" relies on cluster
+					// admission expanding it; unexpanded, nothing outside the
+					// cluster resolves it, so the desktop forwards instead.
+					if rule.HTTP == nil || !strings.Contains(rule.Host, ".") {
 						continue
 					}
 					for _, path := range rule.HTTP.Paths {

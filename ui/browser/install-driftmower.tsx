@@ -39,7 +39,9 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
         <p>This runs <code>helm upgrade --install</code> with the latest Driftmower chart, creating the <code>driftmower</code> namespace if it does not exist, plus cluster-wide read RBAC for MCP.</p>
         {anonymous
           ? <p>This cluster has no Passmower OIDC, so MCP runs <strong>without login</strong> and only MCP is installed. A NetworkPolicy blocks in-cluster connections, so it is reachable only by port-forwarding: anyone allowed to port-forward to Pods in the <code>driftmower</code> namespace can read every namespace through it. Mutation tools are disabled.</p>
-          : <p>This cluster has Passmower, so the chart defaults apply: OIDC login with each caller&apos;s own Kubernetes RBAC, an Ingress, the dashboard, scanner and crawlers.</p>}
+          : offer.hostExpansion
+            ? <p>This cluster has Passmower, so the chart defaults apply: OIDC login with each caller&apos;s own Kubernetes RBAC, Ingresses for MCP and the hosted dashboard, the scanner and crawlers.</p>
+            : <p>This cluster has Passmower, so MCP uses OIDC login with each caller&apos;s own Kubernetes RBAC, plus the scanner and crawlers. Its admission does not expand the chart&apos;s short Ingress hosts (<code>mcp</code>, <code>dashboard</code>), so no Ingress or hosted dashboard is installed: the desktop reaches MCP by port-forward. Set real hostnames with the deployment guide to publish them.</p>}
         <p className="rounded border border-status-patch bg-status-patch-bg p-3 text-status-patch-label">{POLICY}</p>
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded border px-3 py-2" onClick={() => setConfirming(false)}>Cancel</button>

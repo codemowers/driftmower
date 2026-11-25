@@ -94,7 +94,9 @@ whether your organization requires new cluster workloads to go through its own
 workflow (GitOps, review or a platform team). The desktop gives helm a
 temporary kubeconfig with the credentials it already resolved, so no
 credential plugin runs, and removes it afterwards. Clusters with Passmower get
-the chart defaults; others get an anonymous MCP only, reachable solely by
+the chart defaults when their admission expands the chart's short Ingress hosts
+(checked with a server-side dry run); otherwise MCP is installed without
+Ingresses or the hosted dashboard and reached by port-forward. Others get an anonymous MCP only, reachable solely by
 port-forwarding (`mcp.portForwardOnly`), see
 [access modes](../docs/deployment.md#access-modes).
 

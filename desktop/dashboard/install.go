@@ -14,7 +14,9 @@ import (
 	"sync"
 	"time"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -35,6 +37,9 @@ type InstallOffer struct {
 	// rbac when the cluster has Passmower's OIDCClient API; anonymous when it
 	// confirmedly has not; empty when that could not be determined.
 	AuthMode string `json:"authMode,omitempty"`
+	// The cluster's admission expands short Ingress hosts such as "mcp" into
+	// resolvable names, which the chart's default Ingresses rely on.
+	HostExpansion bool `json:"hostExpansion,omitempty"`
 	// Copyable helm command using the person's kubeconfig context.
 	Command string `json:"command"`
 	// Local helm executable is available for one-click install.
@@ -45,12 +50,18 @@ type InstallOffer struct {
 }
 
 // installValues are the Helm values one-click install sets. With Passmower the
-// chart defaults apply. Without it, MCP runs anonymously behind a Service only,
+// chart defaults apply where admission expands their short Ingress hosts;
+// otherwise those Ingresses would advertise unresolvable names, so MCP is
+// reached by port-forward with its canonical OIDC audience and the desktop
+// serves the dashboard. Without Passmower, MCP runs anonymously behind a Service only,
 // and its NetworkPolicy leaves Kubernetes port-forwarding (and so
 // pods/portforward RBAC) as the only way in; components needing other
 // platform APIs stay off, as in the deployment guide's minimal profile.
-func installValues(authMode string) []string {
+func installValues(authMode string, hostExpansion bool) []string {
 	values := []string{"mcp.dashboard.localOrigins={" + DesktopOrigin + "}"}
+	if authMode == "rbac" && !hostExpansion {
+		values = append(values, "mcp.ingress.enabled=false", "ui.enabled=false")
+	}
 	if authMode == "anonymous" {
 		values = append(values,
 			"mcp.auth.mode=anonymous",
@@ -66,13 +77,13 @@ func installValues(authMode string) []string {
 	return values
 }
 
-func installArgs(kubeconfig, context, authMode string) []string {
+func installArgs(kubeconfig, context, authMode string, hostExpansion bool) []string {
 	args := []string{"upgrade", "--install", installRelease, installChart}
 	if kubeconfig != "" {
 		args = append(args, "--kubeconfig", kubeconfig)
 	}
 	args = append(args, "--kube-context", context, "--namespace", installNamespace, "--create-namespace")
-	for _, value := range installValues(authMode) {
+	for _, value := range installValues(authMode, hostExpansion) {
 		args = append(args, "--set", value)
 	}
 	return args
@@ -85,8 +96,8 @@ func shellQuote(arg string) string {
 	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 }
 
-func installCommand(context, authMode string) string {
-	args := installArgs("", context, authMode)
+func installCommand(context, authMode string, hostExpansion bool) string {
+	args := installArgs("", context, authMode, hostExpansion)
 	quoted := make([]string, 0, len(args)+1)
 	quoted = append(quoted, "helm")
 	for _, arg := range args {
@@ -116,12 +127,28 @@ func (d *ContextDiscovery) installOffer(ctx context.Context, client kubernetes.I
 	if mode == "" {
 		mode = "anonymous"
 	}
-	offer.Command = installCommand(context, mode)
+	if mode == "rbac" {
+		offer.HostExpansion = expandsShortHosts(ctx, client)
+	}
+	offer.Command = installCommand(context, mode, offer.HostExpansion)
 	if d.kubeLogin {
 		_, err := lookPath("helm", pluginPath())
 		offer.Helm = err == nil && offer.AuthMode != ""
 	}
 	return offer
+}
+
+// expandsShortHosts asks admission, through a server-side dry run that
+// persists nothing, what becomes of an Ingress host "mcp". Any failure,
+// including missing permission, counts as no expansion: port-forwarding works
+// either way.
+func expandsShortHosts(ctx context.Context, client kubernetes.Interface) bool {
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "driftmower-host-check-"},
+		Spec:       networkingv1.IngressSpec{Rules: []networkingv1.IngressRule{{Host: "mcp"}}},
+	}
+	created, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(ctx, ingress, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	return err == nil && len(created.Spec.Rules) > 0 && strings.Contains(created.Spec.Rules[0].Host, ".")
 }
 
 // installs allows one install per connection at a time.
@@ -255,7 +282,7 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
-	args := append(installArgs(kubeconfig, target.Name, target.Install.AuthMode), "--wait", "--timeout", "5m")
+	args := append(installArgs(kubeconfig, target.Name, target.Install.AuthMode, target.Install.HostExpansion), "--wait", "--timeout", "5m")
 	cmd := exec.CommandContext(ctx, helm, args...)
 	// Keep helm's own caches and registry login; isolate only Kubernetes access.
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "PATH="+pluginPath())
