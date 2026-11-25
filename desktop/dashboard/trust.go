@@ -58,6 +58,8 @@ func servesResource(client kubernetes.Interface, groupVersion, resource string) 
 
 func trustSetup(ctx context.Context, client kubernetes.Interface, kubeContext string) *TrustSetup {
 	setup := &TrustSetup{
+		// Never null in JSON, also when every part already exists.
+		Commands:     []string{},
 		CertManager:  servesResource(client, "cert-manager.io/v1", "certificates"),
 		TrustManager: servesResource(client, bundleResource.GroupVersion().String(), bundleResource.Resource),
 	}

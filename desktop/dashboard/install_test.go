@@ -390,3 +390,18 @@ func TestOlderChartStopsInstallBeforeTrustLayer(t *testing.T) {
 		t.Fatal("the trust layer was installed for a chart that cannot use it")
 	}
 }
+
+func TestTrustSetupEncodesNoStepsAsEmptyList(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	client.Resources = []*metav1.APIResourceList{
+		{GroupVersion: "cert-manager.io/v1", APIResources: []metav1.APIResource{{Name: "certificates"}}},
+		{GroupVersion: "trust.cert-manager.io/v1alpha1", APIResources: []metav1.APIResource{{Name: "bundles"}}},
+	}
+	setup := trustSetup(context.Background(), client, "ctx")
+	setup.Bundle = true
+	setup.Commands = setup.Commands[:0]
+	body, _ := json.Marshal(setup)
+	if !strings.Contains(string(body), `"commands":[]`) {
+		t.Fatalf("Settings maps over commands; got %s", body)
+	}
+}

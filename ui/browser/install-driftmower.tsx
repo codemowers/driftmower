@@ -40,7 +40,7 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
     {trust && <p className="text-xs text-muted-foreground">Pods on this cluster get no CA certificates, and Driftmower&apos;s images contain none, so logins would fail. Install first sets up CA trust the way the codemowers platform does.</p>}
     <details className="text-xs text-muted-foreground">
       <summary className="cursor-pointer">{trust ? "Commands" : "Helm command"}</summary>
-      {trust?.commands.map(command => <Command key={command} value={command}/>)}
+      {(trust?.commands ?? []).map(command => <Command key={command} value={command}/>)}
       <Command value={offer.command}/>
       {offer.sshJump && <p className="mt-1">This context uses a desktop SSH jump host, which helm and kubectl do not use on their own; run the commands where the API server is reachable, or use Install.</p>}
       {!offer.authMode && <p className="mt-1">The desktop could not tell whether this cluster has Passmower OIDC. Choose the access mode in the <a className="underline" href="https://github.com/codemowers/driftmower/blob/main/docs/deployment.md#access-modes" target="_blank" rel="noreferrer">deployment guide</a> before installing.</p>}
