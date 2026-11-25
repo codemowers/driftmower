@@ -144,11 +144,40 @@ func (d *ContextDiscovery) installOffer(ctx context.Context, client kubernetes.I
 // either way.
 func expandsShortHosts(ctx context.Context, client kubernetes.Interface) bool {
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "driftmower-host-check-"},
+		ObjectMeta: metav1.ObjectMeta{Name: "driftmower-host-check"},
 		Spec:       networkingv1.IngressSpec{Rules: []networkingv1.IngressRule{{Host: "mcp"}}},
 	}
-	created, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(ctx, ingress, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-	return err == nil && len(created.Spec.Rules) > 0 && strings.Contains(created.Spec.Rules[0].Host, ".")
+	for _, namespace := range probeNamespaces(ctx, client) {
+		created, err := client.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err == nil {
+			return len(created.Spec.Rules) > 0 && strings.Contains(created.Spec.Rules[0].Host, ".")
+		}
+	}
+	return false
+}
+
+// probeNamespaces lists where dry-run admission probes may run: the release
+// namespace when it exists, default, then a few ordinary namespaces, because
+// platforms may block the default namespace and exempt kube-* namespaces
+// from workload policies. Probes use fixed names because admission policies
+// may read metadata.name, which generateName leaves empty at that point.
+func probeNamespaces(ctx context.Context, client kubernetes.Interface) []string {
+	out := []string{installNamespace, metav1.NamespaceDefault}
+	list, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{Limit: 50})
+	if err != nil {
+		return out
+	}
+	for _, namespace := range list.Items {
+		if len(out) >= 5 {
+			break
+		}
+		name := namespace.Name
+		if name == installNamespace || name == metav1.NamespaceDefault || strings.HasPrefix(name, "kube-") || strings.HasSuffix(name, "-system") {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
 }
 
 // installs allows one install per connection at a time.
