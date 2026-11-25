@@ -46,7 +46,7 @@ func TestSSHJumpExtensionAndContextIdentity(t *testing.T) {
 	raw.Contexts["one"] = &clientcmdapi.Context{Cluster: "one", AuthInfo: "admin"}
 	raw.Contexts["two"] = &clientcmdapi.Context{Cluster: "two", AuthInfo: "admin"}
 	raw.Contexts["alias"] = &clientcmdapi.Context{Cluster: "one", AuthInfo: "admin", Namespace: "team"}
-	if groups := contextGroups(raw); len(groups) != 2 {
+	if groups := contextGroups(raw, ""); len(groups) != 2 {
 		t.Fatalf("jump-host routes merged or namespace aliases split: %+v", groups)
 	}
 }

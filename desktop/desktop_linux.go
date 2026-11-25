@@ -14,7 +14,9 @@ import (
 // directory. Match that ID so GNOME finds our icon even in an existing Chrome
 // process. Query parameters (including connection/profile selection) do not
 // affect it. See Chromium's GetXdgAppIdForWebApp/GetShortcutFileName.
-func installDesktop(profiles *dashboard.ChromeProfiles, binary string) error {
+// Firefox windows always carry Firefox's own app ID, so only the launcher is
+// installed for it. A browser chosen with --browser is kept in the launcher.
+func installDesktop(profiles *dashboard.BrowserProfiles, binary, browser string) error {
 	data := os.Getenv("XDG_DATA_HOME")
 	if !filepath.IsAbs(data) {
 		home, err := os.UserHomeDir()
@@ -33,9 +35,13 @@ func installDesktop(profiles *dashboard.ChromeProfiles, binary string) error {
 	if err := os.WriteFile(filepath.Join(icons, "driftmower.svg"), desktopIcon, 0644); err != nil {
 		return err
 	}
-	existing, err := profiles.List()
-	if err != nil {
-		return err
+	chrome := profiles.Kind() == dashboard.BrowserChrome
+	var existing []dashboard.BrowserProfile
+	if chrome {
+		var err error
+		if existing, err = profiles.List(); err != nil {
+			return err
+		}
 	}
 	entries := []struct{ file, name, profile string }{{"driftmower.desktop", "Driftmower", ""}}
 	for _, profile := range existing {
@@ -44,15 +50,22 @@ func installDesktop(profiles *dashboard.ChromeProfiles, binary string) error {
 	}
 	for _, entry := range entries {
 		args := []string{binary}
+		if browser != "" {
+			args = append(args, "--browser="+browser)
+		}
 		if entry.profile != "" {
-			args = append(args, "--chrome-profile="+entry.profile)
+			args = append(args, "--browser-profile="+entry.profile)
 		}
 		name := strings.NewReplacer("\n", " ", "\r", " ", "\\", "\\\\").Replace(entry.name)
 		hidden := ""
 		if entry.profile != "" {
 			hidden = "NoDisplay=true\n"
 		}
-		body := fmt.Sprintf("[Desktop Entry]\nVersion=1.0\nType=Application\nName=%s\nComment=Kubernetes cluster dashboard\nExec=%s\nIcon=driftmower\nTerminal=false\nCategories=Development;\nStartupWMClass=localhost__settings\n%s", name, desktopExec(args), hidden)
+		windowClass := ""
+		if chrome {
+			windowClass = "StartupWMClass=localhost__settings\n"
+		}
+		body := fmt.Sprintf("[Desktop Entry]\nVersion=1.0\nType=Application\nName=%s\nComment=Kubernetes cluster dashboard\nExec=%s\nIcon=driftmower\nTerminal=false\nCategories=Development;\n%s%s", name, desktopExec(args), windowClass, hidden)
 		if err := os.WriteFile(filepath.Join(applications, entry.file), []byte(body), 0644); err != nil {
 			return err
 		}

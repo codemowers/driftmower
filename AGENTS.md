@@ -86,8 +86,11 @@ large, return a summary and move detail to a per-item tool and detail page.
 ## Local desktop dashboard
 
 The local dashboard is the native `desktop` binary, not a
-container: it serves on `localhost:17843` (the origin MCP allows) and opens a
-Google Chrome application window, falling back to Chromium. Background context
+container: it serves on `localhost:17843` (the origin MCP allows) and opens the
+browser selected by `--browser`/`DRIFTMOWER_BROWSER`, else the system default
+browser when it is Chrome, Chromium or Firefox, else whichever is installed
+(Chrome first). Chrome/Chromium use an application window; Firefox has no app
+mode and opens an ordinary window. Background context
 discovery only reads kubelogin's token cache; kubelogin runs only when a person
 clicks Sign in. AWS (`aws eks get-token`) and Azure kubelogin in a non-prompting
 mode such as `azurecli` are run by discovery itself, which captures their
@@ -95,20 +98,25 @@ output and keeps each token until it expires, since they only read the cloud
 CLI's session. Sign in runs `az login --tenant … --scope …`, `aws login` or
 `aws sso login`, as the plugin and the AWS profile call for. No other credential plugin is ever run.
 
-One Chrome profile may be assigned per kubeconfig user/auth entry in
-Settings. Persist its name and directory in the existing kubeconfig auth entry's
-`extensions` under `driftmower.codemowers.io/desktop`, with a single `chromeProfile` object. All contexts using the same auth entry share the assignment, including different
+One browser profile may be assigned per kubeconfig user/auth entry and browser
+family in Settings. Persist its name and directory in the existing kubeconfig
+auth entry's `extensions` under `driftmower.codemowers.io/desktop`, with a
+single `chromeProfile` object for Chrome/Chromium and a separate single
+`firefoxProfile` object for Firefox; never reinterpret one browser's directory
+as the other's. A Firefox directory is a `Path` listed in `profiles.ini`, and
+only listed profiles are launched. All contexts using the same auth entry share the assignment, including different
 API servers. Namespace aliases for that auth entry share it. Preserve unrelated extensions, authentication
 fields, current context and the originating files in a merged KUBECONFIG.
 Settings always lists every connection. On first Sign in or Connect, prompt for
-an existing Chrome profile when several exist, or associate the sole profile
+an existing browser profile when several exist, or associate the sole profile
 automatically. Provide Clear association so the next attempt chooses again.
-Connect reuses the current profile's window; another profile opens a Chrome app
+Connect reuses the current profile's window; another profile opens a new browser
 window with its profile identity carried into window-scoped session storage.
-Use the person's existing Chrome user-data root, not a separate app profile.
+Use the person's existing Chrome user-data root or Firefox profiles directory,
+not a separate app profile.
 Browser connection selection
 is window-scoped; OAuth state and tokens must never cross profile/window state.
-Assigned kubelogin flows use a desktop-only cache scoped by connection, Chrome
+Assigned kubelogin flows use a desktop-only cache scoped by connection, browser
 user-data root and profile, plus a native browser helper. Do not modify kubectl's
 exec arguments or cache configuration on disk. Distinguish Azure kubelogin from
 int128's plugin using the OIDC issuer/client arguments; never pass OIDC cache or

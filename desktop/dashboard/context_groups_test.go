@@ -22,7 +22,7 @@ func TestContextGroupsRetainNamespaceAliasesAndSeparateCredentials(t *testing.T)
 	raw.Contexts["user/team"] = &clientcmdapi.Context{Cluster: "one", AuthInfo: "token", Namespace: "team"}
 	raw.Contexts["other-user"] = &clientcmdapi.Context{Cluster: "one", AuthInfo: "different-token"}
 	raw.CurrentContext = "admin/team"
-	groups := contextGroups(raw)
+	groups := contextGroups(raw, "")
 	if len(groups) != 3 {
 		t.Fatalf("expected three API/auth identities, got %+v", groups)
 	}
@@ -45,7 +45,7 @@ func TestContextGroupsRetainNamespaceAliasesAndSeparateCredentials(t *testing.T)
 	// Namespace renames do not change the connection's key.
 	before := cert.Key
 	raw.Contexts["another-namespace"] = &clientcmdapi.Context{Cluster: "one", AuthInfo: "cert", Namespace: "other"}
-	for _, group := range contextGroups(raw) {
+	for _, group := range contextGroups(raw, "") {
 		if group.Certificate && group.Key != before {
 			t.Fatal("namespace changed authentication identity")
 		}

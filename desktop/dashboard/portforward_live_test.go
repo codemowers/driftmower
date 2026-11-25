@@ -28,7 +28,7 @@ func TestDesktopForwardLive(t *testing.T) {
 	d := StartDiscovery(false, "", true)
 	defer d.Close()
 	var key string
-	for _, group := range contextGroups(raw) {
+	for _, group := range contextGroups(raw, "") {
 		for _, alias := range group.Aliases {
 			if alias.Name == name {
 				key = group.Key

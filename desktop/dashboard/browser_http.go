@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (d *Dashboard) setChromeProfile(w http.ResponseWriter, r *http.Request) {
+func (d *Dashboard) setBrowserProfile(w http.ResponseWriter, r *http.Request) {
 	if !sameOriginLoopback(r) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -20,14 +20,14 @@ func (d *Dashboard) setChromeProfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "connection required", 400)
 		return
 	}
-	if err := d.cfg.ChromeProfiles.Set(d.discovery, body.Key, body.Directory); err != nil {
+	if err := d.cfg.BrowserProfiles.Set(d.discovery, body.Key, body.Directory); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (d *Dashboard) openChromeConnection(w http.ResponseWriter, r *http.Request) {
+func (d *Dashboard) openBrowserConnection(w http.ResponseWriter, r *http.Request) {
 	if !sameOriginLoopback(r) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -52,32 +52,32 @@ func (d *Dashboard) openChromeConnection(w http.ResponseWriter, r *http.Request)
 		if connection.Key != body.Key {
 			continue
 		}
-		if connection.ChromeProfile == nil {
-			http.Error(w, "choose a Chrome profile first", 400)
+		if connection.BrowserProfile == nil {
+			http.Error(w, "choose a "+d.cfg.BrowserProfiles.Kind().Name()+" profile first", 400)
 			return
 		}
-		profiles, err := d.cfg.ChromeProfiles.List()
+		profiles, err := d.cfg.BrowserProfiles.List()
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		found := false
 		for _, profile := range profiles {
-			if profile.Directory == connection.ChromeProfile.Directory {
+			if profile.Directory == connection.BrowserProfile.Directory {
 				found = true
 			}
 		}
 		if !found {
-			http.Error(w, "assigned Chrome profile no longer exists", 409)
+			http.Error(w, "assigned "+d.cfg.BrowserProfiles.Kind().Name()+" profile no longer exists", 409)
 			return
 		}
 		d.discovery.Retry(connection.Key)
-		query := url.Values{"connect": {body.Key}, "chrome-profile": {connection.ChromeProfile.Directory}}
+		query := url.Values{"connect": {body.Key}, "browser-profile": {connection.BrowserProfile.Directory}}
 		if body.ReturnTo != "" {
 			query.Set("return-to", body.ReturnTo)
 		}
-		target := DesktopOrigin + "/settings?" + query.Encode()
-		if err := d.cfg.ChromeProfiles.launch(connection.ChromeProfile.Directory, target, true); err != nil {
+		target := settingsURL(query)
+		if err := d.cfg.BrowserProfiles.launch(connection.BrowserProfile.Directory, target, true); err != nil {
 			http.Error(w, err.Error(), 502)
 			return
 		}

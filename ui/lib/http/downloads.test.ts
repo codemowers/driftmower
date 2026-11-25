@@ -72,7 +72,7 @@ test("empty responses and persistent MCP update streams do not leave a download 
 
 
 test("desktop control requests bypass byte tracking and preserve the original response", async t => {
-  for (const path of ["/dashboard-config.json", "/api/desktop/chrome-profile", "/api/desktop/connect", "/api/desktop/retry", "/api/kubernetes-sign-in"]) {
+  for (const path of ["/dashboard-config.json", "/api/desktop/browser-profile", "/api/desktop/connect", "/api/desktop/retry", "/api/kubernetes-sign-in"]) {
     const original = new Response("local response")
     t.mock.method(globalThis, "fetch", async () => original)
     const response = await fetchWithContext("Desktop control", path)

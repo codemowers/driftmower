@@ -50,7 +50,9 @@ func authMethod(auth *clientcmdapi.AuthInfo) (string, bool) {
 // Context identity excludes namespace and kubeconfig entry names. Authentication
 // identities (including impersonation) and TLS trust are kept separate, even
 // when they reach the same API server. Only an opaque key leaves this process.
-func contextGroups(raw *clientcmdapi.Config) []DiscoveredContext {
+// browser selects which browser family's profile assignment is reported;
+// an empty browser reports none.
+func contextGroups(raw *clientcmdapi.Config, browser Browser) []DiscoveredContext {
 	names := make([]string, 0, len(raw.Contexts))
 	for name := range raw.Contexts {
 		names = append(names, name)
@@ -109,8 +111,8 @@ func contextGroups(raw *clientcmdapi.Config) []DiscoveredContext {
 		})
 		group.Name = group.Aliases[0].Name
 		if c := raw.Contexts[group.Name]; c != nil {
-			if profile, err := profileForAuth(raw.AuthInfos[c.AuthInfo]); err == nil && profile.Directory != "" {
-				group.ChromeProfile = &profile
+			if profile, err := browser.profileFor(raw.AuthInfos[c.AuthInfo]); err == nil && profile.Directory != "" {
+				group.BrowserProfile = &profile
 			}
 		}
 		out = append(out, *group)

@@ -1,5 +1,5 @@
 "use client"
-import { ChromeProfilePrompt } from "./chrome-profile-prompt"
+import { BrowserProfilePrompt } from "./browser-profile-prompt"
 import { loadCrawlerFindings } from "./crawler"
 import { useEffect, useRef, useState, lazy, Suspense } from "react"
 import { LoaderCircle } from "lucide-react"
@@ -110,7 +110,7 @@ export default function Dashboard() {
    const config = await deploymentConfig()
    if (cancelled) return
    setConfigError(config.discoveryError ?? "")
-   setDesktop(config.configUpdates === true || config.chromeProfilesEnabled === true)
+   setDesktop(config.configUpdates === true || config.browserProfilesEnabled === true)
    setConfigured(Boolean(config.mcpUrl))
    const discovered = config.mcpUrl ? [{name:contextTitle(config.mcpUrl),url:config.mcpUrl}] : config.clusters ?? []
    setPinnedEndpoints(discovered.map(endpoint=>endpoint.url))
@@ -268,7 +268,7 @@ export default function Dashboard() {
  return <SettingsContext.Provider value={{streamUpdates,setStreamUpdates}}><TooltipProvider><div className="flex h-screen flex-col bg-background text-foreground">
   <RequestInspector />
   <DashboardNotices desktop={desktop} onRefresh={()=>{setViewRevision(value=>value+1);window.dispatchEvent(new Event("driftmower:refresh-inventory"))}} messages={[connectionError, error, configError, ...warnings]} missingComponents={missingComponents} />
-  <ChromeProfilePrompt/>
+  <BrowserProfilePrompt/>
   <div className="flex min-h-0 flex-1">
    <aside className="border-r"><NavBar claims={claims} navigationEnabled={connected} seesClusterWideViews={false} clusterEndpoints={clusters} activeEndpoint={active} pinnedEndpoints={pinnedEndpoints} fixedEndpoint={configured===true} onSelectEndpoint={(url,key)=>void loginToEndpoint(url,key).catch(e=>setError((e as Error).message))} /></aside>
    <main className="min-w-0 flex-1 overflow-auto"><Params.Provider value={params}><Suspense fallback={<div className="p-8"><LoadingLine /></div>}>

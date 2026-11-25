@@ -28,7 +28,7 @@ func fakeKubectl(t *testing.T, token string) (dir string, record string) {
 	dir = t.TempDir()
 	record = filepath.Join(dir, "record")
 	script := "#!/bin/sh\necho \"$@\" > " + record + "\necho \"$KUBERNETES_EXEC_INFO $EXTRA\" >> " + record +
-		"\necho \"$DRIFTMOWER_CHROME_PROFILE $DRIFTMOWER_OPEN_AUTH_URL\" >> " + record +
+		"\necho \"$DRIFTMOWER_BROWSER_PROFILE $DRIFTMOWER_OPEN_AUTH_URL\" >> " + record +
 		"\necho '{\"apiVersion\":\"client.authentication.k8s.io/v1\",\"kind\":\"ExecCredential\",\"status\":{\"token\":\"" + token + "\"}}'\n"
 	if err := os.WriteFile(filepath.Join(dir, "kubectl"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)

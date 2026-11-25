@@ -27,15 +27,15 @@ type ClusterEndpoint struct {
 }
 
 type DiscoveredContext struct {
-	ChromeProfile *ChromeProfile `json:"chromeProfile,omitempty"`
-	PortForward   bool           `json:"portForward,omitempty"`
-	Key           string         `json:"key"`
-	APIServer     string         `json:"apiServer,omitempty"`
-	AuthMethod    string         `json:"authMethod,omitempty"`
-	Certificate   bool           `json:"certificate,omitempty"`
-	Aliases       []ContextAlias `json:"aliases,omitempty"`
-	Name          string         `json:"name"`
-	Status        string         `json:"status"`
+	BrowserProfile *BrowserProfile `json:"browserProfile,omitempty"`
+	PortForward    bool            `json:"portForward,omitempty"`
+	Key            string          `json:"key"`
+	APIServer      string          `json:"apiServer,omitempty"`
+	AuthMethod     string          `json:"authMethod,omitempty"`
+	Certificate    bool            `json:"certificate,omitempty"`
+	Aliases        []ContextAlias  `json:"aliases,omitempty"`
+	Name           string          `json:"name"`
+	Status         string          `json:"status"`
 	// available; auth when the API server answers but credentials are
 	// missing, expired or refused; unreachable; or other.
 	State string `json:"state"`
@@ -63,7 +63,7 @@ type ContextDiscovery struct {
 	done       chan struct{}
 	jumps      *sshJumps
 	forwards   *desktopForwards
-	chrome     *ChromeProfiles
+	browser    *BrowserProfiles
 	watchDone  chan struct{}
 	updates    configUpdates
 	generation atomic.Uint64
@@ -114,15 +114,15 @@ func (d *ContextDiscovery) SignIn(ctx context.Context, name string) error {
 		return errors.New("invalid context configuration")
 	}
 	var connectionKey string
-	for _, group := range contextGroups(raw) {
+	for _, group := range contextGroups(raw, d.browserKind()) {
 		for _, alias := range group.Aliases {
 			if alias.Name == name {
 				connectionKey = group.Key
 			}
 		}
 	}
-	if d.chrome != nil {
-		if err := d.chrome.prepare(auth, raw.Clusters[c.Cluster].Server, connectionKey); err != nil {
+	if d.browser != nil {
+		if err := d.browser.prepare(auth, raw.Clusters[c.Cluster].Server, connectionKey); err != nil {
 			return err
 		}
 	}
@@ -206,7 +206,7 @@ func (d *ContextDiscovery) refresh() {
 			}
 			result := d.inspectContext(raw, group.Name, group.Key, reachable)
 			result.Key, result.APIServer, result.AuthMethod, result.Certificate, result.Aliases = group.Key, group.APIServer, group.AuthMethod, group.Certificate, group.Aliases
-			result.ChromeProfile = group.ChromeProfile
+			result.BrowserProfile = group.BrowserProfile
 			d.mu.Lock()
 			if generation == d.generation.Load() {
 				d.contexts[i] = result
@@ -234,7 +234,7 @@ func (d *ContextDiscovery) refresh() {
 		d.mu.RLock()
 		for _, result := range d.contexts {
 			if result.PortForward {
-				keep[forwardIdentityKey(result.Key, result.ChromeProfile)] = true
+				keep[forwardIdentityKey(result.Key, result.BrowserProfile)] = true
 			}
 		}
 		d.mu.RUnlock()
@@ -300,8 +300,8 @@ func (d *ContextDiscovery) inspectContext(raw *clientcmdapi.Config, name, key st
 		return result
 	}
 	auth := raw.AuthInfos[c.AuthInfo]
-	if d.chrome != nil {
-		if err := d.chrome.prepare(auth, raw.Clusters[c.Cluster].Server, key); err != nil {
+	if d.browser != nil {
+		if err := d.browser.prepare(auth, raw.Clusters[c.Cluster].Server, key); err != nil {
 			result.Status = err.Error()
 			return result
 		}
@@ -410,7 +410,7 @@ func (d *ContextDiscovery) inspectContext(raw *clientcmdapi.Config, name, key st
 			result.Status = "MCP installed but not running"
 			return result
 		}
-		profile, _ := profileForAuth(auth)
+		profile, _ := d.browserKind().profileFor(auth)
 		endpoint, err = d.forwards.service(ctx, forwardIdentityKey(key, &profile), config, client, service)
 		if err != nil {
 			result.Status = "MCP port-forward unavailable: " + err.Error()
@@ -454,11 +454,11 @@ func anyReady(slices []discoveryv1.EndpointSlice) bool {
 
 // StartDiscovery reacts to kubeconfig writes, sign-in, retries and tunnel
 // lifecycle events. It never polls files or probes clusters on a timer.
-func StartDiscovery(enabled bool, path string, kubeLogin bool, chrome ...*ChromeProfiles) *ContextDiscovery {
+func StartDiscovery(enabled bool, path string, kubeLogin bool, browser ...*BrowserProfiles) *ContextDiscovery {
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &ContextDiscovery{path: path, kubeLogin: kubeLogin, wake: make(chan struct{}, 1), ctx: ctx, cancel: cancel, done: make(chan struct{}), watchDone: make(chan struct{})}
-	if len(chrome) > 0 {
-		d.chrome = chrome[0]
+	if len(browser) > 0 {
+		d.browser = browser[0]
 	}
 	if kubeLogin {
 		d.forwards = newDesktopForwards(ctx, d.wake)
@@ -497,4 +497,11 @@ func (d *ContextDiscovery) Close() {
 	}
 	<-d.done
 	<-d.watchDone
+}
+
+func (d *ContextDiscovery) browserKind() Browser {
+	if d.browser == nil {
+		return ""
+	}
+	return d.browser.kind
 }
