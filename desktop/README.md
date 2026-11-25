@@ -101,6 +101,10 @@ port-forwarding (`mcp.portForwardOnly`), see
 [access modes](../docs/deployment.md#access-modes). Install first checks
 that the published chart defines every value it sets and pins that version,
 and asks for a StorageClass when the cluster has no default one.
+For development, `DRIFTMOWER_INSTALL_CHART=/path/to/driftmower/chart` makes
+one-click install use that chart directory instead of the published chart.
+It still uses the latest release's image references; the shown command keeps
+the published chart.
 
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
 Kubernetes port-forward on an OS-assigned `127.0.0.1` port. Settings marks it
