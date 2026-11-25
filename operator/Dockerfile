@@ -5,7 +5,7 @@ RUN go mod download
 COPY internal ./internal
 COPY operator ./operator
 RUN CGO_ENABLED=0 go build -trimpath -o /operator ./operator/cmd/driftmower-operator
-# CA certificates are mounted by the cluster.
+# CA certificates are mounted by the cluster; the binary embeds fallback roots.
 FROM scratch
 COPY --from=builder /operator /driftmower-operator
 USER 65532:65532

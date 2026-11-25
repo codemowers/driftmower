@@ -10,6 +10,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/common v0.72.0
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20261123192653-4dc4fb521066
 	golang.org/x/sync v0.24.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
