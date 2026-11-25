@@ -8,7 +8,7 @@ import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validatio
 import { type Tool, ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
 import { InMemoryWebStorage,UserManager,WebStorageStateStore,type User } from "oidc-client-ts"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
-import { connectionForEndpoint, type KubeconfigConnection } from "@/lib/kubernetes/contexts"
+import { connectionForEndpoint, type InstallOptions, type KubeconfigConnection } from "@/lib/kubernetes/contexts"
 import { navigate } from "./navigation"
 import { loginDestination, loginCallbackDestination } from "@/lib/connection/login-return"
 import { claimLoginRecovery, loginRecoveryKey, loginReturnKey } from "@/lib/connection/login-recovery"
@@ -198,8 +198,8 @@ export async function ensureChromeProfile(key:string):Promise<KubeconfigConnecti
   return updated.contexts?.find(context=>context.key===key)
 }
 
-export async function installDriftmower(key:string) {
-  const response=await fetchWithContext("Install Driftmower", "/api/desktop/install",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})})
+export async function installDriftmower(key:string,options:InstallOptions={}) {
+  const response=await fetchWithContext("Install Driftmower", "/api/desktop/install",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,...options})})
   if(!response.ok)throw new Error((await response.text()).trim() || "Could not install Driftmower")
   return deploymentConfig(true)
 }

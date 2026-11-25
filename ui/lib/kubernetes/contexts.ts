@@ -18,7 +18,9 @@ export type KubeconfigConnection = {
   // Set when the API server answers but Driftmower is not installed.
   install?: InstallOffer
 }
-export type InstallOffer = { authMode?: "rbac" | "anonymous"; hostExpansion?: boolean; command: string; helm?: boolean; sshJump?: boolean }
+// The person's choices in the install confirmation dialog.
+export type InstallOptions = { storageClass?: string }
+export type InstallOffer = { authMode?: "rbac" | "anonymous"; hostExpansion?: boolean; storageClasses?: string[]; defaultStorageClass?: string; command: string; helm?: boolean; sshJump?: boolean }
 
 export function connectionForEndpoint(connections: KubeconfigConnection[], endpoint: string, selectedKey?: string): KubeconfigConnection | undefined {
   const selected = connections.find(connection => connection.key === selectedKey)

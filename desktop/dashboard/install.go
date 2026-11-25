@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,10 @@ type InstallOffer struct {
 	// The cluster's admission expands short Ingress hosts such as "mcp" into
 	// resolvable names, which the chart's default Ingresses rely on.
 	HostExpansion bool `json:"hostExpansion,omitempty"`
+	// StorageClasses the operator and registry scraper claims could use, and
+	// the cluster default among them; without a default the person chooses.
+	StorageClasses      []string `json:"storageClasses,omitempty"`
+	DefaultStorageClass string   `json:"defaultStorageClass,omitempty"`
 	// Copyable helm command using the person's kubeconfig context.
 	Command string `json:"command"`
 	// Local helm executable is available for one-click install.
@@ -57,8 +62,19 @@ type InstallOffer struct {
 // and its NetworkPolicy leaves Kubernetes port-forwarding (and so
 // pods/portforward RBAC) as the only way in; components needing other
 // platform APIs stay off, as in the deployment guide's minimal profile.
-func installValues(authMode string, hostExpansion bool) []string {
+type installSettings struct {
+	authMode      string
+	hostExpansion bool
+	// Empty uses the cluster default StorageClass.
+	storageClass string
+}
+
+func installValues(settings installSettings) []string {
+	authMode, hostExpansion := settings.authMode, settings.hostExpansion
 	values := []string{"mcp.dashboard.localOrigins={" + DesktopOrigin + "}"}
+	if authMode == "rbac" && settings.storageClass != "" {
+		values = append(values, "operator.sbomStorageClassName="+settings.storageClass, "registryScraper.storageClassName="+settings.storageClass)
+	}
 	if authMode == "rbac" && !hostExpansion {
 		values = append(values, "mcp.ingress.enabled=false", "ui.enabled=false")
 	}
@@ -77,13 +93,16 @@ func installValues(authMode string, hostExpansion bool) []string {
 	return values
 }
 
-func installArgs(kubeconfig, context, authMode string, hostExpansion bool) []string {
+func installArgs(kubeconfig, context, version string, settings installSettings) []string {
 	args := []string{"upgrade", "--install", installRelease, installChart}
+	if version != "" {
+		args = append(args, "--version", version)
+	}
 	if kubeconfig != "" {
 		args = append(args, "--kubeconfig", kubeconfig)
 	}
 	args = append(args, "--kube-context", context, "--namespace", installNamespace, "--create-namespace")
-	for _, value := range installValues(authMode, hostExpansion) {
+	for _, value := range installValues(settings) {
 		args = append(args, "--set", value)
 	}
 	return args
@@ -96,8 +115,8 @@ func shellQuote(arg string) string {
 	return "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 }
 
-func installCommand(context, authMode string, hostExpansion bool) string {
-	args := installArgs("", context, authMode, hostExpansion)
+func installCommand(context string, settings installSettings) string {
+	args := installArgs("", context, "", settings)
 	quoted := make([]string, 0, len(args)+1)
 	quoted = append(quoted, "helm")
 	for _, arg := range args {
@@ -130,7 +149,14 @@ func (d *ContextDiscovery) installOffer(ctx context.Context, client kubernetes.I
 	if mode == "rbac" {
 		offer.HostExpansion = expandsShortHosts(ctx, client)
 	}
-	offer.Command = installCommand(context, mode, offer.HostExpansion)
+	settings := installSettings{authMode: mode, hostExpansion: offer.HostExpansion}
+	if mode == "rbac" {
+		offer.StorageClasses, offer.DefaultStorageClass = storageClasses(ctx, client)
+		if offer.DefaultStorageClass == "" {
+			settings.storageClass = "<storage-class>"
+		}
+	}
+	offer.Command = installCommand(context, settings)
 	if d.kubeLogin {
 		_, err := lookPath("helm", pluginPath())
 		offer.Helm = err == nil && offer.AuthMode != ""
@@ -272,7 +298,14 @@ func (d *ContextDiscovery) installKubeconfig(raw *clientcmdapi.Config, name, key
 
 // Install deploys the Driftmower chart with helm for one discovered
 // connection, then refreshes its discovery.
-func (d *ContextDiscovery) Install(ctx context.Context, key string) error {
+// InstallOptions are the person's choices in the confirmation dialog.
+type InstallOptions struct {
+	// Required for the operator and registry scraper claims when the cluster
+	// has no default StorageClass.
+	StorageClass string `json:"storageClass"`
+}
+
+func (d *ContextDiscovery) Install(ctx context.Context, key string, options InstallOptions) error {
 	var target *DiscoveredContext
 	d.mu.RLock()
 	for _, c := range d.contexts {
@@ -311,7 +344,20 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
-	args := append(installArgs(kubeconfig, target.Name, target.Install.AuthMode, target.Install.HostExpansion), "--wait", "--timeout", "5m")
+	settings := installSettings{authMode: target.Install.AuthMode, hostExpansion: target.Install.HostExpansion}
+	if settings.authMode == "rbac" && target.Install.DefaultStorageClass == "" {
+		if !slices.Contains(target.Install.StorageClasses, options.StorageClass) {
+			return errors.New("this cluster has no default StorageClass; choose one for the operator and registry scraper volumes")
+		}
+		settings.storageClass = options.StorageClass
+	}
+	// Check the chart before changing anything: helm silently ignores values
+	// a chart does not define, which would install a broken Driftmower.
+	version, err := checkChart(ctx, helm, installValues(settings))
+	if err != nil {
+		return err
+	}
+	args := append(installArgs(kubeconfig, target.Name, version, settings), "--wait", "--timeout", "5m")
 	cmd := exec.CommandContext(ctx, helm, args...)
 	// Keep helm's own caches and registry login; isolate only Kubernetes access.
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "PATH="+pluginPath())
@@ -334,13 +380,14 @@ func (d *Dashboard) installDriftmower(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Key string `json:"key"`
+		InstallOptions
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil || body.Key == "" {
 		http.Error(w, "connection required", http.StatusBadRequest)
 		return
 	}
 	// A page reload must not abort helm halfway; the desktop's lifetime bounds it.
-	if err := d.discovery.Install(d.discovery.ctx, body.Key); err != nil {
+	if err := d.discovery.Install(d.discovery.ctx, body.Key, body.InstallOptions); err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}

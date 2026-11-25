@@ -98,7 +98,9 @@ the chart defaults when their admission expands the chart's short Ingress hosts
 (checked with a server-side dry run); otherwise MCP is installed without
 Ingresses or the hosted dashboard and reached by port-forward. Others get an anonymous MCP only, reachable solely by
 port-forwarding (`mcp.portForwardOnly`), see
-[access modes](../docs/deployment.md#access-modes).
+[access modes](../docs/deployment.md#access-modes). Install first checks
+that the published chart defines every value it sets and pins that version,
+and asks for a StorageClass when the cluster has no default one.
 
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
 Kubernetes port-forward on an OS-assigned `127.0.0.1` port. Settings marks it

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	networkingv1 "k8s.io/api/networking/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -20,7 +21,7 @@ import (
 )
 
 func TestInstallCommandFollowsClusterAuthCapability(t *testing.T) {
-	anonymous := installCommand("admin@dev cluster", "anonymous", false)
+	anonymous := installCommand("admin@dev cluster", installSettings{authMode: "anonymous"})
 	for _, want := range []string{
 		"helm upgrade --install driftmower oci://ghcr.io/codemowers/charts/driftmower",
 		"--kube-context 'admin@dev cluster'",
@@ -33,11 +34,11 @@ func TestInstallCommandFollowsClusterAuthCapability(t *testing.T) {
 			t.Fatalf("anonymous command lacks %q: %s", want, anonymous)
 		}
 	}
-	rbac := installCommand("admin@prod", "rbac", true)
+	rbac := installCommand("admin@prod", installSettings{authMode: "rbac", hostExpansion: true})
 	if strings.Contains(rbac, "anonymous") || strings.Contains(rbac, "portForwardOnly") || strings.Contains(rbac, "ingress") || !strings.Contains(rbac, "localOrigins") {
 		t.Fatalf("Passmower clusters with host expansion keep chart defaults: %s", rbac)
 	}
-	unexpanded := installCommand("admin@katri", "rbac", false)
+	unexpanded := installCommand("admin@cluster", installSettings{authMode: "rbac"})
 	if strings.Contains(unexpanded, "anonymous") || !strings.Contains(unexpanded, "--set mcp.ingress.enabled=false") || !strings.Contains(unexpanded, "--set ui.enabled=false") {
 		t.Fatalf("unexpanded short hosts must not be advertised: %s", unexpanded)
 	}
@@ -93,7 +94,7 @@ func fakeHelm(t *testing.T, exit int) string {
 	t.Helper()
 	dir := t.TempDir()
 	record := filepath.Join(dir, "record")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
+	script := "#!/bin/sh\nif [ \"$1\" = show ]; then\n  [ \"$2\" = chart ] && echo 'version: 0.0.0-test' || cat \"${FAKE_CHART_VALUES:-" + chartValuesPath(t) + "}\"\n  exit 0\nfi\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
 	if exit != 0 {
 		script += "echo 'Error: INSTALLATION FAILED: namespaces is forbidden' >&2\nexit 1\n"
 	}
@@ -107,7 +108,7 @@ func fakeHelm(t *testing.T, exit int) string {
 func TestInstallRunsHelmWithResolvedSingleContextKubeconfig(t *testing.T) {
 	d, path := installFixture(t, "anonymous")
 	record := fakeHelm(t, 0)
-	if err := d.Install(context.Background(), "identity"); err != nil {
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	args, _ := os.ReadFile(record)
@@ -139,15 +140,15 @@ func TestInstallRunsHelmWithResolvedSingleContextKubeconfig(t *testing.T) {
 func TestInstallReportsHelmFailureAndRefusesUnknownAuth(t *testing.T) {
 	d, _ := installFixture(t, "anonymous")
 	fakeHelm(t, 1)
-	err := d.Install(context.Background(), "identity")
+	err := d.Install(context.Background(), "identity", InstallOptions{})
 	if err == nil || !strings.Contains(err.Error(), "namespaces is forbidden") {
 		t.Fatalf("helm failure: %v", err)
 	}
 	unknown, _ := installFixture(t, "")
-	if err := unknown.Install(context.Background(), "identity"); err == nil {
+	if err := unknown.Install(context.Background(), "identity", InstallOptions{}); err == nil {
 		t.Fatal("installed without knowing which auth mode fits the cluster")
 	}
-	if err := d.Install(context.Background(), "missing"); err == nil {
+	if err := d.Install(context.Background(), "missing", InstallOptions{}); err == nil {
 		t.Fatal("unknown connection accepted")
 	}
 }
@@ -168,5 +169,78 @@ func TestInstallRouteRequiresSameOrigin(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	if _, err := os.Stat(record); !os.IsNotExist(err) {
 		t.Fatal("cross-origin request ran helm")
+	}
+}
+
+// chartValuesPath is the repository chart's values.yaml, which the fake helm
+// serves for `helm show values`.
+func chartValuesPath(t *testing.T) string {
+	t.Helper()
+	path, err := filepath.Abs(filepath.Join("..", "..", "chart", "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestInstallPinsCheckedChartAndRefusesOlderCharts(t *testing.T) {
+	d, _ := installFixture(t, "anonymous")
+	record := fakeHelm(t, 0)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(record)
+	if !strings.Contains(string(args), "--version\n0.0.0-test\n") {
+		t.Fatalf("install did not pin the checked chart:\n%s", args)
+	}
+	// A published chart without a value this desktop sets must not install.
+	old := filepath.Join(t.TempDir(), "values.yaml")
+	body, _ := os.ReadFile(chartValuesPath(t))
+	if err := os.WriteFile(old, []byte(strings.Replace(string(body), "portForwardOnly:", "removedForTest:", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_CHART_VALUES", old)
+	_ = os.Remove(record)
+	err := d.Install(context.Background(), "identity", InstallOptions{})
+	if err == nil || !strings.Contains(err.Error(), "0.0.0-test") || !strings.Contains(err.Error(), "mcp.portForwardOnly") {
+		t.Fatalf("older chart: %v", err)
+	}
+	if _, err := os.Stat(record); !os.IsNotExist(err) {
+		t.Fatal("helm installed a chart lacking required values")
+	}
+}
+
+func TestInstallRequiresStorageClassWithoutClusterDefault(t *testing.T) {
+	client := fake.NewSimpleClientset(
+		&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "zfs"}},
+		&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "hostpath"}},
+	)
+	client.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	offer := (&ContextDiscovery{}).installOffer(context.Background(), client, "ctx", false)
+	if strings.Join(offer.StorageClasses, ",") != "hostpath,zfs" || offer.DefaultStorageClass != "" || !strings.Contains(offer.Command, "operator.sbomStorageClassName=<storage-class>") {
+		t.Fatalf("no default StorageClass: %+v", offer)
+	}
+	withDefault := fake.NewSimpleClientset(&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "longhorn", Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"}}})
+	withDefault.Resources = client.Resources
+	if offer := (&ContextDiscovery{}).installOffer(context.Background(), withDefault, "ctx", false); offer.DefaultStorageClass != "longhorn" || strings.Contains(offer.Command, "StorageClassName") {
+		t.Fatalf("default StorageClass: %+v", offer)
+	}
+
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.StorageClasses = []string{"hostpath", "zfs"}
+	record := fakeHelm(t, 0)
+	for _, choice := range []string{"", "missing"} {
+		if err := d.Install(context.Background(), "identity", InstallOptions{StorageClass: choice}); err == nil || !strings.Contains(err.Error(), "StorageClass") {
+			t.Fatalf("storage %q: %v", choice, err)
+		}
+	}
+	if err := d.Install(context.Background(), "identity", InstallOptions{StorageClass: "zfs"}); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(record)
+	for _, want := range []string{"operator.sbomStorageClassName=zfs", "registryScraper.storageClassName=zfs"} {
+		if !strings.Contains(string(args), want) {
+			t.Fatalf("missing %s:\n%s", want, args)
+		}
 	}
 }

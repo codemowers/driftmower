@@ -131,6 +131,11 @@ Clusters confirmed without it get the anonymous
 Service-only MCP with `mcp.portForwardOnly`, whose NetworkPolicy leaves
 port-forwarding (and so `pods/portforward` RBAC) as the only access path. When
 the API cannot be inspected, never guess: offer the command and guide only.
+Before changing the cluster, one-click install reads the published chart with
+`helm show` and refuses when it does not define every value it would `--set`
+(helm silently ignores unknown values), then pins that checked `--version`.
+Without a default StorageClass the person chooses one for the operator and
+registry scraper claims; never pick one silently.
 
 Desktop Settings groups kubeconfig entries by API server and authentication
 identity, retaining namespace aliases within each connection. Never merge
