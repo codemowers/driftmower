@@ -18,9 +18,11 @@ export type KubeconfigConnection = {
   // Set when the API server answers but Driftmower is not installed.
   install?: InstallOffer
 }
+// The cluster CA trust layer one-click install adds before an OIDC install.
+export type TrustSetup = { certManager?: boolean; trustManager?: boolean; bundle?: boolean; commands: string[] }
 // The person's choices in the install confirmation dialog.
-export type InstallOptions = { storageClass?: string }
-export type InstallOffer = { authMode?: "rbac" | "anonymous"; hostExpansion?: boolean; storageClasses?: string[]; defaultStorageClass?: string; command: string; helm?: boolean; sshJump?: boolean }
+export type InstallOptions = { storageClass?: string; installCertManager?: boolean }
+export type InstallOffer = { authMode?: "rbac" | "anonymous"; hostExpansion?: boolean; storageClasses?: string[]; defaultStorageClass?: string; trustedCA?: "injected" | "missing"; trust?: TrustSetup; command: string; helm?: boolean; sshJump?: boolean }
 
 export function connectionForEndpoint(connections: KubeconfigConnection[], endpoint: string, selectedKey?: string): KubeconfigConnection | undefined {
   const selected = connections.find(connection => connection.key === selectedKey)

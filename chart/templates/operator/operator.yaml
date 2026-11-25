@@ -163,6 +163,7 @@ spec:
         - name: operator
           image: {{ .Values.operator.image | quote }}
           env:
+            {{- with include "driftmower.trustedCA.env" . }}{{ . | nindent 12 }}{{- end }}
             - name: SCANNER_READER_ACCOUNT
               value: {{ .Release.Name }}-mcp
             - name: SCANNER_INSTANCE
@@ -219,6 +220,11 @@ spec:
           volumeMounts:
             - name: sboms
               mountPath: /cache
+            {{- with include "driftmower.trustedCA.volumeMount" . }}{{ . | nindent 12 }}{{- end }}
+      {{- if .Values.trustedCA.configMapName }}
+      volumes:
+        {{- with include "driftmower.trustedCA.volume" . }}{{ . | nindent 8 }}{{- end }}
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: sboms

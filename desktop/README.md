@@ -101,6 +101,11 @@ port-forwarding (`mcp.portForwardOnly`), see
 [access modes](../docs/deployment.md#access-modes). Install first checks
 that the published chart defines every value it sets and pins that version,
 and asks for a StorageClass when the cluster has no default one.
+Driftmower's images carry no CA certificates and expect the cluster to
+provide them; when a dry-run probe shows the cluster does not, an OIDC install
+first sets up the platform's CA trust layer (trust-manager and a
+`trusted-ca-certs` Bundle; cert-manager only if you tick it), listed in the
+confirmation dialog ([CA certificates](../docs/deployment.md#ca-certificates)).
 
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
 Kubernetes port-forward on an OS-assigned `127.0.0.1` port. Settings marks it

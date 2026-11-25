@@ -13,7 +13,7 @@ COPY ui/cmd ./ui/cmd
 COPY desktop/dashboard ./desktop/dashboard
 RUN CGO_ENABLED=0 go build -o /dashboard ./ui/cmd/driftmower-dashboard
 
-# CA certificates are mounted by the cluster.
+# CA certificates are provided by the cluster; see docs/deployment.md#ca-certificates.
 FROM scratch
 WORKDIR /app
 COPY --from=server /dashboard /dashboard

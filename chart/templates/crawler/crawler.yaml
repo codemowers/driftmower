@@ -89,6 +89,7 @@ spec:
             capabilities:
               drop: ["ALL"]
           env:
+            {{- with include "driftmower.trustedCA.env" . }}{{ . | nindent 12 }}{{- end }}
             - name: MCP_ENABLED
               value: {{ .Values.crawler.mcp.enabled | quote }}
             {{- if and .Values.mcp.enabled (ne .Values.mcp.auth.mode "anonymous") }}
@@ -135,8 +136,9 @@ spec:
             - name: GITHUB_ENTERPRISE_TOKEN_FILES
               value: {{ $tokens | toJson | quote }}
             {{- end }}
-          {{- if .Values.crawler.githubEnterprise }}
+          {{- if or .Values.crawler.githubEnterprise .Values.trustedCA.configMapName }}
           volumeMounts:
+            {{- with include "driftmower.trustedCA.volumeMount" . }}{{ . | nindent 12 }}{{- end }}
             {{- range $i, $host := .Values.crawler.githubEnterprise }}
             - name: github-enterprise-{{ $i }}
               mountPath: /var/run/secrets/driftmower/github-enterprise/{{ $i }}
@@ -166,8 +168,9 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if .Values.crawler.githubEnterprise }}
+      {{- if or .Values.crawler.githubEnterprise .Values.trustedCA.configMapName }}
       volumes:
+        {{- with include "driftmower.trustedCA.volume" . }}{{ . | nindent 8 }}{{- end }}
         {{- range $i, $host := .Values.crawler.githubEnterprise }}
         - name: github-enterprise-{{ $i }}
           secret:

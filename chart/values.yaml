@@ -3,6 +3,16 @@
 # in a registry the cluster does not supply credentials for.
 imagePullSecrets: []
 
+# CA certificates for outbound TLS (OIDC keys, GitHub, registries). The images
+# contain none and expect the cluster to provide them, as the codemowers
+# platform's workload-trusted-ca admission policy does with trust-manager's
+# trusted-ca-certs ConfigMap. Without such a policy, name an existing ConfigMap
+# in this namespace holding a PEM bundle; it is mounted at
+# /etc/ssl/certs/ca.pem with SSL_CERT_FILE pointing to it.
+trustedCA:
+  configMapName: ""
+  key: ca.pem
+
 # Existing PriorityClass for long-running Driftmower components; scan Pods use
 # operator.priorityClassName independently.
 priorityClassName: ""
