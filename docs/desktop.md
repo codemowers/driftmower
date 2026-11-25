@@ -5,9 +5,12 @@
 Download a matching [desktop release](../desktop/README.md), or build it from
 source as shown below.
 
-The desktop application runs the dashboard on `localhost:17843`, opens it in a
-Google Chrome (or Chromium) application window and discovers MCP servers from
-your kubeconfig:
+The desktop application runs the dashboard on `localhost:17843`, opens it in
+your browser and discovers MCP servers from your kubeconfig. It follows your
+system default browser when that is Chrome, Chromium or Firefox; pass
+`--browser=firefox` (or `chrome`/`chromium`, or set `DRIFTMOWER_BROWSER`) to
+choose explicitly. Chrome opens an application window, Firefox an ordinary
+window:
 
 ```bash
 desktop/build.sh
@@ -15,7 +18,7 @@ desktop/build/driftmower-desktop
 ```
 
 Settings lists every connection. On first **Sign in** or **Connect**, choose an
-existing Chrome profile if several are available; a single profile is selected
+existing browser profile if several are available; a single profile is selected
 automatically. Connect stays in the current window when the profile matches,
 and opens a new window in the assigned profile otherwise. **Clear association**
 in Settings removes the choice so the next attempt asks again. The name

@@ -38,7 +38,7 @@ func (d *ContextDiscovery) kubeconfigPaths() []string {
 	return paths
 }
 func (d *ContextDiscovery) publishGroups(raw *clientcmdapi.Config, generation uint64) ([]DiscoveredContext, bool) {
-	results := contextGroups(raw)
+	results := contextGroups(raw, d.browserKind())
 	d.mu.Lock()
 	if generation != d.generation.Load() {
 		d.mu.Unlock()

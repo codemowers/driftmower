@@ -1,11 +1,12 @@
-// driftmower-desktop runs the dashboard on this machine and opens it as a
-// Google Chrome application window, falling back to Chromium. Unlike the
-// server image it may run kubelogin, so Settings can sign in to a context.
+// driftmower-desktop runs the dashboard on this machine and opens it in the
+// person's browser: a Google Chrome (or Chromium) application window, or a
+// Firefox window, following --browser or the system default browser. Unlike
+// the server image it may run kubelogin, so Settings can sign in to a context.
 //
-// Chrome runs with the person's own profile, so their passkeys and password
-// manager work for MCP sign-in. Chrome hands the window to its running
-// instance and the launch returns at once, so this process exits when the
-// page has stopped polling for a while instead of when the window closes.
+// The browser runs with the person's own profile, so their passkeys and
+// password manager work for MCP sign-in. The browser hands the window to its
+// running instance and the launch returns at once, so this process exits when
+// the page has stopped polling for a while instead of when the window closes.
 package main
 
 import (
@@ -17,9 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -31,7 +30,7 @@ const (
 	// MCP servers allow this origin (mcp.dashboard.localOrigins) and its
 	// /callback as a loopback redirect, so the port is fixed.
 	listenAddr = dashboard.DesktopAddress
-	// Chrome throttles timers in hidden windows to once a minute.
+	// Browsers throttle timers in hidden windows to once a minute.
 	idleAfter = 5 * time.Minute
 )
 
@@ -40,7 +39,11 @@ func main() {
 		if len(os.Args) != 2 {
 			log.Fatal("browser helper requires one URL")
 		}
-		if err := dashboard.OpenChromeProfile(os.Getenv("DRIFTMOWER_CHROME_BINARY"), os.Getenv("DRIFTMOWER_CHROME_ROOT"), os.Getenv("DRIFTMOWER_CHROME_PROFILE"), os.Args[1], false); err != nil {
+		kind, err := dashboard.ParseBrowser(os.Getenv("DRIFTMOWER_BROWSER"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := dashboard.OpenBrowserProfile(kind, os.Getenv("DRIFTMOWER_BROWSER_BINARY"), os.Getenv("DRIFTMOWER_BROWSER_ROOT"), os.Getenv("DRIFTMOWER_BROWSER_PROFILE"), os.Args[1], false); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -67,11 +70,15 @@ func main() {
 		}
 		cfg.AssetFS = assets
 	}
-	browser, err := findBrowser()
+	kind, browser, err := findBrowser(cfg.Browser)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.ChromeProfiles, err = dashboard.NewChromeProfiles(browser, os.Getenv("CHROME_USER_DATA_DIR"))
+	root := os.Getenv("CHROME_USER_DATA_DIR")
+	if kind == dashboard.BrowserFirefox {
+		root = os.Getenv("FIREFOX_PROFILES_DIR")
+	}
+	cfg.BrowserProfiles, err = dashboard.NewBrowserProfiles(kind, browser, root)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,7 +88,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := installDesktop(cfg.ChromeProfiles, binary); err != nil {
+		if err := installDesktop(cfg.BrowserProfiles, binary, cfg.Browser); err != nil {
 			if cfg.InstallDesktop {
 				log.Fatal(err)
 			}
@@ -99,7 +106,7 @@ func main() {
 		instance, readErr := readInstance()
 		if readErr == nil && instance.Address == listenAddr && probeInstance(instance) == nil {
 			log.Printf("Desktop PID %d is already running on %s", instance.PID, instance.Address)
-			if err := cfg.ChromeProfiles.OpenSettings(cfg.ChromeProfile); err != nil {
+			if err := cfg.BrowserProfiles.OpenSettings(cfg.BrowserProfile); err != nil {
 				log.Fatal(err)
 			}
 			return
@@ -125,7 +132,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-	if err := cfg.ChromeProfiles.OpenSettings(cfg.ChromeProfile); err != nil {
+	if err := cfg.BrowserProfiles.OpenSettings(cfg.BrowserProfile); err != nil {
 		log.Fatal(err)
 	}
 
@@ -154,40 +161,4 @@ func main() {
 			}
 		}
 	}
-}
-
-// findBrowser prefers Google Chrome and falls back to Chromium.
-func findBrowser() (string, error) {
-	var candidates []string
-	switch runtime.GOOS {
-	case "darwin":
-		home, _ := os.UserHomeDir()
-		for _, app := range []string{"Google Chrome.app/Contents/MacOS/Google Chrome", "Chromium.app/Contents/MacOS/Chromium"} {
-			candidates = append(candidates, filepath.Join("/Applications", app), filepath.Join(home, "Applications", app))
-		}
-	case "windows":
-		for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "LocalAppData"} {
-			if dir := os.Getenv(env); dir != "" {
-				candidates = append(candidates, filepath.Join(dir, `Google\Chrome\Application\chrome.exe`))
-			}
-		}
-		for _, env := range []string{"ProgramFiles", "LocalAppData"} {
-			if dir := os.Getenv(env); dir != "" {
-				candidates = append(candidates, filepath.Join(dir, `Chromium\Application\chrome.exe`))
-			}
-		}
-	default:
-		for _, name := range []string{"google-chrome-stable", "google-chrome", "chromium", "chromium-browser"} {
-			if path, err := exec.LookPath(name); err == nil {
-				candidates = append(candidates, path)
-			}
-		}
-	}
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && !info.IsDir() {
-			return c, nil
-		}
-	}
-
-	return "", errors.New("google Chrome or Chromium is required")
 }

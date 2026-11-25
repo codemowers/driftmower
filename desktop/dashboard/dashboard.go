@@ -7,16 +7,17 @@ import (
 )
 
 type DashboardConfigResponse struct {
-	ConfigUpdates         bool                `json:"configUpdates,omitempty"`
-	DiscoveryError        string              `json:"discoveryError,omitempty"`
-	ChromeProfiles        []ChromeProfile     `json:"chromeProfiles,omitempty"`
-	ChromeProfilesEnabled bool                `json:"chromeProfilesEnabled,omitempty"`
-	ChromeProfilesError   string              `json:"chromeProfilesError,omitempty"`
-	KubeContext           string              `json:"kubeContext,omitempty"`
-	McpURL                string              `json:"mcpUrl"`
-	Clusters              []ClusterEndpoint   `json:"clusters"`
-	Contexts              []DiscoveredContext `json:"contexts"`
-	DiscoveryEnabled      bool                `json:"discoveryEnabled"`
+	ConfigUpdates          bool                `json:"configUpdates,omitempty"`
+	DiscoveryError         string              `json:"discoveryError,omitempty"`
+	BrowserProfiles        []BrowserProfile    `json:"browserProfiles,omitempty"`
+	Browser                Browser             `json:"browser,omitempty"`
+	BrowserProfilesEnabled bool                `json:"browserProfilesEnabled,omitempty"`
+	BrowserProfilesError   string              `json:"browserProfilesError,omitempty"`
+	KubeContext            string              `json:"kubeContext,omitempty"`
+	McpURL                 string              `json:"mcpUrl"`
+	Clusters               []ClusterEndpoint   `json:"clusters"`
+	Contexts               []DiscoveredContext `json:"contexts"`
+	DiscoveryEnabled       bool                `json:"discoveryEnabled"`
 }
 
 type Dashboard struct {
@@ -38,7 +39,7 @@ func New(cfg *Config) *Dashboard {
 	if cfg.McpEndpoints != "" {
 		_ = json.Unmarshal([]byte(cfg.McpEndpoints), &d.clusters)
 	}
-	d.discovery = StartDiscovery(cfg.DiscoverKubeconfig, cfg.Kubeconfig, cfg.KubeLogin, cfg.ChromeProfiles)
+	d.discovery = StartDiscovery(cfg.DiscoverKubeconfig, cfg.Kubeconfig, cfg.KubeLogin, cfg.BrowserProfiles)
 
 	return d
 }
@@ -61,12 +62,13 @@ func (d *Dashboard) GetConfig() DashboardConfigResponse {
 		Contexts:         contexts,
 		DiscoveryEnabled: d.cfg.DiscoverKubeconfig,
 	}
-	if d.cfg.ChromeProfiles != nil {
-		result.ChromeProfilesEnabled = true
+	if d.cfg.BrowserProfiles != nil {
+		result.BrowserProfilesEnabled = true
+		result.Browser = d.cfg.BrowserProfiles.Kind()
 		var err error
-		result.ChromeProfiles, err = d.cfg.ChromeProfiles.List()
+		result.BrowserProfiles, err = d.cfg.BrowserProfiles.List()
 		if err != nil {
-			result.ChromeProfilesError = err.Error()
+			result.BrowserProfilesError = err.Error()
 		}
 	}
 	return result

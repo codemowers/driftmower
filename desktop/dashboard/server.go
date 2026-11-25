@@ -40,9 +40,9 @@ func (d *Dashboard) Handler() http.Handler {
 		mux.HandleFunc("POST /api/kubernetes-sign-in", d.signIn)
 		mux.HandleFunc("POST /api/desktop/retry", d.retryConnection)
 	}
-	if d.cfg.KubeLogin && d.cfg.ChromeProfiles != nil {
-		mux.HandleFunc("POST /api/desktop/chrome-profile", d.setChromeProfile)
-		mux.HandleFunc("POST /api/desktop/connect", d.openChromeConnection)
+	if d.cfg.KubeLogin && d.cfg.BrowserProfiles != nil {
+		mux.HandleFunc("POST /api/desktop/browser-profile", d.setBrowserProfile)
+		mux.HandleFunc("POST /api/desktop/connect", d.openBrowserConnection)
 	}
 	files := http.FileServer(http.FS(assets))
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

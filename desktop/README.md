@@ -2,8 +2,8 @@
 
 Download the executable for your operating system and CPU from
 [GitHub Releases](https://github.com/codemowers/driftmower/releases). The HTML,
-JavaScript and CSS are embedded; install Chrome or Chromium and configure your
-kubeconfig, then run the executable.
+JavaScript and CSS are embedded; install Chrome, Chromium or Firefox and
+configure your kubeconfig, then run the executable.
 
 | System | Release asset |
 | --- | --- |
@@ -19,9 +19,9 @@ chmod +x driftmower-desktop-darwin-arm64
 ./driftmower-desktop-darwin-arm64
 ```
 
-The application opens Chrome or Chromium at `http://localhost:17843`. In
-Settings, choose the kubeconfig connection and sign in when required. Existing
-Chrome profiles and kubeconfig authentication tools are supported on macOS too.
+The application opens your browser at `http://localhost:17843`. In Settings,
+choose the kubeconfig connection and sign in when required. Existing browser
+profiles and kubeconfig authentication tools are supported on macOS too.
 Mac builds are not Developer ID signed or notarized. If macOS blocks a download,
 follow [Apple's instructions for opening an app from an unidentified developer](https://support.apple.com/102445).
 Linux taskbar integration is installed automatically; macOS currently launches
@@ -43,25 +43,32 @@ On Linux, the desktop binary installs a **Driftmower** application launcher
 and its icon under `$XDG_DATA_HOME` (normally `~/.local/share`). Chrome app
 windows get matching profile-specific desktop entries, so Ubuntu's Wayland
 taskbar can show the Driftmower icon separately from ordinary Chrome windows.
+Firefox has no application windows, so with Firefox only the launcher is
+installed and dashboard windows appear as Firefox windows.
 Run `desktop/build/driftmower-desktop --install-desktop` to install/update the entries
 without opening a window. Reopen an existing window after installation; use
 **Pin to Dash** on its icon to keep it in the taskbar. Launchers refer to this
 binary's absolute path, so rerun installation if you move the binary.
-The existing Chrome profiles and their credentials are preserved.
+The existing browser profiles and their credentials are preserved.
 
-`desktop/` runs the same dashboard on `localhost:17843` and
-opens it as a Google Chrome application window, falling back to Chromium. It
-uses the person's own Chrome profile, so passkeys work for MCP sign-in, and it
-exits a few minutes after the last dashboard window disconnects. The built executable embeds the HTML, JavaScript, CSS and icon; no separate
+`desktop/` runs the same dashboard on `localhost:17843` and opens it in a
+browser: `--browser=chrome|chromium|firefox` (or `DRIFTMOWER_BROWSER`) selects
+one; otherwise the system default browser is used when it is Chrome, Chromium
+or Firefox (read from `xdg-settings` on Linux, LaunchServices on macOS and the
+https handler on Windows), else whichever is installed, Chrome first. Chrome
+and Chromium open an application window; Firefox opens an ordinary window. It
+uses the person's own browser profile, so passkeys and the password manager
+work for MCP sign-in, and it exits a few minutes after the last dashboard window disconnects. The built executable embeds the HTML, JavaScript, CSS and icon; no separate
 `public/` directory is needed. `ASSET_DIR` can override the embedded UI during
 development.
 
-Settings offers one **Chrome profile** per kubeconfig user/auth entry.
-It reads profile names from Chrome's Local State, without reading cookies or
+Settings offers one **browser profile** per kubeconfig user/auth entry.
+It reads profile names from Chrome's `Local State` or Firefox's `profiles.ini`
+(and `installs.ini` for the default profile), without reading cookies or
 passwords. **Connect** opens a dashboard window in the assigned profile, so MCP
 OIDC login uses that profile's session. Every context using that auth entry shares the setting, even across API servers;
 different authentication identities remain separate. Each window keeps its own
-selected connection, even when several windows use one Chrome profile.
+selected connection, even when several windows use one browser profile.
 
 The selection is saved on the existing kubeconfig auth entry using the supported
 extension field (other auth fields and the current context remain unchanged):
@@ -77,14 +84,24 @@ users:
             chromeProfile:
               directory: Profile 1
               name: Work
+            firefoxProfile:
+              directory: Profiles/abc123.work
+              name: Work
 ```
 
+Chrome and Firefox assignments are separate fields, so switching the desktop's
+browser keeps the other browser's choice. A Firefox `directory` is the profile's
+`Path` from `profiles.ini` (relative to it unless `IsRelative=0`); only profiles
+listed there are opened.
+
 The desktop updates the auth stanza's originating file when KUBECONFIG merges
-several files. Assigned kubelogin sign-in uses the same Chrome profile and an
+several files. Assigned kubelogin sign-in uses the same browser profile and an
 isolated desktop cache, leaving ordinary kubectl's browser/cache behavior alone.
 AWS/Azure browser helpers are passed through `BROWSER` where supported; their CLI
 credential stores remain provider-managed. `CHROME_USER_DATA_DIR` selects a
-nonstandard Chrome user-data directory. Clear the selector to use the current
+nonstandard Chrome user-data directory and `FIREFOX_PROFILES_DIR` a nonstandard
+directory containing Firefox's `profiles.ini` (by default the XDG
+`~/.config/mozilla/firefox`, `~/.mozilla/firefox` or the Snap copy on Linux). Clear the selector to use the current
 profile without a saved assignment.
 
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
@@ -102,7 +119,7 @@ Unlike the container, it may run kubelogin. Discovery still only reads
 kubelogin's token cache, so it never opens a browser by itself. A context whose
 token is missing or expired gets a **Sign in** button in Settings: the desktop
 application then runs that context's own `oidc-login get-token` plugin with its
-command, arguments, environment and `KUBERNETES_EXEC_INFO`. Assigned Chrome
+command, arguments, environment and `KUBERNETES_EXEC_INFO`. Assigned browser
 profiles add only the desktop browser and isolated-cache overrides described above.
 kubelogin refreshes silently or opens the default browser, and writes its cache;
 the token it prints is also kept in memory, which covers keyring storage.

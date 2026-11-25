@@ -18,7 +18,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func chromeFixture(t *testing.T) *ChromeProfiles {
+func chromeFixture(t *testing.T) *BrowserProfiles {
 	t.Helper()
 	root := t.TempDir()
 	for _, dir := range []string{"Default", "Profile 1"} {
@@ -30,7 +30,7 @@ func chromeFixture(t *testing.T) *ChromeProfiles {
 	if err := os.WriteFile(filepath.Join(root, "Local State"), []byte(state), 0600); err != nil {
 		t.Fatal(err)
 	}
-	p, err := NewChromeProfiles("/fake/chrome", root)
+	p, err := NewBrowserProfiles(BrowserChrome, "/fake/chrome", root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func chromeFixture(t *testing.T) *ChromeProfiles {
 	return p
 }
 
-func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) {
+func TestBrowserProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) {
 	p := chromeFixture(t)
 	profiles, err := p.List()
 	if err != nil {
@@ -76,7 +76,7 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 		t.Fatal(err)
 	}
 	var key string
-	for _, g := range contextGroups(resolved) {
+	for _, g := range contextGroups(resolved, BrowserChrome) {
 		if g.Name == "one" {
 			key = g.Key
 		}
@@ -85,7 +85,7 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 		t.Fatal("missing context group")
 	}
 	oldForward := &desktopForward{stop: make(chan struct{}), done: make(chan struct{})}
-	oldProfile := &ChromeProfile{Directory: "Default", Name: "Personal"}
+	oldProfile := &BrowserProfile{Directory: "Default", Name: "Personal"}
 	d.forwards.entries[forwardIdentityKey(key, oldProfile)] = &forwardEntry{forward: oldForward}
 	go func() { <-oldForward.stop; close(oldForward.done) }()
 	if err := p.Set(d, key, "Profile 1"); err != nil {
@@ -104,7 +104,7 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 		t.Fatal(err)
 	}
 	for _, name := range []string{"user", "alias-user"} {
-		profile, err := profileForAuth(saved.AuthInfos[name])
+		profile, err := BrowserChrome.profileFor(saved.AuthInfos[name])
 		if err != nil || profile.Name != "Work" || profile.Directory != "Profile 1" {
 			t.Fatalf("alias profile %s: %+v %v", name, profile, err)
 		}
@@ -127,8 +127,8 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 		t.Fatal("unrelated context/auth entry changed")
 	}
 	reloaded, _ := d.load()
-	for _, g := range contextGroups(reloaded) {
-		if g.Name == "one" && (g.Key != key || g.ChromeProfile == nil || g.ChromeProfile.Directory != "Profile 1") {
+	for _, g := range contextGroups(reloaded, BrowserChrome) {
+		if g.Name == "one" && (g.Key != key || g.BrowserProfile == nil || g.BrowserProfile.Directory != "Profile 1") {
 			t.Fatal("saving preference changed connection identity")
 		}
 	}
@@ -172,7 +172,7 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 		t.Fatal(err)
 	}
 	cleared, _ := clientcmd.LoadFromFile(path)
-	if profile, _ := profileForAuth(cleared.AuthInfos["user"]); profile.Directory != "" {
+	if profile, _ := BrowserChrome.profileFor(cleared.AuthInfos["user"]); profile.Directory != "" {
 		t.Fatal("profile assignment was not removed")
 	}
 
@@ -180,13 +180,13 @@ func TestChromeProfilesKubeconfigExtensionPreservesAuthAndAliases(t *testing.T) 
 
 func TestChromeDesktopRoutesRequireSameOriginAndLaunchAssignedProfile(t *testing.T) {
 	p := chromeFixture(t)
-	d := New(&Config{KubeLogin: true, ChromeProfiles: p})
+	d := New(&Config{KubeLogin: true, BrowserProfiles: p})
 	defer d.Close()
-	d.discovery.contexts = []DiscoveredContext{{Key: "identity", Status: "available", URL: "https://mcp.example/mcp", ChromeProfile: &ChromeProfile{Directory: "Profile 1", Name: "Work"}}}
+	d.discovery.contexts = []DiscoveredContext{{Key: "identity", Status: "available", URL: "https://mcp.example/mcp", BrowserProfile: &BrowserProfile{Directory: "Profile 1", Name: "Work"}}}
 	launched := 0
 	p.launch = func(profile, target string, app bool) error {
 		launched++
-		if profile != "Profile 1" || target != "http://localhost:17843/settings?chrome-profile=Profile+1&connect=identity" || !app {
+		if profile != "Profile 1" || target != "http://localhost:17843/settings?browser-profile=Profile+1&connect=identity" || !app {
 			t.Fatalf("wrong launch: %s %s %v", profile, target, app)
 		}
 		return nil
@@ -219,7 +219,7 @@ func TestChromeLaunchPreservesArgumentBoundaries(t *testing.T) {
 	}
 	root := filepath.Join(t.TempDir(), "Browser Data")
 	target := "https://auth.example/authorize?client_id=test&state=literal"
-	if err := OpenChromeProfile(command, root, "Profile 1", target, false); err != nil {
+	if err := OpenBrowserProfile(BrowserChrome, command, root, "Profile 1", target, false); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(time.Second)
@@ -235,15 +235,15 @@ func TestChromeLaunchPreservesArgumentBoundaries(t *testing.T) {
 	if string(body) != want {
 		t.Fatalf("browser arguments %q, want %q", body, want)
 	}
-	if err := OpenChromeProfile(command, root, "../outside", target, false); err == nil {
+	if err := OpenBrowserProfile(BrowserChrome, command, root, "../outside", target, false); err == nil {
 		t.Fatal("invalid profile accepted")
 	}
-	if err := OpenChromeProfile(command, root, "Default", "file:///etc/passwd", false); err == nil {
+	if err := OpenBrowserProfile(BrowserChrome, command, root, "Default", "file:///etc/passwd", false); err == nil {
 		t.Fatal("unsafe browser URL accepted")
 	}
 }
 
-func TestChromeProfileUpdatesOnlyAuthSourceInMergedKubeconfigs(t *testing.T) {
+func TestBrowserProfileUpdatesOnlyAuthSourceInMergedKubeconfigs(t *testing.T) {
 	p := chromeFixture(t)
 	one, two := clientcmdapi.NewConfig(), clientcmdapi.NewConfig()
 	one.Clusters["one"] = &clientcmdapi.Cluster{Server: "https://api.one"}
@@ -271,7 +271,7 @@ func TestChromeProfileUpdatesOnlyAuthSourceInMergedKubeconfigs(t *testing.T) {
 		t.Fatal(err)
 	}
 	var key string
-	for _, group := range contextGroups(raw) {
+	for _, group := range contextGroups(raw, BrowserChrome) {
 		if group.Name == "one" {
 			key = group.Key
 		}
@@ -287,7 +287,7 @@ func TestChromeProfileUpdatesOnlyAuthSourceInMergedKubeconfigs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile, _ := profileForAuth(saved.AuthInfos["one"])
+	profile, _ := BrowserChrome.profileFor(saved.AuthInfos["one"])
 	if profile.Name != "Work" || saved.AuthInfos["one"].ClientCertificate != "relative.crt" || saved.CurrentContext != "one" {
 		t.Fatal("auth source file was rewritten incorrectly")
 	}
@@ -318,7 +318,7 @@ func TestInitialWindowUsesExistingLastActiveProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.launch = func(profile, target string, app bool) error {
-		if profile != "Profile 1" || target != "http://localhost:17843/settings?chrome-profile=Profile+1" || !app {
+		if profile != "Profile 1" || target != "http://localhost:17843/settings?browser-profile=Profile+1" || !app {
 			t.Fatal(profile, target, app)
 		}
 		return nil
@@ -331,7 +331,7 @@ func TestInitialWindowUsesExistingLastActiveProfile(t *testing.T) {
 func TestPinnedLauncherUsesItsExistingProfile(t *testing.T) {
 	p := chromeFixture(t)
 	p.launch = func(profile, target string, app bool) error {
-		if profile != "Profile 1" || target != "http://localhost:17843/settings?chrome-profile=Profile+1" || !app {
+		if profile != "Profile 1" || target != "http://localhost:17843/settings?browser-profile=Profile+1" || !app {
 			t.Fatal(profile, target, app)
 		}
 		return nil
@@ -376,7 +376,7 @@ func TestDesktopRetryKeepsFailedContextAndWakesDiscovery(t *testing.T) {
 	}
 }
 
-func TestChromeProfileIsSingleAssociationPerAuthEntry(t *testing.T) {
+func TestBrowserProfileIsSingleAssociationPerAuthEntry(t *testing.T) {
 	auth := &clientcmdapi.AuthInfo{Extensions: map[string]runtime.Object{desktopExtension: &runtime.Unknown{Raw: []byte(`{"chromeProfile":{"directory":"Profile 1","name":"Work"}}`)}}}
 	raw := clientcmdapi.NewConfig()
 	raw.AuthInfos["shared"] = auth
@@ -384,8 +384,8 @@ func TestChromeProfileIsSingleAssociationPerAuthEntry(t *testing.T) {
 		raw.Clusters[name] = &clientcmdapi.Cluster{Server: "https://" + name}
 		raw.Contexts[name] = &clientcmdapi.Context{Cluster: name, AuthInfo: "shared"}
 	}
-	for _, group := range contextGroups(raw) {
-		if group.ChromeProfile == nil || group.ChromeProfile.Directory != "Profile 1" {
+	for _, group := range contextGroups(raw, BrowserChrome) {
+		if group.BrowserProfile == nil || group.BrowserProfile.Directory != "Profile 1" {
 			t.Fatal("API server changed auth profile", group)
 		}
 	}
@@ -393,9 +393,9 @@ func TestChromeProfileIsSingleAssociationPerAuthEntry(t *testing.T) {
 
 func TestChromeConnectPassesOnlyLocalReturnPathToNewProfile(t *testing.T) {
 	p := chromeFixture(t)
-	d := New(&Config{KubeLogin: true, ChromeProfiles: p})
+	d := New(&Config{KubeLogin: true, BrowserProfiles: p})
 	defer d.Close()
-	d.discovery.contexts = []DiscoveredContext{{Key: "identity", Status: "available", URL: "https://mcp.example/mcp", ChromeProfile: &ChromeProfile{Directory: "Profile 1", Name: "Work"}}}
+	d.discovery.contexts = []DiscoveredContext{{Key: "identity", Status: "available", URL: "https://mcp.example/mcp", BrowserProfile: &BrowserProfile{Directory: "Profile 1", Name: "Work"}}}
 	launches := 0
 	linked := "/topmost-owners/workload/pod?tab=metadata#details"
 	p.launch = func(profile, target string, app bool) error {
@@ -404,7 +404,7 @@ func TestChromeConnectPassesOnlyLocalReturnPathToNewProfile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if profile != "Profile 1" || !app || u.Scheme+"://"+u.Host != DesktopOrigin || u.Path != "/settings" || u.Query().Get("return-to") != linked || u.Query().Get("connect") != "identity" || u.Query().Get("chrome-profile") != "Profile 1" {
+		if profile != "Profile 1" || !app || u.Scheme+"://"+u.Host != DesktopOrigin || u.Path != "/settings" || u.Query().Get("return-to") != linked || u.Query().Get("connect") != "identity" || u.Query().Get("browser-profile") != "Profile 1" {
 			t.Fatalf("wrong launch %s", target)
 		}
 		return nil

@@ -177,9 +177,9 @@ func (m *desktopForwards) drop(key string) {
 	}
 }
 
-func forwardIdentityKey(key string, profile *ChromeProfile) string {
+func forwardIdentityKey(key string, profile *BrowserProfile) string {
 	if profile != nil && profile.Directory != "" {
-		return key + "/chrome/" + profile.Directory
+		return key + "/browser/" + profile.Directory
 	}
 	return key
 }

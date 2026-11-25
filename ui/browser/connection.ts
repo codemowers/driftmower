@@ -1,5 +1,5 @@
 import { inspect, inspecting } from "@/lib/features/inspector/store"
-import { chooseChromeProfile } from "./chrome-profile-prompt"
+import { chooseBrowserProfile } from "./browser-profile-prompt"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 // The default validator compiles schemas with new Function, which the
@@ -20,12 +20,14 @@ export { connectionProgress, restoreConnectionProgress, useConnectionProgress } 
 
 export type ClusterEndpoint = { name: string; url: string; contextKey?: string; authMethod?: string; portForward?:boolean }
 export type ClientConfig = { authMode?: "oidc"; clientId: string; issuer: string; resource: string; scopes: string[] } | { authMode:"anonymous" }
-export type ChromeProfile = {directory:string;name:string}
-export type DashboardConfig = { configUpdates?:boolean;discoveryError?:string; chromeProfilesEnabled?:boolean;chromeProfiles?:ChromeProfile[];chromeProfilesError?:string;kubeContext?: string;  mcpUrl?: string; clusters?: ClusterEndpoint[]; discoveryEnabled?: boolean; contexts?: KubeconfigConnection[] }
+export type BrowserProfile = {directory:string;name:string}
+export function browserName(config?:{browser?:DesktopBrowser}|null){return config?.browser==="firefox"?"Firefox":"Chrome"}
+export type DesktopBrowser = "chrome"|"firefox"
+export type DashboardConfig = { configUpdates?:boolean;discoveryError?:string; browser?:DesktopBrowser;browserProfilesEnabled?:boolean;browserProfiles?:BrowserProfile[];browserProfilesError?:string;kubeContext?: string;  mcpUrl?: string; clusters?: ClusterEndpoint[]; discoveryEnabled?: boolean; contexts?: KubeconfigConnection[] }
 let dashboardConfig: Promise<DashboardConfig> | null = null
 let configLoading = false
 export function deploymentConfig(refresh = false): Promise<DashboardConfig> {
-  currentChromeProfile()
+  currentBrowserProfile()
   if (refresh && !configLoading) dashboardConfig = null
   if (dashboardConfig) return dashboardConfig
   configLoading = true
@@ -140,17 +142,17 @@ export async function loginToEndpoint(url: string, contextKey?: string) {
   try {
     const config=await deploymentConfig()
     let selected=connectionForEndpoint(config.contexts??[],url,contextKey)
-    if(config.chromeProfilesEnabled&&selected){
-      connectionStage("checking the Chrome profile",undefined,operation)
-      selected=await ensureChromeProfile(selected.key)
+    if(config.browserProfilesEnabled&&selected){
+      connectionStage(`checking the ${browserName(config)} profile`,undefined,operation)
+      selected=await ensureBrowserProfile(selected.key)
       if(!selected){connectionProgress(null);return}
     }
-    if (config.chromeProfilesEnabled && selected?.chromeProfile && selected.chromeProfile.directory!==currentChromeProfile()) {
-      connectionStage("opening the selected Chrome profile","/api/desktop/connect",operation)
-      const response=await fetchWithContext("Open Chrome profile", "/api/desktop/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:selected.key,returnTo:destination})})
-      if (!response.ok) throw new Error((await response.text()).trim() || "Could not open Chrome profile")
+    if (config.browserProfilesEnabled && selected?.browserProfile && selected.browserProfile.directory!==currentBrowserProfile()) {
+      connectionStage(`opening the selected ${browserName(config)} profile`,"/api/desktop/connect",operation)
+      const response=await fetchWithContext(`Open ${browserName(config)} profile`, "/api/desktop/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:selected.key,returnTo:destination})})
+      if (!response.ok) throw new Error((await response.text()).trim() || `Could not open ${browserName(config)} profile`)
       connectionProgress(null)
-      return selected.chromeProfile.name
+      return selected.browserProfile.name
     }
     if(selected&&selected.status!=="available"){
       sessionStorage.setItem("driftmower.pending-connect",selected.key)
@@ -175,32 +177,32 @@ export async function loginToEndpoint(url: string, contextKey?: string) {
   }
 }
 
-export function currentChromeProfile():string|null {
+export function currentBrowserProfile():string|null {
   const url=new URL(location.href)
-  const profile=url.searchParams.get("chrome-profile")
+  const profile=url.searchParams.get("browser-profile")
   if(profile){
-    sessionStorage.setItem("driftmower.chrome-profile",profile)
-    url.searchParams.delete("chrome-profile")
+    sessionStorage.setItem("driftmower.browser-profile",profile)
+    url.searchParams.delete("browser-profile")
     history.replaceState(null,"",url.pathname+url.search+url.hash)
   }
-  return sessionStorage.getItem("driftmower.chrome-profile")
+  return sessionStorage.getItem("driftmower.browser-profile")
 }
 
-export async function ensureChromeProfile(key:string):Promise<KubeconfigConnection|undefined>{
+export async function ensureBrowserProfile(key:string):Promise<KubeconfigConnection|undefined>{
   const config=await deploymentConfig()
   const selected=config.contexts?.find(context=>context.key===key)
-  if(!selected||!config.chromeProfilesEnabled||selected.chromeProfile)return selected
-  const profiles=config.chromeProfiles??[]
+  if(!selected||!config.browserProfilesEnabled||selected.browserProfile)return selected
+  const profiles=config.browserProfiles??[]
   if(!profiles.length)return selected
-  const directory=profiles.length===1?profiles[0].directory:await chooseChromeProfile(selected.name,profiles)
+  const directory=profiles.length===1?profiles[0].directory:await chooseBrowserProfile(browserName(config),selected.name,profiles)
   if(!directory)return undefined
-  const updated=await saveChromeProfile(key,directory)
+  const updated=await saveBrowserProfile(key,directory)
   return updated.contexts?.find(context=>context.key===key)
 }
 
-export async function saveChromeProfile(key:string,directory:string) {
-  const response=await fetchWithContext("Save Chrome profile", "/api/desktop/chrome-profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,directory})})
-  if(!response.ok)throw new Error((await response.text()).trim() || "Could not save Chrome profile")
+export async function saveBrowserProfile(key:string,directory:string) {
+  const response=await fetchWithContext("Save browser profile", "/api/desktop/browser-profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,directory})})
+  if(!response.ok)throw new Error((await response.text()).trim() || "Could not save browser profile")
   if(sessionStorage.getItem("driftmower.pending-connect")===key)sessionStorage.removeItem("driftmower.pending-connect")
   return deploymentConfig(true)
 }

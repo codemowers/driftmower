@@ -2,7 +2,7 @@ import { shellQuote } from "../utils/shell.ts"
 
 export type ContextAlias = { name: string; namespace?: string }
 export type KubeconfigConnection = {
-	chromeProfile?:{directory:string;name:string}
+	browserProfile?:{directory:string;name:string}
   key: string
   name: string
   apiServer?: string

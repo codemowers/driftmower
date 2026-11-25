@@ -7,7 +7,7 @@ import CopyButton from "@/app/components/copy-button"
 import MyAccess from "@/app/users/components/my-access"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
-import { deploymentConfig, subscribeDesktopConfig, ensureChromeProfile, kubernetesSignIn, loginToEndpoint, saveChromeProfile, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
+import { deploymentConfig, subscribeDesktopConfig, ensureBrowserProfile, kubernetesSignIn, loginToEndpoint, saveBrowserProfile, browserName, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
 
 // A context's state: green when its MCP is available, yellow when the API
 // server answers but credentials need a sign-in or refresh, red when the
@@ -15,7 +15,7 @@ import { deploymentConfig, subscribeDesktopConfig, ensureChromeProfile, kubernet
 const STATE_DOT = { available: "bg-status-ok", auth: "bg-status-patch", unreachable: "bg-status-major", other: "bg-gray-300" } as const
 const STATE_TITLE = { available: "Available", auth: "API server reachable; credentials need a sign-in or refresh", unreachable: "API server unreachable", other: "Reachable; see the status" } as const
 
-const EXTENSION_EXAMPLE = `clusters:
+const extensionExample = (browser?:string) => `clusters:
   - name: talos-dev1.codemowers.io
     cluster:
       server: https://172.31.253.250:6443
@@ -31,9 +31,11 @@ users:
       extensions:
         - name: driftmower.codemowers.io/desktop
           extension:
-            chromeProfile:
+            ${browser==="firefox"?`firefoxProfile:
+              directory: Profiles/abc123.work
+              name: Work`:`chromeProfile:
               directory: "Profile 1"
-              name: Work`
+              name: Work`}`
 
 export const SettingsContext = createContext<{streamUpdates: boolean; setStreamUpdates: (enabled: boolean) => void}>({ streamUpdates: true, setStreamUpdates: () => {} })
 
@@ -49,16 +51,16 @@ export default function SettingsPage() {
  const kubeconfig=useKubeconfigState()
  const [connectingKey,setConnectingKey]=useState<string|null>(null)
  const [signingIn,setSigningIn]=useState<string|null>(null)
- async function signIn(context:string){setError("");setSigningIn(context);try{const selected=config?.contexts?.find(c=>c.name===context);if(selected&&!(await ensureChromeProfile(selected.key)))return;await kubernetesSignIn(context);setConfig(await deploymentConfig(true))}catch(e){setError((e as Error).message)}finally{setSigningIn(null)}}
- async function connect(url:string,contextKey?:string){setError("");setNotice("");setConnectingKey(contextKey??"configured");try{const profile=await loginToEndpoint(url,contextKey);setConfig(await deploymentConfig(true));if(profile)setNotice(`Opened in Chrome profile ${profile}`)}catch(e){setError((e as Error).message)}finally{setConnectingKey(null)}}
- async function setProfile(key:string,directory:string){setError("");setNotice("");setSavingProfile(key);try{setConfig(await saveChromeProfile(key,directory))}catch(e){setError((e as Error).message)}finally{setSavingProfile(null)}}
+ async function signIn(context:string){setError("");setSigningIn(context);try{const selected=config?.contexts?.find(c=>c.name===context);if(selected&&!(await ensureBrowserProfile(selected.key)))return;await kubernetesSignIn(context);setConfig(await deploymentConfig(true))}catch(e){setError((e as Error).message)}finally{setSigningIn(null)}}
+ async function connect(url:string,contextKey?:string){setError("");setNotice("");setConnectingKey(contextKey??"configured");try{const profile=await loginToEndpoint(url,contextKey);setConfig(await deploymentConfig(true));if(profile)setNotice(`Opened in ${browserName(config)} profile ${profile}`)}catch(e){setError((e as Error).message)}finally{setConnectingKey(null)}}
+ async function setProfile(key:string,directory:string){setError("");setNotice("");setSavingProfile(key);try{setConfig(await saveBrowserProfile(key,directory))}catch(e){setError((e as Error).message)}finally{setSavingProfile(null)}}
  useEffect(()=>subscribeDesktopConfig(setConfig,error=>setError(error.message)),[])
  return <div className="mx-auto max-w-4xl space-y-8 p-6">
   <h1 className="text-2xl font-semibold">Settings</h1>
   <p className="text-sm text-muted-foreground">Connect to a context to open the dashboard views.</p>
   {error&&<p role="alert" className="text-red-700">{error}</p>}
   {notice&&<p role="status" className="text-sm text-muted-foreground">{notice}</p>}
-  {config?.chromeProfilesError&&<p role="alert" className="text-red-700">{config.chromeProfilesError}</p>}
+  {config?.browserProfilesError&&<p role="alert" className="text-red-700">{config.browserProfilesError}</p>}
   {config?.mcpUrl&&<section className="flex items-center justify-between gap-4 rounded border p-3"><div><h2 className="font-medium">Configured context</h2><p className="break-all font-mono text-sm">{contextTitle(config.mcpUrl)}</p></div><button disabled={connecting} className="rounded border px-3 py-1 text-sm disabled:opacity-50" onClick={()=>void connect(config.mcpUrl!)}>{connectingTo===config.mcpUrl?<span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden/>Connecting…<DownloadProgress /></span>:"Connect"}</button></section>}
   <section className="space-y-3"><h2 className="text-lg font-medium">Updates</h2>
    <label className="flex items-start gap-3"><input type="checkbox" checked={streamUpdates} onChange={e=>setStreamUpdates(e.target.checked)}/><span>Stream updates<span className="block text-sm text-muted-foreground">Refresh from MCP notifications, with polling fallback.</span></span></label>
@@ -77,7 +79,7 @@ export default function SettingsPage() {
           {(c.status!=="available"||c.portForward)&&<p className={`break-all text-sm ${c.state === "auth" ? "text-status-patch-label" : c.state === "unreachable" ? "text-status-major-label" : "text-muted-foreground"}`}>{c.status!=="available"?c.status:null}{c.portForward && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">Port-forward</span>}</p>}
           {c.aliases && c.aliases.length > 1 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{c.aliases.length} kubeconfig names</summary><ul className="mt-1 space-y-1">{c.aliases.map(alias => <li key={alias.name} className="break-all font-mono">{alias.name}<span className="font-sans"> · {alias.namespace ? `namespace ${alias.namespace}` : "no namespace set"}</span></li>)}</ul></details>}
           {c.signIn && c.signInCommand && <p className="break-all font-mono text-xs text-muted-foreground">Sign in runs {c.signInCommand}</p>}
-          {config.chromeProfilesEnabled&&c.chromeProfile&&<div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-muted-foreground">Chrome profile: {c.chromeProfile.name}</span><button type="button" className="rounded border px-2 py-1 text-xs" disabled={savingProfile!==null||signingIn!==null||connecting} onClick={()=>void setProfile(c.key,"")}>Clear association</button>{savingProfile===c.key&&<LoaderCircle className="size-4 animate-spin" aria-label="Clearing Chrome profile"/>}</div>}
+          {config.browserProfilesEnabled&&c.browserProfile&&<div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-muted-foreground">{browserName(config)} profile: {c.browserProfile.name}</span><button type="button" className="rounded border px-2 py-1 text-xs" disabled={savingProfile!==null||signingIn!==null||connecting} onClick={()=>void setProfile(c.key,"")}>Clear association</button>{savingProfile===c.key&&<LoaderCircle className="size-4 animate-spin" aria-label={`Clearing ${browserName(config)} profile`}/>}</div>}
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -88,14 +90,14 @@ export default function SettingsPage() {
    </>}
   </section>}
   {connected&&<MyAccess/>}
-  {config?.chromeProfilesEnabled&&<section className="space-y-4 border-t pt-6" aria-labelledby="desktop-extensions-title">
-   <div className="flex items-center justify-between gap-3"><h2 id="desktop-extensions-title" className="text-base font-semibold">Driftmower kubeconfig extensions</h2><CopyButton value={EXTENSION_EXAMPLE}/></div>
+  {config?.browserProfilesEnabled&&<section className="space-y-4 border-t pt-6" aria-labelledby="desktop-extensions-title">
+   <div className="flex items-center justify-between gap-3"><h2 id="desktop-extensions-title" className="text-base font-semibold">Driftmower kubeconfig extensions</h2><CopyButton value={extensionExample(config.browser)}/></div>
    <p className="text-sm text-muted-foreground">Configure desktop behavior in your kubeconfig, normally <code>~/.kube/config</code> or the files listed in <code>KUBECONFIG</code>. Merge these extensions into existing entries; retain their credentials, CA fields and other extensions. This example is a fragment, not a replacement kubeconfig.</p>
-   <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-xs"><code>{EXTENSION_EXAMPLE}</code></pre>
+   <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-xs"><code>{extensionExample(config.browser)}</code></pre>
    <dl className="space-y-3 text-sm">
     <div><dt className="font-medium">SSH jump host — cluster extension</dt><dd className="mt-1 text-muted-foreground"><code>sshJumpHost</code> accepts an SSH host alias from <code>~/.ssh/config</code> or <code>user@host</code>. ProxyJump and existing SSH settings apply. The desktop reuses an existing SSH master when available and closes only its own forward. Keep a YubiKey-authenticated SSH connection open to avoid repeated authentication; a fresh connection may require a touch. The Kubernetes API retains its certificate validation. Configure either this jump host or <code>proxy-url</code>, not both.</dd></div>
-    <div><dt className="font-medium">Chrome profile — user/auth extension</dt><dd className="mt-1 text-muted-foreground"><code>chromeProfile</code> assigns one existing Chrome profile to this kubeconfig user/auth entry, shared by every context using it. The directory is Chrome’s folder name, such as <code>Default</code> or <code>Profile 1</code>, rather than its display name. Connect or Sign in prompts for a profile when needed and writes this association for you. Clear association above to choose again. Namespace aliases and different API servers using the same auth entry share this profile. Different auth entries can use different profiles.</dd></div>
-    <div><dt className="font-medium">Desktop-only behavior</dt><dd className="mt-1 text-muted-foreground">Kubectl preserves these extension fields but does not open SSH tunnels or select Chrome profiles. Driftmower uses the jump host for both API discovery and MCP port-forwarding. A local forward does not replace the cluster’s real API URL in kubeconfig.</dd></div>
+    <div><dt className="font-medium">{browserName(config)} profile — user/auth extension</dt><dd className="mt-1 text-muted-foreground">{config.browser==="firefox"?<><code>firefoxProfile</code> assigns one existing Firefox profile to this kubeconfig user/auth entry, shared by every context using it. The directory is the profile’s <code>Path</code> from Firefox’s <code>profiles.ini</code>, such as <code>Profiles/abc123.work</code>, rather than its display name. A <code>chromeProfile</code> assignment is kept separately for when the desktop runs with Chrome.</>:<><code>chromeProfile</code> assigns one existing Chrome profile to this kubeconfig user/auth entry, shared by every context using it. The directory is Chrome’s folder name, such as <code>Default</code> or <code>Profile 1</code>, rather than its display name. A <code>firefoxProfile</code> assignment is kept separately for when the desktop runs with Firefox.</>} Connect or Sign in prompts for a profile when needed and writes this association for you. Clear association above to choose again. Namespace aliases and different API servers using the same auth entry share this profile. Different auth entries can use different profiles.</dd></div>
+    <div><dt className="font-medium">Desktop-only behavior</dt><dd className="mt-1 text-muted-foreground">Kubectl preserves these extension fields but does not open SSH tunnels or select browser profiles. Driftmower uses the jump host for both API discovery and MCP port-forwarding. A local forward does not replace the cluster’s real API URL in kubeconfig.</dd></div>
    </dl>
   </section>}
  </div>

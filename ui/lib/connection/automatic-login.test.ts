@@ -21,7 +21,7 @@ test("hosted entry and deep links initiate login once per endpoint/window",()=>{
 })
 
 test("desktop selection, Settings and callbacks do not automatically redirect",()=>{
- for(const config of [{},{mcpUrl:endpoint,discoveryEnabled:true},{mcpUrl:endpoint,configUpdates:true},{mcpUrl:endpoint,chromeProfilesEnabled:true}]){
+ for(const config of [{},{mcpUrl:endpoint,discoveryEnabled:true},{mcpUrl:endpoint,configUpdates:true},{mcpUrl:endpoint,browserProfilesEnabled:true}]){
   assert.equal(automaticLoginEndpoint(config,"/",store()),undefined)
  }
  for(const path of ["/settings","/settings/","/callback","/callback/"]){

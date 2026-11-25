@@ -21,8 +21,9 @@ type Config struct {
 	Restart            bool
 	FlagError          error
 	InstallDesktop     bool
-	ChromeProfile      string
-	ChromeProfiles     *ChromeProfiles
+	Browser            string
+	BrowserProfile     string
+	BrowserProfiles    *BrowserProfiles
 	DiscoverKubeconfig bool
 	Kubeconfig         string
 	AssetFS            fs.FS
@@ -41,7 +42,10 @@ func LoadConfig(args []string) *Config {
 
 	fs := flag.NewFlagSet("dashboard", flag.ContinueOnError)
 	fs.BoolVar(&cfg.InstallDesktop, "install-desktop", false, "Install the Linux application launcher and icon, then exit")
-	fs.StringVar(&cfg.ChromeProfile, "chrome-profile", "", "Open the desktop window in this existing Chrome profile directory")
+	fs.StringVar(&cfg.Browser, "browser", os.Getenv("DRIFTMOWER_BROWSER"), "Browser to open: chrome, chromium or firefox (defaults to DRIFTMOWER_BROWSER, then the system default browser)")
+	fs.StringVar(&cfg.BrowserProfile, "browser-profile", "", "Open the desktop window in this existing browser profile (Chrome directory or Firefox profiles.ini Path)")
+	// Launchers installed by earlier versions pass --chrome-profile.
+	fs.StringVar(&cfg.BrowserProfile, "chrome-profile", "", "Deprecated alias for --browser-profile")
 	fs.BoolVar(&cfg.DiscoverKubeconfig, "discover-kubeconfig", false, "Discover MCP installations using local kubeconfig contexts")
 	fs.StringVar(&cfg.Kubeconfig, "kubeconfig", "", "Kubeconfig file (defaults to KUBECONFIG or ~/.kube/config)")
 
