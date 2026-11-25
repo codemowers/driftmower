@@ -115,6 +115,23 @@ int128's plugin using the OIDC issuer/client arguments; never pass OIDC cache or
 browser flags to Azure's binary. Cloud CLI sessions remain managed
 by their own providers; pass the assigned browser helper where supported.
 
+When an API server answers but has no MCP Service, Settings explains that
+Driftmower is not installed, shows a copyable `helm upgrade --install` command
+with an explicit `--kube-context`, and notes that organizational policy may
+require the cluster's own workflow for new workloads. One-click install is an
+explicit, confirmed person action: it runs local `helm` against a temporary
+single-context kubeconfig holding the credentials discovery already resolved
+(never a credential plugin; SSH jump forwards keep TLS server-name
+verification), and deletes it afterwards. Clusters with Passmower's OIDCClient
+API get chart defaults when a server-side dry run shows admission expanding
+the short Ingress host `mcp`; without expansion they get rbac MCP without
+Ingresses or hosted UI, reached by port-forward with its canonical OIDC
+audience. Discovery ignores single-label Ingress hosts for the same reason.
+Clusters confirmed without it get the anonymous
+Service-only MCP with `mcp.portForwardOnly`, whose NetworkPolicy leaves
+port-forwarding (and so `pods/portforward` RBAC) as the only access path. When
+the API cannot be inspected, never guess: offer the command and guide only.
+
 Desktop Settings groups kubeconfig entries by API server and authentication
 identity, retaining namespace aliases within each connection. Never merge
 different certificates, tokens or impersonation identities solely because they

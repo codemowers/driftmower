@@ -7,7 +7,8 @@ import CopyButton from "@/app/components/copy-button"
 import MyAccess from "@/app/users/components/my-access"
 import { useClusterState } from "@/lib/cluster/cluster-state"
 import { useKubeconfigState } from "@/lib/kubernetes/context-state"
-import { deploymentConfig, subscribeDesktopConfig, ensureChromeProfile, kubernetesSignIn, loginToEndpoint, saveChromeProfile, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
+import { InstallDriftmower } from "./install-driftmower"
+import { deploymentConfig, subscribeDesktopConfig, ensureChromeProfile, installDriftmower, kubernetesSignIn, loginToEndpoint, saveChromeProfile, contextTitle, useConnectionProgress, type DashboardConfig } from "./connection"
 
 // A context's state: green when its MCP is available, yellow when the API
 // server answers but credentials need a sign-in or refresh, red when the
@@ -51,6 +52,7 @@ export default function SettingsPage() {
  const [signingIn,setSigningIn]=useState<string|null>(null)
  async function signIn(context:string){setError("");setSigningIn(context);try{const selected=config?.contexts?.find(c=>c.name===context);if(selected&&!(await ensureChromeProfile(selected.key)))return;await kubernetesSignIn(context);setConfig(await deploymentConfig(true))}catch(e){setError((e as Error).message)}finally{setSigningIn(null)}}
  async function connect(url:string,contextKey?:string){setError("");setNotice("");setConnectingKey(contextKey??"configured");try{const profile=await loginToEndpoint(url,contextKey);setConfig(await deploymentConfig(true));if(profile)setNotice(`Opened in Chrome profile ${profile}`)}catch(e){setError((e as Error).message)}finally{setConnectingKey(null)}}
+ async function install(key:string){setError("");setNotice("");try{setConfig(await installDriftmower(key));setNotice("Driftmower installed; checking the connection")}catch(e){setError((e as Error).message);throw e}}
  async function setProfile(key:string,directory:string){setError("");setNotice("");setSavingProfile(key);try{setConfig(await saveChromeProfile(key,directory))}catch(e){setError((e as Error).message)}finally{setSavingProfile(null)}}
  useEffect(()=>subscribeDesktopConfig(setConfig,error=>setError(error.message)),[])
  return <div className="mx-auto max-w-4xl space-y-8 p-6">
@@ -76,6 +78,7 @@ export default function SettingsPage() {
           <p className="break-all text-xs text-muted-foreground">{c.apiServer}{c.authMethod && ` · ${c.authMethod}`}</p>
           {(c.status!=="available"||c.portForward)&&<p className={`break-all text-sm ${c.state === "auth" ? "text-status-patch-label" : c.state === "unreachable" ? "text-status-major-label" : "text-muted-foreground"}`}>{c.status!=="available"?c.status:null}{c.portForward && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">Port-forward</span>}</p>}
           {c.aliases && c.aliases.length > 1 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{c.aliases.length} kubeconfig names</summary><ul className="mt-1 space-y-1">{c.aliases.map(alias => <li key={alias.name} className="break-all font-mono">{alias.name}<span className="font-sans"> · {alias.namespace ? `namespace ${alias.namespace}` : "no namespace set"}</span></li>)}</ul></details>}
+          {c.install && <InstallDriftmower connection={c} busy={connecting||signingIn!==null} onInstall={key=>install(key).catch(()=>{})}/>}
           {c.signIn && c.signInCommand && <p className="break-all font-mono text-xs text-muted-foreground">Sign in runs {c.signInCommand}</p>}
           {config.chromeProfilesEnabled&&c.chromeProfile&&<div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-muted-foreground">Chrome profile: {c.chromeProfile.name}</span><button type="button" className="rounded border px-2 py-1 text-xs" disabled={savingProfile!==null||signingIn!==null||connecting} onClick={()=>void setProfile(c.key,"")}>Clear association</button>{savingProfile===c.key&&<LoaderCircle className="size-4 animate-spin" aria-label="Clearing Chrome profile"/>}</div>}
         </div>

@@ -23,6 +23,8 @@ spec:
 ---
 # Drift metrics list every namespace's workloads without a caller to scope
 # them, so only explicitly selected Prometheus instances may scrape them.
+# portForwardOnly also closes the MCP port to the Pod network; port-forwarded
+# connections arrive on the Pod's loopback and are unaffected.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -36,7 +38,9 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - ports:
+        {{- if not .Values.mcp.portForwardOnly }}
         - port: mcp
+        {{- end }}
         - port: health
     - from:
         - podSelector:

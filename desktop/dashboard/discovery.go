@@ -40,6 +40,8 @@ type DiscoveredContext struct {
 	// missing, expired or refused; unreachable; or other.
 	State string `json:"state"`
 	URL   string `json:"url,omitempty"`
+	// Set when the API server answers but Driftmower is not installed.
+	Install *InstallOffer `json:"install,omitempty"`
 	// The context signs in with kubelogin and has no usable token; offered
 	// only where this server may run kubelogin.
 	// Offered also for AWS and Azure plugins, whose CLI login renews them.
@@ -67,6 +69,7 @@ type ContextDiscovery struct {
 	watchDone  chan struct{}
 	updates    configUpdates
 	generation atomic.Uint64
+	installs   installs
 }
 
 func (d *ContextDiscovery) Snapshot() ([]DiscoveredContext, []ClusterEndpoint) {
@@ -357,7 +360,8 @@ func (d *ContextDiscovery) inspectContext(raw *clientcmdapi.Config, name, key st
 	if err != nil {
 		switch {
 		case apierrors.IsNotFound(err):
-			result.Status = "MCP is not installed"
+			result.Status = "Driftmower is not installed on this cluster: no MCP Service in the driftmower namespace"
+			result.Install = d.installOffer(ctx, client, name, tunnel != "")
 		case apierrors.IsForbidden(err):
 			result.Status = "Service discovery forbidden"
 		case apierrors.IsUnauthorized(err):
@@ -383,7 +387,10 @@ func (d *ContextDiscovery) inspectContext(raw *clientcmdapi.Config, name, key st
 		if ingresses != nil {
 			for _, ingress := range ingresses.Items {
 				for _, rule := range ingress.Spec.Rules {
-					if rule.HTTP == nil || rule.Host == "" {
+					// A single-label host such as "mcp" relies on cluster
+					// admission expanding it; unexpanded, nothing outside the
+					// cluster resolves it, so the desktop forwards instead.
+					if rule.HTTP == nil || !strings.Contains(rule.Host, ".") {
 						continue
 					}
 					for _, path := range rule.HTTP.Paths {

@@ -39,6 +39,7 @@ func (d *Dashboard) Handler() http.Handler {
 	if d.cfg.KubeLogin {
 		mux.HandleFunc("POST /api/kubernetes-sign-in", d.signIn)
 		mux.HandleFunc("POST /api/desktop/retry", d.retryConnection)
+		mux.HandleFunc("POST /api/desktop/install", d.installDriftmower)
 	}
 	if d.cfg.KubeLogin && d.cfg.ChromeProfiles != nil {
 		mux.HandleFunc("POST /api/desktop/chrome-profile", d.setChromeProfile)
