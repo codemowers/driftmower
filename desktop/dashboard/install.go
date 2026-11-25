@@ -49,6 +49,9 @@ type InstallOffer struct {
 	// Set for OIDC installs where Pods get no CA bundle: the CA trust layer
 	// one-click install adds first, since every login would fail without it.
 	Trust *TrustSetup `json:"trust,omitempty"`
+	// Set for full installs where nodestatd's APIs are missing; installed
+	// before Driftmower.
+	Nodestatd *NodestatdSetup `json:"nodestatd,omitempty"`
 	// StorageClasses the operator and registry scraper claims could use, and
 	// the cluster default among them; without a default the person chooses.
 	StorageClasses      []string `json:"storageClasses,omitempty"`
@@ -170,6 +173,9 @@ func (d *ContextDiscovery) installOffer(ctx context.Context, client kubernetes.I
 	if offer.AuthMode == "rbac" && offer.TrustedCA == "missing" {
 		offer.Trust = trustSetup(ctx, client, context)
 		settings.trustBundle = true
+	}
+	if offer.AuthMode == "rbac" {
+		offer.Nodestatd = nodestatdSetup(ctx, client, context)
 	}
 	if mode == "rbac" {
 		offer.StorageClasses, offer.DefaultStorageClass = storageClasses(ctx, client)
@@ -448,6 +454,15 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 			if err := createTrustBundle(ctx, kubeconfig); err != nil {
 				return fmt.Errorf("create Bundle %s: %w", trustBundleName, err)
 			}
+		}
+	}
+	if nodestatd := target.Install.Nodestatd; nodestatd != nil {
+		nodestatdVersion, err := chartVersion(ctx, helm, nodestatdChart)
+		if err != nil {
+			return err
+		}
+		if err := runHelm(ctx, helm, kubeconfig, "nodestatd", nodestatdArgs(kubeconfig, target.Name, nodestatdVersion, nodestatd.K3s)); err != nil {
+			return err
 		}
 	}
 	if err := runHelm(ctx, helm, kubeconfig, "Driftmower", installArgs(kubeconfig, target.Name, version, settings)); err != nil {

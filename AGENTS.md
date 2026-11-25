@@ -134,7 +134,11 @@ then `trustedCA.configMapName=trusted-ca-certs`. Missing cert-manager is
 installed only with explicit opt-in. Never add the cluster-wide
 `workload-trusted-ca` admission policy from the desktop; that stays a platform
 decision. An existing Bundle is never modified. An undeterminable probe only
-warns. Admission
+warns. A full (OIDC) one-click install also adds nodestatd to `kube-system`
+when its `codemowers.io` ContainerImage/SourceRepository APIs are missing,
+pinning the resolved chart version and using k3s's containerd socket on k3s,
+before Driftmower so MCP discovers the APIs at start. The anonymous profile
+stays MCP-only. MCP's nodestatd notice remains for manual installs. Admission
 probes try the release namespace, `default`, then ordinary namespaces, and use
 fixed names, because platforms may block `default` and policies may read
 `metadata.name`. Clusters with Passmower's OIDCClient

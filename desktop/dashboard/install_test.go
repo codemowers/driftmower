@@ -427,3 +427,35 @@ func TestLocalChartOverrideUsesPublishedImagesUnpinned(t *testing.T) {
 		t.Fatal("the copyable command must keep the published chart")
 	}
 }
+
+func TestFullInstallAddsNodestatdWhenItsAPIsAreMissing(t *testing.T) {
+	d := &ContextDiscovery{}
+	passmower := []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	k3s := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.33.4+k3s1"}}})
+	k3s.Resources = passmower
+	offer := d.installOffer(context.Background(), k3s, "admin@cluster", false)
+	if offer.Nodestatd == nil || !offer.Nodestatd.K3s || !strings.Contains(offer.Nodestatd.Command, "charts/nodestatd") ||
+		!strings.Contains(offer.Nodestatd.Command, "--namespace kube-system") || !strings.Contains(offer.Nodestatd.Command, "containerd.socket=/run/k3s/containerd/containerd.sock") {
+		t.Fatalf("k3s without nodestatd: %+v", offer.Nodestatd)
+	}
+	installed := fake.NewSimpleClientset()
+	installed.Resources = append(passmower, &metav1.APIResourceList{GroupVersion: "codemowers.io/v1alpha1", APIResources: []metav1.APIResource{{Name: "containerimages"}, {Name: "sourcerepositories"}}})
+	if offer := d.installOffer(context.Background(), installed, "ctx", false); offer.Nodestatd != nil {
+		t.Fatalf("nodestatd already installed: %+v", offer.Nodestatd)
+	}
+	// The anonymous profile stays MCP-only.
+	if offer := d.installOffer(context.Background(), fake.NewSimpleClientset(), "ctx", false); offer.Nodestatd != nil {
+		t.Fatalf("anonymous install: %+v", offer.Nodestatd)
+	}
+
+	install, _ := installFixture(t, "rbac")
+	install.contexts[0].Install.DefaultStorageClass = "longhorn"
+	install.contexts[0].Install.Nodestatd = &NodestatdSetup{}
+	record := fakeHelm(t, 0)
+	if err := install.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "nodestatd\ndriftmower\n" {
+		t.Fatalf("nodestatd must install before Driftmower: %q", calls)
+	}
+}

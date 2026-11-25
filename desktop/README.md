@@ -106,6 +106,8 @@ provide them; when a dry-run probe shows the cluster does not, an OIDC install
 first sets up the platform's CA trust layer (trust-manager and a
 `trusted-ca-certs` Bundle; cert-manager only if you tick it), listed in the
 confirmation dialog ([CA certificates](../docs/deployment.md#ca-certificates)).
+A full install also adds nodestatd (the per-node image inventory) to
+`kube-system` when it is missing, before Driftmower itself.
 For development, `DRIFTMOWER_INSTALL_CHART=/path/to/driftmower/chart` makes
 one-click install use that chart directory instead of the published chart.
 It still uses the latest release's image references; the shown command keeps

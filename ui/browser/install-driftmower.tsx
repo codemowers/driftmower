@@ -20,6 +20,8 @@ function Command({ value }: { value: string }) {
 export function InstallDriftmower({ connection, busy, onInstall }: { connection: KubeconfigConnection; busy: boolean; onInstall: (key: string, options: InstallOptions) => Promise<void> }) {
   const offer = connection.install!
   const trust = offer.trust
+  const nodestatd = offer.nodestatd
+  const prerequisites = Boolean(trust || nodestatd)
   const dialog = useRef<HTMLDialogElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [installing, setInstalling] = useState(false)
@@ -38,9 +40,11 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
   return <div className="space-y-2 text-sm">
     <p className="text-muted-foreground">There is no Driftmower MCP to connect to. Install the Driftmower Helm chart into the <code>driftmower</code> namespace to add it.</p>
     {trust && <p className="text-xs text-muted-foreground">Pods on this cluster get no CA certificates, and Driftmower&apos;s images contain none, so logins would fail. Install first sets up CA trust the way the codemowers platform does.</p>}
+    {nodestatd && <p className="text-xs text-muted-foreground">nodestatd is not installed; Install adds it first so Driftmower has an image inventory for drift, advisories and scans.</p>}
     <details className="text-xs text-muted-foreground">
-      <summary className="cursor-pointer">{trust ? "Commands" : "Helm command"}</summary>
+      <summary className="cursor-pointer">{prerequisites ? "Commands" : "Helm command"}</summary>
       {(trust?.commands ?? []).map(command => <Command key={command} value={command}/>)}
+      {nodestatd && <Command value={nodestatd.command}/>}
       <Command value={offer.command}/>
       {offer.sshJump && <p className="mt-1">This context uses a desktop SSH jump host, which helm and kubectl do not use on their own; run the commands where the API server is reachable, or use Install.</p>}
       {!offer.authMode && <p className="mt-1">The desktop could not tell whether this cluster has Passmower OIDC. Choose the access mode in the <a className="underline" href="https://github.com/codemowers/driftmower/blob/main/docs/deployment.md#access-modes" target="_blank" rel="noreferrer">deployment guide</a> before installing.</p>}
@@ -52,7 +56,7 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
       <div className="space-y-3 text-sm">
         <h2 id="install-driftmower-title" className="text-lg font-semibold">Install Driftmower on {connection.name}?</h2>
         {trust && <div className="space-y-2">
-          <p className="font-medium">1. Cluster CA trust (cluster-wide)</p>
+          <p className="font-medium">Cluster CA trust (cluster-wide)</p>
           <p>Pods here get no CA certificates. Without them MCP cannot fetch the OIDC signing keys and every login fails. This adds the platform&apos;s reusable trust layer, which other workloads can use too:</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>{trust.certManager ? "cert-manager: already installed." : <label className="inline-flex items-start gap-2"><input type="checkbox" className="mt-1" checked={certManager} onChange={event => setCertManager(event.target.checked)}/><span>Install cert-manager 1.20 into <code>cert-manager</code>. trust-manager requires it; it also adds cluster-wide certificate CRDs and webhooks.</span></label>}</li>
@@ -60,8 +64,12 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
             <li>{trust.bundle ? <>Bundle <code>trusted-ca-certs</code>: already exists.</> : <>Create Bundle <code>trusted-ca-certs</code>: the public CAs as a ConfigMap with key <code>ca.pem</code> in every namespace, named as on the codemowers platform.</>}</li>
           </ul>
           <p className="text-xs text-muted-foreground">Driftmower then mounts it with <code>trustedCA.configMapName</code>. Adopting the platform&apos;s <code>workload-trusted-ca</code> admission policy later makes that setting redundant.</p>
-          <p className="font-medium">2. Driftmower</p>
         </div>}
+        {nodestatd && <div className="space-y-2">
+          <p className="font-medium">Image inventory (cluster-wide)</p>
+          <p>Install nodestatd into <code>kube-system</code>: a DaemonSet on every node, including control-plane nodes, that reads the node&apos;s containerd images through its socket and records them as ContainerImage objects. Without it Driftmower shows no drift, advisories or scans.{nodestatd.k3s && <> This is k3s, so it uses k3s&apos;s containerd socket.</>}</p>
+        </div>}
+        {prerequisites && <p className="font-medium">Driftmower</p>}
         <p>This runs <code>helm upgrade --install</code> with the latest Driftmower chart, creating the <code>driftmower</code> namespace if it does not exist, plus cluster-wide read RBAC for MCP.</p>
         {anonymous
           ? <p>This cluster has no Passmower OIDC, so MCP runs <strong>without login</strong> and only MCP is installed. A NetworkPolicy blocks in-cluster connections, so it is reachable only by port-forwarding: anyone allowed to port-forward to Pods in the <code>driftmower</code> namespace can read every namespace through it. Mutation tools are disabled.</p>
