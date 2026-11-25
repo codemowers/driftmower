@@ -77,6 +77,13 @@ registryScraper:
   enabled: false
 ```
 
+Add `mcp.portForwardOnly: true` to close the MCP port to the Pod network as well.
+Port-forwarded connections arrive on the Pod's loopback and are not filtered by
+NetworkPolicy, so reaching this unauthenticated MCP then requires permission to
+port-forward to Pods in its namespace rather than mere network access. The
+desktop application's one-click install uses exactly these values when a
+cluster has no Passmower OIDCClient API, and the chart defaults when it has.
+
 Configure `mcp.dashboard.localOrigins` to include `http://localhost:17843` for
 the desktop browser. Start the desktop normally and connect to the admin
 certificate context in Settings. It automatically forwards the Service when no

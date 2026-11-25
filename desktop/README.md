@@ -87,6 +87,17 @@ credential stores remain provider-managed. `CHROME_USER_DATA_DIR` selects a
 nonstandard Chrome user-data directory. Clear the selector to use the current
 profile without a saved assignment.
 
+When an API server answers but Driftmower is not installed, Settings says so
+and shows the `helm upgrade --install` command for that context. If `helm` is
+installed, **Install Driftmower…** runs it after a confirmation; check first
+whether your organization requires new cluster workloads to go through its own
+workflow (GitOps, review or a platform team). The desktop gives helm a
+temporary kubeconfig with the credentials it already resolved, so no
+credential plugin runs, and removes it afterwards. Clusters with Passmower get
+the chart defaults; others get an anonymous MCP only, reachable solely by
+port-forwarding (`mcp.portForwardOnly`), see
+[access modes](../docs/deployment.md#access-modes).
+
 When MCP has no advertised URL or Ingress, desktop discovery opens a native
 Kubernetes port-forward on an OS-assigned `127.0.0.1` port. Settings marks it
 **Port-forward**. It uses the same resolved kubeconfig credentials and needs

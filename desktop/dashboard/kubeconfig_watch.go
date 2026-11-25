@@ -47,7 +47,7 @@ func (d *ContextDiscovery) publishGroups(raw *clientcmdapi.Config, generation ui
 	for i, group := range results {
 		for _, previous := range d.contexts {
 			if previous.Key == group.Key {
-				results[i].Status, results[i].State, results[i].URL, results[i].PortForward = previous.Status, previous.State, previous.URL, previous.PortForward
+				results[i].Status, results[i].State, results[i].URL, results[i].PortForward, results[i].Install = previous.Status, previous.State, previous.URL, previous.PortForward, previous.Install
 				break
 			}
 		}

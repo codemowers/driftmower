@@ -198,6 +198,12 @@ export async function ensureChromeProfile(key:string):Promise<KubeconfigConnecti
   return updated.contexts?.find(context=>context.key===key)
 }
 
+export async function installDriftmower(key:string) {
+  const response=await fetchWithContext("Install Driftmower", "/api/desktop/install",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})})
+  if(!response.ok)throw new Error((await response.text()).trim() || "Could not install Driftmower")
+  return deploymentConfig(true)
+}
+
 export async function saveChromeProfile(key:string,directory:string) {
   const response=await fetchWithContext("Save Chrome profile", "/api/desktop/chrome-profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,directory})})
   if(!response.ok)throw new Error((await response.text()).trim() || "Could not save Chrome profile")

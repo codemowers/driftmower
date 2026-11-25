@@ -74,6 +74,11 @@ mcp:
     host: mcp
   # Explicit advertised origin for deployments without Passmower.
   publicUrl: ""
+  # Deny in-cluster connections to the MCP port, leaving only Kubernetes
+  # port-forwarding (which NetworkPolicy does not filter): reaching MCP then
+  # requires pods/portforward permission in this namespace. Intended for an
+  # anonymous Service-only MCP used through the desktop application.
+  portForwardOnly: false
   metrics:
     # Optional platform Prometheus namespace permitted to read cluster-wide
     # security/version metadata on the dedicated metrics port.

@@ -15,7 +15,10 @@ export type KubeconfigConnection = {
   portForward?: boolean
   signIn?: boolean
   signInCommand?: string
+  // Set when the API server answers but Driftmower is not installed.
+  install?: InstallOffer
 }
+export type InstallOffer = { authMode?: "rbac" | "anonymous"; command: string; helm?: boolean; sshJump?: boolean }
 
 export function connectionForEndpoint(connections: KubeconfigConnection[], endpoint: string, selectedKey?: string): KubeconfigConnection | undefined {
   const selected = connections.find(connection => connection.key === selectedKey)
