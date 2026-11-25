@@ -456,7 +456,7 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 			}
 		}
 	}
-	if nodestatd := target.Install.Nodestatd; nodestatd != nil {
+	if nodestatd := target.Install.Nodestatd; nodestatd != nil && nodestatd.Unsupported == "" {
 		nodestatdVersion, err := chartVersion(ctx, helm, nodestatdChart)
 		if err != nil {
 			return err

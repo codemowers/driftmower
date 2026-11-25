@@ -20,7 +20,8 @@ function Command({ value }: { value: string }) {
 export function InstallDriftmower({ connection, busy, onInstall }: { connection: KubeconfigConnection; busy: boolean; onInstall: (key: string, options: InstallOptions) => Promise<void> }) {
   const offer = connection.install!
   const trust = offer.trust
-  const nodestatd = offer.nodestatd
+  const nodestatd = offer.nodestatd?.unsupported ? undefined : offer.nodestatd
+  const nodestatdUnsupported = offer.nodestatd?.unsupported
   const prerequisites = Boolean(trust || nodestatd)
   const dialog = useRef<HTMLDialogElement>(null)
   const [confirming, setConfirming] = useState(false)
@@ -41,6 +42,7 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
     <p className="text-muted-foreground">There is no Driftmower MCP to connect to. Install the Driftmower Helm chart into the <code>driftmower</code> namespace to add it.</p>
     {trust && <p className="text-xs text-muted-foreground">Pods on this cluster get no CA certificates, and Driftmower&apos;s images contain none, so logins would fail. Install first sets up CA trust the way the codemowers platform does.</p>}
     {nodestatd && <p className="text-xs text-muted-foreground">nodestatd is not installed; Install adds it first so Driftmower has an image inventory for drift, advisories and scans.</p>}
+    {nodestatdUnsupported && <p className="text-xs text-status-patch-label">{nodestatdUnsupported}.</p>}
     <details className="text-xs text-muted-foreground">
       <summary className="cursor-pointer">{prerequisites ? "Commands" : "Helm command"}</summary>
       {(trust?.commands ?? []).map(command => <Command key={command} value={command}/>)}
@@ -69,6 +71,7 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
           <p className="font-medium">Image inventory (cluster-wide)</p>
           <p>Install nodestatd into <code>kube-system</code>: a DaemonSet on every node, including control-plane nodes, that reads the node&apos;s containerd images through its socket and records them as ContainerImage objects. Without it Driftmower shows no drift, advisories or scans.{nodestatd.k3s && <> This is k3s, so it uses k3s&apos;s containerd socket.</>}</p>
         </div>}
+        {nodestatdUnsupported && <p className="rounded border border-status-patch bg-status-patch-bg p-3 text-status-patch-label">{nodestatdUnsupported}. Install continues without nodestatd.</p>}
         {prerequisites && <p className="font-medium">Driftmower</p>}
         <p>This runs <code>helm upgrade --install</code> with the latest Driftmower chart, creating the <code>driftmower</code> namespace if it does not exist, plus cluster-wide read RBAC for MCP.</p>
         {anonymous

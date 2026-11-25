@@ -24,6 +24,9 @@ type NodestatdSetup struct {
 	// covers Talos and kubeadm.
 	K3s     bool   `json:"k3s,omitempty"`
 	Command string `json:"command"`
+	// Set when nodestatd cannot run here: it reads containerd's socket, so
+	// nodes with another runtime such as CRI-O are skipped by Install.
+	Unsupported string `json:"unsupported,omitempty"`
 }
 
 func nodestatdSetup(ctx context.Context, client kubernetes.Interface, kubeContext string) *NodestatdSetup {
@@ -31,8 +34,16 @@ func nodestatdSetup(ctx context.Context, client kubernetes.Interface, kubeContex
 		return nil
 	}
 	setup := &NodestatdSetup{}
-	if nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1}); err == nil && len(nodes.Items) > 0 {
+	if nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{}); err == nil && len(nodes.Items) > 0 {
 		setup.K3s = strings.Contains(nodes.Items[0].Status.NodeInfo.KubeletVersion, "k3s")
+		for _, node := range nodes.Items {
+			runtime := node.Status.NodeInfo.ContainerRuntimeVersion
+			if runtime != "" && !strings.HasPrefix(runtime, "containerd://") {
+				name, _, _ := strings.Cut(runtime, "://")
+				setup.Unsupported = "nodestatd reads containerd's socket, but node " + node.Name + " runs " + name + "; Driftmower will have no image inventory, drift, advisories or scans here"
+				break
+			}
+		}
 	}
 	setup.Command = "helm " + strings.Join(quoteAll(nodestatdArgs("", kubeContext, "", setup.K3s)), " ")
 	return setup

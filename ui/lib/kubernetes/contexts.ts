@@ -20,7 +20,7 @@ export type KubeconfigConnection = {
 }
 // The cluster CA trust layer one-click install adds before an OIDC install.
 // nodestatd, installed before Driftmower when its APIs are missing.
-export type NodestatdSetup = { k3s?: boolean; command: string }
+export type NodestatdSetup = { k3s?: boolean; command: string; unsupported?: string }
 export type TrustSetup = { certManager?: boolean; trustManager?: boolean; bundle?: boolean; commands: string[] }
 // The person's choices in the install confirmation dialog.
 export type InstallOptions = { storageClass?: string; installCertManager?: boolean }

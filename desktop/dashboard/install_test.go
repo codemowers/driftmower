@@ -459,3 +459,25 @@ func TestFullInstallAddsNodestatdWhenItsAPIsAreMissing(t *testing.T) {
 		t.Fatalf("nodestatd must install before Driftmower: %q", calls)
 	}
 }
+
+func TestNodestatdSkippedOnNonContainerdNodes(t *testing.T) {
+	crio := fake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "a"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "containerd://2.2.7"}}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "b"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+	)
+	crio.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	offer := (&ContextDiscovery{}).installOffer(context.Background(), crio, "ctx", false)
+	if offer.Nodestatd == nil || !strings.Contains(offer.Nodestatd.Unsupported, "node b runs cri-o") {
+		t.Fatalf("CRI-O node: %+v", offer.Nodestatd)
+	}
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	d.contexts[0].Install.Nodestatd = offer.Nodestatd
+	record := fakeHelm(t, 0)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "driftmower\n" {
+		t.Fatalf("nodestatd installed on a CRI-O cluster: %q", calls)
+	}
+}
