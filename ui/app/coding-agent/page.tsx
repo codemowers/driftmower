@@ -1,4 +1,5 @@
 "use client"
+import { unexpandedHost } from "@/lib/connection/hostnames"
 import { ICONS } from "@/app/components/layout/icons"
 import Page from "@/app/components/layout/page"
 
@@ -124,6 +125,9 @@ export default function CodingAgentPage() {
             {selectedServer && recipe ? <>
               {selectedServer.current && <PrefetchLink href={linkTo("/coding-agent/mcp-servers/driftmower")} className="text-sm text-brand-text hover:underline">View available tools</PrefetchLink>}
               {selectedServer.description && <MarkdownText text={selectedServer.description} className="text-sm text-muted-foreground" />}
+              {unexpandedHost(selectedServer.url) ? <p className="text-sm text-status-minor-label">
+                {selectedServer.url} is a short hostname this cluster does not expand into a public address, so a coding agent cannot reach it. {selectedServer.current && "The dashboard connects through the desktop's own port-forward, which agents cannot use, and MCP's sign-in audience is tied to this address. "}Publishing MCP under a resolvable hostname requires the cluster to expand short Ingress hosts, as the codemowers platform does.
+              </p> : <>
               {internalOnly(selectedServer.url) && <p className="text-xs text-status-minor-label">Reachable only from inside the cluster, such as by agents running there.</p>}
               {recipe.caption && <p className="text-sm text-muted-foreground">{recipe.caption}</p>}
               {recipe.blocks.map(block => (
@@ -132,6 +136,7 @@ export default function CodingAgentPage() {
                   <pre className="overflow-x-auto bg-muted px-3 py-2 pr-10 font-mono text-xs text-foreground">{block}</pre>
                 </div>
               ))}
+              </>}
             </> : <p className="text-sm text-muted-foreground">Commands appear when the MCP servers have loaded.</p>}
           </Card>
         </div>
