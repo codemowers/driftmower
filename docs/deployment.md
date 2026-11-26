@@ -25,6 +25,62 @@ Prometheus integration uses the installed Prometheus Operator APIs. Each compone
 value. Set `history.storageClassName` to select storage explicitly; otherwise
 the cluster default is used. Namespace lifecycle belongs to the platform.
 
+### CA certificates
+
+Driftmower's images are built `FROM scratch` and contain no CA certificates.
+The cluster must give its Pods a CA bundle; Driftmower makes outbound HTTPS
+requests to the OIDC issuer (to verify logins), GitHub and other source
+hosts, and container registries. Without one, every login fails with
+`x509: certificate signed by unknown authority`.
+
+The codemowers platform provides this with trust-manager, which distributes a
+`trusted-ca-certs` ConfigMap to namespaces, and the `workload-trusted-ca`
+admission policy, which mounts it at `/etc/ssl/certs/ca.pem` and sets
+`SSL_CERT_FILE`. Clusters without that layer, such as a plain Talos Linux
+installation (Talos does not share its host trust store with Pods), can name an
+existing ConfigMap in the release namespace that holds a PEM bundle:
+
+```yaml
+trustedCA:
+  configMapName: ca-bundle   # in the release namespace
+  key: ca.pem                # default
+```
+
+Every Driftmower workload then mounts it at the same path with
+`SSL_CERT_FILE`, which the platform policy leaves untouched where both exist.
+Include internal CAs if the OIDC issuer or a registry uses one.
+
+A cluster can adopt the platform's approach in steps. The reusable layer is
+cert-manager, trust-manager and a `Bundle` named `trusted-ca-certs` that
+publishes the public CAs to every namespace:
+
+```bash
+helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --version 1.20.0 --namespace cert-manager --create-namespace --set crds.enabled=true
+helm upgrade --install trust-manager oci://quay.io/jetstack/charts/trust-manager \
+  --version 0.22.0 --namespace cert-manager
+kubectl apply -f - <<'EOF'
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: trusted-ca-certs
+spec:
+  sources:
+    - useDefaultCAs: true
+  target:
+    configMap:
+      key: ca.pem
+    namespaceSelector: {}
+EOF
+```
+
+Then set `trustedCA.configMapName: trusted-ca-certs`. Other workloads can mount
+the same ConfigMap. Adding the platform's `workload-trusted-ca` admission
+policy later (it needs the `MutatingAdmissionPolicy` API) injects it into every
+Pod and makes the explicit setting redundant. The desktop's one-click install
+performs these steps for OIDC installs on clusters whose Pods get no CA bundle,
+with cert-manager as an explicit opt-in when it is missing.
+
 Trivy CycloneDX results live on the operator StatefulSet's
 `sboms-<release>-operator-0` PVC mounted at `/cache`, so operator Pod replacements
 preserve scan results. Configure

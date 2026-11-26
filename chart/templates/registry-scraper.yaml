@@ -86,6 +86,7 @@ spec:
           image: {{ .Values.registryScraper.image | default .Values.crawler.image | quote }}
           command: [/driftmower-crawler, registry]
           env:
+            {{- with include "driftmower.trustedCA.env" . }}{{ . | nindent 12 }}{{- end }}
             {{- if .Values.registryScraper.credentialsSecretName }}
             - name: REGISTRY_CREDENTIALS_FILE
               value: /var/run/secrets/driftmower/registry-auth/config.json
@@ -149,6 +150,7 @@ spec:
               readOnly: true
             - name: catalog
               mountPath: /data
+            {{- with include "driftmower.trustedCA.volumeMount" . }}{{ . | nindent 12 }}{{- end }}
       volumes:
         {{- if .Values.registryScraper.credentialsSecretName }}
         - name: registry-auth
@@ -168,6 +170,7 @@ spec:
               - key: token
                 path: token
         {{- end }}
+        {{- with include "driftmower.trustedCA.volume" . }}{{ . | nindent 8 }}{{- end }}
         - name: config
           configMap:
             name: {{ .Values.registryScraper.configMapName | default (printf "%s-registry-scraper" .Release.Name) }}

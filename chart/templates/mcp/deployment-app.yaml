@@ -53,6 +53,7 @@ spec:
             {{- end }}
           {{- end }}
           env:
+            {{- with include "driftmower.trustedCA.env" . }}{{ . | nindent 12 }}{{- end }}
             - name: MCP_AUTH_MODE
               value: {{ required "mcp.auth.mode must be rbac, oidc or anonymous" .Values.mcp.auth.mode | quote }}
             {{- if not (has .Values.mcp.auth.mode (list "rbac" "oidc" "anonymous")) }}
@@ -152,8 +153,9 @@ spec:
             periodSeconds: 2
           resources:
             {{- toYaml .Values.mcp.resources | nindent 12 }}
-          {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled }}
+          {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled .Values.trustedCA.configMapName }}
           volumeMounts:
+            {{- with include "driftmower.trustedCA.volumeMount" . }}{{ . | nindent 12 }}{{- end }}
             {{- if .Values.registryScraper.enabled }}
             - name: registry-token
               mountPath: /var/run/secrets/driftmower/registry
@@ -170,8 +172,9 @@ spec:
               readOnly: true
             {{- end }}
           {{- end }}
-      {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled }}
+      {{- if or .Values.crawler.enabled .Values.operator.enabled .Values.registryScraper.enabled .Values.trustedCA.configMapName }}
       volumes:
+        {{- with include "driftmower.trustedCA.volume" . }}{{ . | nindent 8 }}{{- end }}
         {{- if .Values.registryScraper.enabled }}
         - name: registry-token
           projected:

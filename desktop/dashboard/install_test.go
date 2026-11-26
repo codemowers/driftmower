@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -94,7 +97,7 @@ func fakeHelm(t *testing.T, exit int) string {
 	t.Helper()
 	dir := t.TempDir()
 	record := filepath.Join(dir, "record")
-	script := "#!/bin/sh\nif [ \"$1\" = show ]; then\n  [ \"$2\" = chart ] && echo 'version: 0.0.0-test' || cat \"${FAKE_CHART_VALUES:-" + chartValuesPath(t) + "}\"\n  exit 0\nfi\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
+	script := "#!/bin/sh\nif [ \"$1\" = show ]; then\n  [ \"$2\" = chart ] && echo 'version: 0.0.0-test' || cat \"${FAKE_CHART_VALUES:-" + chartValuesPath(t) + "}\"\n  exit 0\nfi\necho \"$3\" >> " + record + ".calls\nprintf '%s\\n' \"$@\" > " + record + ".$3\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
 	if exit != 0 {
 		script += "echo 'Error: INSTALLATION FAILED: namespaces is forbidden' >&2\nexit 1\n"
 	}
@@ -172,6 +175,130 @@ func TestInstallRouteRequiresSameOrigin(t *testing.T) {
 	}
 }
 
+func TestInstallOfferPlansClusterCATrustForOIDC(t *testing.T) {
+	d := &ContextDiscovery{kubeLogin: true}
+	t.Setenv("PATH", filepath.Dir(fakeHelm(t, 0)))
+	passmower := func(extra ...*metav1.APIResourceList) *fake.Clientset {
+		client := fake.NewSimpleClientset()
+		client.Resources = append([]*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}, extra...)
+		return client
+	}
+	// No admission injects a CA bundle: plan the platform's trust layer.
+	missing := d.installOffer(context.Background(), passmower(), "admin@cluster", false)
+	if missing.TrustedCA != "missing" || missing.Trust == nil || missing.Trust.CertManager || missing.Trust.TrustManager || !missing.Helm {
+		t.Fatalf("OIDC install without cluster CAs: %+v", missing)
+	}
+	if !strings.Contains(missing.Command, "--set trustedCA.configMapName=trusted-ca-certs") || len(missing.Trust.Commands) != 3 ||
+		!strings.Contains(missing.Trust.Commands[0], "charts/cert-manager --version 1.20.0") || !strings.Contains(missing.Trust.Commands[1], "charts/trust-manager --version 0.22.0") ||
+		!strings.Contains(missing.Trust.Commands[2], "name: trusted-ca-certs") || !strings.Contains(missing.Trust.Commands[2], "--context admin@cluster") {
+		t.Fatalf("trust plan: %s %q", missing.Command, missing.Trust.Commands)
+	}
+	withCertManager := d.installOffer(context.Background(), passmower(&metav1.APIResourceList{GroupVersion: "cert-manager.io/v1", APIResources: []metav1.APIResource{{Name: "certificates"}}}), "ctx", false)
+	if withCertManager.Trust == nil || !withCertManager.Trust.CertManager || len(withCertManager.Trust.Commands) != 2 {
+		t.Fatalf("existing cert-manager: %+v", withCertManager.Trust)
+	}
+	// Anonymous MCP makes no outbound TLS calls and needs no trust layer.
+	if offer := d.installOffer(context.Background(), fake.NewSimpleClientset(), "ctx", false); offer.Trust != nil || !offer.Helm {
+		t.Fatalf("anonymous install: %+v", offer)
+	}
+	injected := passmower()
+	injected.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		create := action.(k8stesting.CreateActionImpl)
+		if len(create.CreateOptions.DryRun) == 0 {
+			t.Fatal("CA injection check persisted a Pod")
+		}
+		pod := create.GetObject().(*corev1.Pod).DeepCopy()
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{Name: "SSL_CERT_FILE", Value: "/etc/ssl/certs/ca.pem"})
+		return true, pod, nil
+	})
+	if offer := d.installOffer(context.Background(), injected, "ctx", false); offer.TrustedCA != "injected" || offer.Trust != nil || strings.Contains(offer.Command, "trustedCA") {
+		t.Fatalf("platform with trusted-CA policy: %+v", offer)
+	}
+	refused := passmower()
+	refused.PrependReactor("create", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(corev1.Resource("pods"), "", nil)
+	})
+	if offer := d.installOffer(context.Background(), refused, "ctx", false); offer.TrustedCA != "" || offer.Trust != nil {
+		t.Fatalf("an undeterminable check must not plan cluster changes: %+v", offer)
+	}
+}
+
+func TestInstallSetsUpTrustLayerInOrder(t *testing.T) {
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.Trust = &TrustSetup{Bundle: true}
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	record := fakeHelm(t, 0)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err == nil || !strings.Contains(err.Error(), "cert-manager") {
+		t.Fatalf("installed without consenting to cert-manager: %v", err)
+	}
+	if _, err := os.Stat(record + ".calls"); !os.IsNotExist(err) {
+		t.Fatal("helm ran without consent")
+	}
+	if err := d.Install(context.Background(), "identity", InstallOptions{InstallCertManager: true}); err != nil {
+		t.Fatal(err)
+	}
+	calls, _ := os.ReadFile(record + ".calls")
+	if string(calls) != "cert-manager\ntrust-manager\ndriftmower\n" {
+		t.Fatalf("install order: %q", calls)
+	}
+	args, _ := os.ReadFile(record)
+	if !strings.Contains(string(args), "--set\ntrustedCA.configMapName=trusted-ca-certs\n") {
+		t.Fatalf("Driftmower does not mount the bundle:\n%s", args)
+	}
+	// With cert-manager present only trust-manager and Driftmower run.
+	_ = os.Remove(record + ".calls")
+	d.contexts[0].Install.Trust = &TrustSetup{CertManager: true, Bundle: true}
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "trust-manager\ndriftmower\n" {
+		t.Fatalf("existing cert-manager reinstalled: %q", calls)
+	}
+}
+
+func TestCreateTrustBundleMatchesPlatformAndKeepsExisting(t *testing.T) {
+	var created map[string]any
+	exists := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/apis/trust.cert-manager.io/v1alpha1/bundles" {
+			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+		if exists {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"AlreadyExists","code":409}`))
+			return
+		}
+		_ = json.NewDecoder(r.Body).Decode(&created)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(created)
+	}))
+	defer server.Close()
+	config := clientcmdapi.NewConfig()
+	config.Clusters["c"] = &clientcmdapi.Cluster{Server: server.URL, InsecureSkipTLSVerify: true}
+	config.AuthInfos["u"] = &clientcmdapi.AuthInfo{Token: "t"}
+	config.Contexts["x"] = &clientcmdapi.Context{Cluster: "c", AuthInfo: "u"}
+	config.CurrentContext = "x"
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	if err := clientcmd.WriteToFile(*config, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := createTrustBundle(context.Background(), path); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(created)
+	for _, want := range []string{`"name":"trusted-ca-certs"`, `"useDefaultCAs":true`, `"key":"ca.pem"`, `"namespaceSelector":{}`} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("Bundle lacks %s: %s", want, body)
+		}
+	}
+	exists = true
+	if err := createTrustBundle(context.Background(), path); err != nil {
+		t.Fatalf("an existing Bundle must be kept: %v", err)
+	}
+}
+
 // chartValuesPath is the repository chart's values.yaml, which the fake helm
 // serves for `helm show values`.
 func chartValuesPath(t *testing.T) string {
@@ -245,6 +372,40 @@ func TestInstallRequiresStorageClassWithoutClusterDefault(t *testing.T) {
 	}
 }
 
+func TestOlderChartStopsInstallBeforeTrustLayer(t *testing.T) {
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.Trust = &TrustSetup{CertManager: true}
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	record := fakeHelm(t, 0)
+	old := filepath.Join(t.TempDir(), "values.yaml")
+	body, _ := os.ReadFile(chartValuesPath(t))
+	if err := os.WriteFile(old, []byte(strings.Replace(string(body), "trustedCA:", "removedForTest:", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_CHART_VALUES", old)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err == nil || !strings.Contains(err.Error(), "trustedCA.configMapName") {
+		t.Fatalf("older chart: %v", err)
+	}
+	if _, err := os.Stat(record + ".calls"); !os.IsNotExist(err) {
+		t.Fatal("the trust layer was installed for a chart that cannot use it")
+	}
+}
+
+func TestTrustSetupEncodesNoStepsAsEmptyList(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	client.Resources = []*metav1.APIResourceList{
+		{GroupVersion: "cert-manager.io/v1", APIResources: []metav1.APIResource{{Name: "certificates"}}},
+		{GroupVersion: "trust.cert-manager.io/v1alpha1", APIResources: []metav1.APIResource{{Name: "bundles"}}},
+	}
+	setup := trustSetup(context.Background(), client, "ctx")
+	setup.Bundle = true
+	setup.Commands = setup.Commands[:0]
+	body, _ := json.Marshal(setup)
+	if !strings.Contains(string(body), `"commands":[]`) {
+		t.Fatalf("Settings maps over commands; got %s", body)
+	}
+}
+
 func TestLocalChartOverrideUsesPublishedImagesUnpinned(t *testing.T) {
 	d, _ := installFixture(t, "anonymous")
 	record := fakeHelm(t, 0)
@@ -264,5 +425,99 @@ func TestLocalChartOverrideUsesPublishedImagesUnpinned(t *testing.T) {
 	}
 	if offer := d.contexts[0].Install; strings.Contains(installCommand("ctx", installSettings{authMode: offer.AuthMode}), local) {
 		t.Fatal("the copyable command must keep the published chart")
+	}
+}
+
+func TestFullInstallAddsNodestatdWhenItsAPIsAreMissing(t *testing.T) {
+	d := &ContextDiscovery{}
+	passmower := []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	k3s := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.33.4+k3s1"}}})
+	k3s.Resources = passmower
+	offer := d.installOffer(context.Background(), k3s, "admin@cluster", false)
+	if offer.Nodestatd == nil || !offer.Nodestatd.K3s || !strings.Contains(offer.Nodestatd.Command, "charts/nodestatd") ||
+		!strings.Contains(offer.Nodestatd.Command, "--namespace kube-system") || !strings.Contains(offer.Nodestatd.Command, "containerd.socket=/run/k3s/containerd/containerd.sock") {
+		t.Fatalf("k3s without nodestatd: %+v", offer.Nodestatd)
+	}
+	installed := fake.NewSimpleClientset()
+	installed.Resources = append(passmower, &metav1.APIResourceList{GroupVersion: "codemowers.io/v1alpha1", APIResources: []metav1.APIResource{{Name: "containerimages"}, {Name: "sourcerepositories"}}})
+	if offer := d.installOffer(context.Background(), installed, "ctx", false); offer.Nodestatd != nil {
+		t.Fatalf("nodestatd already installed: %+v", offer.Nodestatd)
+	}
+	// The anonymous profile stays MCP-only.
+	if offer := d.installOffer(context.Background(), fake.NewSimpleClientset(), "ctx", false); offer.Nodestatd != nil {
+		t.Fatalf("anonymous install: %+v", offer.Nodestatd)
+	}
+
+	install, _ := installFixture(t, "rbac")
+	install.contexts[0].Install.DefaultStorageClass = "longhorn"
+	install.contexts[0].Install.Nodestatd = &NodestatdSetup{}
+	record := fakeHelm(t, 0)
+	if err := install.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "nodestatd\ndriftmower\n" {
+		t.Fatalf("nodestatd must install before Driftmower: %q", calls)
+	}
+}
+
+func TestNodestatdSkippedOnNonContainerdNodes(t *testing.T) {
+	crio := fake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "a"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "containerd://2.2.7"}}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "b"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+	)
+	crio.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	offer := (&ContextDiscovery{}).installOffer(context.Background(), crio, "ctx", false)
+	if offer.Nodestatd == nil || !strings.Contains(offer.Nodestatd.Unsupported, "mix containerd and cri-o") {
+		t.Fatalf("CRI-O node: %+v", offer.Nodestatd)
+	}
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	d.contexts[0].Install.Nodestatd = offer.Nodestatd
+	record := fakeHelm(t, 0)
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "driftmower\n" {
+		t.Fatalf("nodestatd installed on a CRI-O cluster: %q", calls)
+	}
+}
+
+func TestNodestatdUsesCRIORuntimeWhenTheChartSupportsIt(t *testing.T) {
+	crio := fake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "a"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "b"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+	)
+	crio.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	offer := (&ContextDiscovery{}).installOffer(context.Background(), crio, "ctx", false)
+	if offer.Nodestatd == nil || offer.Nodestatd.Runtime != "crio" || offer.Nodestatd.Unsupported != "" || !strings.Contains(offer.Nodestatd.Command, "--set runtime=crio") {
+		t.Fatalf("CRI-O cluster: %+v", offer.Nodestatd)
+	}
+
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	d.contexts[0].Install.Nodestatd = offer.Nodestatd
+	record := fakeHelm(t, 0)
+	// The served values lack `runtime`, like nodestatd before CRI-O support.
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "driftmower\n" {
+		t.Fatalf("installed a nodestatd without CRI-O support: %q", calls)
+	}
+	supporting := filepath.Join(t.TempDir(), "values.yaml")
+	body, _ := os.ReadFile(chartValuesPath(t))
+	if err := os.WriteFile(supporting, append(body, []byte("\nruntime: containerd\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_CHART_VALUES", supporting)
+	_ = os.Remove(record + ".calls")
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "nodestatd\ndriftmower\n" {
+		t.Fatalf("CRI-O-capable nodestatd: %q", calls)
+	}
+	if args, _ := os.ReadFile(record + ".nodestatd"); !strings.Contains(string(args), "--set\nruntime=crio\n") || strings.Contains(string(args), "containerd.socket") {
+		t.Fatalf("nodestatd arguments:\n%s", args)
 	}
 }

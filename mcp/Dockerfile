@@ -11,7 +11,7 @@ COPY internal ./internal
 ARG BUILD_REVISION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${BUILD_REVISION}" -o /out/driftmower-mcp ./mcp/cmd/driftmower-mcp
 
-# CA certificates are mounted by the cluster.
+# CA certificates are provided by the cluster; see docs/deployment.md#ca-certificates.
 FROM scratch
 
 COPY --from=builder /out/driftmower-mcp /driftmower-mcp

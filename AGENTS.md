@@ -122,7 +122,29 @@ require the cluster's own workflow for new workloads. One-click install is an
 explicit, confirmed person action: it runs local `helm` against a temporary
 single-context kubeconfig holding the credentials discovery already resolved
 (never a credential plugin; SSH jump forwards keep TLS server-name
-verification), and deletes it afterwards. Clusters with Passmower's OIDCClient
+verification), and deletes it afterwards. One-click install also dry-runs a probe Pod to see whether admission gives
+Pods a CA bundle (`SSL_CERT_FILE` or an `/etc/ssl/certs` mount). The images are
+`FROM scratch` without CA certificates by design; trust is the cluster's
+responsibility (codemowers platform: trust-manager plus `workload-trusted-ca`),
+with the chart's optional `trustedCA.configMapName` mounting an admin-provided
+bundle elsewhere. When the probe shows no CA bundle, an OIDC install (which would fail every
+login) first adds the platform's reusable trust layer under its platform names:
+trust-manager and a `trusted-ca-certs` Bundle of public CAs to all namespaces,
+then `trustedCA.configMapName=trusted-ca-certs`. Missing cert-manager is
+installed only with explicit opt-in. Never add the cluster-wide
+`workload-trusted-ca` admission policy from the desktop; that stays a platform
+decision. An existing Bundle is never modified. An undeterminable probe only
+warns. A full (OIDC) one-click install also adds nodestatd to `kube-system`
+when its `codemowers.io` ContainerImage/SourceRepository APIs are missing,
+pinning the resolved chart version and using k3s's containerd socket on k3s
+and `runtime=crio` when every node runs CRI-O (only with a nodestatd chart that
+defines `runtime`; older charts are skipped). One release serves one runtime,
+so mixed or other runtimes skip nodestatd with a notice,
+before Driftmower so MCP discovers the APIs at start. The anonymous profile
+stays MCP-only. MCP's nodestatd notice remains for manual installs. Admission
+probes try the release namespace, `default`, then ordinary namespaces, and use
+fixed names, because platforms may block `default` and policies may read
+`metadata.name`. Clusters with Passmower's OIDCClient
 API get chart defaults when a server-side dry run shows admission expanding
 the short Ingress host `mcp`; without expansion they get rbac MCP without
 Ingresses or hosted UI, reached by port-forward with its canonical OIDC

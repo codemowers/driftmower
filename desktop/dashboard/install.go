@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +29,9 @@ const (
 	installChart     = "oci://ghcr.io/codemowers/charts/driftmower"
 	installRelease   = "driftmower"
 	installNamespace = "driftmower"
-	installTimeout   = 10 * time.Minute
-	passmowerGroup   = "codemowers.cloud/v1"
+	// Up to three helm installs (cert-manager, trust-manager, Driftmower).
+	installTimeout = 20 * time.Minute
+	passmowerGroup = "codemowers.cloud/v1"
 )
 
 // InstallOffer describes how Driftmower could be added to a cluster that has
@@ -41,6 +44,15 @@ type InstallOffer struct {
 	// The cluster's admission expands short Ingress hosts such as "mcp" into
 	// resolvable names, which the chart's default Ingresses rely on.
 	HostExpansion bool `json:"hostExpansion,omitempty"`
+	// Whether admission gives Pods a CA bundle: injected, missing, or empty
+	// when the dry-run check could not tell.
+	TrustedCA string `json:"trustedCA,omitempty"`
+	// Set for OIDC installs where Pods get no CA bundle: the CA trust layer
+	// one-click install adds first, since every login would fail without it.
+	Trust *TrustSetup `json:"trust,omitempty"`
+	// Set for full installs where nodestatd's APIs are missing; installed
+	// before Driftmower.
+	Nodestatd *NodestatdSetup `json:"nodestatd,omitempty"`
 	// StorageClasses the operator and registry scraper claims could use, and
 	// the cluster default among them; without a default the person chooses.
 	StorageClasses      []string `json:"storageClasses,omitempty"`
@@ -67,6 +79,8 @@ type installSettings struct {
 	hostExpansion bool
 	// Empty uses the cluster default StorageClass.
 	storageClass string
+	// Mount the trusted-ca-certs bundle from the CA trust layer.
+	trustBundle bool
 	// Chart reference; empty is the published chart.
 	chart string
 	// Further values, such as release image references for a local chart.
@@ -76,6 +90,9 @@ type installSettings struct {
 func installValues(settings installSettings) []string {
 	authMode, hostExpansion := settings.authMode, settings.hostExpansion
 	values := []string{"mcp.dashboard.localOrigins={" + DesktopOrigin + "}"}
+	if settings.trustBundle {
+		values = append(values, "trustedCA.configMapName="+trustBundleName)
+	}
 	if authMode == "rbac" && settings.storageClass != "" {
 		values = append(values, "operator.sbomStorageClassName="+settings.storageClass, "registryScraper.storageClassName="+settings.storageClass)
 	}
@@ -125,13 +142,7 @@ func shellQuote(arg string) string {
 }
 
 func installCommand(context string, settings installSettings) string {
-	args := installArgs("", context, "", settings)
-	quoted := make([]string, 0, len(args)+1)
-	quoted = append(quoted, "helm")
-	for _, arg := range args {
-		quoted = append(quoted, shellQuote(arg))
-	}
-	return strings.Join(quoted, " ")
+	return "helm " + strings.Join(quoteAll(installArgs("", context, "", settings)), " ")
 }
 
 // installOffer runs only after the MCP Service lookup returned NotFound, so
@@ -158,7 +169,15 @@ func (d *ContextDiscovery) installOffer(ctx context.Context, client kubernetes.I
 	if mode == "rbac" {
 		offer.HostExpansion = expandsShortHosts(ctx, client)
 	}
+	offer.TrustedCA = trustedCAInjection(ctx, client)
 	settings := installSettings{authMode: mode, hostExpansion: offer.HostExpansion}
+	if offer.AuthMode == "rbac" && offer.TrustedCA == "missing" {
+		offer.Trust = trustSetup(ctx, client, context)
+		settings.trustBundle = true
+	}
+	if offer.AuthMode == "rbac" {
+		offer.Nodestatd = nodestatdSetup(ctx, client, context)
+	}
 	if mode == "rbac" {
 		offer.StorageClasses, offer.DefaultStorageClass = storageClasses(ctx, client)
 		if offer.DefaultStorageClass == "" {
@@ -213,6 +232,47 @@ func probeNamespaces(ctx context.Context, client kubernetes.Interface) []string 
 		out = append(out, name)
 	}
 	return out
+}
+
+// trustedCAInjection asks admission, through a server-side dry run, whether a
+// new Pod receives a CA bundle the way the codemowers platform's
+// workload-trusted-ca policy provides one. The probe Pod meets the restricted
+// Pod Security profile so that policy does not reject it first.
+func trustedCAInjection(ctx context.Context, client kubernetes.Interface) string {
+	yes, no, user := true, false, int64(65535)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "driftmower-ca-check"},
+		Spec: corev1.PodSpec{
+			SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &yes, RunAsUser: &user, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}},
+			Containers: []corev1.Container{{
+				Name:            "check",
+				Image:           "registry.k8s.io/pause:3.10",
+				SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: &no, Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}},
+			}},
+		},
+	}
+	var created *corev1.Pod
+	for _, namespace := range probeNamespaces(ctx, client) {
+		if result, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}); err == nil {
+			created = result
+			break
+		}
+	}
+	if created == nil || len(created.Spec.Containers) == 0 {
+		return ""
+	}
+	container := created.Spec.Containers[0]
+	for _, env := range container.Env {
+		if env.Name == "SSL_CERT_FILE" {
+			return "injected"
+		}
+	}
+	for _, mount := range container.VolumeMounts {
+		if strings.HasPrefix(mount.MountPath, "/etc/ssl/certs") {
+			return "injected"
+		}
+	}
+	return "missing"
 }
 
 // installs allows one install per connection at a time.
@@ -312,6 +372,8 @@ type InstallOptions struct {
 	// Required for the operator and registry scraper claims when the cluster
 	// has no default StorageClass.
 	StorageClass string `json:"storageClass"`
+	// Consent to install cert-manager when the CA trust layer needs it.
+	InstallCertManager bool `json:"installCertManager"`
 }
 
 func (d *ContextDiscovery) Install(ctx context.Context, key string, options InstallOptions) error {
@@ -329,6 +391,10 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 	}
 	if target.Install == nil || target.Install.AuthMode == "" {
 		return errors.New("this connection does not offer installation")
+	}
+	trust := target.Install.Trust
+	if trust != nil && !trust.CertManager && !options.InstallCertManager {
+		return errors.New("this cluster gives Pods no CA certificates; setting up trust-manager needs cert-manager, which must be installed too")
 	}
 	helm, err := lookPath("helm", pluginPath())
 	if err != nil {
@@ -353,15 +419,16 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 	}
 	ctx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
-	settings := installSettings{authMode: target.Install.AuthMode, hostExpansion: target.Install.HostExpansion}
+	settings := installSettings{authMode: target.Install.AuthMode, hostExpansion: target.Install.HostExpansion, trustBundle: trust != nil}
 	if settings.authMode == "rbac" && target.Install.DefaultStorageClass == "" {
 		if !slices.Contains(target.Install.StorageClasses, options.StorageClass) {
 			return errors.New("this cluster has no default StorageClass; choose one for the operator and registry scraper volumes")
 		}
 		settings.storageClass = options.StorageClass
 	}
-	// Check the chart before changing anything: helm silently ignores values
-	// a chart does not define, which would install a broken Driftmower.
+	// Check the chart before changing anything, including the trust layer:
+	// helm silently ignores values a chart does not define, which would
+	// install a broken Driftmower.
 	if local := localInstallChart(); local != "" {
 		images, err := releaseImages(ctx, helm)
 		if err != nil {
@@ -373,8 +440,51 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 	if err != nil {
 		return err
 	}
-	args := append(installArgs(kubeconfig, target.Name, version, settings), "--wait", "--timeout", "5m")
-	cmd := exec.CommandContext(ctx, helm, args...)
+	if trust != nil {
+		if !trust.CertManager {
+			if err := runHelm(ctx, helm, kubeconfig, "cert-manager", certManagerArgs(kubeconfig, target.Name)); err != nil {
+				return err
+			}
+		}
+		if !trust.TrustManager {
+			if err := runHelm(ctx, helm, kubeconfig, "trust-manager", trustManagerArgs(kubeconfig, target.Name)); err != nil {
+				return err
+			}
+		}
+		if !trust.Bundle {
+			if err := createTrustBundle(ctx, kubeconfig); err != nil {
+				return fmt.Errorf("create Bundle %s: %w", trustBundleName, err)
+			}
+		}
+	}
+	if nodestatd := target.Install.Nodestatd; nodestatd != nil && nodestatd.Unsupported == "" {
+		nodestatdVersion, err := chartVersion(ctx, helm, nodestatdChart)
+		if err != nil {
+			return err
+		}
+		supported := true
+		if nodestatd.Runtime != "" {
+			if supported, err = nodestatdSupportsRuntime(ctx, helm, nodestatdVersion); err != nil {
+				return err
+			}
+		}
+		if supported {
+			if err := runHelm(ctx, helm, kubeconfig, "nodestatd", nodestatdArgs(kubeconfig, target.Name, nodestatdVersion, nodestatd.K3s, nodestatd.Runtime)); err != nil {
+				return err
+			}
+		} else {
+			log.Printf("Install on %s: skipped nodestatd; chart %s predates %s support", target.Name, nodestatdVersion, nodestatd.Runtime)
+		}
+	}
+	if err := runHelm(ctx, helm, kubeconfig, "Driftmower", installArgs(kubeconfig, target.Name, version, settings)); err != nil {
+		return err
+	}
+	d.Retry(key)
+	return nil
+}
+
+func runHelm(ctx context.Context, helm, kubeconfig, what string, args []string) error {
+	cmd := exec.CommandContext(ctx, helm, append(args, "--wait", "--timeout", "5m")...)
 	// Keep helm's own caches and registry login; isolate only Kubernetes access.
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig, "PATH="+pluginPath())
 	output, err := cmd.CombinedOutput()
@@ -383,9 +493,8 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 		if message == "" {
 			message = err.Error()
 		}
-		return fmt.Errorf("helm install failed: %s", lastLine(message))
+		return fmt.Errorf("helm install of %s failed: %s", what, lastLine(message))
 	}
-	d.Retry(key)
 	return nil
 }
 

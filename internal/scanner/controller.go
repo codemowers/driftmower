@@ -66,7 +66,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		return err
 	}
 	if !installed {
-		c.Log.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; Trivy scanner dispatching is disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock; restart Driftmower after installing")
+		c.Log.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; Trivy scanner dispatching is disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock", "cri-o", "add --set runtime=crio (needs a nodestatd release with CRI-O support)", "after", "restart Driftmower after installing")
 		c.disabled.Store(true)
 		c.ready.Store(true)
 		defer c.ready.Store(false)
