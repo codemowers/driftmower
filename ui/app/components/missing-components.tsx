@@ -6,6 +6,8 @@ import { CopySnippet } from "@/app/components/copy-button"
 // GitHub's container registry with every release.
 const NODESTATD = "helm install nodestatd oci://ghcr.io/codemowers/charts/nodestatd --namespace kube-system"
 const NODESTATD_K3S = `${NODESTATD} \\\n  --set containerd.socket=/run/k3s/containerd/containerd.sock`
+// One release serves one runtime; the chart does not detect it.
+const NODESTATD_CRIO = `${NODESTATD} \\\n  --set runtime=crio`
 
 
 // What the cluster lacks for drift and advisories, and how to install it.
@@ -21,6 +23,8 @@ export default function MissingComponents({ components }: { components: string[]
       <CopySnippet text={NODESTATD} />
       <p className="text-xs text-status-patch-text">On k3s, point it at k3s&apos;s containerd socket:</p>
       <CopySnippet text={NODESTATD_K3S} />
+      <p className="text-xs text-status-patch-text">On CRI-O nodes, select the CRI-O runtime. This needs a nodestatd release with CRI-O support, and one release serves a single runtime, so clusters mixing containerd and CRI-O nodes are not supported:</p>
+      <CopySnippet text={NODESTATD_CRIO} />
       <p className="text-xs text-status-patch-text">Restart Driftmower MCP and the scanner after installation to discover the new APIs.</p>
     </section>
   )

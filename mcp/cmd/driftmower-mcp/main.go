@@ -195,7 +195,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		return err
 	}
 	if !nodestatd {
-		logger.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; GHSA advisories, vulnerabilities and Trivy scanning are disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock; restart Driftmower after installing")
+		logger.Warn("nodestatd is not installed: ContainerImage or SourceRepository CRD is missing; GHSA advisories, vulnerabilities and Trivy scanning are disabled", "install", platformapis.NodestatdInstall, "k3s", "add --set containerd.socket=/run/k3s/containerd/containerd.sock", "cri-o", "add --set runtime=crio (needs a nodestatd release with CRI-O support)", "after", "restart Driftmower after installing")
 		cfg.ScannerURL = ""
 	}
 	issuer := ""
