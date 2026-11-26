@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -461,8 +462,18 @@ func (d *ContextDiscovery) Install(ctx context.Context, key string, options Inst
 		if err != nil {
 			return err
 		}
-		if err := runHelm(ctx, helm, kubeconfig, "nodestatd", nodestatdArgs(kubeconfig, target.Name, nodestatdVersion, nodestatd.K3s)); err != nil {
-			return err
+		supported := true
+		if nodestatd.Runtime != "" {
+			if supported, err = nodestatdSupportsRuntime(ctx, helm, nodestatdVersion); err != nil {
+				return err
+			}
+		}
+		if supported {
+			if err := runHelm(ctx, helm, kubeconfig, "nodestatd", nodestatdArgs(kubeconfig, target.Name, nodestatdVersion, nodestatd.K3s, nodestatd.Runtime)); err != nil {
+				return err
+			}
+		} else {
+			log.Printf("Install on %s: skipped nodestatd; chart %s predates %s support", target.Name, nodestatdVersion, nodestatd.Runtime)
 		}
 	}
 	if err := runHelm(ctx, helm, kubeconfig, "Driftmower", installArgs(kubeconfig, target.Name, version, settings)); err != nil {

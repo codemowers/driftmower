@@ -69,7 +69,7 @@ export function InstallDriftmower({ connection, busy, onInstall }: { connection:
         </div>}
         {nodestatd && <div className="space-y-2">
           <p className="font-medium">Image inventory (cluster-wide)</p>
-          <p>Install nodestatd into <code>kube-system</code>: a DaemonSet on every node, including control-plane nodes, that reads the node&apos;s containerd images through its socket and records them as ContainerImage objects. Without it Driftmower shows no drift, advisories or scans.{nodestatd.k3s && <> This is k3s, so it uses k3s&apos;s containerd socket.</>}</p>
+          <p>Install nodestatd into <code>kube-system</code>: a DaemonSet on every node, including control-plane nodes, that reads the node&apos;s images through the container runtime and records them as ContainerImage objects. Without it Driftmower shows no drift, advisories or scans.{nodestatd.runtime === "crio" ? <> These nodes run CRI-O, so it reads CRI-O&apos;s socket and, read-only, its image storage. CRI-O support needs a nodestatd release that includes it; with an older published chart this step is skipped.</> : nodestatd.k3s && <> This is k3s, so it uses k3s&apos;s containerd socket.</>}</p>
         </div>}
         {nodestatdUnsupported && <p className="rounded border border-status-patch bg-status-patch-bg p-3 text-status-patch-label">{nodestatdUnsupported}. Install continues without nodestatd.</p>}
         {prerequisites && <p className="font-medium">Driftmower</p>}

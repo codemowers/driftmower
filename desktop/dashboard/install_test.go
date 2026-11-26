@@ -97,7 +97,7 @@ func fakeHelm(t *testing.T, exit int) string {
 	t.Helper()
 	dir := t.TempDir()
 	record := filepath.Join(dir, "record")
-	script := "#!/bin/sh\nif [ \"$1\" = show ]; then\n  [ \"$2\" = chart ] && echo 'version: 0.0.0-test' || cat \"${FAKE_CHART_VALUES:-" + chartValuesPath(t) + "}\"\n  exit 0\nfi\necho \"$3\" >> " + record + ".calls\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
+	script := "#!/bin/sh\nif [ \"$1\" = show ]; then\n  [ \"$2\" = chart ] && echo 'version: 0.0.0-test' || cat \"${FAKE_CHART_VALUES:-" + chartValuesPath(t) + "}\"\n  exit 0\nfi\necho \"$3\" >> " + record + ".calls\nprintf '%s\\n' \"$@\" > " + record + ".$3\nprintf '%s\\n' \"$@\" > " + record + "\ncat \"$KUBECONFIG\" > " + record + ".kubeconfig\necho \"$KUBECONFIG\" > " + record + ".path\n"
 	if exit != 0 {
 		script += "echo 'Error: INSTALLATION FAILED: namespaces is forbidden' >&2\nexit 1\n"
 	}
@@ -467,7 +467,7 @@ func TestNodestatdSkippedOnNonContainerdNodes(t *testing.T) {
 	)
 	crio.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
 	offer := (&ContextDiscovery{}).installOffer(context.Background(), crio, "ctx", false)
-	if offer.Nodestatd == nil || !strings.Contains(offer.Nodestatd.Unsupported, "node b runs cri-o") {
+	if offer.Nodestatd == nil || !strings.Contains(offer.Nodestatd.Unsupported, "mix containerd and cri-o") {
 		t.Fatalf("CRI-O node: %+v", offer.Nodestatd)
 	}
 	d, _ := installFixture(t, "rbac")
@@ -479,5 +479,45 @@ func TestNodestatdSkippedOnNonContainerdNodes(t *testing.T) {
 	}
 	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "driftmower\n" {
 		t.Fatalf("nodestatd installed on a CRI-O cluster: %q", calls)
+	}
+}
+
+func TestNodestatdUsesCRIORuntimeWhenTheChartSupportsIt(t *testing.T) {
+	crio := fake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "a"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "b"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{ContainerRuntimeVersion: "cri-o://1.36.8"}}},
+	)
+	crio.Resources = []*metav1.APIResourceList{{GroupVersion: passmowerGroup, APIResources: []metav1.APIResource{{Name: "oidcclients"}}}}
+	offer := (&ContextDiscovery{}).installOffer(context.Background(), crio, "ctx", false)
+	if offer.Nodestatd == nil || offer.Nodestatd.Runtime != "crio" || offer.Nodestatd.Unsupported != "" || !strings.Contains(offer.Nodestatd.Command, "--set runtime=crio") {
+		t.Fatalf("CRI-O cluster: %+v", offer.Nodestatd)
+	}
+
+	d, _ := installFixture(t, "rbac")
+	d.contexts[0].Install.DefaultStorageClass = "longhorn"
+	d.contexts[0].Install.Nodestatd = offer.Nodestatd
+	record := fakeHelm(t, 0)
+	// The served values lack `runtime`, like nodestatd before CRI-O support.
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "driftmower\n" {
+		t.Fatalf("installed a nodestatd without CRI-O support: %q", calls)
+	}
+	supporting := filepath.Join(t.TempDir(), "values.yaml")
+	body, _ := os.ReadFile(chartValuesPath(t))
+	if err := os.WriteFile(supporting, append(body, []byte("\nruntime: containerd\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_CHART_VALUES", supporting)
+	_ = os.Remove(record + ".calls")
+	if err := d.Install(context.Background(), "identity", InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls, _ := os.ReadFile(record + ".calls"); string(calls) != "nodestatd\ndriftmower\n" {
+		t.Fatalf("CRI-O-capable nodestatd: %q", calls)
+	}
+	if args, _ := os.ReadFile(record + ".nodestatd"); !strings.Contains(string(args), "--set\nruntime=crio\n") || strings.Contains(string(args), "containerd.socket") {
+		t.Fatalf("nodestatd arguments:\n%s", args)
 	}
 }

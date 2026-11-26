@@ -137,7 +137,9 @@ decision. An existing Bundle is never modified. An undeterminable probe only
 warns. A full (OIDC) one-click install also adds nodestatd to `kube-system`
 when its `codemowers.io` ContainerImage/SourceRepository APIs are missing,
 pinning the resolved chart version and using k3s's containerd socket on k3s
-(skipped, with a notice, when any node runs a runtime other than containerd),
+and `runtime=crio` when every node runs CRI-O (only with a nodestatd chart that
+defines `runtime`; older charts are skipped). One release serves one runtime,
+so mixed or other runtimes skip nodestatd with a notice,
 before Driftmower so MCP discovers the APIs at start. The anonymous profile
 stays MCP-only. MCP's nodestatd notice remains for manual installs. Admission
 probes try the release namespace, `default`, then ordinary namespaces, and use
