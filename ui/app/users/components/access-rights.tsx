@@ -26,8 +26,13 @@ function namespaceKey(g: Grant): string {
 function GrantTable({ grants, showNamespaces }: { grants: Grant[]; showNamespaces: boolean }) {
   const sorted = [...grants].sort((a, b) => resourceLabel(a).localeCompare(resourceLabel(b)))
   return (
-    <div className={showNamespaces ? "overflow-x-clip" : "overflow-x-auto"}>
-      <table className="w-full text-left text-sm">
+    <div className="min-w-0">
+      <table className="w-full table-fixed text-left text-sm">
+        <colgroup>
+          <col className={showNamespaces ? "w-2/5" : "w-3/5"} />
+          <col className={showNamespaces ? "w-3/10" : "w-2/5"} />
+          {showNamespaces && <col className="w-3/10" />}
+        </colgroup>
         <thead className="text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th className="py-2 pr-4 font-semibold">Kind</th>
@@ -46,9 +51,9 @@ function GrantTable({ grants, showNamespaces }: { grants: Grant[]; showNamespace
             return (
             <tr key={`${g.group}/${g.resource}/${(g.resourceNames ?? []).join(",")}/${(g.namespaces ?? []).join(",")}/${g.verbs.join(",")}`} className="border-t border-border align-top">
               <td className="py-2 pr-4">
-                <div className="font-mono text-xs font-medium">{resourceLabel(g)}</div>
+                <div className="break-all font-mono text-xs font-medium">{resourceLabel(g)}</div>
                 {(g.clusterScoped || g.resourceNames?.length) && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="break-all text-xs text-muted-foreground">
                     {g.clusterScoped && "cluster-scoped"}
                     {g.clusterScoped && g.resourceNames?.length ? " · " : ""}
                     {g.resourceNames?.length ? <>only <span className="font-mono">{g.resourceNames.join(", ")}</span></> : null}
@@ -60,7 +65,7 @@ function GrantTable({ grants, showNamespaces }: { grants: Grant[]; showNamespace
                 <td className="py-2" rowSpan={namespaceRows}>
                   <div className="sticky top-4 flex flex-col items-start gap-1">
                     {[...new Set(g.namespaces ?? [])].sort().map(ns => (
-                      <span key={ns} className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{ns}</span>
+                      <span key={ns} className="max-w-full break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{ns}</span>
                     ))}
                   </div>
                 </td>

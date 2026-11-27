@@ -22,6 +22,7 @@ import ProvenanceCard from "./components/provenance-card"
 import { WorkloadNav } from "@/app/components/layout/resource-navs"
 import CommandsCard from "./components/commands-card"
 import WorkloadTabs from "./components/workload-tabs"
+import FrameworksCard from "@/app/components/packages/frameworks-card"
 import ImagesCard from "@/app/components/scope/images-card"
 import PodsCard from "@/app/components/scope/pods-card"
 import RestartTile, { type RestartTarget } from "@/app/components/restart-tile"
@@ -140,6 +141,7 @@ function WorkloadDetailPage() {
             ) : isArgo && argoApp ? (
               <ManagerCard kind="argo" appName={argoApp.name} url={argoApp.url} resourceKind={argoApp.kind} resourceRef={argoApp.resourceRef} />
             ) : null}
+            <FrameworksCard namespace={namespace} uid={liveWorkloadUid}/>
             <ImagesCard usages={running} livenessProbes={[...new Map(livePods.flatMap(p => p.livenessProbes ?? []).map(p => [`${p.container}::${p.check}`, p])).values()]} />
             <PodsCard pods={clusterResources ? ownedPods : null} workloadUid={uid} />
             <VolumesCard namespace={namespace} pods={podNames} operator={{ kind, apiVersion: root?.apiVersion ?? rootInfo?.apiGroup, name }} />

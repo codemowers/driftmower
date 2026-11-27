@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 	"k8s.io/client-go/metadata"
 
 	"github.com/codemowers/driftmower/internal/registry"
@@ -17,6 +18,7 @@ import (
 )
 
 type Workloads struct {
+	packageReads      singleflight.Group
 	MissingComponents []string
 	Registry          *registry.Reader
 	ScanURL           string

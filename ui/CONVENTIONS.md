@@ -93,6 +93,12 @@ MCP. Keep each view to about ten MCP calls, without pagination.
 
 ## Images, sources and vulnerabilities
 
+- ELF interpreter maps are artifact subpages. Group retained binary evidence by
+  architecture and declared interpreter path, keeping static executables, shared
+  objects and unknown classifications separate. Loader-family labels are name
+  hints, not proof of libc version or execution. Provide pan/zoom, full image
+  paths and a text alternative; expose truncation and scan failures.
+
 - Source details split 50:50: license/changelog left, images right. Releases are
   flat rows in one card; running versions are marked running and expanded.
   Image rows show tags/digests inline; link only running-inventory images with
@@ -186,3 +192,32 @@ MCP. Keep each view to about ten MCP calls, without pagination.
   Missing state permits one fresh sign-in per endpoint/window with the saved
   destination; repeated failures and token/issuer verification errors stay
   visible. Never accept unmatched callbacks or fall back to anonymous.
+
+## Packages and lifecycle evidence
+
+- Packages is a fixed Workloads section link. The list contains compact package
+  identities/counts; one detail request loads observed versions, image/platform
+  digests, consumer links and CVE/GHSA evidence. Never fetch all SBOMs in a browser.
+- Package identity is the versionless PURL, preserving ecosystem and scope. Keep
+  full distro/architecture-qualified PURLs on occurrences. Tag filters use OR
+  within tags and AND with search; tags link back to the filtered Packages list.
+- Lifecycle tags and support facts come from the crawler's endoflife.date data,
+  with bundled/configured classification rules explicitly separate from observed
+  presence. Link to upstream product pages, expose freshness and errors, and
+  retain unknown status when no product/cycle is reliable. Upstream EOL is not
+  the distribution's security backport policy.
+- Workload framework summaries show package version and per-container/image
+  evidence. Missing evidence, compiled bundles and excluded analyzers remain
+  unknown; neither installed presence nor classification proves execution.
+- Package list lifecycle filters are Supported, EOL reached and Unknown. A
+  package with several observed versions can match several states; no match or
+  missing evidence stays Unknown. Used by lists image links, with full image
+  detail per package rather than workload names in package tables.
+- Package detail shows a lifecycle timeline per observed version: green active
+  support, yellow maintenance/security support, red EOL, and a Today marker.
+  Position segments using published release/active-support/EOL dates only;
+  explicitly label missing dates instead of inventing maintenance windows.
+- Frontend source-repository hints use conservative PURL/module mappings and
+  label inferred links. Registry package links are separate from repository
+  hints. File evidence is labelled Path in image and displayed as an absolute
+  image path, without implying the browser read the file's contents.

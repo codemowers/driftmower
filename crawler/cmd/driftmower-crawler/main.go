@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -37,6 +38,10 @@ func main() {
 	}
 	var kubeconfig, listenAddr, healthAddr, uiAddr, audience, allowed, giteaHosts, logLevel string
 	var cfg crawler.Config
+	var cacheMiB int64
+	var lifecycleEnabled bool
+	var lifecycleRules string
+	var lifecycleInterval time.Duration
 	flag.StringVar(&kubeconfig, "kubeconfig", env("KUBECONFIG", ""), "kubeconfig path; in-cluster configuration when empty")
 	flag.StringVar(&listenAddr, "listen-addr", env("LISTEN_ADDR", ":8080"), "report API address")
 	flag.StringVar(&healthAddr, "health-addr", env("HEALTH_ADDR", ":8081"), "health endpoint address")
@@ -48,8 +53,27 @@ func main() {
 	flag.StringVar(&giteaHosts, "gitea-hosts", env("GITEA_HOSTS", ""), "comma-separated Gitea or Forgejo hosts besides codeberg.org and gitea.com")
 	flag.DurationVar(&cfg.Interval, "interval", envDuration("CRAWL_INTERVAL", 6*time.Hour), "interval between crawls of a source")
 	flag.StringVar(&logLevel, "log-level", env("LOG_LEVEL", "info"), "debug, info, warn or error")
+	flag.StringVar(&cfg.CacheDir, "cache-dir", env("CRAWLER_CACHE_DIR", "/data"), "persistent crawler cache directory")
+	flag.BoolVar(&lifecycleEnabled, "lifecycle", env("LIFECYCLE_ENABLED", "true") == "true", "fetch endoflife.date metadata")
+	flag.StringVar(&lifecycleRules, "lifecycle-rules", env("LIFECYCLE_RULES_FILE", ""), "optional lifecycle mapping overrides")
+	flag.DurationVar(&lifecycleInterval, "lifecycle-interval", envDuration("LIFECYCLE_INTERVAL", 14*24*time.Hour), "lifecycle metadata TTL")
+	flag.Int64Var(&cacheMiB, "cache-mib", 512, "maximum compressed crawler cache MiB")
+	if value := os.Getenv("CRAWLER_CACHE_MIB"); value != "" {
+		if _, err := fmt.Sscan(value, &cacheMiB); err != nil {
+			slog.Error("invalid CRAWLER_CACHE_MIB")
+			os.Exit(1)
+		}
+	}
 	flag.Parse()
+	cfg.CacheMaxBytes = cacheMiB << 20
+	if cacheMiB < 128 {
+		slog.Error("cache-mib must be at least 128")
+		os.Exit(1)
+	}
 	// The token stays out of flags, which show in process listings.
+	cfg.LifecycleEnabled = lifecycleEnabled
+	cfg.LifecycleRulesFile = lifecycleRules
+	cfg.LifecycleInterval = lifecycleInterval
 	cfg.GitHubToken = os.Getenv("GITHUB_TOKEN")
 	cfg.GiteaHosts = split(giteaHosts)
 	if raw := os.Getenv("GITHUB_ENTERPRISE_TOKEN_FILES"); raw != "" {
@@ -106,6 +130,11 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 		return err
 	}
 	c := crawler.New(cfg, dynamicClient, log)
+	if cfg.LifecycleEnabled {
+		if err := c.OpenLifecycle(cfg.LifecycleRulesFile, cfg.LifecycleInterval); err != nil {
+			return err
+		}
+	}
 	authorizer := authz.New(clientset, audience)
 	authenticate := func(ctx context.Context, token string) (string, error) {
 		id, err := authorizer.Authenticate(ctx, token)
@@ -157,6 +186,7 @@ func run(ctx context.Context, kubeconfig, listenAddr, healthAddr, uiAddr, audien
 
 	group, ctx := errgroup.WithContext(ctx)
 	group.Go(func() error { c.Run(ctx); return ctx.Err() })
+	group.Go(func() error { c.RunLifecycle(ctx); return ctx.Err() })
 	group.Go(func() error { return serve(ctx, listenAddr, mux) })
 	group.Go(func() error { return serve(ctx, healthAddr, health) })
 	if uiAddr != "" {

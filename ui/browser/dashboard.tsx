@@ -25,6 +25,8 @@ import LoadingLine from "@/app/components/loading-line"
 import type { SessionClaims } from "@/lib/auth/types"
 
 const routes = [
+ {pattern:new RegExp("^/packages/([^/]+)/?$"),names:["purl"],Page:lazy(()=>import("@/app/packages/[purl]/page"))},
+ {pattern:new RegExp("^/packages/?$"),names:[],Page:lazy(()=>import("@/app/packages/page"))},
   {pattern: new RegExp("^/cluster/nodes/([^/]+)/?$"), names: ["name"], Page: lazy(() => import("@/app/cluster/nodes/[name]/page"))},
   {pattern: new RegExp("^/coding-agent/mcp-servers/driftmower/?$"), names: [], Page: lazy(() => import("@/app/coding-agent/mcp-servers/driftmower/page"))},
   {pattern: new RegExp("^/vulnerabilities/([^/]+)/?$"), names: ["id"], Page: lazy(() => import("@/app/vulnerabilities/[id]/page"))},

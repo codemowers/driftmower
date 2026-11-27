@@ -31,7 +31,7 @@ export function imagePath(key: string): string {
 
 // A lone "-" is never a valid OCI repository path component, so it separates
 // the image name from its artifact and subpage: <image>/-/<artifact>[/sbom].
-export function containerImageHref(key: string, artifact?: string, subpage?: "sbom" | "base-image"): string {
+export function containerImageHref(key: string, artifact?: string, subpage?: "sbom" | "base-image" | "elf-interpreters"): string {
   const base = `/container-images/${imagePath(key)}`
   if (!artifact) return base
   return `${base}/-/${encodeURIComponent(artifact).replace(/%3A/gi, ":")}${subpage ? `/${subpage}` : ""}`

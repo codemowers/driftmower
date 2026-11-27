@@ -12,6 +12,8 @@
 !internal/
 !internal/**/*.go
 !internal/**/*.html
+!internal/lifecycle/
+!internal/lifecycle/defaults.json
 **/*_test.go
 /chart/cluster-values/
 /scripts/promote-images.sh

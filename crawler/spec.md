@@ -13,13 +13,15 @@ It is deterministic. It runs no language model and decides nothing that a
 namespace administrator has not activated. Agents consume its reports and
 open the permanent fix as a pull request.
 
-Reports are living data and stay in memory: workloads from informers,
-releases, advisories and scan findings from the operator's own crawls. They
+Reports are living data: workloads come from informers, while fetched releases,
+changelogs and advisories are retained in categorized gzip caches on the crawler
+PVC. Conditional HTTP validators survive restarts. Scan artifacts and their
+package projections live on the scanner PVC. They
 reach Agents and humans through driftmower-mcp, never through the Kubernetes
 API. Only what admission and humans act on is stored as
 resources: rewrite rules and upgrade policies, API group
-`codemowers.io/v1alpha1`, shared with nodestatd. A restart rebuilds the
-model from the API, forges and OSV and rescans images at a bounded rate.
+`codemowers.io/v1alpha1`, shared with nodestatd. A restart rebuilds live associations from the API and restores fetched evidence
+from disk, then revalidates upstream data when its refresh interval expires.
 
 ## MCP
 

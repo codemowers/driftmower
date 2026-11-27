@@ -23,6 +23,7 @@ import { driftIssues } from "@/lib/cluster/issues"
 import { useImageAnalysis } from "@/lib/features/image-analysis"
 import ImageAnalysisCard from "@/app/components/image/image-analysis"
 import ImageSbom from "@/app/components/image/image-sbom"
+import ElfInterpreterMap from "@/app/components/image/elf-interpreter-map"
 import { ArtifactNav } from "@/app/components/layout/resource-navs"
 import VulnerabilitiesCard from "@/app/components/findings/vulnerabilities-card"
 import ImageTagStats from "@/app/components/image/image-tag-stats"
@@ -139,7 +140,7 @@ function ContainerImageDetailContent() {
     : undefined
 
   // Artifact subpages share the artifact's header and navigation.
-  const ARTIFACT_SUBPAGES: Record<string, { label: string; icon: typeof ICONS.sbom }> = { sbom: { label: "SBOM", icon: ICONS.sbom }, "base-image": { label: "Base image", icon: ICONS.baseImages } }
+  const ARTIFACT_SUBPAGES: Record<string, { label: string; icon: typeof ICONS.sbom }> = { sbom: { label: "SBOM", icon: ICONS.sbom }, "base-image": { label: "Base image", icon: ICONS.baseImages }, "elf-interpreters": { label: "ELF interpreters", icon: ICONS.containerImages } }
   const artifactSubpage = subpage ? ARTIFACT_SUBPAGES[subpage] : undefined
   if (selected && artifactSubpage && selected.digest) {
     const artifactHref = linkTo(containerImageHref(detail.key, selected.artifactKey))
@@ -161,6 +162,7 @@ function ContainerImageDetailContent() {
           <ArtifactNav image={detail.key} artifact={selected.artifactKey} />
           {subpage === "sbom"
             ? <ImageSbom digest={selected.digest} />
+            : subpage === "elf-interpreters" ? <ElfInterpreterMap key={selected.digest} digest={selected.digest} />
             : <BaseImageHierarchy images={selected.usage.imageInfo.platforms ?? []} targetLabel={`${detail.key}@${selected.digest}`} />}
         </Page>
       </div>

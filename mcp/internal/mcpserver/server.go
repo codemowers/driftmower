@@ -92,6 +92,7 @@ func New(d Deps) *mcp.Server {
 		addWorkloadSourcesTool(s, d.Workloads, d.Mapping)
 		if !d.ImageInventoryDisabled {
 			addImageScanTool(s, d.Workloads, d.Mapping)
+			addPackageTools(s, d.Workloads, d.Mapping, d.Findings)
 			addImageAnalysisTool(s, d.Workloads, d.Mapping)
 		}
 		addBaseImageTools(s, d.Workloads)

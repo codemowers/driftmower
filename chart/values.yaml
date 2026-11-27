@@ -39,6 +39,18 @@ crawler:
     host: crawler
   image: driftmower-crawler
   logLevel: info
+  # Retained gzip caches: source evidence, HTTP validators and lifecycle metadata.
+  storageClassName: ""
+  storageSize: 1Gi
+  cacheMiB: 512
+  lifecycle:
+    enabled: true
+    # 14 days, independent of source/advisory freshness.
+    interval: 336h
+    configMapName: ""
+    # Versionless PURL -> rule. Overrides/additions to defaults compiled in image.
+    # Example: {"pkg:golang/stdlib": {product: go}}
+    mappings: {}
   # Interval between crawls of one source.
   interval: 6h
   # Gitea or Forgejo hosts besides codeberg.org and gitea.com.

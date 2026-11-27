@@ -68,6 +68,7 @@ const navItems: NavItem[] = [
   { group: "Workloads", name: "Applications", href: "/applications", icon: ICONS.applications },
   { group: "Workloads", name: "Helm Releases", href: "/helm-releases", icon: ICONS.helmReleases },
   { group: "Workloads", name: "Container Images", href: "/container-images", icon: ICONS.containerImages },
+  {group:"Workloads",name:"Packages",href:"/packages",icon:ICONS.packages,tool:"get_packages",requires:{verb:"list",group:"codemowers.io",resource:"containerimages"}},
   { group: "Workloads", name: "Source Repositories", href: "/source-repositories", icon: ICONS.sources, tool: "get_source_findings" },
   { group: "Workloads", name: "Operators", href: "/operators", icon: ICONS.operators },
   { group: "Workloads", name: "Sandboxes", href: "/sandboxes", icon: ICONS.sandboxes },

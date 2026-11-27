@@ -2,10 +2,12 @@ package crawler
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/codemowers/driftmower/internal/gzipstore"
 	"io"
 	"net"
 	"net/http"
@@ -30,6 +32,9 @@ var errResponseTooLarge = errors.New("response too large")
 // fetcher makes conditional GET requests, reusing a cached body on 304, and
 // paces GitHub requests by the rate limit GitHub reports.
 type fetcher struct {
+	validate    func([]byte) error
+	cacheDir    string
+	bodyLimit   int64
 	client      *http.Client
 	githubToken string
 	githubBase  string
@@ -42,6 +47,7 @@ type fetcher struct {
 }
 
 type cachedResponse struct {
+	checkedAt          time.Time
 	etag, lastModified string
 	body               []byte
 }
@@ -84,6 +90,7 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 		return nil, err
 	}
 	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set("Accept", "application/json")
 	if raw {
 		req.Header.Set("Accept", "*/*")
@@ -98,9 +105,22 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 			req.Header.Set("Authorization", "Bearer "+f.githubToken)
 		}
 	}
+	cacheKey := url
+	if raw {
+		cacheKey += "#representation=raw"
+	}
 	f.mu.Lock()
-	cached, hasCache := f.cache[url]
+	cached, hasCache := f.cache[cacheKey]
 	f.mu.Unlock()
+	if f.cacheDir != "" {
+		cached, hasCache, err = f.diskResponse(cacheKey, f.limit())
+		if errors.Is(err, errInvalidHTTPCache) {
+			cached = cachedResponse{}
+			hasCache = false
+		} else if err != nil {
+			return nil, fmt.Errorf("read HTTP cache: %w", err)
+		}
+	}
 	if hasCache {
 		if cached.etag != "" {
 			req.Header.Set("If-None-Match", cached.etag)
@@ -118,10 +138,18 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 	if github {
 		f.recordGitHub(resp.Header)
 	}
-	var body []byte
+	body, compressed, err := f.responseBody(url, resp)
+	if err != nil {
+		return nil, err
+	}
 	switch {
 	case resp.StatusCode == http.StatusNotModified && hasCache:
 		body = cached.body
+		if f.cacheDir != "" {
+			if err := f.touchResponse(cacheKey, cached); err != nil {
+				return nil, err
+			}
+		}
 	case resp.StatusCode == http.StatusNotFound:
 		return nil, errNotFound
 	case resp.StatusCode == http.StatusUnauthorized:
@@ -132,22 +160,26 @@ func (f *fetcher) get(ctx context.Context, url string, raw bool) ([]byte, error)
 		var response struct {
 			Message string `json:"message"`
 		}
-		_ = json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&response)
+		_ = json.NewDecoder(bytes.NewReader(body)).Decode(&response)
 		limited := resp.Header.Get("X-RateLimit-Remaining") == "0" || resp.Header.Get("Retry-After") != "" || strings.Contains(strings.ToLower(response.Message), "rate limit")
 		if limited {
 			return nil, fmt.Errorf("%s: HTTP %d (rate limited)", url, resp.StatusCode)
 		}
 		return nil, fmt.Errorf("%s: HTTP %d: %w", url, resp.StatusCode, errUnauthorized)
 	case resp.StatusCode == http.StatusOK:
-		if body, err = io.ReadAll(io.LimitReader(resp.Body, maxBody+1)); err != nil {
-			return nil, err
+		if f.validate != nil {
+			if err := f.validate(body); err != nil {
+				return nil, err
+			}
 		}
-		if len(body) > maxBody {
-			return nil, fmt.Errorf("%s: %w", url, errResponseTooLarge)
-		}
-		if etag, modified := resp.Header.Get("ETag"), resp.Header.Get("Last-Modified"); etag != "" || modified != "" {
+		etag, modified := resp.Header.Get("ETag"), resp.Header.Get("Last-Modified")
+		if f.cacheDir != "" {
+			if err := f.persistResponse(cacheKey, compressed, body, etag, modified); err != nil {
+				return nil, fmt.Errorf("persist HTTP cache: %w", err)
+			}
+		} else if etag != "" || modified != "" {
 			f.mu.Lock()
-			f.cache[url] = cachedResponse{etag: etag, lastModified: modified, body: body}
+			f.cache[cacheKey] = cachedResponse{etag: etag, lastModified: modified, body: body}
 			f.mu.Unlock()
 		}
 	default:
@@ -168,6 +200,7 @@ func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) (err er
 		return err
 	}
 	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Accept-Encoding", "gzip")
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := f.client.Do(req)
 	f.observeHTTP(url, resp)
@@ -175,10 +208,23 @@ func (f *fetcher) postJSON(ctx context.Context, url string, in, out any) (err er
 		return err
 	}
 	defer resp.Body.Close()
+	body, compressed, err := f.responseBody(url, resp)
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
-	return json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(out)
+	if f.cacheDir != "" {
+		key := url + "#" + cacheID(string(data))
+		if err := f.persistResponse(key, compressed, body, resp.Header.Get("ETag"), resp.Header.Get("Last-Modified")); err != nil {
+			return err
+		}
+	}
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, out)
 }
 
 func (f *fetcher) waitGitHub(ctx context.Context) error {
@@ -247,4 +293,57 @@ var sharedAddressSpace = net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMa
 
 func publicIP(ip net.IP) bool {
 	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !sharedAddressSpace.Contains(ip)
+}
+
+func (f *fetcher) limit() int64 {
+	if f.bodyLimit > 0 {
+		return f.bodyLimit
+	}
+	return maxBody
+}
+
+// Explicit Accept-Encoding disables Go's automatic decompression: measure and
+// persist the wire representation, decoding only a separate reader for parsing.
+func (f *fetcher) responseBody(raw string, resp *http.Response) ([]byte, []byte, error) {
+	limit := f.limit()
+	wire, err := io.ReadAll(io.LimitReader(resp.Body, limit+(1<<20)+1))
+	encoding := resp.Header.Get("Content-Encoding")
+	if encoding == "" {
+		encoding = "identity"
+	}
+	if f.metrics != nil {
+		f.metrics.downloads.WithLabelValues(downloadCategory(raw), responseHostname(raw, resp), downloadEncoding(encoding)).Observe(float64(len(wire)))
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if int64(len(wire)) > limit+(1<<20) {
+		return nil, nil, errResponseTooLarge
+	}
+	if resp.StatusCode == http.StatusNotModified {
+		return nil, nil, nil
+	}
+	if encoding == "gzip" {
+		// Decode checks both the uncompressed limit and the gzip checksum.
+		body, err := gzipstore.Decode(wire, limit)
+		return body, wire, err
+	}
+	if encoding != "identity" {
+		return nil, nil, fmt.Errorf("unsupported content encoding %q", encoding)
+	}
+	if int64(len(wire)) > limit {
+		return nil, nil, errResponseTooLarge
+	}
+	if resp.StatusCode != http.StatusOK {
+		return wire, nil, nil
+	}
+	var out bytes.Buffer
+	z := gzip.NewWriter(&out)
+	if _, err = z.Write(wire); err != nil {
+		return nil, nil, err
+	}
+	if err = z.Close(); err != nil {
+		return nil, nil, err
+	}
+	return wire, out.Bytes(), nil
 }

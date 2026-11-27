@@ -41,17 +41,19 @@ subjects:
     namespace: {{ .Release.Namespace | quote }}
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ .Release.Name }}-crawler
   labels:
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
     app: {{ .Release.Name }}-crawler
 spec:
-  # Crawl state lives in memory; a second replica would crawl twice.
+  serviceName: {{ .Release.Name }}-crawler
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  # One writer per retained cache; a second replica would crawl twice.
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: {{ .Release.Name }}-crawler
@@ -73,6 +75,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
+        fsGroup: 65532
       {{- with compact .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- range . }}
@@ -113,6 +116,16 @@ spec:
               value: {{ printf "%s-crawler.%s" .Release.Name .Release.Namespace | quote }}
             - name: ALLOWED_CALLERS
               value: system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-mcp
+            - name: CRAWLER_CACHE_DIR
+              value: /data
+            - name: CRAWLER_CACHE_MIB
+              value: {{ .Values.crawler.cacheMiB | quote }}
+            - name: LIFECYCLE_ENABLED
+              value: {{ .Values.crawler.lifecycle.enabled | quote }}
+            - name: LIFECYCLE_INTERVAL
+              value: {{ .Values.crawler.lifecycle.interval | quote }}
+            - name: LIFECYCLE_RULES_FILE
+              value: /etc/driftmower-lifecycle/mappings.json
             - name: CRAWL_INTERVAL
               value: {{ .Values.crawler.interval | quote }}
             - name: GITEA_HOSTS
@@ -135,8 +148,13 @@ spec:
             - name: GITHUB_ENTERPRISE_TOKEN_FILES
               value: {{ $tokens | toJson | quote }}
             {{- end }}
-          {{- if .Values.crawler.githubEnterprise }}
           volumeMounts:
+            - name: cache
+              mountPath: /data
+            - name: lifecycle-mappings
+              mountPath: /etc/driftmower-lifecycle
+              readOnly: true
+          {{- if .Values.crawler.githubEnterprise }}
             {{- range $i, $host := .Values.crawler.githubEnterprise }}
             - name: github-enterprise-{{ $i }}
               mountPath: /var/run/secrets/driftmower/github-enterprise/{{ $i }}
@@ -166,8 +184,11 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if .Values.crawler.githubEnterprise }}
       volumes:
+        - name: lifecycle-mappings
+          configMap:
+            name: {{ .Values.crawler.lifecycle.configMapName | default (printf "%s-lifecycle" .Release.Name) | quote }}
+      {{- if .Values.crawler.githubEnterprise }}
         {{- range $i, $host := .Values.crawler.githubEnterprise }}
         - name: github-enterprise-{{ $i }}
           secret:
@@ -178,7 +199,33 @@ spec:
                 path: token
         {{- end }}
       {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: cache
+        labels:
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+          skaffold.dev/keep: "true"
+      spec:
+        {{- with .Values.crawler.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.crawler.storageSize | quote }}
 ---
+{{- if not .Values.crawler.lifecycle.configMapName }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-lifecycle
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+data:
+  mappings.json: |
+    {{- .Values.crawler.lifecycle.mappings | toJson | nindent 4 }}
+---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:

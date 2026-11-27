@@ -143,6 +143,7 @@ manifests:
           history.storageClassName: prometheus
           operator.sbomStorageClassName: scratch
           registryScraper.storageClassName: scratch
+          crawler.storageClassName: scratch
         setValueTemplates:
           priorityClassName: '{{ default "observability-critical" .DRIFTMOWER_PRIORITY_CLASS }}'
           crawler.image: "{{.IMAGE_FULLY_QUALIFIED_driftmower_crawler}}"

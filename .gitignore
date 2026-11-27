@@ -25,3 +25,7 @@ skaffold.env.*
 
 # Python release tooling caches.
 __pycache__/
+
+# Demo recorder dependencies and recordings.
+/scripts/demo/node_modules/
+/scripts/demo/out/

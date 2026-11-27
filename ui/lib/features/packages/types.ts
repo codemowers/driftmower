@@ -1,0 +1,9 @@
+export type Lifecycle = {product:string;label:string;category:string;tags:string[];url:string;mapping:string;cycle?:string;released?:string;activeSupportEnd?:string;state:string;eol?:string;latest?:string}
+export type PackageSummary = {usedBy?:{image:string;repository:string;digest:string}[];lifecycleStates?:string[];id:string;name:string;ecosystem:string;versions:number;images:number;vulnerabilities:number;tags:string[];lifecycle?:Lifecycle}
+export type PackageOccurrence = {id:string;purl:string;name:string;ecosystem:string;version?:string;paths?:string[];licenses?:string[];findings?:{id:string;severity:string;score?:number;fixed?:string}[];digest:string;platformDigest:string;repository:string;image:string;containerImage:string;uses:{namespace:string;workload:string;uid:string;kind:string;container:string}[];coverage:string;reason?:string;scannedAt?:string;sbomUrl:string;lifecycle?:Lifecycle}
+export type PackagesResult = {packages:PackageSummary[];occurrences?:PackageOccurrence[];coverage:{images:number;scanned:number;partial:number;unavailable:number;unresolvedContainers:number};lifecycle?:{checkedAt?:string;nextCheck?:string;stale:boolean;errors?:string[]};warnings?:string[]}
+export function packagePath(id:string){return `/packages/${encodeURIComponent(id)}`}
+export function packageName(id:string){try{return decodeURIComponent(id)}catch{return id}}
+export function filterPackages(rows:PackageSummary[],search:string,tags:string[],states:string[]=[]){const q=search.trim().toLowerCase();return rows.filter(p=>(!q||[p.id,p.name,p.ecosystem,p.lifecycle?.label,...p.tags].filter(Boolean).join(" ").toLowerCase().includes(q))&&(!tags.length||p.tags.some(tag=>tags.includes(tag)))&&(!states.length||(p.lifecycleStates??["unknown"]).some(state=>states.includes(state))))}
+
+export function packageIdentity(purl:string){const base=purl.split(/[?#]/,1)[0];const i=base.lastIndexOf("@");return i>base.lastIndexOf("/")?base.slice(0,i):base}

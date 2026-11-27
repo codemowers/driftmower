@@ -1,0 +1,44 @@
+{
+  "pkg:golang/stdlib": {
+    "product": "go"
+  },
+  "pkg:npm/next": {
+    "product": "nextjs",
+    "tags": [
+      "frontend",
+      "backend"
+    ]
+  },
+  "pkg:npm/react": {
+    "product": "react",
+    "tags": [
+      "frontend"
+    ]
+  },
+  "pkg:pypi/flask": {
+    "label": "Flask",
+    "category": "framework",
+    "tags": [
+      "backend",
+      "framework"
+    ]
+  },
+  "pkg:pypi/django": {
+    "product": "django",
+    "tags": [
+      "backend"
+    ]
+  },
+  "pkg:npm/express": {
+    "product": "express",
+    "tags": [
+      "backend"
+    ]
+  },
+  "pkg:npm/react-dom": {
+    "product": "react",
+    "tags": [
+      "frontend"
+    ]
+  }
+}

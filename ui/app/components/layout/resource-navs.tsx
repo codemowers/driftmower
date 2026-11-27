@@ -44,6 +44,7 @@ export function ArtifactNav({ image, artifact }: { image: string; artifact: stri
   return <SubpageNav items={[
     { label: "Overview", href: linkTo(containerImageHref(image, artifact)) },
     { label: "SBOM", href: linkTo(containerImageHref(image, artifact, "sbom")) },
+    { label: "ELF interpreters", href: linkTo(containerImageHref(image, artifact, "elf-interpreters")) },
     { label: "Base image", href: linkTo(containerImageHref(image, artifact, "base-image")) },
   ]} />
 }

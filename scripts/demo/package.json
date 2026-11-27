@@ -1,0 +1,9 @@
+{
+  "name": "driftmower-demo",
+  "private": true,
+  "type": "module",
+  "description": "Scripted, narrated recording of the Driftmower dashboard",
+  "dependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

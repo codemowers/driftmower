@@ -1,6 +1,6 @@
 // Package crawler fetches releases and security advisories for every source
 // repository images on the cluster were built from, and matches them against
-// the versions deployed. Everything it learns stays in memory.
+// the versions deployed. Fetched evidence and conditional HTTP responses survive restarts on the crawler PVC.
 package crawler
 
 import (
@@ -36,16 +36,22 @@ var (
 const sourceIndex = "source"
 
 type Config struct {
+	CacheMaxBytes int64
 	// Interval between crawls of a source; each is jittered by up to a
 	// tenth.
-	Interval         time.Duration
-	GitHubToken      string
-	GitHubEnterprise map[string]string
-	GiteaHosts       []string
-	OSVURL           string
+	CacheDir           string
+	LifecycleEnabled   bool
+	LifecycleRulesFile string
+	LifecycleInterval  time.Duration
+	Interval           time.Duration
+	GitHubToken        string
+	GitHubEnterprise   map[string]string
+	GiteaHosts         []string
+	OSVURL             string
 }
 
 type Crawler struct {
+	lifecycle  *lifecycleCache
 	cfg        Config
 	fetch      *fetcher
 	enterprise map[string]*fetcher
@@ -94,10 +100,12 @@ func New(cfg Config, client dynamic.Interface, log *slog.Logger) *Crawler {
 	}
 	c := &Crawler{cfg: cfg, fetch: newFetcher(PublicHTTPClient(), cfg.GitHubToken), osvURL: cfg.OSVURL, log: log,
 		wake: make(chan struct{}, 1), state: map[string]*sourceState{}}
+	c.fetch.cacheDir = cfg.CacheDir
 	c.enterprise = map[string]*fetcher{}
 	for host, token := range cfg.GitHubEnterprise {
 		f := newEnterpriseFetcher(host, token)
 		f.metrics = c.fetch.metrics
+		f.cacheDir = cfg.CacheDir
 		c.enterprise[host] = f
 	}
 	c.sources = dynamicinformer.NewFilteredDynamicInformer(client, sourceRepositories, metav1.NamespaceAll, 0, cache.Indexers{}, nil).Informer()
@@ -230,6 +238,9 @@ func (c *Crawler) Run(ctx context.Context) {
 				break
 			}
 			c.crawl(ctx, url)
+			if err := c.pruneCache(); err != nil {
+				c.log.Error("prune crawler cache", "error", err)
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -256,6 +267,14 @@ func (c *Crawler) next() (string, bool) {
 	var bestDue time.Time
 	for _, url := range urls {
 		due := time.Time{}
+		if c.state[url] == nil {
+			state, err := c.restoreSource(url)
+			if err != nil {
+				c.log.Error("restore source cache", "source", url, "error", err)
+			} else if state != nil {
+				c.state[url] = state
+			}
+		}
 		if state := c.state[url]; state != nil {
 			due = state.due
 			versions, revisions := c.deployed(url)
@@ -352,6 +371,7 @@ func (c *Crawler) deployed(url string) (map[string]*deployment, []string) {
 func (c *Crawler) crawl(ctx context.Context, url string) {
 	c.mu.Lock()
 	c.activeSource = url
+	previous := c.state[url]
 	c.mu.Unlock()
 	defer func() { c.mu.Lock(); c.activeSource = ""; c.mu.Unlock() }()
 	state := &sourceState{checkedAt: time.Now(), versions: map[string]bool{}, revisions: map[string]bool{}, osv: map[string][]Advisory{}}
@@ -380,22 +400,34 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 		license, err := c.repositoryLicense(ctx, loc)
 		if err != nil {
 			fail("license", err)
+			if previous != nil && !errors.Is(err, errUnauthorized) && !errors.Is(err, errNotFound) {
+				license = previous.license
+			}
 		}
 		state.license = license
 		releases, err := c.releases(ctx, loc)
 		if err != nil {
 			fail("releases", err)
+			if previous != nil && !errors.Is(err, errUnauthorized) && !errors.Is(err, errNotFound) {
+				releases = previous.releases
+			}
 		}
 		state.releases = releases
 		changelog, err := c.changelog(ctx, loc)
 		if err != nil {
 			fail("changelog", err)
+			if previous != nil && !errors.Is(err, errUnauthorized) && !errors.Is(err, errNotFound) {
+				changelog = previous.changelog
+			}
 		}
 		state.changelog = changelog
 		if loc.forge == GitHub {
 			advisories, err := c.githubAdvisories(ctx, loc)
 			if err != nil {
 				fail("advisories", err)
+				if previous != nil && !errors.Is(err, errUnauthorized) && !errors.Is(err, errNotFound) {
+					advisories = previous.advisories
+				}
 			}
 			state.advisories = advisories
 		}
@@ -406,6 +438,9 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 				advisories, err := c.osvQuery(ctx, query)
 				if err != nil {
 					fail("osv "+version, err)
+					if previous != nil {
+						advisories = previous.osv[version]
+					}
 				}
 				state.osv[version] = advisories
 			}
@@ -424,11 +459,17 @@ func (c *Crawler) crawl(ctx context.Context, url string) {
 		advisories, err := c.osvQuery(ctx, map[string]any{"commit": revision})
 		if err != nil {
 			fail("osv "+revision, err)
+			if previous != nil {
+				advisories = previous.osv[revision]
+			}
 		}
 		state.osv[revision] = advisories
 	}
 	if ctx.Err() != nil {
 		return
+	}
+	if err := c.persistSource(url, state); err != nil {
+		fail("persist source", err)
 	}
 	c.mu.Lock()
 	c.state[url] = state

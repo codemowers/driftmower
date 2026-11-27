@@ -39,6 +39,53 @@ before starting the StatefulSet; its old emptyDir cache must be regenerated.
 On a cluster where `scratch` is TopoLVM, this is
 node-local TopoLVM storage; it survives Pod replacement, not loss of its node.
 
+## Crawler persistence and lifecycle metadata
+
+The crawler runs as a single-replica StatefulSet with a retained
+`cache-<release>-crawler-0` PVC mounted at `/data`. Configure
+`crawler.storageClassName` and `crawler.storageSize` (default 1Gi) for the target
+cluster. Migrating from the crawler Deployment requires replacing that Deployment
+with the StatefulSet; its previous in-memory reports are rebuilt on the first crawl.
+The compressed cache budget is `crawler.cacheMiB` (default 512). Cache categories
+are `sources/`, `releases/`, `changelogs/`, `advisories/`, `http/` and `endoflife/`.
+Every stored response/report is gzip compressed. Old entries can be evicted;
+this regenerable cache is not an archive or backup. Token rotation separates
+credential-scoped upstream response and source caches.
+
+Source/advisory refresh remains `crawler.interval` (default 6h), using persisted
+ETags/Last-Modified and conditional GETs. Existing changelog history is reused on
+304, while new entries and advisory corrections are discovered on refresh.
+`crawler.lifecycle.interval` defaults to `336h` (14 days). Lifecycle metadata
+keeps its last successful catalog on refresh failure, with freshness/errors
+visible separately from package and vulnerability coverage.
+
+Default PURL rules are compiled into the image. The chart owns a lifecycle
+ConfigMap unless `crawler.lifecycle.configMapName` names an existing one with
+`mappings.json`. Mounted changes reload without restarting the crawler. Helm
+`crawler.lifecycle.mappings` adds or replaces individual default rules:
+
+```yaml
+crawler:
+  lifecycle:
+    mappings:
+      "pkg:golang/example.org/framework":
+        product: example-framework
+        versionPattern: "^release-([0-9.]+)$"
+        versionReplacement: "${1}"
+        tags: [backend]
+```
+
+Use a real endoflife.date product slug. Rules can set an explicit `cycle`, or
+`disabled: true` to suppress a match. A rule with only `label`, `category` and
+`tags` classifies a package without inventing upstream lifecycle data or a link.
+Unconfigured packages use endoflife.date's own exact PURL identifiers; ambiguous
+matches and unavailable version comparisons remain unknown.
+
+`driftmower_crawler_download_bytes{category,hostname,encoding}` measures upstream
+body bytes before decompression. Encoding is `gzip`, `identity` or `other`;
+bodyless 304 responses record zero. Upstream gzip bytes are stored directly,
+while servers without gzip support have their plain response compressed locally.
+
 ## Access modes
 
 `mcp.auth.mode` selects the access policy:

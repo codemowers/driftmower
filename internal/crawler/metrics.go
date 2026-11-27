@@ -13,7 +13,7 @@ var crawlerSources = prometheus.NewDesc("driftmower_crawler_sources", "Registere
 
 func (c *Crawler) Metrics() http.Handler {
 	r := prometheus.NewRegistry()
-	r.MustRegister(&crawlerCollector{crawler: c}, &crawlerFootprintCollector{crawler: c}, c.fetch.metrics.duration, c.fetch.metrics.requests,
+	r.MustRegister(&crawlerCollector{crawler: c}, &crawlerFootprintCollector{crawler: c}, c.fetch.metrics.duration, c.fetch.metrics.requests, c.fetch.metrics.downloads,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	return promhttp.HandlerFor(r, promhttp.HandlerOpts{})
 }

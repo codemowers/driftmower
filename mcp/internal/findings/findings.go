@@ -3,10 +3,13 @@
 package findings
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/codemowers/driftmower/internal/lifecycle"
+	"io"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -193,4 +196,35 @@ func canonicalRepository(name string) string {
 		path = "library/" + path
 	}
 	return host + "/" + path
+}
+
+// Lifecycles reads upstream evidence only; the client retains no response cache.
+func (c *Client) Lifecycles(ctx context.Context, queries []lifecycle.Query) (lifecycle.Result, error) {
+	var out lifecycle.Result
+	body, err := json.Marshal(map[string]any{"queries": queries})
+	if err != nil {
+		return out, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.URL, "/")+"/v1/lifecycles", bytes.NewReader(body))
+	if err != nil {
+		return out, err
+	}
+	if c.TokenFile != "" {
+		token, err := os.ReadFile(c.TokenFile)
+		if err != nil {
+			return out, err
+		}
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return out, fmt.Errorf("crawler: HTTP %d", resp.StatusCode)
+	}
+	err = json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&out)
+	return out, err
 }

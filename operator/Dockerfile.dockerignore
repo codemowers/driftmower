@@ -7,6 +7,8 @@
 !internal/
 !internal/**/*.go
 !internal/**/*.html
+!internal/lifecycle/
+!internal/lifecycle/defaults.json
 !operator/
 !operator/**/*.go
 **/*_test.go

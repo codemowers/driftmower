@@ -374,3 +374,28 @@ node-local root process observations come from nodestatd PodProcess resources,
 read on demand with Pod UID and caller Pod/process-resource authorization.
 Keep OCI configured process facts separate from live process evidence. Never
 interpret Kata guest PIDs as host PIDs. Never retain process environments.
+
+## Package inventory and upstream lifecycle cache
+
+Package inventory is a scanner-owned disk projection of retained CycloneDX
+artifacts, evicted with the original artifact, never a browser SBOM cache.
+MCP joins caller-visible live consumers by immutable image digest and exposes
+compact get_packages summaries and per-PURL get_package detail. Preserve PURL
+scope, distro/architecture qualifiers on occurrences and per-version CVE joins.
+
+The source crawler owns retained gzip evidence on its own PVC, separated into
+sources/, releases/, changelogs/, advisories/, http/ and endoflife/. Preserve
+upstream gzip bodies without recompressing; explicitly request gzip and decode
+separate readers. Persist conditional validators with integrity-checked bodies;
+304 refreshes validation time without rewriting the body. Source/advisory
+refresh defaults to six hours; endoflife.date defaults to 14 days. Never freeze
+advisories as immutable or infer current coverage from old cache alone. The
+compressed disk budget defaults to 512 MiB with regenerable oldest-entry eviction.
+
+Bundle default lifecycle rules in the crawler image; ConfigMap mappings add or
+override versionless PURL anchors and reload from the mounted directory. Prefer
+upstream identifiers, keep ambiguous matches unknown, and expose upstream tags,
+links, refresh times and failures. Classification-only rules may identify a
+framework without inventing an endoflife.date product or support policy.
+Crawler download histograms label category, hostname and encoding, measuring
+response-body bytes before decompression; never include paths/queries/credentials.

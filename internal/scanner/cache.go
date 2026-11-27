@@ -15,7 +15,7 @@ func artifactFamily(name string) (string, bool) {
 	if stem == name {
 		return "", false
 	}
-	stem = strings.TrimSuffix(strings.TrimSuffix(stem, ".analysis"), ".findings")
+	stem = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(stem, ".analysis"), ".findings"), ".packages")
 	return stem, len(stem) == 64 && strings.Trim(stem, "0123456789abcdef") == ""
 }
 

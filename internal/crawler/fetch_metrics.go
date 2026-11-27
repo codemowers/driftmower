@@ -13,14 +13,16 @@ import (
 )
 
 type fetchMetrics struct {
-	duration *prometheus.HistogramVec
-	requests *prometheus.CounterVec
+	duration  *prometheus.HistogramVec
+	requests  *prometheus.CounterVec
+	downloads *prometheus.HistogramVec
 }
 
 func newFetchMetrics() *fetchMetrics {
 	return &fetchMetrics{
-		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "driftmower_crawler_fetch_duration_seconds", Help: "Crawler fetch and decode duration including rate-limit waits; operations use bounded categories, never repository URLs.", Buckets: []float64{.01, .05, .1, .5, 1, 5, 15, 60, 300, 900}}, []string{"provider", "operation", "outcome"}),
-		requests: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "driftmower_crawler_http_requests_total", Help: "Crawler upstream HTTP responses; status_code 0 indicates transport failure. A 304 reuses a retained conditional response body."}, []string{"provider", "operation", "status_code"}),
+		downloads: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "driftmower_crawler_download_bytes", Help: "Upstream response body bytes as received, before decompression, by cache category, hostname and content encoding. Bodyless 304 responses count as zero; partial failed reads count bytes received. No URLs or credentials.", Buckets: []float64{0, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216, 67108864}}, []string{"category", "hostname", "encoding"}),
+		duration:  prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "driftmower_crawler_fetch_duration_seconds", Help: "Crawler fetch and decode duration including rate-limit waits; operations use bounded categories, never repository URLs.", Buckets: []float64{.01, .05, .1, .5, 1, 5, 15, 60, 300, 900}}, []string{"provider", "operation", "outcome"}),
+		requests:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "driftmower_crawler_http_requests_total", Help: "Crawler upstream HTTP responses; status_code 0 indicates transport failure. A 304 reuses a retained conditional response body."}, []string{"provider", "operation", "status_code"}),
 	}
 }
 
@@ -37,6 +39,8 @@ func fetchLabels(raw string) (provider, operation string) {
 		provider = "gitlab"
 	case "codeberg.org", "gitea.com":
 		provider = "gitea"
+	case "endoflife.date":
+		provider = "endoflife"
 	case "api.osv.dev":
 		provider = "osv"
 	}
@@ -45,6 +49,8 @@ func fetchLabels(raw string) (provider, operation string) {
 	}
 	path := u.Path
 	switch {
+	case u.Hostname() == "endoflife.date":
+		operation = "endoflife"
 	case strings.HasSuffix(path, "/license"):
 		operation = "license"
 	case strings.HasSuffix(path, "/v1/query"):
@@ -91,4 +97,27 @@ func (f *fetcher) observeHTTP(raw string, resp *http.Response) {
 	}
 	provider, operation := fetchLabels(raw)
 	f.metrics.requests.WithLabelValues(provider, operation, strconv.Itoa(status)).Inc()
+}
+
+func downloadHostname(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "unknown"
+	}
+	return strings.ToLower(u.Hostname())
+}
+func downloadEncoding(encoding string) string {
+	switch encoding {
+	case "gzip", "identity":
+		return encoding
+	default:
+		return "other"
+	}
+}
+
+func responseHostname(raw string, response *http.Response) string {
+	if response.Request != nil && response.Request.URL != nil {
+		return strings.ToLower(response.Request.URL.Hostname())
+	}
+	return downloadHostname(raw)
 }

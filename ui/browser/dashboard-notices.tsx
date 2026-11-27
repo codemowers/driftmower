@@ -1,8 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { create } from "zustand"
+import { useEffect, useState } from "react"
 import { AlertTriangle, RefreshCw, X } from "lucide-react"
 import MissingComponents from "@/app/components/missing-components"
+
+const useScopedNotices=create<{entries:Record<string,string[]>}>(()=>({entries:{}}))
+export function usePageNotices(key:string,messages:string[]){
+ const signature=JSON.stringify(messages)
+ useEffect(()=>{useScopedNotices.setState(state=>({entries:{...state.entries,[key]:JSON.parse(signature) as string[]}}));return()=>{useScopedNotices.setState(state=>{const entries={...state.entries};delete entries[key];return {entries}})}},[key,signature])
+}
 
 // Keep notices out of document flow so refreshes never move the dashboard.
 export default function DashboardNotices({ messages, missingComponents, desktop, onRefresh }: {
@@ -11,9 +18,11 @@ export default function DashboardNotices({ messages, missingComponents, desktop,
   desktop: boolean
   onRefresh: () => void
 }) {
+  const scoped=useScopedNotices(state=>state.entries)
   const [dismissed, setDismissed] = useState("")
   const notices = [...new Set([
     ...messages,
+    ...Object.values(scoped).flat(),
     ...missingComponents.map(name => `${name} is not installed`),
   ].flatMap(message => message?.trim() ? [message.trim()] : []))]
   const signature = JSON.stringify(notices)

@@ -508,6 +508,7 @@ func (c *Controller) Handler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": out})
 	})
+	mux.HandleFunc("POST /v1/packages", c.servePackages)
 	mux.HandleFunc("GET /v1/sboms/{key}", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := c.authenticated(r, c.Config.readerServiceAccount()); err != nil {
 			http.Error(w, "unauthorized", 401)

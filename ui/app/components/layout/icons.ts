@@ -37,6 +37,7 @@ export const ICONS = {
   settings: Settings,
   logs: ScrollText,
   network: Network,
+  packages: Package,
   sbom: ListTree,
   yaml: FileCode,
   export: Download,

@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"github.com/codemowers/driftmower/internal/lifecycle"
 	"net/http"
 	"slices"
 	"time"
@@ -76,6 +77,9 @@ func (c *Crawler) MCP(version string, authorize func(*http.Request) error) http.
 	}
 	mcp.AddTool(server, &mcp.Tool{Name: "get_crawled_sources", Description: "List compact cached upstream scrape status, licenses and release/advisory counts. Supply an exact repository URL to include its releases and security advisories. No cluster inventory, deployed-version associations, or live upstream requests.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, func(_ context.Context, _ *mcp.CallToolRequest, in input) (*mcp.CallToolResult, output, error) {
 		return nil, output{Sources: c.CrawledSources(in.URL)}, nil
+	})
+	mcp.AddTool(server, &mcp.Tool{Name: "get_package_lifecycle", Description: "Fetched endoflife.date lifecycle evidence for a PURL and optional observed version. Includes source tags, support cycle, upstream link, refresh time and errors; no cluster inventory or live upstream requests.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, func(_ context.Context, _ *mcp.CallToolRequest, in lifecycle.Query) (*mcp.CallToolResult, lifecycle.Result, error) {
+		return nil, c.Lifecycles([]lifecycle.Query{in}), nil
 	})
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

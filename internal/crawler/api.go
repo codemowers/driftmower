@@ -2,8 +2,10 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/codemowers/driftmower/internal/httpcache"
+	"github.com/codemowers/driftmower/internal/lifecycle"
 	"net/http"
 	"slices"
 	"strings"
@@ -25,11 +27,11 @@ type API struct {
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	w.Header().Set("Cache-Control", "no-store")
-	if r.URL.Path != "/v1/sources" && r.URL.Path != "/v1/changes" {
+	if r.URL.Path != "/v1/sources" && r.URL.Path != "/v1/changes" && r.URL.Path != "/v1/lifecycles" {
 		http.NotFound(w, r)
 		return
 	}
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && !(r.Method == http.MethodPost && r.URL.Path == "/v1/lifecycles") {
 		w.Header().Set("Allow", http.MethodGet)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -47,6 +49,22 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !slices.Contains(a.Allowed, user) {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.URL.Path == "/v1/lifecycles" {
+		var in struct {
+			Queries []lifecycle.Query `json:"queries"`
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", 405)
+			return
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<20)).Decode(&in); err != nil {
+			http.Error(w, "invalid lifecycle queries", 400)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(a.Crawler.Lifecycles(in.Queries))
 		return
 	}
 	// The changes after a version, parsed from the stored release notes and
